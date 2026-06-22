@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+*.log
+*.tmp
+agentbridge.db
+*.db
+tmp/
+.DS_Store
+Thumbs.db
+
+# AgentBridge runtime artifacts
+agents/*/input/*
+!agents/*/input/.gitkeep
+agents/*/output/*
+!agents/*/output/.gitkeep
+workflow/agentbridge/output/
+workflow/agentbridge/prompts/
+workflow/agentbridge/FINAL_REPORT_TASK_*.md
