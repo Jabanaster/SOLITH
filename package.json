@@ -2,9 +2,9 @@
   "name": "resourceforge",
   "version": "1.0.0",
   "description": "A premium local game trainer and save editor platform",
-  "main": "electron/main/main.js",
+  "main": "dist/electron/main/main.js",
   "bin": {
-    "resourceforge": "./electron/main/main.js"
+    "resourceforge": "./dist/electron/main/main.js"
   },
   "scripts": {
     "dev": "concurrently \"electron .\" \"wait-on http://localhost:3000 && electron --remote-devtools",
@@ -48,11 +48,11 @@
     "appId": "com.resourceforge.app",
     "productName": "ResourceForge",
     "directories": {
-      "output": "dist",
+      "output": "release",
       "buildResources": "build"
     },
     "files": [
-      "electron/**/*",
+      "dist/electron/**/*",
       "src/**/*",
       "package.json",
       "demo-game/**/*",
