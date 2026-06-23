@@ -52,16 +52,19 @@ export function createProfile(
 
   const db = getDb();
 
-  // Helper to safely escape SQL string values
-  const escapeSql = (val: any): string => {
-    if (val === null || val === undefined) return 'NULL';
-    if (typeof val === 'number') return String(val);
-    if (typeof val === 'boolean') return val ? '1' : '0';
-    return `'${String(val).replace(/'/g, "''")}'`;
-  };
+  // Use sql.js run with bound parameters
+  const sql = `
+    INSERT INTO compatibility_profiles (
+      id, gameId, gameName, schemaVersion, store, storeAppId,
+      executableNames, executableHash, engine,
+      publisherHints, developerHints, saveLocationPatterns, configLocationPatterns,
+      supportedAdapters, gameVersion, saveFormatVersion, fingerprint,
+      validationStatus, limitations, hasCloudSync, cloudSyncWarning,
+      createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
 
-  // Build INSERT with direct SQL (sql.js prepared statement binding is unreliable)
-  const values = [
+  const params = [
     validated.id,
     validated.gameId,
     validated.gameName,
@@ -85,20 +88,9 @@ export function createProfile(
     validated.cloudSyncWarning ?? null,
     validated.createdAt || new Date().toISOString(),
     validated.updatedAt || new Date().toISOString()
-  ].map(escapeSql).join(', ');
+  ];
 
-  const sql = `
-    INSERT INTO compatibility_profiles (
-      id, gameId, gameName, schemaVersion, store, storeAppId,
-      executableNames, executableHash, engine,
-      publisherHints, developerHints, saveLocationPatterns, configLocationPatterns,
-      supportedAdapters, gameVersion, saveFormatVersion, fingerprint,
-      validationStatus, limitations, hasCloudSync, cloudSyncWarning,
-      createdAt, updatedAt
-    ) VALUES (${values})
-  `;
-
-  db.run(sql);
+  db.run(sql, params);
 
   schedulePersistence();
   return validated;
@@ -110,9 +102,9 @@ export function createProfile(
 export function getProfile(profileId: string): CompatibilityProfile | null {
   const db = getDb();
 
-  const escapeSql = (val: string): string => `'${val.replace(/'/g, "''")}'`;
-  const sql = `SELECT * FROM compatibility_profiles WHERE id = ${escapeSql(profileId)}`;
-  const results = db.exec(sql);
+  // Use sql.js exec with bound parameter (? placeholders)
+  const sql = 'SELECT * FROM compatibility_profiles WHERE id = ?';
+  const results = db.exec(sql, [profileId]);
 
   if (!results || !results[0] || !results[0].values || results[0].values.length === 0) {
     return null;
@@ -135,9 +127,9 @@ export function getProfile(profileId: string): CompatibilityProfile | null {
 export function getProfilesForGame(gameId: string): CompatibilityProfile[] {
   const db = getDb();
 
-  const escapeSql = (val: string): string => `'${val.replace(/'/g, "''")}'`;
-  const sql = `SELECT * FROM compatibility_profiles WHERE gameId = ${escapeSql(gameId)} ORDER BY updatedAt DESC`;
-  const results = db.exec(sql);
+  // Use sql.js exec with bound parameter
+  const sql = 'SELECT * FROM compatibility_profiles WHERE gameId = ? ORDER BY updatedAt DESC';
+  const results = db.exec(sql, [gameId]);
 
   if (!results || !results[0] || !results[0].values) {
     return [];
@@ -176,40 +168,55 @@ export function updateProfile(
 
   const db = getDb();
 
-  // Helper to safely escape SQL string values
-  const escapeSql = (val: any): string => {
-    if (val === null || val === undefined) return 'NULL';
-    if (typeof val === 'number') return String(val);
-    if (typeof val === 'boolean') return val ? '1' : '0';
-    return `'${String(val).replace(/'/g, "''")}'`;
-  };
-
-  // Build UPDATE with direct SQL
+  // Use sql.js run with bound parameters
   const sql = `
     UPDATE compatibility_profiles SET
-      gameName = ${escapeSql(validated.gameName)},
-      store = ${escapeSql(validated.store)},
-      storeAppId = ${escapeSql(validated.storeAppId)},
-      executableNames = ${escapeSql(JSON.stringify(validated.executableNames))},
-      executableHash = ${escapeSql(validated.executableHash)},
-      engine = ${escapeSql(validated.engine)},
-      publisherHints = ${escapeSql(JSON.stringify(validated.publisherHints))},
-      developerHints = ${escapeSql(JSON.stringify(validated.developerHints))},
-      saveLocationPatterns = ${escapeSql(JSON.stringify(validated.saveLocationPatterns))},
-      configLocationPatterns = ${escapeSql(JSON.stringify(validated.configLocationPatterns))},
-      supportedAdapters = ${escapeSql(JSON.stringify(validated.supportedAdapters))},
-      gameVersion = ${escapeSql(validated.gameVersion)},
-      saveFormatVersion = ${escapeSql(validated.saveFormatVersion)},
-      fingerprint = ${escapeSql(JSON.stringify(validated.fingerprint))},
-      validationStatus = ${escapeSql(validated.validationStatus)},
-      limitations = ${escapeSql(JSON.stringify(validated.limitations))},
-      hasCloudSync = ${validated.hasCloudSync ? 1 : 0},
-      cloudSyncWarning = ${escapeSql(validated.cloudSyncWarning)},
-      updatedAt = ${escapeSql(validated.updatedAt)}
-    WHERE id = ${escapeSql(profileId)}
+      gameName = ?,
+      store = ?,
+      storeAppId = ?,
+      executableNames = ?,
+      executableHash = ?,
+      engine = ?,
+      publisherHints = ?,
+      developerHints = ?,
+      saveLocationPatterns = ?,
+      configLocationPatterns = ?,
+      supportedAdapters = ?,
+      gameVersion = ?,
+      saveFormatVersion = ?,
+      fingerprint = ?,
+      validationStatus = ?,
+      limitations = ?,
+      hasCloudSync = ?,
+      cloudSyncWarning = ?,
+      updatedAt = ?
+    WHERE id = ?
   `;
 
-  db.run(sql);
+  const params = [
+    validated.gameName,
+    validated.store,
+    validated.storeAppId ?? null,
+    JSON.stringify(validated.executableNames),
+    validated.executableHash ?? null,
+    validated.engine,
+    JSON.stringify(validated.publisherHints),
+    JSON.stringify(validated.developerHints),
+    JSON.stringify(validated.saveLocationPatterns),
+    JSON.stringify(validated.configLocationPatterns),
+    JSON.stringify(validated.supportedAdapters),
+    validated.gameVersion ?? null,
+    validated.saveFormatVersion ?? null,
+    JSON.stringify(validated.fingerprint),
+    validated.validationStatus,
+    JSON.stringify(validated.limitations),
+    validated.hasCloudSync ? 1 : 0,
+    validated.cloudSyncWarning ?? null,
+    validated.updatedAt,
+    profileId
+  ];
+
+  db.run(sql, params);
 
   schedulePersistence();
   return validated;
@@ -244,30 +251,24 @@ export function validateProfile(
 
   const db = getDb();
 
-  // Helper to safely escape SQL string values
-  const escapeSql = (val: any): string => {
-    if (val === null || val === undefined) return 'NULL';
-    if (typeof val === 'number') return String(val);
-    if (typeof val === 'boolean') return val ? '1' : '0';
-    return `'${String(val).replace(/'/g, "''")}'`;
-  };
-
-  // Build INSERT with direct SQL
+  // Use sql.js run with bound parameters
   const sql = `
     INSERT INTO profile_validations (
       id, profileId, status, checkedAt, passed, evidence, fingerprint
-    ) VALUES (
-      ${escapeSql(validated.id)},
-      ${escapeSql(profileId)},
-      ${escapeSql(validated.status)},
-      ${escapeSql(validated.checkedAt)},
-      ${validated.passed ? 1 : 0},
-      ${escapeSql(JSON.stringify(validated.evidence))},
-      ${escapeSql(JSON.stringify(validated.fingerprint))}
-    )
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(sql);
+  const params = [
+    validated.id,
+    profileId,
+    validated.status,
+    validated.checkedAt,
+    validated.passed ? 1 : 0,
+    JSON.stringify(validated.evidence),
+    JSON.stringify(validated.fingerprint)
+  ];
+
+  db.run(sql, params);
 
   // Update profile.lastValidatedAt
   updateProfile(profileId, {
@@ -333,14 +334,11 @@ function parseProfileRow(row: any): CompatibilityProfile {
 export function deleteProfile(profileId: string): boolean {
   const db = getDb();
 
-  const escapeSql = (val: string): string => `'${val.replace(/'/g, "''")}'`;
-  const idSql = escapeSql(profileId);
+  // Delete validations first (FK constraint) using sql.js run with bound parameter
+  db.run('DELETE FROM profile_validations WHERE profileId = ?', [profileId]);
 
-  // Delete validations first (FK constraint)
-  db.run(`DELETE FROM profile_validations WHERE profileId = ${idSql}`);
-
-  // Delete profile
-  db.run(`DELETE FROM compatibility_profiles WHERE id = ${idSql}`);
+  // Delete profile using sql.js run with bound parameter
+  db.run('DELETE FROM compatibility_profiles WHERE id = ?', [profileId]);
 
   schedulePersistence();
   return true; // Assume success for now since sql.js doesn't reliably report changes

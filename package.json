@@ -17,6 +17,7 @@
     "build": "npm run build:vite && npm run build:electron && electron-builder",
     "test": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts",
     "test:electron-smoke": "playwright test tests/electron.smoke.test.ts",
+    "test:gate13": "tsx --test tests/gate13-complete-workflow.test.ts",
     "verify:electron-output": "node scripts/verify-electron-output.mjs",
     "postinstall": "electron-builder install-app-deps"
   },
