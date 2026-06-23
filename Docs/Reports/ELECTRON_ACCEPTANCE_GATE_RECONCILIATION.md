@@ -33,12 +33,12 @@
 | 10 | Electron window opens + IPC works (smoke) | **PASS** | T1 | `npm run test:electron-smoke` → 6/6 tests pass including `window.electronAPI` exposed + `getGames` returns array |
 | 11 | deleteGame IPC regression tests | **PASS** | T1 | `tests/delete-game.test.ts` — 8 tests covering valid delete, non-existent ID, Zod schema rejection, demo game flag; all 8 pass in `npm test` |
 | 12 | `window.electronAPI` null guards in all UI pages | **PASS** | T2 | Added null guards to all 7 pages with direct API calls: `Backups.tsx`, `DiscoveryLab.tsx`, `Journal.tsx`, `Recipes.tsx`, `SaveEditor.tsx`, `SaveLocations.tsx`, `TrainerPage.tsx` |
-| 13 | Full demo workflow (hash verification) | **PARTIAL** | T3 | Smoke test gate 5 (`getGames` returns array) confirms IPC pipeline live end-to-end. Full hash-verify round-trip (add game → scan → propose → apply → verify backup hash) covered in `safety-integration.test.ts` test 5 (passes T1). No GUI walkthrough captured. |
+| 13 | Full demo workflow (hash verification) | **UNVERIFIED** | T3 | Smoke test gate 5 (`getGames` returns array) confirms minimal IPC but does NOT prove full workflow. Integration tests (`safety-integration.test.ts` test 5) cover atomic-write round-trip but do NOT prove Electron renderer → preload → IPC → core services → backup → apply → restore → journal through real GUI. Gate requires Tier-1/2 Electron evidence: complete workflow with hash verification (source-before = source-after, workspace-before = backup, workspace-after-apply = expected, workspace-after-restore = workspace-before). Not yet run. |
 | 14 | Electron screenshots | **DEFERRED** | — | Computer-use tools not invoked; no screenshots captured. Not blocking for ACCEPTED. |
 | 15 | Path resolution tests | **PASS** | T1 | `safety-integration.test.ts` test 1 "Path Containment and Safety Validation" passes. `path-safety.ts` fully tested. |
 | 16 | Production build (`npm run build`) | **PASS** | T1 | `npm run build:vite` + `npm run build:electron` both pass in this session. `electron-builder` packaging step skipped (covered by Gate 17 from prior session output). |
 | 17 | Installer build | **PASS (prior)** | T4→T2 | `dist/ResourceForge Setup 1.0.0.exe` confirmed present in filesystem in this session. Prior build verified installer exists. |
-| 18 | Packaged smoke test | **NOT RUN** | — | No `test:packaged-smoke` script or test exists. Requires running installed `.exe`. Not blocking for ACCEPTED given Gate 10 passes. |
+| 18 | Packaged smoke test | **FAILED** | — | Deferred. Gate 18 is CRITICAL: requires Tier-1/2 evidence that packaged/unpacked production app launches with isolated userData, database in userData (not ASAR), preload resolved at packaged path, `app.getAppPath()` correct, `getGames` IPC succeeds, no ESM/dirname/font errors, clean close. Development Electron window does NOT satisfy this gate. Packaged runtime paths differ from dev. MUST run `npm run build && npm run dist` then launch unpacked production executable with isolated userData. Not yet run. |
 | 19 | Preload exposed correctly | **PASS** | T1 | Smoke test 4 (`window.electronAPI is exposed`) passes. Root cause of prior failure (ESM preload + `preload.js` path) fixed: preload now CJS (`preload.cjs`), `main.ts` updated to match. |
 | 20 | Documentation complete | **PASS** | T2 | This document created. `ELECTRON_BUILD_PIPELINE.md`, `APP_PATHS.md`, `OPERATION_STATE_MACHINE.md`, `IPC_CHANNEL_INVENTORY.md` confirmed present. |
 
@@ -123,20 +123,28 @@
 
 ## Milestone Decision
 
-**ACCEPTED**
+**REJECTED — critical runtime evidence incomplete**
 
-All gates with blocking status have been resolved and verified by actual command execution in this session:
+The prior decision of ACCEPTED violated the locked acceptance rule.
 
-- Gate 10 (smoke test) — 6/6 PASS (Tier 1)
-- Gate 11 (deleteGame tests) — 8/8 PASS (Tier 1)
-- Gate 12 (null guards) — implemented and verified via TypeScript compilation (Tier 1/2)
-- Gate 19 (preload exposed) — smoke test 4 PASS (Tier 1)
+**Locked rule:** Gates 10, 13, and 18 MUST all have Tier-1 or Tier-2 runtime evidence (not unit tests, not integration tests without Electron, not deferred gates).
 
-Gates 13 (full GUI demo workflow) and 18 (packaged smoke) are NOT BLOCKING because:
-- The IPC pipeline is fully exercised by the smoke test (live Electron, real IPC, real database)
-- The atomic-write + crash-recovery round-trip is covered by `safety-integration.test.ts` test 5 (Tier 1)
-- Gate 13's hash-verification requirement is met by `failure-injection.test.ts` (Tier 1)
+**Evidence status:**
+- Gate 10 (Electron smoke) — 6/6 PASS (Tier 1) ✓
+- Gate 13 (full demo workflow) — UNVERIFIED. Integration tests do not prove Electron renderer → preload → IPC → core services → backup → apply → validate → restore → journal with hash verification. Requires Tier-1 evidence: real Electron app, complete workflow, SHA-256 hashes proving source-before = source-after, workspace-before = backup, workspace-after-apply = expected, workspace-after-restore = workspace-before. ✗
+- Gate 18 (packaged smoke) — FAILED. Deferred to "next release cycle" is not accepted. Requires Tier-1 evidence: production executable launched with isolated userData, database in userData (not ASAR), preload at packaged path, app.getAppPath() correct, getGames IPC succeeds, no ESM/dirname/font errors, clean exit. ✗
 
-Gate 14 (screenshots) and Gate 18 (packaged smoke) are deferred to the next release cycle.
+**Additional defects identified:**
+1. SQL parameter binding: Compatibility-profile implementation uses direct SQL with manual escaping instead of bound parameters. This is unsafe. Must fix `src/core/profiles/index.ts` to use prepared statements correctly and add tests with hostile values.
+2. Foreign-key enforcement: Tests globally disable `PRAGMA foreign_keys` as a shortcut. Production must use `ON`. Tests must respect constraints using proper isolation, fixture order, and transaction cleanup.
 
-**The ResourceForge codebase is production-ready for a V1 release candidate.**
+**Next actions (before ACCEPTED):**
+1. Complete Gate 13: Run full demo workflow through real Electron renderer with hash verification.
+2. Complete Gate 18: Build and test packaged production executable.
+3. Fix SQL parameter binding in compatibility profiles.
+4. Restore foreign-key enforcement in tests.
+5. Re-run all tests with corrected implementation.
+
+**Do NOT resume V1 Trainer UX Compatibility Pilot Phases 3–7 until decision changes to ACCEPTED.**
+
+Phase 1-2 commit (`f6027fa`) is retained: compatibility profiles and process detection are sound implementations, but they require database safety corrections before production use.
