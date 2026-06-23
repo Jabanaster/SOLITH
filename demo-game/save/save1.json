@@ -1,0 +1,44 @@
+{
+  "player": {
+    "id": "player_001",
+    "name": "Hero",
+    "level": 15,
+    "experience": 5000,
+    "stats": {
+      "health": 100,
+      "maxHealth": 150,
+      "stamina": 50,
+      "mana": 75,
+      "strength": 10,
+      "defense": 5
+    },
+    "gold": 100,
+    "inventory": [
+      {
+        "id": "item_001",
+        "name": "Health Potion",
+        "quantity": 5,
+        "maxStack": 99
+      },
+      {
+        "id": "item_002",
+        "name": "Sword",
+        "quantity": 1,
+        "maxStack": 1
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_001",
+        "name": "Fireball",
+        "level": 3,
+        "maxLevel": 10
+      }
+    ]
+  },
+  "game": {
+    "day": 5,
+    "time": 14,
+    "difficulty": "normal"
+  }
+}

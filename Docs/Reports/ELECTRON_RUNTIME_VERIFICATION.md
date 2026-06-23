@@ -1,0 +1,112 @@
+# Electron Runtime Verification Report
+
+**Date:** 2026-06-23  
+**Session:** ResourceForge Milestone — Electron Runtime and Package Verification
+
+## Build Pipeline Verification
+
+### tsup Configuration
+- Entry: `electron/main.ts` → `dist-electron/main.js` (ESM, Node 22 target)
+- Entry: `electron/preload.ts` → `dist-electron/preload.js` (ESM, Node 22 target)
+- Externals: `electron`, `better-sqlite3`
+- All relative imports bundled inline — no bare relative imports at runtime
+- `__dirname`/`__filename`/`require` shims injected via banner
+
+### Output Verifier (scripts/verify-electron-output.mjs)
+Checks performed (18 total):
+1. main.js exists
+2. preload.js exists
+3. main.js has no .ts imports
+4. preload.js has no .ts imports
+5. main.js has no bare relative imports
+6. preload.js has no bare relative imports
+7. main.js does not import from .gemini
+8. preload.js does not import from .gemini
+9. main.js does not import a test runner
+10. preload.js uses contextBridge
+11. preload.js uses exposeInMainWorld
+12. main.js has nodeIntegration: false
+13. main.js has contextIsolation: true
+14. main.js has single-instance lock
+15. main.js > 10 KB
+16. main.js < 5 MB
+17. preload.js > 100 bytes
+18. preload.js < 100 KB
+
+### Verification Status
+Runs automatically as part of `npm run build:electron`. Build fails if any check fails.
+
+## Preload Bridge
+
+`electron/preload.ts` exposes `window.electronAPI` with the following methods:
+- `getGames`, `addGame`, `deleteGame`, `scanGame`
+- `getRecipes`, `createRecipe`, `deleteRecipe`
+- `getJournal`, `logEvent`
+- `getSettings`, `setSetting`
+- `getBackups`, `restoreBackup`
+- `detectSaveFiles`, `parseSave`, `compareSaves`
+- `createProposalForEdit`, `applyProposal`, `suggestDataEdits`
+- `discoverSaveLocations`, `getSaveLocations`
+- `approveSaveLocation`, `revokeSaveLocation`, `addUserSelectedLocation`
+
+All IPC handlers validate inputs via Zod schemas before processing.
+
+## Single-Instance Handling
+
+```typescript
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) { app.quit(); process.exit(0); }
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+```
+
+Only the ResourceForge process is affected. No `taskkill /IM electron.exe` — unrelated Electron applications are never touched.
+
+## Security Settings
+
+```typescript
+webPreferences: {
+  nodeIntegration: false,
+  contextIsolation: true,
+  sandbox: true,
+  preload: path.join(moduleDirectory, 'preload.js')
+}
+```
+
+## Font & CSP
+
+### Content Security Policy (index.html)
+```
+default-src 'self';
+script-src 'self';
+style-src 'self' 'unsafe-inline';
+font-src 'self' data:;
+img-src 'self' data:;
+connect-src 'self' http://localhost:3000 ws://localhost:3000 ... (dev server only);
+frame-src 'none';
+object-src 'none';
+```
+
+No remote fonts, scripts, styles, or images are permitted.
+
+### Font Stacks
+Sans-serif: `Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif`  
+Monospace: `"Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace`
+
+No CDN requests. No `@import url(https://...)`. Works fully offline.
+
+## Pending Manual Verification
+
+The following require terminal access to execute:
+- Run `npm test` twice consecutively and confirm both pass
+- Run `npx tsc --noEmit` and confirm 0 errors
+- Run `npm run build:vite` and confirm renderer builds
+- Run `npm run build:electron` and confirm verifier passes
+- Launch `npm run dev` and confirm Vite + tsup + Electron start
+- Run `npm run test:electron-smoke` (after `npm install && npx playwright install`)
+- Run `npm run build` and confirm installer is generated

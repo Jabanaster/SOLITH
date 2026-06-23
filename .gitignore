@@ -1,0 +1,89 @@
+# ── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Build outputs ────────────────────────────────────────────────────────────
+dist/
+dist-electron/
+out/
+build/
+*.tsbuildinfo
+
+# ── Electron Builder installer artifacts ─────────────────────────────────────
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.zip
+*.tar.gz
+*.nupkg
+
+# ── User data (MUST NOT be committed) ────────────────────────────────────────
+# Production database — lives in Electron's userData directory
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Backups written by ResourceForge
+backups/
+*.backup.json
+
+# Logs
+logs/
+*.log
+
+# Temporary workspaces
+.tmp/
+tmp/
+temp/
+
+# ── Test artifacts ────────────────────────────────────────────────────────────
+test-results/
+playwright-report/
+coverage/
+
+# ── IDE and tool directories ──────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# AI context / brain files — these are local planning artifacts only
+.gemini/
+.brain/
+*.brain.md
+CURRENT_STATE.md
+SESSION_HANDOFF.md
+plans/
+
+# ── OS artifacts ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Local configuration overrides ────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+local.config.*
+
+# ── Demo game save files should not be committed if they contain real data ──
+# The demo-game directory is tracked as fixture data; exclude any accidentally
+# generated runtime copies:
+demo-game/**/*.bak
+
+# ── Compat test database (only used by the legacy compat runner) ──────────────
+electron/test-compat.db
+
+# ── ESM import fixer (legacy — tsup handles bundling now) ────────────────────
+# Kept in repo for documentation purposes but excluded from meaningful diffs
+# fix-esm-imports.mjs
+# fix-esm-imports.ps1

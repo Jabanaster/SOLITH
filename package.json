@@ -1,0 +1,72 @@
+{
+  "name": "resourceforge",
+  "version": "1.0.0",
+  "description": "Local AI Game Trainer + Save Editor + Discovery Lab",
+  "main": "dist-electron/main.js",
+  "author": "ResourceForge",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "node scripts/dev.mjs",
+    "dev:vite": "vite",
+    "dev:electron:watch": "tsup --config tsup.config.ts --watch",
+    "dev:electron:launch": "electron dist-electron/main.js --dev",
+    "build:vite": "vite build",
+    "build:electron": "tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs",
+    "build": "npm run build:vite && npm run build:electron && electron-builder",
+    "test": "tsx --test tests/*.test.ts",
+    "test:electron-smoke": "playwright test tests/electron.smoke.test.ts",
+    "verify:electron-output": "node scripts/verify-electron-output.mjs",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": [
+    "trainer",
+    "save-editor",
+    "game-trainer"
+  ],
+  "build": {
+    "appId": "com.resourceforge.app",
+    "productName": "ResourceForge",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "!dist-electron/**/*.map"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**",
+      "node_modules/sql.js/**"
+    ],
+    "extraResources": [
+      {
+        "from": "demo-game",
+        "to": "demo-game"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^10.0.3",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "vite": "^8.0.16",
+    "wait-on": "^8.0.3"
+  },
+  "dependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "better-sqlite3": "^12.11.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sql.js": "^1.14.1",
+    "typescript": "^6.0.3",
+    "xml2js": "^0.6.2",
+    "zod": "^4.4.3"
+  }
+}

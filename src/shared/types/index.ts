@@ -1,0 +1,220 @@
+export interface Game {
+  id: string;
+  name: string;
+  path: string;
+  dateAdded: string;
+  lastScan?: string;
+  engine?: string;
+  fingerprint?: GameFingerprint;
+  needsRescan?: boolean;
+}
+
+export interface GameFingerprint {
+  fileCount: number;
+  totalSize: number;
+  keyHashes: string[];
+  mainExecutable?: string;
+  lastScan: string;
+}
+
+export interface ScanResult {
+  files: string[];
+  directories: string[];
+  saveFiles: string[];
+  configFiles: string[];
+  dataFiles: string[];
+}
+
+export interface ParsedSave {
+  data: any;
+  format: string;
+  path: string;
+  normalized?: ParsedDocument;
+}
+
+export interface ParserDiagnostic {
+  severity: 'warning' | 'error';
+  message: string;
+  line?: number;
+}
+
+export interface ParsedNode {
+  path: string;
+  key?: string;
+  displayName: string;
+  valueType: 'number' | 'string' | 'boolean' | 'null' | 'object' | 'array' | 'unknown';
+  value?: any;
+  children?: ParsedNode[];
+  editability: 'editable' | 'read-only' | 'blocked';
+  risk: 'safe' | 'caution' | 'risky' | 'blocked';
+  evidence: string[];
+}
+
+export interface ParsedDocument {
+  adapterId: string;
+  adapterVersion: string;
+  sourcePath: string;
+  format: string;
+  root: ParsedNode;
+  diagnostics: ParserDiagnostic[];
+  editable: boolean;
+}
+
+export interface SaveValue {
+  path: string;
+  value: string | number | boolean;
+  type: 'number' | 'string' | 'boolean' | 'array' | 'object';
+  risk: 'Safe' | 'Caution' | 'Risky' | 'Blocked';
+}
+
+export interface DiscoveryResult {
+  path: string;
+  oldValue: any;
+  newValue: any;
+  confidence: number;
+  description: string;
+  suggestedCategory?: string;
+  suggestedName?: string;
+  adapterId?: string;
+  sourceA?: string;
+  sourceB?: string;
+  valueType?: string;
+  risk?: string;
+  noiseClassification?: string;
+  evidence?: string;
+  explanation?: string;
+}
+
+export interface RiskAssessment {
+  risk: 'Safe' | 'Caution' | 'Risky' | 'Blocked';
+  reason: string;
+  requiresBackup: boolean;
+  requiresGameClosed: boolean;
+}
+
+export interface Backup {
+  id: string;
+  timestamp: string;
+  filePath: string;
+  originalHash: string;
+  backupPath: string;
+  recipeId?: string;
+}
+
+export interface RollbackManifest {
+  backups: Backup[];
+  timestamp: string;
+  recipeId?: string;
+}
+
+export interface TrainerItem {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  source: string;
+  risk: string;
+  status: string;
+  confidence?: number;
+  currentValue?: string | number;
+  newValue?: string | number;
+  path?: string;
+  target?: string;
+  hotkey?: string;
+  inputType?: 'number' | 'toggle' | 'slider' | 'dropdown';
+  min?: number;
+  max?: number;
+  options?: string[];
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  gameId: string;
+  category: string;
+  source: string;
+  target: string;
+  path: string;
+  valueType: string;
+  risk: string;
+  requiresBackup: boolean;
+  confidence: number;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  fileHash?: string;
+  gameFingerprintHash?: string;
+  needsRescan?: boolean;
+  isActive?: boolean;
+  version?: number;
+  schemaVersion?: string | number;
+  adapterId?: string;
+  adapterVersion?: string;
+  targetStrategy?: string;
+  safeRelativePattern?: string;
+  structuredPath?: string;
+  inputType?: string;
+  minimum?: number;
+  maximum?: number;
+  allowedValues?: any[];
+  preconditions?: any;
+  validationRules?: any;
+  fingerprintCompatibility?: string;
+}
+
+export interface Proposal {
+  id: string;
+  gameId: string;
+  recipeId?: string;
+  targetFile: string;
+  operation: 'set' | 'increment' | 'decrement' | 'toggle';
+  path: string;
+  oldValue: any;
+  newValue: any;
+  risk: string;
+  preview: string;
+  validationRule: string;
+  requiresBackup: boolean;
+  dryRunPassed: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface JournalEvent {
+  id: string;
+  timestamp: string;
+  type: 'scan' | 'discovery' | 'proposal' | 'backup' | 'apply' | 'rollback' | 'error' | 'recipe' | 'game_added' | 'settings';
+  gameId?: string;
+  recipeId?: string;
+  description: string;
+  details?: string;
+}
+
+export interface Settings {
+  onboardingCompleted: boolean;
+  aiProvider: 'None' | 'Ollama' | 'LM Studio';
+  aiEndpoint: string;
+  aiModel: string;
+  scanSizeLimitMB: number;
+  backupMode: 'per-game' | 'global';
+  backupLocation: string;
+  backupRetentionCount: number;
+  theme: 'dark' | 'light';
+  safetyAcknowledged: boolean;
+  externalSaveScanEnabled: boolean;
+  v2LiveModeEnabled: boolean;
+  v2HotkeysEnabled: boolean;
+  v2OverlayEnabled: boolean;
+}
+
+export interface AIConfig {
+  provider: 'None' | 'Ollama' | 'LM Studio';
+  endpoint: string;
+  model: string;
+  timeout: number;
+}
+
+export interface FileClassification {
+  type: 'save' | 'config' | 'data' | 'script' | 'texture' | 'audio' | 'archive' | 'executable' | 'unknown';
+  risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'BLOCKED';
+}

@@ -1,0 +1,2 @@
+gold=100
+health: 200

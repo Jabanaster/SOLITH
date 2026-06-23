@@ -1,0 +1,1081 @@
+/*
+ * ResourceForge — Design System
+ * Fonts: Uses locally-installed fonts where available, with system fallbacks.
+ * Inter and JetBrains Mono are referenced by name — if installed on the system
+ * they will be picked up automatically. No CDN or network requests.
+ * Fallback stack ensures readable UI even on clean systems without those fonts.
+ */
+
+/* ─── CSS Custom Properties ─────────────────────────────── */
+:root {
+  --bg-base:        #080b12;
+  --bg-surface:     #0d1117;
+  --bg-raised:      #111827;
+  --bg-hover:       #1a2235;
+
+  --cyan:           #00e5ff;
+  --cyan-dim:       rgba(0, 229, 255, 0.12);
+  --cyan-glow:      rgba(0, 229, 255, 0.25);
+  --teal:           #64ffda;
+  --teal-dim:       rgba(100, 255, 218, 0.12);
+  --purple:         #a78bfa;
+  --purple-dim:     rgba(167, 139, 250, 0.12);
+
+  --safe:           #22c55e;
+  --safe-dim:       rgba(34, 197, 94, 0.12);
+  --caution:        #f59e0b;
+  --caution-dim:    rgba(245, 158, 11, 0.12);
+  --risky:          #ef4444;
+  --risky-dim:      rgba(239, 68, 68, 0.12);
+
+  --text-primary:   #f0f4ff;
+  --text-secondary: #8b96b0;
+  --text-muted:     #4a5568;
+  --text-accent:    #00e5ff;
+
+  --border:         rgba(255, 255, 255, 0.06);
+  --border-accent:  rgba(0, 229, 255, 0.25);
+
+  --glass-bg:       rgba(13, 17, 23, 0.75);
+  --glass-bg-light: rgba(26, 34, 53, 0.6);
+  --glass-blur:     blur(20px);
+  --glass-border:   rgba(255, 255, 255, 0.07);
+
+  --radius-sm:  6px;
+  --radius:     10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+
+  --shadow-sm:  0 2px 8px rgba(0,0,0,0.4);
+  --shadow:     0 4px 20px rgba(0,0,0,0.5);
+  --shadow-lg:  0 8px 40px rgba(0,0,0,0.6);
+  --shadow-cyan: 0 0 20px rgba(0, 229, 255, 0.15), 0 0 60px rgba(0, 229, 255, 0.05);
+
+  --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Reset & Base ──────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html { font-size: 14px; }
+
+body {
+  font-family:
+    Inter,
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* ─── Scrollbars ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 229, 255, 0.4); }
+
+/* ─── Animated Background ───────────────────────────────── */
+.app-container {
+  display: flex;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(0, 100, 255, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 80%, rgba(100, 0, 255, 0.05) 0%, transparent 60%),
+    linear-gradient(180deg, #080b12 0%, #0a0e18 100%);
+}
+
+/* Subtle grid overlay */
+.app-container::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--glass-bg);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  z-index: 10;
+  position: relative;
+}
+
+/* Sidebar top gradient accent */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan) 0%, var(--teal) 50%, var(--purple) 100%);
+  z-index: 1;
+}
+
+.app-title {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 8px;
+}
+
+.app-title h1 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--teal) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 2px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+
+.nav-section {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+}
+
+.nav-section h3 {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 0 6px;
+  margin-bottom: 6px;
+}
+
+.nav-section button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  margin-bottom: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.nav-section button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.nav-section button.active {
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  border-color: var(--border-accent);
+  font-weight: 600;
+}
+
+.nav-section button.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--cyan);
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+/* ─── Main Content ──────────────────────────────────────── */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.game-header {
+  padding: 14px 24px;
+  background: var(--glass-bg);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 60px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: all var(--transition);
+}
+
+.back-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.game-header h2 {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ─── Buttons ───────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: linear-gradient(135deg, var(--cyan) 0%, #0099cc 100%);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #000;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 2px 12px rgba(0, 229, 255, 0.3);
+  letter-spacing: 0.2px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
+  filter: brightness(1.1);
+}
+
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+
+.btn-secondary:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+.btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: linear-gradient(135deg, var(--cyan) 0%, #0099cc 100%);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #000;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 2px 12px rgba(0, 229, 255, 0.25);
+  white-space: nowrap;
+}
+
+.btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
+  filter: brightness(1.1);
+}
+
+/* ─── Content Area ──────────────────────────────────────── */
+.content-area {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  padding-bottom: 40px;
+}
+
+/* ─── V2 Notice Bar ─────────────────────────────────────── */
+.v2-notice {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 16px;
+  background: rgba(239, 68, 68, 0.06);
+  border-top: 1px solid rgba(239, 68, 68, 0.15);
+  color: rgba(239, 68, 68, 0.7);
+  font-size: 10px;
+  text-align: center;
+  letter-spacing: 0.3px;
+  z-index: 100;
+  font-family:
+    "JetBrains Mono",
+    "Cascadia Code",
+    "Cascadia Mono",
+    Consolas,
+    "Courier New",
+    monospace;
+}
+
+/* ─── Glass Card ────────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--radius-lg);
+}
+
+/* ─── Game Library ──────────────────────────────────────── */
+.game-library {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.library-header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Settings Panel */
+.settings-panel {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.checkbox-container input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.checkbox-text strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-bottom: 2px;
+}
+
+.checkbox-text p {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Game Grid */
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.game-card {
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.game-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0) 0%, rgba(0, 229, 255, 0.03) 100%);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.game-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-cyan);
+  transform: translateY(-2px);
+}
+
+.game-card:hover::before { opacity: 1; }
+
+.game-card.border-warning { border-color: rgba(245, 158, 11, 0.35); }
+
+.game-card-content { padding: 16px; }
+
+.game-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.game-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.engine-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.engine-badge.unity    { background: rgba(0, 229, 255, 0.12); color: var(--cyan); }
+.engine-badge.unreal   { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+.engine-badge.godot    { background: rgba(100, 255, 218, 0.12); color: var(--teal); }
+.engine-badge.generic  { background: rgba(139, 150, 176, 0.1); color: var(--text-secondary); }
+
+.game-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family:
+    "JetBrains Mono",
+    "Cascadia Code",
+    "Cascadia Mono",
+    Consolas,
+    "Courier New",
+    monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 10px;
+}
+
+.game-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.game-stats div { display: flex; align-items: center; gap: 4px; }
+.game-stats strong { color: var(--teal); }
+
+.no-scan-text {
+  font-size: 11px;
+  color: var(--caution);
+  padding: 6px 10px;
+  background: var(--caution-dim);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.game-card-actions {
+  padding: 10px 16px 14px;
+  display: flex;
+  gap: 8px;
+}
+
+.btn-scan {
+  flex: 1;
+  padding: 8px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: center;
+}
+
+.btn-scan:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+.btn-scan:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Empty State ───────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 60px 40px;
+  border-radius: var(--radius-xl);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 20px;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ─── Modal ─────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal-content {
+  background: #0e1420;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  min-width: 440px;
+  max-width: 520px;
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(0,0,0,0.5);
+  animation: slideUp 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-content::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--teal));
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-content h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+
+.modal-description {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.input-group {
+  margin-bottom: 14px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
+.input-group input,
+.modal-content input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: all var(--transition);
+  outline: none;
+}
+
+.input-group input:focus,
+.modal-content input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+  background: rgba(0, 229, 255, 0.04);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* ─── Trainer Cards ─────────────────────────────────────── */
+.trainer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+.trainer-card {
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.trainer-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.2), transparent);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.trainer-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.trainer-card:hover::after { opacity: 1; }
+
+.trainer-card h4 {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+
+.trainer-card .badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-right: 4px;
+  margin-bottom: 8px;
+}
+
+.badge-source    { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(100, 255, 218, 0.2); }
+.badge-risk-safe { background: var(--safe-dim); color: var(--safe); border: 1px solid rgba(34, 197, 94, 0.2); }
+.badge-risk-caution { background: var(--caution-dim); color: var(--caution); border: 1px solid rgba(245, 158, 11, 0.2); }
+.badge-risk-risky { background: var(--risky-dim); color: var(--risky); border: 1px solid rgba(239, 68, 68, 0.2); }
+.badge-risk-blocked { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
+.badge-status { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.2); }
+
+.trainer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.trainer-controls input[type="number"] {
+  width: 80px;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  outline: none;
+  transition: all var(--transition);
+}
+
+.trainer-controls input[type="number"]:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+}
+
+.trainer-controls button {
+  padding: 7px 14px;
+  background: var(--cyan-dim);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  color: var(--cyan);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
+  transition: all var(--transition);
+}
+
+.trainer-controls button:hover {
+  background: rgba(0, 229, 255, 0.2);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+}
+
+/* ─── Section Headers ───────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.4px;
+}
+
+.section-subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ─── Data Tables ───────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 11px 14px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.data-table tr:hover td {
+  background: rgba(0, 229, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.data-table .code {
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  font-size: 11px;
+  color: var(--teal);
+}
+
+/* ─── Info Cards ────────────────────────────────────────── */
+.info-card {
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  transition: all var(--transition);
+}
+
+.info-card:hover {
+  border-color: var(--border-accent);
+}
+
+/* ─── Tabs ──────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+.tab.active {
+  background: var(--bg-raised);
+  color: var(--cyan);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Status Indicator ──────────────────────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.status-dot.safe    { background: var(--safe); box-shadow: 0 0 6px var(--safe); }
+.status-dot.caution { background: var(--caution); box-shadow: 0 0 6px var(--caution); }
+.status-dot.risky   { background: var(--risky); box-shadow: 0 0 6px var(--risky); }
+.status-dot.idle    { background: var(--text-muted); }
+.status-dot.active  { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); animation: pulse 1.5s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ─── Loading ───────────────────────────────────────────── */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ─── Notifications / Toast ─────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 18px;
+  background: #0e1420;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 320px;
+  pointer-events: all;
+}
+
+.toast.success { border-left: 3px solid var(--safe); }
+.toast.error   { border-left: 3px solid var(--risky); }
+.toast.info    { border-left: 3px solid var(--cyan); }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Code / Mono Text ──────────────────────────────────── */
+code, .mono {
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  font-size: 0.9em;
+  color: var(--teal);
+  background: rgba(100, 255, 218, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ─── Diff View ─────────────────────────────────────────── */
+.diff-old { color: var(--risky); background: var(--risky-dim); padding: 2px 6px; border-radius: 3px; font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace; }
+.diff-new { color: var(--safe); background: var(--safe-dim); padding: 2px 6px; border-radius: 3px; font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace; }
+
+/* ─── Misc Utility ──────────────────────────────────────── */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.mt-8  { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.text-cyan { color: var(--cyan); }
+.text-teal { color: var(--teal); }
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+.font-mono { font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace; }
+.font-bold { font-weight: 700; }
+
+/* ─── Divider ───────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+
+/* ─── Reduced Motion ────────────────────────────────────── */
+/*
+ * When the OS has "Reduce Motion" enabled, suppress all non-essential
+ * animations and transitions. Functionality is unaffected; only
+ * decorative motion is removed.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep keyboard-focus outlines clearly visible without relying on motion */
+  :focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+  }
+}

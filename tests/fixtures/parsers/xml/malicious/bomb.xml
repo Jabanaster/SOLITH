@@ -1,0 +1,5 @@
+<!DOCTYPE root [
+<!ENTITY lol "lol">
+<!ENTITY lol2 "&lol;&lol;&lol;">
+]>
+<root>&lol2;</root>
