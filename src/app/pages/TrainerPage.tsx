@@ -37,6 +37,11 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category, onBack }) =
   }, [gameId, category]);
 
   const loadTrainerItems = async () => {
+    if (!window.electronAPI) {
+      console.error('[TrainerPage] window.electronAPI unavailable — must run inside Electron');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await window.electronAPI.getRecipes(gameId);
@@ -69,6 +74,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category, onBack }) =
   };
 
   const handleApply = async (itemId: string) => {
+    if (!window.electronAPI) return;
     const item = trainerItems.find(i => i.id === itemId);
     if (!item || !item.path || !item.target) return;
     

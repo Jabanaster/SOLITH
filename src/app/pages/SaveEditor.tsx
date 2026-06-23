@@ -44,6 +44,10 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   }, [gameId, mode]);
 
   const loadSaveFiles = async () => {
+    if (!window.electronAPI) {
+      console.error('[SaveEditor] window.electronAPI unavailable — must run inside Electron');
+      return;
+    }
     setLoading(true);
     try {
       const files = await window.electronAPI.detectSaveFiles(gameId);
@@ -58,6 +62,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!window.electronAPI) return;
     const filePath = e.target.value;
     setSelectedFile(filePath);
     if (!filePath) {
@@ -97,7 +102,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   };
 
   const handleApplyEdit = async () => {
-    if (!editingField || !gameId || !selectedFile) return;
+    if (!editingField || !gameId || !selectedFile || !window.electronAPI) return;
     setApplying(true);
     try {
       const pathStr = editingField.path;

@@ -37,6 +37,11 @@ const Journal: React.FC<JournalProps> = ({ gameId }) => {
   }, [gameId]);
 
   const loadJournal = async () => {
+    if (!window.electronAPI) {
+      console.error('[Journal] window.electronAPI unavailable — must run inside Electron');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await window.electronAPI.getJournal(gameId || undefined);

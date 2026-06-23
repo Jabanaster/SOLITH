@@ -25,6 +25,11 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
   }, [gameId]);
 
   const loadBackups = async () => {
+    if (!window.electronAPI) {
+      console.error('[Backups] window.electronAPI unavailable — must run inside Electron');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await window.electronAPI.getBackups(gameId);
@@ -38,6 +43,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
   };
 
   const handleRestore = async (backupId: string) => {
+    if (!window.electronAPI) return;
     if (!confirm('Are you sure you want to restore this backup? This will overwrite the current save file state.')) {
       return;
     }

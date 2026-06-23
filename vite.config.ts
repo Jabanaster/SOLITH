@@ -8,6 +8,11 @@ const moduleDirectory = dirname(moduleFilename);
 
 export default defineConfig({
   plugins: [react()],
+  // base: './' ensures Vite outputs relative asset paths (e.g. ./assets/main.js)
+  // instead of absolute paths (/assets/main.js). Absolute paths break when
+  // Electron loads the bundle via loadFile() — the file:// protocol resolves /
+  // to the filesystem root, not the bundle directory.
+  base: './',
   server: {
     port: 3000,
     strictPort: true

@@ -41,6 +41,11 @@ const Recipes: React.FC<RecipesProps> = ({ gameId }) => {
   }, [gameId]);
 
   const loadRecipes = async () => {
+    if (!window.electronAPI) {
+      console.error('[Recipes] window.electronAPI unavailable — must run inside Electron');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await window.electronAPI.getRecipes(gameId);
@@ -59,6 +64,7 @@ const Recipes: React.FC<RecipesProps> = ({ gameId }) => {
   };
 
   const handleDelete = async (recipeId: string) => {
+    if (!window.electronAPI) return;
     if (!confirm('Are you sure you want to delete this recipe?')) return;
     setDeletingId(recipeId);
     try {

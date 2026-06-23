@@ -15,7 +15,7 @@
     "build:vite": "vite build",
     "build:electron": "tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs",
     "build": "npm run build:vite && npm run build:electron && electron-builder",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts",
     "test:electron-smoke": "playwright test tests/electron.smoke.test.ts",
     "verify:electron-output": "node scripts/verify-electron-output.mjs",
     "postinstall": "electron-builder install-app-deps"

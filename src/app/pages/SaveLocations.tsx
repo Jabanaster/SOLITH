@@ -32,6 +32,11 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
   }, [gameId]);
 
   const loadLocations = async () => {
+    if (!window.electronAPI) {
+      console.error('[SaveLocations] window.electronAPI unavailable — must run inside Electron');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await window.electronAPI.getSaveLocations(gameId);
@@ -45,7 +50,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
   };
 
   const handleScan = async () => {
-    if (!gameId) return;
+    if (!gameId || !window.electronAPI) return;
     setScanning(true);
     try {
       const result = await window.electronAPI.discoverSaveLocations(gameId);
@@ -60,6 +65,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
   };
 
   const handleApprove = async (id: string) => {
+    if (!window.electronAPI) return;
     try {
       const res = await window.electronAPI.approveSaveLocation(id);
       if (res.success) {
@@ -74,6 +80,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
   };
 
   const handleRevoke = async (id: string) => {
+    if (!window.electronAPI) return;
     if (!confirm('Are you sure you want to revoke access? ResourceForge will block all scans and edits to this location immediately.')) {
       return;
     }
@@ -92,7 +99,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
 
   const handleAddUserPath = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!gameId || !userPath.trim()) return;
+    if (!gameId || !userPath.trim() || !window.electronAPI) return;
     setAddingLocation(true);
     try {
       const result = await window.electronAPI.addUserSelectedLocation(gameId, userPath.trim());

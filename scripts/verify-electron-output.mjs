@@ -38,10 +38,10 @@ console.log('\n🔍 ResourceForge — Electron Output Verifier\n');
 // ── 1. Required files exist ──────────────────────────────────────────────────
 console.log('── Required files');
 check('main.js exists', fileExists('main.js'));
-check('preload.js exists', fileExists('preload.js'));
+check('preload.cjs exists', fileExists('preload.cjs'));
 
 const mainText  = readBundleText('main.js');
-const preloadText = readBundleText('preload.js');
+const preloadText = readBundleText('preload.cjs');
 
 // ── 2. No TypeScript source paths in compiled output ─────────────────────────
 console.log('\n── No TypeScript leakage');
@@ -51,7 +51,7 @@ const mainTsHits      = [...mainText.matchAll(tsImportPattern), ...mainText.matc
 const preloadTsHits   = [...preloadText.matchAll(tsImportPattern), ...preloadText.matchAll(tsDynPattern)];
 check('main.js contains no .ts imports',    mainTsHits.length === 0,
   mainTsHits.length ? mainTsHits.slice(0,3).map(m => m[0]).join(', ') : '');
-check('preload.js contains no .ts imports', preloadTsHits.length === 0,
+check('preload.cjs contains no .ts imports', preloadTsHits.length === 0,
   preloadTsHits.length ? preloadTsHits.slice(0,3).map(m => m[0]).join(', ') : '');
 
 // ── 3. No bare relative imports remain ──────────────────────────────────────
@@ -62,14 +62,14 @@ const mainRelHits   = [...mainText.matchAll(relImportPattern)];
 const preloadRelHits = [...preloadText.matchAll(relImportPattern)];
 check('main.js has no bare relative imports',    mainRelHits.length === 0,
   mainRelHits.length ? `${mainRelHits.length} found: ` + mainRelHits.slice(0,3).map(m => m[1]).join(', ') : '');
-check('preload.js has no bare relative imports', preloadRelHits.length === 0,
+check('preload.cjs has no bare relative imports', preloadRelHits.length === 0,
   preloadRelHits.length ? `${preloadRelHits.length} found: ` + preloadRelHits.slice(0,3).map(m => m[1]).join(', ') : '');
 
 // ── 4. No development-only paths ────────────────────────────────────────────
 console.log('\n── No development-only paths');
 const geminiPattern = /\.gemini[\/\\]/;
 check('main.js does not import from .gemini', !geminiPattern.test(mainText));
-check('preload.js does not import from .gemini', !geminiPattern.test(preloadText));
+check('preload.cjs does not import from .gemini', !geminiPattern.test(preloadText));
 
 const testRunnerPattern = /require\(['"]mocha|require\(['"]jest|from ['"]vitest|--test\b/;
 check('main.js does not import a test runner', !testRunnerPattern.test(mainText));
@@ -85,11 +85,11 @@ check('main.js has single-instance lock', mainText.includes('requestSingleInstan
 // ── 6. Bundle size sanity ────────────────────────────────────────────────────
 console.log('\n── Bundle sanity');
 const mainSize = existsSync(join(DIST, 'main.js')) ? statSync(join(DIST, 'main.js')).size : 0;
-const preloadSize = existsSync(join(DIST, 'preload.js')) ? statSync(join(DIST, 'preload.js')).size : 0;
-check('main.js > 10 KB (not empty/stub)',    mainSize > 10_000,   `actual: ${(mainSize/1024).toFixed(1)} KB`);
-check('main.js < 5 MB (not bloated)',        mainSize < 5_000_000, `actual: ${(mainSize/1024).toFixed(1)} KB`);
-check('preload.js > 100 bytes (not empty)',  preloadSize > 100,    `actual: ${preloadSize} bytes`);
-check('preload.js < 100 KB (not bloated)',   preloadSize < 100_000, `actual: ${preloadSize} bytes`);
+const preloadSize = existsSync(join(DIST, 'preload.cjs')) ? statSync(join(DIST, 'preload.cjs')).size : 0;
+check('main.js > 10 KB (not empty/stub)',     mainSize > 10_000,    `actual: ${(mainSize/1024).toFixed(1)} KB`);
+check('main.js < 5 MB (not bloated)',         mainSize < 5_000_000, `actual: ${(mainSize/1024).toFixed(1)} KB`);
+check('preload.cjs > 100 bytes (not empty)',  preloadSize > 100,    `actual: ${preloadSize} bytes`);
+check('preload.cjs < 100 KB (not bloated)',   preloadSize < 100_000, `actual: ${preloadSize} bytes`);
 
 // ── Result ───────────────────────────────────────────────────────────────────
 console.log(`\n── Summary: ${checks - failures}/${checks} checks passed\n`);

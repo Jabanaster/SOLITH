@@ -37,6 +37,11 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   }, [gameId]);
 
   const loadSaveFiles = async () => {
+    if (!window.electronAPI) {
+      console.error('[DiscoveryLab] window.electronAPI unavailable — must run inside Electron');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const files = await window.electronAPI.detectSaveFiles(gameId);
@@ -55,7 +60,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   };
 
   const handleCompare = async () => {
-    if (!saveA || !saveB) return;
+    if (!saveA || !saveB || !window.electronAPI) return;
     setComparing(true);
     try {
       const valA = knownValueA.trim() !== '' ? (isNaN(Number(knownValueA)) ? knownValueA : Number(knownValueA)) : undefined;
@@ -80,7 +85,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   };
 
   const handleCreateRecipe = async () => {
-    if (!selectedCandidate || !recipeName || !gameId) return;
+    if (!selectedCandidate || !recipeName || !gameId || !window.electronAPI) return;
     setCreatingRecipe(selectedCandidate.path);
     try {
       const recipeData = {

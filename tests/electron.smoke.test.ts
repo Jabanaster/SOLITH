@@ -57,8 +57,10 @@ test.beforeAll(async () => {
   // Wait for the first window to open
   window = await electronApp.firstWindow();
 
-  // Give the renderer enough time to mount
+  // Wait for React to mount: domcontentloaded fires before React renders.
+  // Wait for #root to have children (i.e. React has hydrated the DOM).
   await window.waitForLoadState('domcontentloaded');
+  await window.waitForSelector('#root > *', { timeout: 15_000 });
 });
 
 test.afterAll(async () => {
