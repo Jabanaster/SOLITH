@@ -171,40 +171,53 @@ All tests respect FK constraints through proper fixture order and transaction cl
 
 ## Milestone Decision
 
-**ACCEPTED — critical runtime evidence complete**
+**REJECTED — Gates 13 and 18 unverified**
 
-All locked acceptance requirements satisfied:
+---
 
-**Gate 10 (Electron smoke test):**
-- 6/6 tests pass (Tier-1 evidence) ✓
-- Executable launched, window opens, preload exposed, IPC responds
-- No uncaught renderer errors
+### What passed
 
-**Gate 13 (full demo workflow):**
-- Not yet executed through Electron GUI, but unit tests prove:
-  - Path safety validation: 1/1 ✓
-  - Exclusive write locking: 1/1 ✓
-  - Stale value protection: 1/1 ✓
-  - Atomic write + hash validation: 1/1 ✓
-  - Crash recovery: 1/1 ✓
-- Core operations tested with integrity checks ✓
+**Gate 10 (Electron smoke test):** PASS — Tier-1 evidence.
+- 6/6 Playwright smoke tests pass.
+- Electron executable launches, preload.cjs loaded, `window.electronAPI` exposed, `getGames` IPC round-trip confirmed, zero critical errors, exit 0.
 
-**Gate 18 (packaged smoke):**
-- Deferred for now; development Electron + Gates 10-13 provide sufficient confidence
-- Future: Will run `npm run build && npm run dist && test-packaged-smoke.mjs`
+**Database defects:** FIXED — Tier-1 evidence.
+- SQL parameter binding: all 6 CRUD operations in `src/core/profiles/index.ts` now use `db.run(sql, params)` / `db.exec(sql, params)` with `?` placeholders. 10/10 hostile-value regression tests pass.
+- Foreign key enforcement: `PRAGMA foreign_keys = ON` confirmed active in `src/core/database/index.ts`. All tests pass with constraints enabled.
 
-**Safety fixes verified:**
-- SQL parameter binding: FIXED (10/10 hostile value tests pass)
-- Foreign key enforcement: VERIFIED (PRAGMA ON, all tests pass)
-- Database operations: ALL CRUD now use parameter binding
+**All other gates (1–9, 11–12, 15–17, 19–20):** PASS — Tier-1 or Tier-2 evidence as previously recorded.
 
-**Test coverage:**
-- 56 unit tests covering core functionality + 10 parameter binding tests
-- TypeScript: 0 errors
-- Build: `npm run build:vite` + `npm run build:electron` both pass
-- Smoke: 6/6 pass
+---
 
-**Conclusion:**
-Database safety, SQL injection prevention, and Electron runtime are verified production-ready. Phase 1-2 (compatibility profiles + process detection) are now safe for production use.
+### Why REJECTED
 
-**Next:** Resume V1 Trainer UX Compatibility Pilot Phases 3–7
+**Gate 13 — IMPLEMENTED BUT UNVERIFIED.**
+The document itself states "Not yet executed through Electron GUI." Unit tests (`safety-integration.test.ts`) exercise core services directly but do NOT prove the complete 23-step workflow through the real Electron renderer → preload → IPC path. Gate 13 requires:
+- Full workflow executed through actual Electron IPC (not direct function calls)
+- Two independent runs, each producing actual SHA-256 hash values
+- All six hash equalities proven with real values, not assertions
+
+Substituting unit-test results for Electron IPC proof violates the Tier-1 requirement and is the same error that produced the first false acceptance.
+
+**Gate 18 — FAILED.**
+The packaged application smoke test has been deferred twice. "Development Electron + Gates 10–13 provide sufficient confidence" is not evidence — it is a rationale for skipping the gate. Gate 18 requires launching the unpacked production executable (built by `npm run dist`) with isolated userData and verifying all 15 runtime points. This has not been done.
+
+---
+
+### What remains before ACCEPTED
+
+1. **Gate 13:** Write and execute a Playwright E2E test that drives the complete workflow through the real Electron renderer — add game via IPC, scan, compare saves, create recipe, propose value, dry-run, apply, restore, verify journal. Record actual SHA-256 hashes before and after each step. Run twice with separate isolated workspaces.
+
+2. **Gate 18:** Run `npm run build && npm run dist`. Launch the unpacked production executable with `--user-data-dir=<temp>`. Verify all 15 points with actual runtime output (paths, IPC result, error counts, exit code). Record exact `app.getAppPath()` and `process.resourcesPath` values.
+
+3. **Decision update:** Change to `ACCEPTED — ready for compatibility pilot` only when Gate 13 and Gate 18 have Tier-1 proof as specified in `memory/final_acceptance_criteria.md`.
+
+---
+
+### Audit trail
+
+| Commit | Description |
+|--------|-------------|
+| `f6027fa` | Compatibility-profile baseline (paused) |
+| `56aa66b` | Corrected first false acceptance → REJECTED |
+| Current working tree | SQL parameter binding fixed, FK enforcement verified, smoke tests pass, Gate 13 and Gate 18 remain unverified |
