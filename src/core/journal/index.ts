@@ -26,9 +26,9 @@ export function logEvent(event: Omit<JournalEvent, 'id' | 'timestamp'>): Journal
 }
 
 export function getJournalEvents(gameId?: string, limit: number = 100): JournalEvent[] {
-  const whereClause = gameId ? `WHERE gameId = ?` : '';
-  const params = gameId ? [gameId] : [];
-  
+  const whereClause = gameId ? `WHERE je.gameId = ?` : '';
+  const params: any[] = gameId ? [gameId, limit] : [limit];
+
   const stmt = db.prepare(`
     SELECT je.*, g.name as gameName, r.name as recipeName
     FROM journal_events je
@@ -38,17 +38,19 @@ export function getJournalEvents(gameId?: string, limit: number = 100): JournalE
     ORDER BY je.timestamp DESC
     LIMIT ?
   `);
-  
-  return stmt.all(...params).map(row => ({
+
+  return stmt.all(...params).map((row: any) => ({
     ...row,
-    timestamp: row.timestamp.toISOString()
+    timestamp: row.timestamp instanceof Date
+      ? row.timestamp.toISOString()
+      : String(row.timestamp)
   }));
 }
 
 export function getJournalEventsByType(gameId: string | undefined, type: string, limit: number = 100): JournalEvent[] {
-  const whereClause = `WHERE gameId = ? AND type = ?`;
-  const params = [gameId, type];
-  
+  const whereClause = `WHERE je.gameId = ? AND je.type = ?`;
+  const params: any[] = [gameId, type, limit];
+
   const stmt = db.prepare(`
     SELECT je.*, g.name as gameName, r.name as recipeName
     FROM journal_events je
@@ -58,10 +60,12 @@ export function getJournalEventsByType(gameId: string | undefined, type: string,
     ORDER BY je.timestamp DESC
     LIMIT ?
   `);
-  
-  return stmt.all(...params).map(row => ({
+
+  return stmt.all(...params).map((row: any) => ({
     ...row,
-    timestamp: row.timestamp.toISOString()
+    timestamp: row.timestamp instanceof Date
+      ? row.timestamp.toISOString()
+      : String(row.timestamp)
   }));
 }
 

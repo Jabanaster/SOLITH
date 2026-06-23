@@ -31,6 +31,14 @@ import {
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
 
+// ── Isolated userData for test runs ─────────────────────────────────────────
+// Must run before app.requestSingleInstanceLock() and app.whenReady().
+// The E2E test sets ELECTRON_USER_DATA_PATH to a temp dir so every run
+// starts from a clean database and never touches production data.
+if (process.env.ELECTRON_USER_DATA_PATH) {
+  app.setPath('userData', process.env.ELECTRON_USER_DATA_PATH);
+}
+
 // ── Single-instance lock ─────────────────────────────────────────────────────
 // Prevents multiple ResourceForge dev instances from stacking up.
 // Only terminates OUR second instance — never touches unrelated Electron apps.
