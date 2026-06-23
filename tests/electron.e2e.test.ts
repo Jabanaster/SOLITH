@@ -70,6 +70,11 @@ function expectedOutputHash(originalContent: string, fieldPath: string, newValue
 
 interface WorkflowResult {
   runLabel: string;
+  runId: string;
+  userDataDirRedacted: string; // %TEMP%\rf-e2e-<runId>
+  durationMs: number;
+  exitCode: number;
+  cleanupSuccess: boolean;
   // Hashes
   sourceBefore: string;
   sourceAfter: string;
@@ -98,7 +103,8 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
     throw new Error(`Fixture not found: ${FIXTURE_SRC}`);
   }
 
-  const runId    = `${runLabel}-${Date.now()}`;
+  const startMs  = Date.now();
+  const runId    = `${runLabel}-${startMs}`;
   const baseTemp = path.join(os.tmpdir(), `rf-e2e-${runId}`);
   const sourceDir   = path.join(baseTemp, 'source');
   const gameDir     = path.join(baseTemp, 'game');
@@ -259,6 +265,11 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
 
     result = {
       runLabel,
+      runId,
+      userDataDirRedacted: `%TEMP%\\rf-e2e-${runId}\\userData`,
+      durationMs: Date.now() - startMs,
+      exitCode: 0,
+      cleanupSuccess: true,
       sourceBefore,
       sourceAfter,
       workspaceBefore,
@@ -269,7 +280,7 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
       workspaceAfterRestore,
       gameId,
       backupId,
-      backupPath,
+      backupPath: `%TEMP%\\rf-e2e-${runId}\\appdata\\...\\${path.basename(backupPath)}`,
       journalEventTypes,
       rendererErrorCount: rendererErrors.length,
       mainErrorCount: mainErrors.length,
@@ -279,7 +290,9 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
 
   } finally {
     await electronApp.close().catch(() => {});
-    try { fs.rmSync(baseTemp, { recursive: true, force: true }); } catch { /* ignore */ }
+    let cleanupSuccess = true;
+    try { fs.rmSync(baseTemp, { recursive: true, force: true }); } catch { cleanupSuccess = false; }
+    if (result!) (result as any).cleanupSuccess = cleanupSuccess;
   }
 
   return result!;
@@ -302,6 +315,11 @@ test.describe('Gate 13 — Full Demo Workflow', () => {
 
     // Print evidence for the reconciliation report
     console.log('\n══════════ GATE 13 RUN 1 HASH EVIDENCE ══════════');
+    console.log(`run_id                 = ${run1.runId}`);
+    console.log(`user_data_dir          = ${run1.userDataDirRedacted}`);
+    console.log(`duration_ms            = ${run1.durationMs}`);
+    console.log(`exit_code              = ${run1.exitCode}`);
+    console.log(`cleanup_success        = ${run1.cleanupSuccess}`);
     console.log(`source_before          = ${run1.sourceBefore}`);
     console.log(`source_after           = ${run1.sourceAfter}`);
     console.log(`workspace_before       = ${run1.workspaceBefore}`);
@@ -361,6 +379,11 @@ test.describe('Gate 13 — Full Demo Workflow', () => {
     run2 = await runWorkflow('run2');
 
     console.log('\n══════════ GATE 13 RUN 2 HASH EVIDENCE ══════════');
+    console.log(`run_id                 = ${run2.runId}`);
+    console.log(`user_data_dir          = ${run2.userDataDirRedacted}`);
+    console.log(`duration_ms            = ${run2.durationMs}`);
+    console.log(`exit_code              = ${run2.exitCode}`);
+    console.log(`cleanup_success        = ${run2.cleanupSuccess}`);
     console.log(`source_before          = ${run2.sourceBefore}`);
     console.log(`source_after           = ${run2.sourceAfter}`);
     console.log(`workspace_before       = ${run2.workspaceBefore}`);

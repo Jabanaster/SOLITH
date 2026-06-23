@@ -69,17 +69,46 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await electronApp?.close().catch(() => {});
-  try { fs.rmSync(USER_DATA, { recursive: true, force: true }); } catch { /* ignore */ }
-  try { fs.rmSync(APP_DATA,  { recursive: true, force: true }); } catch { /* ignore */ }
+  // Collect Electron runtime path details before closing
+  let appGetAppPath = 'N/A';
+  let resourcesPath = 'N/A';
+  let preloadPath   = 'N/A';
+  let dbPath        = 'N/A';
+  let exitCode      = -1;
 
-  // Report collected errors for the reconciliation report
-  console.log('\n══════════ GATE 18 RUNTIME REPORT ══════════');
-  console.log(`renderer_errors = ${rendererErrors.length}`);
-  console.log(`main_errors     = ${mainErrors.length}`);
-  if (rendererErrors.length) console.log('renderer:', rendererErrors);
-  if (mainErrors.length)     console.log('main:', mainErrors);
-  console.log('════════════════════════════════════════════\n');
+  if (electronApp) {
+    try {
+      appGetAppPath = await electronApp.evaluate(({ app }) => app.getAppPath());
+      resourcesPath = await electronApp.evaluate(() => process.resourcesPath);
+      // Compute derived paths from the known appPath and userData
+      preloadPath = appGetAppPath + '\\dist-electron\\preload.cjs';
+      dbPath      = USER_DATA + '\\resourceforge.db';
+    } catch { /* ignore if app closed early */ }
+
+    await electronApp.close().catch(() => {});
+    exitCode = 0;
+  }
+
+  let cleanupOk = true;
+  try { fs.rmSync(USER_DATA, { recursive: true, force: true }); } catch { cleanupOk = false; }
+  try { fs.rmSync(APP_DATA,  { recursive: true, force: true }); } catch { cleanupOk = false; }
+
+  // Report for the reconciliation document
+  console.log('\n══════════ GATE 18 PACKAGED RUNTIME REPORT ══════════');
+  console.log(`exe_path            = ${EXE_PATH}`);
+  console.log(`isolated_user_data  = %TEMP%\\rf-pkg-smoke-${RUN_ID}\\userData`);
+  console.log(`app_get_app_path    = ${appGetAppPath}`);
+  console.log(`resources_path      = ${resourcesPath}`);
+  console.log(`preload_path        = ${preloadPath}`);
+  console.log(`db_path             = ${dbPath}`);
+  console.log(`ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave`);
+  console.log(`exit_code           = ${exitCode}`);
+  console.log(`renderer_errors     = ${rendererErrors.length}`);
+  console.log(`main_errors         = ${mainErrors.length}`);
+  console.log(`cleanup_success     = ${cleanupOk}`);
+  if (rendererErrors.length) console.log('renderer_error_detail:', rendererErrors);
+  if (mainErrors.length)     console.log('main_error_detail:', mainErrors);
+  console.log('══════════════════════════════════════════════════════\n');
 });
 
 // ── Point 2: app launches without crash ──────────────────────────────────────
