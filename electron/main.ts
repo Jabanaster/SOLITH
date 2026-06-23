@@ -25,6 +25,8 @@ import {
   RevokeSaveLocationSchema,
   GetSaveLocationsSchema,
   AddUserSelectedLocationSchema,
+  CheckGameRunningSchema,
+  GetCompatibilityProfileSchema,
   validateIpcPathSafety
 } from './ipc-validation.js';
 
@@ -544,12 +546,69 @@ ipcMain.handle('add-user-selected-location', async (event, gameId: string, path:
     const parsed = AddUserSelectedLocationSchema.parse({ gameId, path });
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
-    
+
     const locationsModule = await import('../src/core/saves/locations.js');
     const result = locationsModule.addUserSelectedLocation(parsed.gameId, parsed.path);
     return result;
   } catch (error) {
     console.error('add-user-selected-location error:', error);
     return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('check-game-running', async (event, gameId: string) => {
+  try {
+    const parsed = CheckGameRunningSchema.parse({ gameId });
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+
+    const profilesModule = await import('../src/core/profiles/index.js');
+    const profiles = profilesModule.getProfilesForGame(parsed.gameId);
+    const profile = profiles[0];
+
+    if (!profile || !profile.executableNames?.length) {
+      return { running: false, evidence: 'No executable names configured for this game' };
+    }
+
+    const processModule = await import('../src/core/process/index.js');
+    return processModule.isGameRunning(profile);
+  } catch (error) {
+    return { running: false, evidence: `Check unavailable: ${String(error).slice(0, 80)}` };
+  }
+});
+
+ipcMain.handle('get-compatibility-profile', async (event, gameId: string) => {
+  try {
+    const parsed = GetCompatibilityProfileSchema.parse({ gameId });
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+
+    const profilesModule = await import('../src/core/profiles/index.js');
+    const profiles = profilesModule.getProfilesForGame(parsed.gameId);
+    return profiles[0] ?? null;
+  } catch (error) {
+    console.error('get-compatibility-profile error:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('get-all-profiles', async () => {
+  try {
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+
+    const db = (await import('../src/core/database/index.js')).getDb();
+    const results = db.exec('SELECT * FROM compatibility_profiles ORDER BY updatedAt DESC');
+    if (!results || !results[0]) return [];
+
+    const columns = results[0].columns as string[];
+    return results[0].values.map((rowValues: any[]) => {
+      const row: any = {};
+      columns.forEach((col: string, idx: number) => { row[col] = rowValues[idx]; });
+      return row;
+    });
+  } catch (error) {
+    console.error('get-all-profiles error:', error);
+    return [];
   }
 });

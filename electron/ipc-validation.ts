@@ -139,6 +139,14 @@ export const AddUserSelectedLocationSchema = z.object({
   path: z.string().min(1)
 });
 
+export const CheckGameRunningSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000'))
+});
+
+export const GetCompatibilityProfileSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000'))
+});
+
 /**
  * Validates a file path against a gameId's registered root directory.
  * Prevents path traversal and link-escapes inside IPC boundaries.

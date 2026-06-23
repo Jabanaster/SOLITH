@@ -29,5 +29,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSaveLocations: (gameId: string) => ipcRenderer.invoke('get-save-locations', gameId),
   approveSaveLocation: (locationId: string) => ipcRenderer.invoke('approve-save-location', locationId),
   revokeSaveLocation: (locationId: string) => ipcRenderer.invoke('revoke-save-location', locationId),
-  addUserSelectedLocation: (gameId: string, path: string) => ipcRenderer.invoke('add-user-selected-location', gameId, path)
+  addUserSelectedLocation: (gameId: string, path: string) => ipcRenderer.invoke('add-user-selected-location', gameId, path),
+
+  // Game-running detection (read-only process check, no injection)
+  checkGameRunning: (gameId: string) => ipcRenderer.invoke('check-game-running', gameId),
+
+  // Compatibility profiles
+  getCompatibilityProfile: (gameId: string) => ipcRenderer.invoke('get-compatibility-profile', gameId),
+  getAllProfiles: () => ipcRenderer.invoke('get-all-profiles'),
 });

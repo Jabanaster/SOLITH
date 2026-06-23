@@ -1,24 +1,8 @@
-import React, { useState, useEffect } from 'react';
-
-interface TrainerItem {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  source: string;
-  risk: string;
-  status: string;
-  confidence?: number;
-  currentValue?: string | number;
-  newValue?: string | number;
-  path?: string;
-  target?: string;
-  hotkey?: string;
-  inputType?: 'number' | 'toggle' | 'slider' | 'dropdown';
-  min?: number;
-  max?: number;
-  options?: string[];
-}
+import React, { useState, useEffect, useCallback } from 'react';
+import type { TrainerItem } from '../../shared/types/index.js';
+import { TrainerCard, type TrainerCardState } from '../components/TrainerCard.js';
+import { ApplyDialog } from '../components/ApplyDialog.js';
+import { ContextPanel } from '../components/ContextPanel.js';
 
 interface TrainerPageProps {
   gameId: string;
@@ -26,182 +10,263 @@ interface TrainerPageProps {
   onBack: () => void;
 }
 
-const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category, onBack }) => {
-  const [trainerItems, setTrainerItems] = useState<TrainerItem[]>([]);
+interface ApplyPending {
+  item: TrainerItem;
+  value: any;
+}
+
+const ALLOWED_CATEGORIES = [
+  'PLAYER', 'HEALTH', 'STAMINA', 'MANA', 'INVENTORY', 'CURRENCY',
+  'EXPERIENCE', 'SKILLS', 'ATTRIBUTES', 'EQUIPMENT', 'WEAPONS', 'ARMOR',
+  'WORLD', 'DIFFICULTY', 'GAME', 'VIDEO', 'AUDIO', 'ACCESSIBILITY',
+  'MISCELLANEOUS', 'STATS', 'ENEMIES', 'UNLOCKS', 'VOICE', 'DISCOVERY',
+];
+
+function normalizeCategory(cat: string): string {
+  const upper = cat.toUpperCase();
+  return ALLOWED_CATEGORIES.includes(upper) ? upper : 'MISCELLANEOUS';
+}
+
+function deriveCardState(
+  item: TrainerItem,
+  transient: TrainerCardState | null,
+  gameRunning: boolean
+): TrainerCardState {
+  if (transient && ['APPLYING', 'APPLIED', 'RESTORED', 'FAILED'].includes(transient)) {
+    return transient;
+  }
+  const statusStr = (item.status ?? '').toLowerCase();
+  if (item.risk === 'Blocked' || statusStr === 'blocked') return 'BLOCKED';
+  if (statusStr === 'needs rescan') return 'NEEDS_RESCAN';
+  if (statusStr === 'broken') return 'BROKEN';
+  if (gameRunning) return 'GAME_RUNNING';
+  return 'READY';
+}
+
+const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
+  const [items, setItems] = useState<TrainerItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [customValues, setCustomValues] = useState<Record<string, any>>({});
+  const [gameRunning, setGameRunning] = useState(false);
+  const [gameRunningEvidence, setGameRunningEvidence] = useState('');
 
-  useEffect(() => {
-    loadTrainerItems();
-  }, [gameId, category]);
+  const [values, setValues] = useState<Record<string, any>>({});
+  const [transientStates, setTransientStates] = useState<Record<string, TrainerCardState>>({});
+  const [backupIds, setBackupIds] = useState<Record<string, string>>({});
+  const [lastOpMessages, setLastOpMessages] = useState<Record<string, string>>({});
 
-  const loadTrainerItems = async () => {
-    if (!window.electronAPI) {
-      console.error('[TrainerPage] window.electronAPI unavailable — must run inside Electron');
-      setLoading(false);
-      return;
-    }
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [applyPending, setApplyPending] = useState<ApplyPending | null>(null);
+
+  const apiAvailable = typeof window !== 'undefined' && !!(window as any).electronAPI;
+
+  const loadItems = useCallback(async () => {
+    if (!apiAvailable) { setLoading(false); return; }
     setLoading(true);
     try {
-      const result = await window.electronAPI.getRecipes(gameId);
-      if (result && !result.error) {
-        setTrainerItems(result);
-        
-        // Initialize custom values dictionary
-        const values: Record<string, any> = {};
-        result.forEach((item: TrainerItem) => {
-          values[item.id] = item.currentValue !== undefined ? item.currentValue : '';
+      const result = await (window as any).electronAPI.getRecipes(gameId);
+      if (Array.isArray(result)) {
+        setItems(result);
+        setValues(prev => {
+          const init: Record<string, any> = {};
+          result.forEach((r: TrainerItem) => {
+            if (!(r.id in prev)) init[r.id] = r.currentValue ?? '';
+          });
+          return { ...init, ...prev };
         });
-        setCustomValues(values);
-      } else {
-        console.error('Failed to load recipes:', result?.error);
-        setTrainerItems([]);
       }
-    } catch (error) {
-      console.error('Error loading recipes:', error);
-      setTrainerItems([]);
+    } catch (e) {
+      console.error('[TrainerPage] loadItems error:', e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [gameId, apiAvailable]);
+
+  const checkGameRunning = useCallback(async () => {
+    if (!apiAvailable) return;
+    try {
+      const result = await (window as any).electronAPI.checkGameRunning(gameId);
+      setGameRunning(result?.running ?? false);
+      setGameRunningEvidence(result?.evidence ?? '');
+    } catch {
+      setGameRunning(false);
+    }
+  }, [gameId, apiAvailable]);
+
+  useEffect(() => {
+    loadItems();
+    checkGameRunning();
+  }, [loadItems, checkGameRunning]);
 
   const handleValueChange = (itemId: string, val: any) => {
-    setCustomValues(prev => ({
-      ...prev,
-      [itemId]: val
-    }));
+    setValues(prev => ({ ...prev, [itemId]: val }));
   };
 
-  const handleApply = async (itemId: string) => {
-    if (!window.electronAPI) return;
-    const item = trainerItems.find(i => i.id === itemId);
-    if (!item || !item.path || !item.target) return;
-    
-    const value = customValues[itemId];
-    if (value === undefined || value === '') return;
+  const handleApplyClick = (item: TrainerItem) => {
+    const val = values[item.id];
+    if (val === undefined || val === '' || val === null) return;
+    setApplyPending({ item, value: val });
+  };
 
-    setApplyingId(itemId);
+  const handleApplyConfirm = async () => {
+    if (!applyPending || !apiAvailable) { setApplyPending(null); return; }
+    const { item, value } = applyPending;
+    setApplyPending(null);
+
+    setTransientStates(prev => ({ ...prev, [item.id]: 'APPLYING' }));
+
     try {
-      let parsedValue: any = value;
-      if (item.inputType === 'number') {
-        parsedValue = Number(value);
-      } else if (item.inputType === 'toggle') {
-        parsedValue = value === true || value === 'true';
-      }
-
-      // Create Proposal
-      const proposal = await window.electronAPI.createProposalForEdit(
-        gameId, 
-        item.target, 
-        item.path, 
-        item.currentValue, 
-        parsedValue, 
+      const proposal = await (window as any).electronAPI.createProposalForEdit(
+        gameId,
+        item.target ?? item.source ?? '',
+        item.path ?? '',
+        item.currentValue,
+        value,
         item.id
       );
 
       if (!proposal) {
-        alert('Failed to generate trainer edit proposal');
+        setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
+        setLastOpMessages(prev => ({ ...prev, [item.id]: 'Proposal creation failed' }));
         return;
       }
 
-      // Apply Proposal
-      const res = await window.electronAPI.applyProposal(proposal);
-      if (res.success) {
-        alert('Trainer action applied successfully! Backup created.');
-        await loadTrainerItems(); // Refresh current values
+      const res = await (window as any).electronAPI.applyProposal(proposal);
+
+      if (res?.success) {
+        setTransientStates(prev => ({ ...prev, [item.id]: 'APPLIED' }));
+        if (res.backupId) {
+          setBackupIds(prev => ({ ...prev, [item.id]: res.backupId }));
+        }
+        const ts = new Date().toLocaleTimeString();
+        setLastOpMessages(prev => ({
+          ...prev, [item.id]: `Applied at ${ts} — backup created`
+        }));
+        await loadItems();
       } else {
-        alert(`Apply failed: ${res.error}`);
+        setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
+        setLastOpMessages(prev => ({
+          ...prev, [item.id]: `Failed: ${res?.error ?? 'unknown error'}`
+        }));
       }
     } catch (e) {
-      console.error('Apply error:', e);
-      alert('An error occurred while applying the trainer.');
-    } finally {
-      setApplyingId(null);
+      console.error('[TrainerPage] apply error:', e);
+      setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
+      setLastOpMessages(prev => ({ ...prev, [item.id]: `Error: ${String(e).slice(0, 80)}` }));
     }
   };
 
-  const filteredItems = category === 'all' 
-    ? trainerItems 
-    : trainerItems.filter(item => item.category.toLowerCase() === category.toLowerCase());
+  const handleRestore = async (backupId: string) => {
+    if (!apiAvailable || !selectedId) return;
+    const sid = selectedId;
+    setTransientStates(prev => ({ ...prev, [sid]: 'APPLYING' }));
+    try {
+      const res = await (window as any).electronAPI.restoreBackup(backupId);
+      if (res?.success) {
+        setTransientStates(prev => ({ ...prev, [sid]: 'RESTORED' }));
+        const ts = new Date().toLocaleTimeString();
+        setLastOpMessages(prev => ({ ...prev, [sid]: `Restored at ${ts}` }));
+        await loadItems();
+      } else {
+        setTransientStates(prev => ({ ...prev, [sid]: 'FAILED' }));
+        setLastOpMessages(prev => ({
+          ...prev, [sid]: `Restore failed: ${res?.error ?? 'unknown error'}`
+        }));
+      }
+    } catch (e) {
+      setTransientStates(prev => ({ ...prev, [sid]: 'FAILED' }));
+    }
+  };
+
+  const selectedItem = items.find(i => i.id === selectedId) ?? null;
+
+  const filteredItems = category === 'all'
+    ? items
+    : items.filter(i => normalizeCategory(i.category) === normalizeCategory(category));
+
+  if (!apiAvailable) {
+    return (
+      <div className="trainer-no-api">
+        <div className="no-api-box glass">
+          <h3>Read-Only Preview</h3>
+          <p>
+            ResourceForge must run inside Electron to apply trainer changes.
+            Privileged IPC operations (apply, backup, restore) are disabled in browser preview.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="trainer-loading">
+        <div className="loading-spinner" aria-hidden="true" />
+        <span>Loading trainer items…</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="trainer-page">
-      {loading ? (
-        <div className="empty-state glass">
-          <p>Loading trainer items...</p>
+    <div className="trainer-page-v2">
+      {gameRunning && (
+        <div className="game-running-banner" role="alert">
+          <span className="banner-icon" aria-hidden="true">⚠</span>
+          <strong>Game is running</strong>
+          <span>{gameRunningEvidence}</span>
+          <span className="banner-note">Close the game before applying changes to avoid data loss.</span>
         </div>
-      ) : filteredItems.length === 0 ? (
-        <div className="empty-state glass">
-          <h3>No trainer recipes created</h3>
-          <p>Go to the <strong>Discovery Lab</strong> or the <strong>Save Editor</strong> to scan files and generate trainer buttons.</p>
+      )}
+
+      <div className="trainer-main-area">
+        <div className="trainer-cards-region" aria-label="Trainer items">
+          {filteredItems.length === 0 ? (
+            <div className="empty-state glass">
+              <h3>No trainer items</h3>
+              <p>
+                Open <strong>Workshop Mode</strong> → <strong>Discovery Lab</strong> or{' '}
+                <strong>Save Editor</strong> to scan and build trainer recipes.
+              </p>
+            </div>
+          ) : (
+            filteredItems.map(item => {
+              const cardState = deriveCardState(
+                item, transientStates[item.id] ?? null, gameRunning
+              );
+              return (
+                <TrainerCard
+                  key={item.id}
+                  item={item}
+                  state={cardState}
+                  value={values[item.id]}
+                  selected={selectedId === item.id}
+                  onSelect={() => setSelectedId(item.id === selectedId ? null : item.id)}
+                  onValueChange={val => handleValueChange(item.id, val)}
+                  onApply={() => handleApplyClick(item)}
+                />
+              );
+            })
+          )}
         </div>
-      ) : (
-        <div className="trainer-grid">
-          {filteredItems.map(item => {
-            const isBlocked = item.status === 'Blocked' || item.risk === 'Blocked';
-            const isStale = item.status === 'Needs Rescan';
-            const value = customValues[item.id];
 
-            return (
-              <div key={item.id} className={`trainer-card glass ${isBlocked ? 'blocked' : ''} ${isStale ? 'stale' : ''}`}>
-                <div className="trainer-header">
-                  <h4>{item.name}</h4>
-                  <div className="badges-wrapper">
-                    <span className="badge badge-source">{item.source}</span>
-                    <span className={`badge risk-${item.risk.toLowerCase()}`}>{item.risk}</span>
-                    <span className={`badge status-${item.status.toLowerCase().replace(/ /g, '-')}`}>
-                      {item.status}
-                    </span>
-                  </div>
-                </div>
-                
-                <p className="trainer-desc">{item.description}</p>
-                <div className="trainer-path-box">
-                  <code>{item.path}</code>
-                </div>
+        <ContextPanel
+          item={selectedItem}
+          value={selectedItem ? values[selectedItem.id] : undefined}
+          cardState={selectedItem
+            ? deriveCardState(selectedItem, transientStates[selectedItem.id] ?? null, gameRunning)
+            : null}
+          lastBackupId={selectedItem ? (backupIds[selectedItem.id] ?? null) : null}
+          lastOpMessage={selectedItem ? (lastOpMessages[selectedItem.id] ?? null) : null}
+          onRestore={handleRestore}
+        />
+      </div>
 
-                <div className="trainer-body">
-                  <div className="value-display">
-                    <span>Current Value:</span>
-                    <strong>{item.currentValue !== undefined ? String(item.currentValue) : 'Not found'}</strong>
-                  </div>
-
-                  <div className="trainer-controls">
-                    {item.inputType === 'toggle' ? (
-                      <label className="switch">
-                        <input 
-                          type="checkbox" 
-                          checked={!!value}
-                          onChange={(e) => handleValueChange(item.id, e.target.checked)}
-                          disabled={isBlocked || applyingId === item.id}
-                        />
-                        <span className="slider round"></span>
-                      </label>
-                    ) : (
-                      <input 
-                        type="number" 
-                        value={value} 
-                        onChange={(e) => handleValueChange(item.id, e.target.value)}
-                        placeholder="New value"
-                        disabled={isBlocked || applyingId === item.id}
-                        className="value-input"
-                      />
-                    )}
-                    
-                    <button 
-                      className="btn-apply btn-sm"
-                      onClick={() => handleApply(item.id)}
-                      disabled={isBlocked || applyingId === item.id || value === undefined || value === ''}
-                    >
-                      {applyingId === item.id ? 'Applying...' : 'Apply'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {applyPending && (
+        <ApplyDialog
+          item={applyPending.item}
+          value={applyPending.value}
+          onConfirm={handleApplyConfirm}
+          onCancel={() => setApplyPending(null)}
+        />
       )}
     </div>
   );
