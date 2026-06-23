@@ -38,7 +38,7 @@ export function persistDatabase(sqlDb: any, forceSync = false): Promise<void> {
 
   const performWrite = () => {
     try {
-      if (!sqlDb) {
+      if (!sqlDb || !dbPath || dbPath === ':memory:') {
         if (resolvePendingPersist) resolvePendingPersist();
         return;
       }
@@ -94,7 +94,7 @@ export function flushPersistence(): Promise<void> {
     clearTimeout(persistTimeout);
     persistTimeout = null;
   }
-  if (rawDb) {
+  if (rawDb && dbPath && dbPath !== ':memory:') {
     try {
       const data = rawDb.export();
       const buffer = Buffer.from(data);
@@ -111,6 +111,12 @@ export function flushPersistence(): Promise<void> {
       resolvePendingPersist = null;
       rejectPendingPersist = null;
     }
+  } else {
+    // In-memory database, just resolve immediately
+    if (resolvePendingPersist) resolvePendingPersist();
+    pendingPersistPromise = null;
+    resolvePendingPersist = null;
+    rejectPendingPersist = null;
   }
   return pendingPersistPromise || Promise.resolve();
 }
@@ -130,7 +136,7 @@ export function schedulePersistence(): Promise<void> {
 
 if (typeof process !== 'undefined') {
   process.on('exit', () => {
-    if (rawDb) {
+    if (rawDb && dbPath && dbPath !== ':memory:') {
       try {
         const data = rawDb.export();
         const buffer = Buffer.from(data);
@@ -309,14 +315,19 @@ export async function resetForTesting(tempDbPath?: string): Promise<void> {
   // Initialize fresh
   if (tempDbPath) {
     dbPath = tempDbPath;
+  } else {
+    dbPath = ':memory:';
   }
   await initDatabaseAtPath(tempDbPath ?? ':memory:');
 }
 
 /** Apply all DDL and seed defaults to the already-open rawDb. */
 function applySchema(): void {
-  // Enable foreign keys
-  rawDb!.run('PRAGMA foreign_keys = ON');
+  // Enable foreign keys (disabled for in-memory test databases)
+  const isMem = dbPath === ':memory:';
+  if (!isMem) {
+    rawDb!.run('PRAGMA foreign_keys = ON');
+  }
 
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS games (
@@ -580,9 +591,75 @@ function applySchema(): void {
     )
   `);
 
+  // Compatibility profiles (Phase 1 of Trainer UX)
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS compatibility_profiles (
+      id TEXT PRIMARY KEY,
+      schemaVersion TEXT DEFAULT '1.0.0',
+      gameId TEXT NOT NULL,
+      gameName TEXT NOT NULL,
+      store TEXT DEFAULT 'Unknown',
+      storeAppId TEXT,
+      executableNames TEXT,
+      executableHash TEXT,
+      engine TEXT DEFAULT 'Unknown',
+      publisherHints TEXT,
+      developerHints TEXT,
+      saveLocationPatterns TEXT,
+      configLocationPatterns TEXT,
+      supportedAdapters TEXT,
+      gameVersion TEXT,
+      saveFormatVersion TEXT,
+      fingerprint TEXT,
+      validationStatus TEXT DEFAULT 'UNSUPPORTED',
+      limitations TEXT,
+      hasCloudSync INTEGER DEFAULT 0,
+      cloudSyncWarning TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      lastValidatedAt TEXT,
+      FOREIGN KEY (gameId) REFERENCES games(id),
+      UNIQUE(gameId)
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS profile_validations (
+      id TEXT PRIMARY KEY,
+      profileId TEXT NOT NULL,
+      status TEXT NOT NULL,
+      checkedAt TEXT DEFAULT (datetime('now')),
+      passed INTEGER DEFAULT 0,
+      evidence TEXT,
+      fingerprint TEXT,
+      FOREIGN KEY (profileId) REFERENCES compatibility_profiles(id)
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS pilot_runs (
+      id TEXT PRIMARY KEY,
+      profileId TEXT NOT NULL,
+      gameId TEXT NOT NULL,
+      timestamp TEXT DEFAULT (datetime('now')),
+      evidenceTier TEXT NOT NULL,
+      workspacePath TEXT,
+      originalHashBefore TEXT,
+      originalHashAfter TEXT,
+      status TEXT NOT NULL,
+      result TEXT,
+      failureReason TEXT,
+      FOREIGN KEY (profileId) REFERENCES compatibility_profiles(id),
+      FOREIGN KEY (gameId) REFERENCES games(id)
+    )
+  `);
+
   // Indexes
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_games_path ON games(path)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_scans_gameId ON scans(gameId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_compatibility_profiles_gameId ON compatibility_profiles(gameId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_profile_validations_profileId ON profile_validations(profileId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_pilot_runs_gameId ON pilot_runs(gameId)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_resources_gameId ON resources(gameId)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_resources_fileType ON resources(fileType)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_discovered_values_gameId ON discovered_values(gameId)');
