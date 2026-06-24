@@ -4,7 +4,7 @@
 
 ## Blocked — Waiting for User
 
-- [ ] **Outcome C: Real-world compatibility pilot** — User nominates a game with a JSON or plain-text save and provides or consents to copy one save file. See `Docs/Compatibility/V1_GAME_VALIDATION.md` for the full pilot checklist.
+- [ ] **Outcome C: Real-world compatibility pilot** — Non-user-data closeout is COMPLETE (see `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`). User nominates a single-player offline game with a JSON, INI, XML, CSV, or plain-text save. Provide game title, version, store, and save path to begin intake. See `Docs/Guides/REAL_WORLD_PILOT_INTAKE.md` for required fields and `Docs/Compatibility/REAL_WORLD_PILOT_CHECKLIST.md` for the full checklist.
 
 ## Short-term (unblocked, no user data needed)
 
@@ -19,19 +19,26 @@
 - [ ] Add onboarding wizard / first-run experience
 - [ ] Delete `fix-esm-imports.mjs` and `fix-esm-imports.ps1` (dead code — KI-003)
 
+## New E2E Test Suites (run after build:electron)
+
+```powershell
+npm run test:ipc-channels      # 9 tests — check-game-running, get-compatibility-profile, get-all-profiles
+npm run test:trainer-states    # 8 tests — card states + control types (5 pass, 3 documented skips)
+npm run test:browser-fallback  # 7 tests — all 7 guarded pages without electronAPI
+```
+
 ## Gate Sequence to Run Before Any New Milestone Acceptance
 
 ```powershell
-npm test
+npm test                         # 109 unit tests (includes pilot-intake)
 npx tsc --noEmit
 npm run build:vite
-npm run build:electron
-npm run verify:electron-output
-npm run test:electron-smoke
-npm run test:electron-e2e
-npm run test:trainer-e2e
+npm run build:electron           # output verifier 18/18
+npm run test:electron-smoke      # Gate 10, 6/6
+npm run test:electron-e2e        # Gate 13, 4/4
+npm run test:trainer-e2e         # 5/5
 npm run dist:dir
-npm run test:packaged-smoke
+npm run test:packaged-smoke      # Gate 18, 20/20
 ```
 
 All must pass before declaring a milestone ACCEPTED. Outcome C remains BLOCKED until Tier 1 real-world save evidence is collected.

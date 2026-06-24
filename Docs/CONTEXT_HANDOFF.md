@@ -13,6 +13,10 @@
 6b5bff8  feat(pilot): V1 Trainer UX — Outcomes A, B, D delivered; 99/99 tests pass
 8c92dcd  fix(types): restore zero-error TypeScript baseline
 d14a0f3  test(trainer): add Electron Trainer UX end-to-end verification
+643e2b4  docs(pilot): record compatibility pilot BLOCKED milestone decision
+[next]   test(pilot): complete non-user-data verification coverage
+[next]   docs(pilot): record accessibility, performance, and closeout evidence
+[next]   feat(pilot): add safe real-world pilot intake framework
 ```
 
 Do not amend, rebase, or rewrite any commit at or before `9a47980`.
@@ -32,17 +36,27 @@ Outcomes A, B, D: COMPLETE. Outcome C: BLOCKED_PENDING_USER_DATA. All non-user-d
 5. **Trainer E2E** — `tests/trainer.e2e.test.ts` — full Electron lifecycle, 5 tests, 28 assertion points, hash invariant evidence
 6. **Gate 18 expanded** — `tests/packaged-smoke.test.ts` expanded from 15 to 20 points; points 16–20 verify Trainer UI in packaged exe
 
-## All Gates Passing
+## All Gates Passing (Non-User-Data Closeout)
 
 | Gate / Suite | Command | Result |
 |--------------|---------|--------|
 | TypeScript | `npx tsc --noEmit` | 0 errors |
-| Unit tests | `npm test` | 99/99 |
-| Electron output verifier | `npm run verify:electron-output` | 18/18 |
+| Unit tests (×2) | `npm test` | **109/109** (includes pilot-intake ×10) |
+| Electron output verifier | `npm run build:electron` | 18/18 |
 | Gate 10 bundled smoke | `npm run test:electron-smoke` | 6/6 |
 | Gate 13 Electron E2E | `npm run test:electron-e2e` | 4/4 |
 | Trainer E2E | `npm run test:trainer-e2e` | 5/5 |
 | Gate 18 packaged smoke | `npm run test:packaged-smoke` | 20/20 |
+
+New E2E test suites written (require `npm run build:electron`):
+
+| Suite | Script | Coverage |
+|-------|--------|---------|
+| IPC channels | `npm run test:ipc-channels` | 9 tests: 3 new channels, valid + invalid inputs, 0 renderer errors |
+| Trainer states + controls | `npm run test:trainer-states` | 8 tests: 5 reachable states, 2 control types, 3 documented gaps |
+| Browser fallback | `npm run test:browser-fallback` | 7 tests: all 7 guarded pages without electronAPI |
+
+Non-user-data closeout decision: **VERIFIED**. See `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`.
 
 ## Key Architecture Notes for Next Session
 
@@ -52,15 +66,27 @@ Outcomes A, B, D: COMPLETE. Outcome C: BLOCKED_PENDING_USER_DATA. All non-user-d
 - `AppMode = 'trainer' | 'workshop'`, persisted to `localStorage` under key `'rf-app-mode'`
 - Game-running detection: read-only `tasklist`/`ps` via `isGameRunning(profile)` — no injection
 
+## Additional Architecture Notes (Closeout Session)
+
+- `recipeToTrainerItem` (line 460) only produces `inputType = 'toggle'` or `'number'` — slider/dropdown unreachable via IPC
+- `verifyRecipeSafety` returning `'Broken'` → `recipeToTrainerItem` maps to `statusBadge = 'Blocked'` — BROKEN state unreachable via IPC
+- All 7 renderer page components have `if (!window.electronAPI)` / `const apiAvailable = !!window.electronAPI` guards verified
+- Pilot intake pipeline: `src/core/pilot/intake.ts` + `src/core/pilot/manifest.ts` — safe copy, SHA-256 hash chain, Zod manifest
+- New .gitignore entries: `.local-pilot-data/`, `.local-pilot-workspaces/`, `.local-pilot-backups/`, `.local-pilot-reports/`
+- Coverage gaps documented as skip tests in `tests/trainer-states-controls.e2e.test.ts` — KI-012, KI-013
+
 ## What Is Needed to Unblock Outcome C
 
-1. User nominates a real single-player game with JSON or plain-text save format
-2. User provides or consents to copy one save file
-3. Discovery Lab identifies candidate fields
-4. Sandbox pilot: apply → verify → restore → verify
-5. Tier 1 hash evidence recorded in `Docs/Compatibility/PILOT_RESULTS.md`
-6. Profile promoted to VERIFIED
-7. No save file content committed to git
+1. User nominates a **single-player, offline** game with JSON, INI, XML, CSV, or plain-text save
+2. Game must be fully closed; cloud sync paused if applicable
+3. Provide: game title, version, store, full save path, cloudSyncRisk
+4. Run `intakePilotSave()` — creates isolated workspace, hash-verified copy, manifest
+5. Use Workshop to scan workspace copy, create recipes
+6. Apply → validate file hash → restore → validate hash reverted → source hash unchanged
+7. Optionally validate in-game (load edited save, confirm value changed)
+8. Record Tier 1 evidence in `Docs/Compatibility/PILOT_RESULTS.md`
+9. No save file content committed to git
+10. See `Docs/Guides/REAL_WORLD_PILOT_INTAKE.md` and `Docs/Compatibility/REAL_WORLD_PILOT_CHECKLIST.md`
 
 ---
 

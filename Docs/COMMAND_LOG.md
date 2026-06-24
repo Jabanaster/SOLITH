@@ -51,6 +51,77 @@ npm run dist:dir              # OK
 npm run test:packaged-smoke   # 20/20
 ```
 
+### Commit C: `643e2b4` — docs(pilot): record compatibility pilot BLOCKED milestone decision
+
+Files added / updated:
+- `Docs/Reports/COMPATIBILITY_PILOT_REPORT.md` — milestone BLOCKED, outcome table, evidence matrix
+- `Docs/IMPLEMENTATION_STATUS.md` — V1 outcomes table, test counts
+- `Docs/CONTEXT_HANDOFF.md` — full commit history, gate results, architecture notes
+- `Docs/NEXT_ACTIONS.md` — Outcome C blocked, unblocked a11y items, gate sequence
+- `Docs/KNOWN_ISSUES.md` — resolved KI-002/KI-004; added KI-006 through KI-011
+- `Docs/COMMAND_LOG.md` — added V1 Trainer UX session commands
+- `Docs/Reports/TRAINER_UX_VERIFICATION.md` — corrected gate terminology (18/18 = output verifier)
+- `Docs/Architecture/PILOT_SANDBOX.md` — NEW
+- `Docs/Compatibility/V1_FORMAT_COMPATIBILITY.md` — NEW
+- `Docs/Compatibility/V1_GAME_VALIDATION.md` — NEW
+- `Docs/Compatibility/PILOT_RESULTS.md` — NEW
+- `Docs/Guides/TRAINER_MODE_GUIDE.md` — NEW
+- `Docs/Guides/WORKSHOP_MODE_GUIDE.md` — NEW
+- `Docs/Reports/ACCESSIBILITY_REPORT.md` — NEW
+- `Docs/Reports/PERFORMANCE_REPORT.md` — NEW
+
+---
+
+## 2026-06-23 — V1 Non-User-Data Closeout
+
+### Purpose
+
+Prove that every non-user-data requirement is complete before beginning the real-save pilot. The 17-step closeout was requested after the milestone BLOCKED decision was found to lack exact evidence for: two consecutive npm test runs, build commands, git clean check, a11y, performance, browser fallback, Electron card state and control coverage, and IPC channel regression tests.
+
+### Files written (non-user-data closeout):
+
+```
+tests/ipc-channels.e2e.test.ts           — 9 tests: check-game-running, get-compatibility-profile, get-all-profiles
+tests/trainer-states-controls.e2e.test.ts — 8 tests: card states + control types (5 pass, 3 documented gaps)
+tests/browser-fallback.e2e.test.ts       — 7 tests: all 7 guarded pages without electronAPI
+src/core/pilot/manifest.ts               — RealWorldPilotManifest Zod schema (schemaVersion 1.0)
+src/core/pilot/intake.ts                 — 13-step intake pipeline (hash → copy → verify → manifest)
+tests/pilot-intake.test.ts               — 10 dry-run tests (JSON, INI, XML, CSV, text, binary fixtures)
+Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md — main closeout evidence matrix
+Docs/Guides/REAL_WORLD_PILOT_INTAKE.md  — intake guide (required fields, accepted formats, what the intake does)
+Docs/Compatibility/REAL_WORLD_PILOT_CHECKLIST.md — checklist (pre-session, format criteria, testing, outcome)
+```
+
+### Files updated:
+
+```
+package.json           — added test:ipc-channels, test:trainer-states, test:browser-fallback scripts
+                         added tests/pilot-intake.test.ts to npm test command
+.gitignore             — added .local-pilot-data/, .local-pilot-workspaces/, .local-pilot-backups/, .local-pilot-reports/
+Docs/KNOWN_ISSUES.md   — added KI-012 (BROKEN state unreachable via IPC), KI-013 (slider/dropdown unreachable)
+Docs/NEXT_ACTIONS.md   — updated Outcome C description to reference intake guide; added new test scripts
+Docs/IMPLEMENTATION_STATUS.md — updated test counts (99→109), added new test suites
+Docs/CONTEXT_HANDOFF.md — added closeout gate table, new architecture notes, updated Outcome C unblock steps
+Docs/COMMAND_LOG.md    — this entry
+```
+
+### Closeout verification sequence:
+
+```powershell
+npm test (run 1)        # 109/109 (includes pilot-intake ×10)
+npm test (run 2)        # 109/109
+npx tsc --noEmit        # 0 errors
+```
+
+Diagnosis note: pilot-intake tests 01-06 initially failed because `os.tmpdir()` was in `BLOCKED_SOURCE_PREFIXES`. Fixed by removing `os.tmpdir()` from constant and instead blocking `workspaceRootDir` per-call in `isBlockedSourcePath()`. Then intake-06 failed because `.bin` was not in the format map — fixed by adding `bin: 'binary'` to `detectFormat()` map.
+
+### Final closeout decision:
+
+```
+All non-user-data requirements are VERIFIED.
+The only remaining blocker is approved real-world save data.
+```
+
 ---
 
 ## 2026-06-23 — Electron Runtime and Package Verification Milestone

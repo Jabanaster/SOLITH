@@ -35,6 +35,12 @@ CSS `prefers-reduced-motion` is respected in `index.css` global transitions, but
 ### KI-011: No pagination on trainer cards
 The trainer cards list in `TrainerPage.tsx` renders all recipes without pagination or virtual scrolling. This is acceptable for small recipe sets (< 50 items) but will degrade for games with 100+ recipes.
 
+### KI-012: BROKEN card state unreachable via recipeToTrainerItem IPC pipeline
+`verifyRecipeSafety()` returns `'Broken'` when a recipe's target file is missing or unreadable. `recipeToTrainerItem()` maps this to `statusBadge = 'Blocked'` (not `'Broken'`). As a result, `deriveCardState()`'s `'broken'` branch is never reached via the `getRecipes` IPC call. The `BROKEN` TrainerCardState is fully implemented in `TrainerCard.tsx` and unit-tested in `trainer-ui.test.ts`, but is not reachable from the Electron renderer via the current pipeline. See `tests/trainer-states-controls.e2e.test.ts::coverage-gap`.
+
+### KI-013: slider and dropdown inputTypes unreachable via recipeToTrainerItem
+`recipeToTrainerItem()` (`src/core/recipes/index.ts` line 460) only produces `inputType = 'toggle'` (for `valueType === 'boolean'`) or `inputType = 'number'` (all other types). The `slider` and `dropdown` control branches in `TrainerCard.tsx` are implemented and unit-tested (trainer-ui.test.ts tests 25-27) but are not reachable via the `getRecipes` IPC call. Resolving this requires adding `inputType`, `min`, `max`, and `options` to the recipe creation IPC or overriding them in `recipeToTrainerItem`.
+
 ## Resolved
 
 | Issue | Resolution |

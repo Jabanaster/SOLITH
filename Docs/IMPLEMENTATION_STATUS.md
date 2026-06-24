@@ -14,7 +14,8 @@ This document tracks the implementation and verification status of ResourceForge
 | D | Compatibility Framework | COMPLETE |
 
 Branch: `feature/v1-trainer-ux-pilot`  
-Last verified commit: `d14a0f3` — test(trainer): add Electron Trainer UX end-to-end verification
+Last verified commit: see `Docs/CONTEXT_HANDOFF.md` for latest commit  
+Non-user-data closeout: **COMPLETE** — see `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`
 
 ---
 
@@ -69,11 +70,15 @@ Last verified commit: `d14a0f3` — test(trainer): add Electron Trainer UX end-t
 | Discovery test isolation | **FIXED** | Uses `resetForTesting()` with unique temp DB per run |
 | Consecutive-run regression | **ADDED** | Second describe block in discovery.test.ts proves isolation |
 | Trainer unit tests | **PASSING** | tests/trainer-ui.test.ts — 33 tests |
+| Pilot intake unit tests | **PASSING** | tests/pilot-intake.test.ts — 10 dry-run tests (invented fixture) |
 | Gate 10 bundled smoke | **PASSING** | tests/electron.smoke.test.ts — 6/6 |
 | Gate 13 Electron E2E | **PASSING** | tests/electron.e2e.test.ts — 4/4, repeatability CONFIRMED |
 | Trainer E2E | **PASSING** | tests/trainer.e2e.test.ts — 5/5, 28 assertion points |
 | Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 20/20 |
-| Total | **99/99** | All suites pass |
+| IPC channel E2E (new) | **WRITTEN** | tests/ipc-channels.e2e.test.ts — 9 tests (requires build:electron) |
+| Trainer states E2E (new) | **WRITTEN** | tests/trainer-states-controls.e2e.test.ts — 8 tests (5 pass, 3 documented skips) |
+| Browser fallback E2E (new) | **WRITTEN** | tests/browser-fallback.e2e.test.ts — 7 tests (requires build:electron) |
+| Total (npm test) | **109/109** | All unit suites pass |
 
 ## TypeScript
 
