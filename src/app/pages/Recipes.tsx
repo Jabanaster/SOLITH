@@ -46,13 +46,14 @@ const Recipes: React.FC<RecipesProps> = ({ gameId }) => {
       setLoading(false);
       return;
     }
+    if (!gameId) { setLoading(false); return; }
     setLoading(true);
     try {
       const result = await window.electronAPI.getRecipes(gameId);
-      if (result && !result.error) {
+      if (Array.isArray(result)) {
         setRecipes(result);
       } else {
-        console.error('Failed to load recipes:', result?.error);
+        console.error('Failed to load recipes: unexpected response');
         setRecipes([]);
       }
     } catch (e) {

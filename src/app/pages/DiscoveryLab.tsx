@@ -42,6 +42,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
       setLoading(false);
       return;
     }
+    if (!gameId) { setLoading(false); return; }
     setLoading(true);
     try {
       const files = await window.electronAPI.detectSaveFiles(gameId);
