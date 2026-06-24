@@ -115,11 +115,63 @@ npx tsc --noEmit        # 0 errors
 
 Diagnosis note: pilot-intake tests 01-06 initially failed because `os.tmpdir()` was in `BLOCKED_SOURCE_PREFIXES`. Fixed by removing `os.tmpdir()` from constant and instead blocking `workspaceRootDir` per-call in `isBlockedSourcePath()`. Then intake-06 failed because `.bin` was not in the format map — fixed by adding `bin: 'binary'` to `detectFormat()` map.
 
+### Initial closeout decision (REJECTED — evidence out of order):
+
+The complete gate sequence ran BEFORE the new test files were added. Decision was set to
+REJECTED — post-change non-user-data verification incomplete.
+
+---
+
+## 2026-06-23 — Post-Change Closeout Verification
+
+### Purpose
+
+Re-run every verification step AFTER adding:
+- `tests/ipc-channels.e2e.test.ts` (expanded 9→13 tests)
+- `tests/trainer-states-controls.e2e.test.ts` (fixed createRecipe return shape + CURRENCY category)
+- `tests/browser-fallback.e2e.test.ts`
+- `tests/accessibility.e2e.test.ts` (NEW)
+- `tests/performance.e2e.test.ts` (NEW)
+- `tests/packaged-smoke.test.ts` points 21-22 (NEW: actual IPC invocations)
+- Missing npm scripts: `test:ipc-e2e`, `test:trainer-states-e2e`, `test:browser-fallback-e2e`,
+  `test:accessibility`, `test:performance`, `test:pilot-intake`
+
+### Post-change verification sequence:
+
+```powershell
+npx tsc --noEmit              # 0 errors
+npm test (run 1)              # 109/109
+npm test (run 2)              # 109/109
+npm run build:vite            # Exit 0, 28 modules, 261.37 kB / 76.08 kB gzip
+npm run build:electron        # Exit 0, 18/18 verifier PASS
+npm run test:electron-smoke   # 6/6 in 7.2s
+npm run test:electron-e2e     # 4/4 in 1.7s, hash chain CONFIRMED
+npm run test:trainer-e2e      # 5/5 in 5.0s
+npm run test:ipc-channels     # 13/13 in 7.8s
+npm run test:trainer-states   # 7/7 + 3 documented skips in 4.4s
+npm run test:browser-fallback # 7/7 in 10.0s
+npm run test:accessibility    # 7/7 in 6.6s
+npm run test:performance      # 5/5 in 1.0s (startup 512ms, IPC 3-12ms)
+npm run test:pilot-intake     # 10/10 in 0.3s
+npm run dist                  # Exit 0, ResourceForge.exe produced
+npm run test:packaged-smoke   # 22/22 in 2.6s (Gate 18)
+git diff --check              # Exit 0 (LF→CRLF warnings only — not errors)
+git status --short            # Modified + untracked only
+```
+
+### Bugs fixed during post-change sequence:
+
+| Bug | File | Fix |
+|-----|------|-----|
+| `recipe?.id` should be `recipe?.recipe?.id` (createRecipe returns `{success, recipe}`) | trainer-states-controls.e2e.test.ts | Fixed all 6 occurrences |
+| `category: 'CURRENCY'` rejected by Zod (not in enum) | Same file | Changed to `'STATS'` |
+| Wrapping-label pattern missing in a11y-06 | accessibility.e2e.test.ts | Added `input.closest('label')` check |
+
 ### Final closeout decision:
 
 ```
-All non-user-data requirements are VERIFIED.
-The only remaining blocker is approved real-world save data.
+BLOCKED — real-world compatibility pilot requires approved user data.
+All non-user-data requirements are VERIFIED (post-change sequence passed).
 ```
 
 ---

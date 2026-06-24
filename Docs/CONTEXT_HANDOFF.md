@@ -25,7 +25,9 @@ Do not amend, rebase, or rewrite any commit at or before `9a47980`.
 
 **BLOCKED — real-world compatibility pilot requires approved user data**
 
-Outcomes A, B, D: COMPLETE. Outcome C: BLOCKED_PENDING_USER_DATA. All non-user-data work is verified. The only remaining blocker is a real commercial save file that the user must provide.
+Outcomes A, B, D: COMPLETE. Outcome C: BLOCKED_PENDING_USER_DATA. All non-user-data work is verified
+(post-change sequence passed — see `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`).
+The only remaining blocker is a real commercial save file that the user must provide.
 
 ## What Was Done This Milestone
 
@@ -36,7 +38,7 @@ Outcomes A, B, D: COMPLETE. Outcome C: BLOCKED_PENDING_USER_DATA. All non-user-d
 5. **Trainer E2E** — `tests/trainer.e2e.test.ts` — full Electron lifecycle, 5 tests, 28 assertion points, hash invariant evidence
 6. **Gate 18 expanded** — `tests/packaged-smoke.test.ts` expanded from 15 to 20 points; points 16–20 verify Trainer UI in packaged exe
 
-## All Gates Passing (Non-User-Data Closeout)
+## All Gates Passing (Non-User-Data Closeout — POST-CHANGE)
 
 | Gate / Suite | Command | Result |
 |--------------|---------|--------|
@@ -44,19 +46,19 @@ Outcomes A, B, D: COMPLETE. Outcome C: BLOCKED_PENDING_USER_DATA. All non-user-d
 | Unit tests (×2) | `npm test` | **109/109** (includes pilot-intake ×10) |
 | Electron output verifier | `npm run build:electron` | 18/18 |
 | Gate 10 bundled smoke | `npm run test:electron-smoke` | 6/6 |
-| Gate 13 Electron E2E | `npm run test:electron-e2e` | 4/4 |
+| Gate 13 Electron E2E | `npm run test:electron-e2e` | 4/4, hash chain CONFIRMED |
 | Trainer E2E | `npm run test:trainer-e2e` | 5/5 |
-| Gate 18 packaged smoke | `npm run test:packaged-smoke` | 20/20 |
+| IPC channels E2E | `npm run test:ipc-channels` | **13/13** (4 edge cases added) |
+| Trainer states E2E | `npm run test:trainer-states` | **7/7** + 3 documented skips |
+| Browser fallback E2E | `npm run test:browser-fallback` | 7/7 |
+| Accessibility E2E | `npm run test:accessibility` | **7/7** (NEW — Playwright DOM checks) |
+| Performance E2E | `npm run test:performance` | **5/5** (NEW — startup 512ms, IPC 3-12ms) |
+| Pilot intake | `npm run test:pilot-intake` | 10/10 |
+| Gate 18 packaged smoke | `npm run test:packaged-smoke` | **22/22** (expanded from 20) |
 
-New E2E test suites written (require `npm run build:electron`):
+Post-change sequence was run in the correct order (all suites run AFTER all new files were added).
 
-| Suite | Script | Coverage |
-|-------|--------|---------|
-| IPC channels | `npm run test:ipc-channels` | 9 tests: 3 new channels, valid + invalid inputs, 0 renderer errors |
-| Trainer states + controls | `npm run test:trainer-states` | 8 tests: 5 reachable states, 2 control types, 3 documented gaps |
-| Browser fallback | `npm run test:browser-fallback` | 7 tests: all 7 guarded pages without electronAPI |
-
-Non-user-data closeout decision: **VERIFIED**. See `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`.
+Non-user-data closeout decision: **BLOCKED (pilot awaiting user data)**. See `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`.
 
 ## Key Architecture Notes for Next Session
 

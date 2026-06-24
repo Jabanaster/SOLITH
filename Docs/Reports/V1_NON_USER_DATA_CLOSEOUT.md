@@ -6,9 +6,46 @@
 
 ---
 
-## 1. Verification Command Sequence
+## CURRENT DECISION
 
-All commands run from the project root in sequence. Results are exact — no paraphrasing.
+```
+BLOCKED — real-world compatibility pilot requires approved user data
+```
+
+All non-user-data requirements are VERIFIED. The complete post-change sequence passed
+after the following were added and their bugs corrected:
+- `tests/ipc-channels.e2e.test.ts` (expanded: 9 → 13 tests, fixed none)
+- `tests/trainer-states-controls.e2e.test.ts` (fixed: createRecipe return shape + CURRENCY category)
+- `tests/browser-fallback.e2e.test.ts` (no fixes required)
+- `tests/accessibility.e2e.test.ts` (NEW — fixed wrapping-label false negative)
+- `tests/performance.e2e.test.ts` (NEW — no fixes required)
+- `tests/packaged-smoke.test.ts` (expanded: 20 → 22 points)
+- Missing npm scripts added: `test:ipc-e2e`, `test:trainer-states-e2e`,
+  `test:browser-fallback-e2e`, `test:accessibility`, `test:performance`, `test:pilot-intake`
+
+**Previous REJECTED status:** The original closeout ran the complete sequence before
+adding the new test files. Now the sequence has been run in the correct order.
+
+**Post-change items resolved:**
+- [x] build:vite → Exit 0, 28 modules, 261.37 kB / 76.08 kB gzip
+- [x] build:electron → Exit 0, 18/18 verifier PASS
+- [x] test:electron-smoke → 6/6
+- [x] test:electron-e2e → 4/4, hash chain CONFIRMED
+- [x] test:trainer-e2e → 5/5, hash chain matches prior runs
+- [x] test:ipc-channels → 13/13 (9 original + 4 new edge cases)
+- [x] test:trainer-states → 7/7 pass + 3 documented skips (KI-012, KI-013, 6 unreachable states)
+- [x] test:browser-fallback → 7/7
+- [x] test:accessibility → 7/7
+- [x] test:performance → 5/5 (startup 512ms, IPC round-trips 3-12ms)
+- [x] test:packaged-smoke → 22/22 (Gate 18)
+- [x] documentation updated
+
+---
+
+## 1. Verification Command Sequence — POST-CHANGE (FINAL)
+
+All commands run from the project root after all new test files were created and bugs corrected.
+Results are exact — no paraphrasing.
 
 | # | Command | Result |
 |---|---------|--------|
@@ -17,14 +54,28 @@ All commands run from the project root in sequence. Results are exact — no par
 | 3 | `npx tsc --noEmit` | **Exit 0, 0 errors** |
 | 4 | `npm run build:vite` | Exit 0, 28 modules, 261.37 kB / 76.08 kB gzip |
 | 5 | `npm run build:electron` | Exit 0, **18/18 verifier PASS** |
-| 6 | `npm run test:electron-smoke` | **6/6 pass** in 2.5s |
-| 7 | `npm run test:electron-e2e` | **4/4 pass** in 2.1s |
-| 8 | `npm run test:trainer-e2e` | **5/5 pass** in 5.3s |
-| 9 | `npm run build` (full installer) | Exit 0, `ResourceForge Setup 1.0.0.exe` produced |
-| 10 | `npm run dist` | Exit 0 |
-| 11 | `npm run test:packaged-smoke` | **20/20 pass** in 1.9s (Gate 18) |
-| 12 | `git diff --check` | Exit 0 — no whitespace errors |
-| 13 | `git status --short` | Exit 0 — clean tree |
+| 6 | `npm run test:electron-smoke` | **6/6 pass** in 7.2s |
+| 7 | `npm run test:electron-e2e` | **4/4 pass** in 1.7s, hash chain CONFIRMED |
+| 8 | `npm run test:trainer-e2e` | **5/5 pass** in 5.0s |
+| 9 | `npm run test:ipc-channels` | **13/13 pass** in 7.8s |
+| 10 | `npm run test:trainer-states` | **7/7 pass** + 3 documented skips in 4.4s |
+| 11 | `npm run test:browser-fallback` | **7/7 pass** in 10.0s |
+| 12 | `npm run test:accessibility` | **7/7 pass** in 6.6s |
+| 13 | `npm run test:performance` | **5/5 pass** in 1.0s (startup 512ms, IPC 3-12ms) |
+| 14 | `npm run test:pilot-intake` | **10/10 pass** in 0.3s |
+| 15 | `npm run dist` | Exit 0, `ResourceForge.exe` produced |
+| 16 | `npm run test:packaged-smoke` | **22/22 pass** in 2.6s (Gate 18) |
+| 17 | `git diff --check` | Exit 0 — no whitespace errors |
+| 18 | `git status --short` | Modified + untracked only — no unexpected files |
+
+### Hardware context
+
+```
+CPU     = AMD Ryzen 7 9850X3D 8-Core Processor × 16 cores
+OS      = Windows 11 Home 10.0.26200
+Node    = v24.15.0
+Build   = dev bundle (dist-electron/main.js)
+```
 
 ---
 
@@ -47,19 +98,23 @@ All commands run from the project root in sequence. Results are exact — no par
 | **Pilot intake (dry-run, invented fixture, 10 assertions)** | **10** | **PASS** |
 | **Total** | **109** | **109 PASS, 0 FAIL** |
 
-### 2.2 Electron Gate Results
+### 2.2 Electron Gate Results (post-change)
 
 | Gate | Command | Result |
 |------|---------|--------|
-| Output Verifier (18/18) | `npm run build:electron` | **18/18 PASS** — not Gate 10/13/18 |
+| Output Verifier (18/18) | `npm run build:electron` | **18/18 PASS** |
 | Gate 10 — Bundled Smoke | `npm run test:electron-smoke` | **6/6 PASS** |
-| Gate 13 — E2E Workflow | `npm run test:electron-e2e` | **4/4 PASS** (hashes confirmed both runs) |
+| Gate 13 — E2E Workflow | `npm run test:electron-e2e` | **4/4 PASS** (hash chain CONFIRMED) |
 | Trainer E2E | `npm run test:trainer-e2e` | **5/5 PASS** |
-| Gate 18 — Packaged Smoke | `npm run test:packaged-smoke` | **20/20 PASS** |
+| Gate 18 — Packaged Smoke | `npm run test:packaged-smoke` | **22/22 PASS** (points 21-22 added: actual IPC invocations) |
 
-### 2.3 New IPC Channel Coverage (`tests/ipc-channels.e2e.test.ts`)
+Gate 18 expanded to 22 points. New points:
+- **Point 21**: `checkGameRunning` is ACTUALLY INVOKED (not just presence check) → `{running:false, evidence:string}` ✓
+- **Point 22**: `getCompatibilityProfile` is ACTUALLY INVOKED → `null` (fresh DB, no profiles) ✓
 
-Covers three new IPC channels added for compatibility framework:
+### 2.3 New IPC Channel Coverage (`tests/ipc-channels.e2e.test.ts`) — 13 tests
+
+Covers three new IPC channels. All 13 pass post-change.
 
 | Test | Channel | Input | Expected |
 |------|---------|-------|----------|
@@ -72,9 +127,17 @@ Covers three new IPC channels added for compatibility framework:
 | ipc-07 | get-compatibility-profile | invalid identifier | null (Zod catch) |
 | ipc-08 | get-all-profiles | (no input) | [] (fresh DB) |
 | ipc-09 | all three channels | valid + invalid inputs | 0 renderer errors |
+| ipc-10 | check-game-running | null input | Zod catch → safe shape, no crash |
+| ipc-11 | get-all-profiles | consecutive calls | idempotent — same result |
+| ipc-12 | get-compatibility-profile | 500-char string | null (Zod rejects, no crash) |
+| ipc-13 | all three channels | number input (wrong type) | handlers recover, 0 renderer errors |
+
+**Coverage gap (explicit, documented):** "existing profile" and "multiple profiles ordering" cases
+cannot be tested via E2E because there is no `createCompatibilityProfile` IPC endpoint.
+Unit tests cover these cases: `tests/profiles.test.ts` tests 1, 3, 12.
 
 **Requires:** `npm run build:electron` before running.  
-**Script:** `npm run test:ipc-channels`
+**Script:** `npm run test:ipc-channels` / `npm run test:ipc-e2e`
 
 ### 2.4 Trainer Card State and Control Type Coverage (`tests/trainer-states-controls.e2e.test.ts`)
 
@@ -127,34 +190,37 @@ All 7 guarded page components verified to handle `window.electronAPI === undefin
 
 **Script:** `npm run test:browser-fallback`
 
-### 2.6 Accessibility
+### 2.6 Accessibility (`tests/accessibility.e2e.test.ts`) — 7 tests — POST-CHANGE
 
-Verified against WCAG 2.1 AA (manual and tooling). Findings documented in `Docs/Reports/ACCESSIBILITY_REPORT.md`.
+Playwright-based DOM checks. All 7 pass.
 
-| Area | Status |
-|------|--------|
-| Semantic HTML (landmarks, headings) | VERIFIED |
-| Keyboard navigation | VERIFIED |
-| ARIA labels on interactive elements | PARTIAL (KI-007, KI-008, KI-009) |
-| Dialog focus trap | PARTIAL (KI-006) |
-| Reduced-motion respect | PARTIAL (KI-010) |
-| Color contrast (WCAG AA) | VERIFIED |
+| Test | Check | Result |
+|------|-------|--------|
+| a11y-01 | All `<img>` have non-empty alt or role="presentation" | PASS |
+| a11y-02 | All `<button>` have accessible names (text or aria-label) | PASS |
+| a11y-03 | Trainer/Workshop mode toggles have `aria-pressed` | PASS |
+| a11y-04 | At least one landmark region present | PASS |
+| a11y-05 | Zero renderer errors on initial page load + hash nav | PASS |
+| a11y-06 | All `<input>` have labels (for=, aria-label, or wrapping `<label>`) | PASS |
+| a11y-07 | Tab key (10 presses) produces no renderer exceptions | PASS |
 
-Outstanding a11y items are non-blocking minor issues — none are WCAG 2.1 AA critical violations.
+**Evidence tier: Tier 3** — structural DOM checks. Axe rule-set not available without additional dependency.
+See `Docs/Reports/ACCESSIBILITY_REPORT.md` for qualitative notes (KI-006 through KI-010).
 
-### 2.7 Performance
+### 2.7 Performance (`tests/performance.e2e.test.ts`) — 5 tests — POST-CHANGE
 
-Measured in Electron renderer via DevTools and bundler output. Documented in `Docs/Reports/PERFORMANCE_REPORT.md`.
+Actual wall-clock timing measurements. All 5 pass.
 
-| Metric | Measured | Target |
-|--------|---------|--------|
-| Renderer bundle (gzip) | 76.08 kB | < 150 kB |
-| Initial page load (Electron) | < 800ms | < 2000ms |
-| Apply operation (JSON patch) | < 200ms | < 500ms |
-| Restore operation | < 150ms | < 500ms |
-| IPC round-trip (simple read) | < 50ms | < 100ms |
+| Test | Metric | Measured | Target |
+|------|--------|---------|--------|
+| perf-01 | App startup → `#root` selector | 512 ms | < 5000 ms |
+| perf-02 | `getAllProfiles` IPC round-trip | 12 ms | < 150 ms |
+| perf-03 | `checkGameRunning` IPC round-trip | 4 ms | < 150 ms |
+| perf-04 | `getGames` IPC round-trip | 3 ms | < 150 ms |
+| perf-05 | Second `getAllProfiles` (DB warm) | 1 ms | < 150 ms |
 
-All metrics are within targets.
+Hardware: AMD Ryzen 7 9850X3D, 16 cores, win32/x64, Node v24.15.0.
+Renderer bundle: 76.08 kB gzip (target < 150 kB) ✓
 
 ### 2.8 Hash Chain Evidence (Pilot Sandbox Fixture)
 
@@ -247,15 +313,33 @@ None of these gaps affect correctness of the pilot data pipeline, safety of the 
 ## 5. Final Decision
 
 ```
+BLOCKED — real-world compatibility pilot requires approved user data.
 All non-user-data requirements are VERIFIED.
-The only remaining blocker is approved real-world save data.
 ```
+
+**Post-change sequence:** The complete verification sequence was re-run AFTER all new
+test files were added and all bugs were fixed. Every item in the sequence passes.
 
 Gate sequence required before each subsequent milestone acceptance:
 1. `npm run build:electron` (output verifier 18/18)
 2. `npm run test:electron-smoke` (Gate 10, 6/6)
 3. `npm run test:electron-e2e` (Gate 13, 4/4)
 4. `npm run test:trainer-e2e` (5/5)
-5. `npm run test:packaged-smoke` (Gate 18, 20/20)
+5. `npm run test:ipc-channels` (13/13)
+6. `npm run test:trainer-states` (7/7 + 3 skips)
+7. `npm run test:browser-fallback` (7/7)
+8. `npm run test:accessibility` (7/7)
+9. `npm run test:performance` (5/5)
+10. `npm run test:packaged-smoke` (Gate 18, 22/22)
 
 Do not label any real-game format VERIFIED until backup / apply / validation / restore / source-file hash evidence all pass with **Tier 1 (real-world save)** evidence.
+
+### Bugs discovered and fixed during post-change sequence
+
+| Bug | Location | Fix |
+|-----|----------|-----|
+| `createRecipe` IPC returns `{ success, recipe }` not recipe directly | `tests/trainer-states-controls.e2e.test.ts` | Changed `recipe?.id` → `recipe?.recipe?.id` |
+| `category: 'CURRENCY'` rejected by Zod schema | Same file | Changed to `'STATS'` |
+| Wrapping-label pattern not checked | `tests/accessibility.e2e.test.ts` | Added `input.closest('label')` check |
+
+None of these bugs were in production code — they were all in the test files themselves.
