@@ -52,7 +52,7 @@ The only remaining blocker is a real commercial save file that the user must pro
 | Trainer states E2E | `npm run test:trainer-states` | **7/7** + 3 documented skips |
 | Browser fallback E2E | `npm run test:browser-fallback` | 7/7 |
 | Accessibility E2E | `npm run test:accessibility` | **7/7** (NEW — Playwright DOM checks) |
-| Performance E2E | `npm run test:performance` | **5/5** (NEW — startup 512ms, IPC 3-12ms) |
+| Performance E2E | `npm run test:performance` | **12/12** (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
 | Pilot intake | `npm run test:pilot-intake` | 10/10 |
 | Gate 18 packaged smoke | `npm run test:packaged-smoke` | **22/22** (expanded from 20) |
 

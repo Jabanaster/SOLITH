@@ -79,7 +79,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | Trainer states E2E | **PASSING** | tests/trainer-states-controls.e2e.test.ts — 7/7 + 3 documented skips |
 | Browser fallback E2E | **PASSING** | tests/browser-fallback.e2e.test.ts — 7/7 |
 | Accessibility E2E (new) | **PASSING** | tests/accessibility.e2e.test.ts — 7/7 DOM-level checks |
-| Performance E2E (new) | **PASSING** | tests/performance.e2e.test.ts — 5/5 (startup 512ms, IPC 3-12ms) |
+| Performance E2E (new) | **PASSING** | tests/performance.e2e.test.ts — 12/12 (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
 | Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 22/22 (expanded from 20) |
 | Total (npm test) | **109/109** | All unit suites pass |
 
