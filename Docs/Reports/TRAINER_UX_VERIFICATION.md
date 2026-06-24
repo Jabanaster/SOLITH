@@ -136,7 +136,7 @@ New points 16–20 (Trainer UI in packaged exe):
 `tests/trainer-ui.test.ts`: **33/33 PASS**
 
 Covers:
-- `deriveCardState()` — all 11 state transitions (tests 1–18)
+- `deriveCardState()` — all 9 active states; `NEEDS_SAVE`/`STALE` removed because no production branch emitted them
 - `STATE_CONFIG` — completeness and field validation (tests 19–23)
 - `TrainerItem` shape constraints — all 4 inputType variants (tests 24–29)
 - Compatibility level taxonomy (tests 30–33)

@@ -422,7 +422,7 @@ export function getRecipesNeedingRescan(gameId: string): Recipe[] {
 
 export function recipeToTrainerItem(recipe: Recipe): TrainerItem {
   const safety = verifyRecipeSafety(recipe);
-  const statusBadge = safety === 'Broken' ? 'Blocked' : safety === 'Needs Rescan' ? 'Needs Rescan' : 'Ready';
+  const statusBadge = safety === 'Broken' ? 'Broken' : safety === 'Needs Rescan' ? 'Needs Rescan' : 'Ready';
   
   // Extract current value from target file if available
   let currentValue: string | number | undefined = undefined;

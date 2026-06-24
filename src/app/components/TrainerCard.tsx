@@ -3,10 +3,8 @@ import type { TrainerItem } from '../../shared/types/index.js';
 
 export type TrainerCardState =
   | 'READY'
-  | 'NEEDS_SAVE'
   | 'GAME_RUNNING'
   | 'NEEDS_RESCAN'
-  | 'STALE'
   | 'BROKEN'
   | 'BLOCKED'
   | 'APPLYING'
@@ -16,10 +14,8 @@ export type TrainerCardState =
 
 export const STATE_CONFIG: Record<TrainerCardState, { label: string; color: string; explanation: string }> = {
   READY:        { label: 'Ready',        color: 'safe',    explanation: '' },
-  NEEDS_SAVE:   { label: 'No Save',      color: 'caution', explanation: 'No save file detected. Run a scan first.' },
   GAME_RUNNING: { label: 'Game Running', color: 'caution', explanation: 'Close the game before modifying this save.' },
   NEEDS_RESCAN: { label: 'Needs Rescan', color: 'caution', explanation: 'The save structure changed after a game update.' },
-  STALE:        { label: 'Stale',        color: 'caution', explanation: 'Recipe may be outdated — rescan to verify.' },
   BROKEN:       { label: 'Broken',       color: 'risky',   explanation: 'Target file not found or inaccessible.' },
   BLOCKED:      { label: 'Blocked',      color: 'blocked', explanation: 'This target is protected and cannot be edited safely.' },
   APPLYING:     { label: 'Applying…',    color: 'info',    explanation: 'Writing change atomically. Do not close.' },

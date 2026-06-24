@@ -12,10 +12,10 @@
 BLOCKED — real-world compatibility pilot requires approved user data
 ```
 
-All non-user-data requirements are VERIFIED. The complete post-change sequence passed
-after the following were added and their bugs corrected:
+All non-user-data requirements are VERIFIED. The complete post-change sequence passed,
+including Electron-renderer assertions for every active exposed trainer-card state.
 - `tests/ipc-channels.e2e.test.ts` (expanded: 9 → 13 tests, fixed none)
-- `tests/trainer-states-controls.e2e.test.ts` (fixed: createRecipe return shape + CURRENCY category)
+- `tests/trainer-states-controls.e2e.test.ts` (12 pass: five new renderer-state assertions; 1 unrelated KI-013 skip)
 - `tests/browser-fallback.e2e.test.ts` (no fixes required)
 - `tests/accessibility.e2e.test.ts` (NEW — fixed wrapping-label false negative)
 - `tests/performance.e2e.test.ts` (NEW — no fixes required)
@@ -33,10 +33,10 @@ adding the new test files. Now the sequence has been run in the correct order.
 - [x] test:electron-e2e → 4/4, hash chain CONFIRMED
 - [x] test:trainer-e2e → 5/5, hash chain matches prior runs
 - [x] test:ipc-channels → 13/13 (9 original + 4 new edge cases)
-- [x] test:trainer-states → 7/7 pass + 3 documented skips (KI-012, KI-013, 6 unreachable states)
+- [x] test:trainer-states → 12/12 pass + 1 documented skip (KI-013 only)
 - [x] test:browser-fallback → 7/7
 - [x] test:accessibility → 7/7
-- [x] test:performance → 12/12 (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms)
+- [x] test:performance → 12/12 (warm startup 501ms, IPC 1-8ms, nav 314-315ms, apply 17ms, restore 7-8ms)
 - [x] test:packaged-smoke → 22/22 (Gate 18)
 - [x] documentation updated
 
@@ -49,22 +49,22 @@ Results are exact — no paraphrasing.
 
 | # | Command | Result |
 |---|---------|--------|
-| 1 | `npm test` (run 1) | **109/109 pass**, 0 fail, 0 skip |
-| 2 | `npm test` (run 2) | **109/109 pass**, 0 fail, 0 skip |
+| 1 | `npm test` (run 1) | **107/107 pass**, 0 fail, 0 skip |
+| 2 | `npm test` (run 2) | **107/107 pass**, 0 fail, 0 skip |
 | 3 | `npx tsc --noEmit` | **Exit 0, 0 errors** |
-| 4 | `npm run build:vite` | Exit 0, 28 modules, 261.37 kB / 76.08 kB gzip |
+| 4 | `npm run build:vite` | Exit 0, 28 modules, 261.82 kB / 76.25 kB gzip |
 | 5 | `npm run build:electron` | Exit 0, **18/18 verifier PASS** |
-| 6 | `npm run test:electron-smoke` | **6/6 pass** in 7.2s |
-| 7 | `npm run test:electron-e2e` | **4/4 pass** in 1.7s, hash chain CONFIRMED |
-| 8 | `npm run test:trainer-e2e` | **5/5 pass** in 5.0s |
-| 9 | `npm run test:ipc-channels` | **13/13 pass** in 7.8s |
-| 10 | `npm run test:trainer-states` | **7/7 pass** + 3 documented skips in 4.4s |
-| 11 | `npm run test:browser-fallback` | **7/7 pass** in 10.0s |
-| 12 | `npm run test:accessibility` | **7/7 pass** in 6.6s |
-| 13 | `npm run test:performance` | **12/12 pass** in 5.3s (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
+| 6 | `npm run test:electron-smoke` | **6/6 pass** in 2.1s |
+| 7 | `npm run test:electron-e2e` | **4/4 pass** in 1.9s, hash chain CONFIRMED |
+| 8 | `npm run test:trainer-e2e` | **5/5 pass** in 5.5s |
+| 9 | `npm run test:ipc-channels` | **13/13 pass** in 8.6s |
+| 10 | `npm run test:trainer-states` | **12/12 pass** + 1 KI-013 skip in 9.4s |
+| 11 | `npm run test:browser-fallback` | **7/7 pass** in 10.5s |
+| 12 | `npm run test:accessibility` | **7/7 pass** in 6.9s |
+| 13 | `npm run test:performance` | **12/12 pass** in 5.3s (warm startup 501ms, IPC 1-8ms, nav 314-315ms, apply 17ms, restore 7-8ms) |
 | 14 | `npm run test:pilot-intake` | **10/10 pass** in 0.3s |
 | 15 | `npm run dist` | Exit 0, `ResourceForge.exe` produced |
-| 16 | `npm run test:packaged-smoke` | **22/22 pass** in 2.6s (Gate 18) |
+| 16 | `npm run test:packaged-smoke` | **22/22 pass** in 2.7s (Gate 18) |
 | 17 | `git diff --check` | Exit 0 — no whitespace errors |
 | 18 | `git status --short` | Modified + untracked only — no unexpected files |
 
@@ -81,7 +81,7 @@ Build   = dev bundle (dist-electron/main.js)
 
 ## 2. Evidence Matrix
 
-### 2.1 Unit + Integration Test Coverage (109 tests)
+### 2.1 Unit + Integration Test Coverage (107 tests)
 
 | Suite | Count | Result |
 |-------|-------|--------|
@@ -94,9 +94,9 @@ Build   = dev bundle (dist-electron/main.js)
 | Compatibility profiles (create, retrieve, update, fingerprint, drift) | 12 | PASS |
 | Process detection (game-running check, read-only) | 4 | PASS |
 | SQL parameter binding + hostile inputs | 10 | PASS |
-| Trainer UI (deriveCardState, TrainerItem shape, compat taxonomy) | 12 | PASS |
+| Trainer UI (deriveCardState, active state config, TrainerItem shape, compat taxonomy) | 10 | PASS |
 | **Pilot intake (dry-run, invented fixture, 10 assertions)** | **10** | **PASS** |
-| **Total** | **109** | **109 PASS, 0 FAIL** |
+| **Total** | **107** | **107 PASS, 0 FAIL** |
 
 ### 2.2 Electron Gate Results (post-change)
 
@@ -141,7 +141,7 @@ Unit tests cover these cases: `tests/profiles.test.ts` tests 1, 3, 12.
 
 ### 2.4 Trainer Card State and Control Type Coverage (`tests/trainer-states-controls.e2e.test.ts`)
 
-#### Per-state classification — ALL 11 `TrainerCardState` values
+#### Per-state classification — all 9 active `TrainerCardState` values
 
 The `deriveCardState` function lives at `src/app/pages/TrainerPage.tsx:30–44`. Its full logic:
 
@@ -156,24 +156,21 @@ if gameRunning                      → return GAME_RUNNING
 
 | State | Classification | Runtime Evidence |
 |-------|---------------|-----------------|
-| **READY** | **VERIFIED (E2E)** | `states-01`: recipe risk=Safe, valid file → `getRecipes` returns `status='Ready'` |
-| **NEEDS_SAVE** | **NOT APPLICABLE** | `deriveCardState` has no branch returning `'NEEDS_SAVE'`. State exists in the type union and `STATE_CONFIG` rendering table but is never emitted by the state machine. Unit test 13 confirms: `deriveCardState(item, 'NEEDS_SAVE', false)` returns `'READY'` (transient falls through). This is a reserved/planned state — no current IPC path activates it. |
-| **GAME_RUNNING** | **COVERED — unit test 2** | `trainer-ui.test.ts test 2`: `assert.strictEqual(deriveCardState(item, null, true), 'GAME_RUNNING')` — requires `isGameRunning(profile)` returning `true` (real OS process); not automatable in E2E without injecting a real executable. |
-| **NEEDS_RESCAN** | **COVERED — unit tests 6, 7** | `trainer-ui.test.ts test 6`: `assert.strictEqual(deriveCardState(makeItem({status:'Needs Rescan'}), null, false), 'NEEDS_RESCAN')`. Requires hash mismatch after recipe creation — not reproducible in E2E isolation (scanner re-runs would be needed). |
-| **STALE** | **NOT APPLICABLE** | `deriveCardState` has no branch returning `'STALE'`. State exists in the type union and `STATE_CONFIG` but is never emitted. Unit test 14 confirms: `deriveCardState(item, 'STALE', false)` returns `'NEEDS_RESCAN'` (transient falls through to status-driven logic). Reserved for future fingerprint-drift detection. |
-| **BROKEN** | **COVERED — unit tests 8, 16; IPC gap KI-012** | `trainer-ui.test.ts test 8`: `assert.strictEqual(deriveCardState(makeItem({status:'broken'}), null, false), 'BROKEN')`. Test 16 additionally confirms: BROKEN status beats GAME_RUNNING. State machine fully verified. IPC pipeline cannot reach it because `recipeToTrainerItem` maps broken files → `status='Blocked'` (KI-012). |
-| **BLOCKED** | **VERIFIED (E2E, two paths)** | `states-02`: recipe `risk='Blocked'` → item returned with `risk='Blocked'`. `states-03`: recipe targeting non-existent file → `verifyRecipeSafety='Broken'` → `recipeToTrainerItem` → `status='Blocked'`. Both paths confirmed in Electron renderer. |
-| **APPLYING** | **COVERED — unit test 9** | `trainer-ui.test.ts test 9`: `assert.strictEqual(deriveCardState(item, 'APPLYING', false), 'APPLYING')`. Transient held during `applyProposal` IPC call — not observable between call initiation and return in automated E2E. |
-| **APPLIED** | **VERIFIED (E2E)** | `states-04`: `applyProposal` succeeds → `backup.id` returned; IPC pipeline produces the APPLIED transient state. |
-| **RESTORED** | **VERIFIED (E2E)** | `states-05`: `restoreBackup` succeeds → file hash matches original; IPC pipeline produces the RESTORED transient state. |
-| **FAILED** | **COVERED — unit test 12** | `trainer-ui.test.ts test 12`: `assert.strictEqual(deriveCardState(item, 'FAILED', true), 'FAILED')`. Transient set on apply error — requires a deliberately failing write, not reproducible in the current E2E fixture. |
+| **READY** | **VERIFIED (Electron/IPC)** | `states-01`: valid safe recipe returns `status='Ready'` |
+| **GAME_RUNNING** | **VERIFIED (Electron renderer)** | `renderer-game_running`: exact label/explanation, running banner, disabled input/apply, enabled Rescan, 0 renderer errors |
+| **NEEDS_RESCAN** | **VERIFIED (Electron renderer)** | `renderer-needs_rescan`: exact label/explanation, enabled input/apply/Rescan, 0 renderer errors |
+| **BROKEN** | **VERIFIED (Electron IPC + renderer)** | `states-03`: missing target returns `status='Broken'`; `renderer-broken`: exact label/explanation, no edit/apply controls, enabled Rescan, 0 renderer errors |
+| **BLOCKED** | **VERIFIED (Electron/IPC)** | `states-02`: recipe `risk='Blocked'` remains protected |
+| **APPLYING** | **VERIFIED (Electron renderer)** | `renderer-applying`: exact label/explanation, disabled input/apply, ellipsis action text, enabled Rescan, 0 renderer errors |
+| **APPLIED** | **VERIFIED (Electron/IPC)** | `states-04`: successful apply creates a backup |
+| **RESTORED** | **VERIFIED (Electron/IPC)** | `states-05`: restore succeeds and original file hash is recovered |
+| **FAILED** | **VERIFIED (Electron renderer)** | `renderer-failed`: exact label/explanation, enabled retry controls/Rescan, 0 renderer errors |
 
-**Summary:**
-- 5 states VERIFIED by Electron E2E runtime (READY, BLOCKED×2, APPLIED, RESTORED)
-- 5 states COVERED by unit tests that execute the state machine at runtime (GAME_RUNNING, NEEDS_RESCAN, BROKEN, APPLYING, FAILED)
-- 2 states NOT APPLICABLE — `deriveCardState` never outputs them; they are reserved states in the type union with no current activation path (NEEDS_SAVE, STALE)
-
-NEEDS_SAVE and STALE are not "deferred" (which would mean more tests are needed to close the gap). The gap is in the production implementation — the state machine simply does not output these values. Test coverage cannot be added for code paths that don't exist.
+**Summary:** all 9 active states have Electron evidence. The five previously unit-only
+states now have real Electron-renderer DOM assertions. `NEEDS_SAVE` and `STALE` were removed
+from the active union/config and documented as future concepts because no production branch
+emitted them. `KI-012` is resolved: broken safety results now remain `status='Broken'` through
+`recipeToTrainerItem()`.
 
 #### Reachable control types:
 
@@ -233,7 +230,7 @@ Actual wall-clock timing measurements. All 12 pass.
 
 | Test | Metric | Runs | Median | Slowest | Target |
 |------|--------|------|--------|---------|--------|
-| perf-01 | App startup → `#root` selector | 1 | 479 ms | 479 ms | < 8000 ms |
+| perf-01 | App startup → `#root` selector (warm) | 1 | 501 ms | 501 ms | < 8000 ms |
 | perf-02 | `getAllProfiles` IPC round-trip | 5 | 1 ms | 1 ms | < 150 ms |
 | perf-03 | `checkGameRunning` IPC round-trip | 3 | 1 ms | 3 ms | < 150 ms |
 | perf-04 | `getGames` IPC round-trip | 3 | 3 ms | 4 ms | < 150 ms |
@@ -251,9 +248,9 @@ Actual wall-clock timing measurements. All 12 pass.
 - perf-08: `getRecipes` is the bottleneck for Trainer list rendering; DOM rendering of 3 cards is not separately measured (requires known TrainerCard CSS selectors).
 - perf-09: Measures from button click until `aria-pressed='true'` reflects on the Workshop button — full UI state update round-trip.
 - perf-11/12: Each apply/restore cycle uses a fresh proposal. File is restored to original between runs. 6 total apply+restore cycles across perf-11 and perf-12.
-- Startup target raised from 5000ms to 8000ms to accommodate cold-start variance (first launch on a loaded system measured 6198ms in a previous run; warmed-system runs are consistently < 500ms).
+- **Known limitation:** a loaded-system cold start measured approximately **6198 ms**. Raising the ceiling from 5000ms to 8000ms avoids a flaky gate; it does not resolve the performance concern. Cold and warm starts are tracked separately. The latest warm measurement is 501ms.
 
-Renderer bundle: 76.08 kB gzip (target < 150 kB) ✓
+Renderer bundle: 76.25 kB gzip (target < 150 kB) ✓
 
 ### 2.8 Hash Chain Evidence (Pilot Sandbox Fixture)
 
@@ -330,7 +327,6 @@ No real game saves, pilot workspaces, or pilot reports are ever committed to Git
 
 | ID | Gap | Severity | Status |
 |----|-----|----------|--------|
-| KI-012 | BROKEN card state unreachable via `recipeToTrainerItem` (maps broken files to `status='Blocked'`) | LOW | Documented |
 | KI-013 | slider/dropdown inputTypes unreachable via current IPC pipeline | LOW | Documented |
 | KI-006 | Dialog focus trap incomplete | MEDIUM | OPEN |
 | KI-007 | Badge ARIA labels | LOW | OPEN |
@@ -359,7 +355,7 @@ Gate sequence required before each subsequent milestone acceptance:
 3. `npm run test:electron-e2e` (Gate 13, 4/4)
 4. `npm run test:trainer-e2e` (5/5)
 5. `npm run test:ipc-channels` (13/13)
-6. `npm run test:trainer-states` (7/7 + 3 skips)
+6. `npm run test:trainer-states` (12/12 + 1 KI-013 skip)
 7. `npm run test:browser-fallback` (7/7)
 8. `npm run test:accessibility` (7/7)
 9. `npm run test:performance` (12/12)
@@ -374,5 +370,8 @@ Do not label any real-game format VERIFIED until backup / apply / validation / r
 | `createRecipe` IPC returns `{ success, recipe }` not recipe directly | `tests/trainer-states-controls.e2e.test.ts` | Changed `recipe?.id` → `recipe?.recipe?.id` |
 | `category: 'CURRENCY'` rejected by Zod schema | Same file | Changed to `'STATS'` |
 | Wrapping-label pattern not checked | `tests/accessibility.e2e.test.ts` | Added `input.closest('label')` check |
+| `BROKEN` safety status collapsed to `Blocked` in IPC mapping (`KI-012`) | `src/core/recipes/index.ts` | Preserve `status='Broken'`; Electron IPC + renderer assertions added |
+| `NEEDS_SAVE` and `STALE` presented as active despite no producer | `TrainerCardState` / `STATE_CONFIG` | Removed from active union/config; retained only as future concepts in architecture docs |
 
-None of these bugs were in production code — they were all in the test files themselves.
+The first three bugs were in test files. `KI-012` and the reserved-state mismatch were
+production/documentation issues and are resolved in this closeout.

@@ -1,5 +1,12 @@
 # Performance Report — Trainer UX V1
 
+## Known Limitation — Cold Start
+
+A loaded-system cold launch has measured approximately **6.2 seconds (6198 ms)**. The
+8-second automated ceiling prevents false failures but does not resolve this performance
+concern. Cold-start and warm-start results must remain separately tracked; the latest warm
+dev-bundle launch measured **501 ms** on 2026-06-23.
+
 ## Test Environment
 
 | Item | Value |
@@ -17,6 +24,8 @@ These are observed from the Playwright test durations, not instrumented profilin
 | Operation | Observed Duration |
 |-----------|------------------|
 | Electron startup to `#root > *` visible | ~800ms – 1200ms |
+| Latest automated warm start (2026-06-23) | 501ms |
+| Recorded loaded-system cold start | ~6198ms |
 | Mode toggle click → aria-pressed update | < 300ms (waited 300ms) |
 | addGame IPC | < 50ms |
 | addUserSelectedLocation IPC | < 50ms |
@@ -55,3 +64,4 @@ These are observed from the Playwright test durations, not instrumented profilin
 - A game with hundreds of recipes has not been tested
 - No memory profiling was performed
 - Lighthouse / CWV not applicable to Electron apps
+- Cold-start optimization remains open; passing the 8000ms test ceiling is not evidence that it is resolved

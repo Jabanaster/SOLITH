@@ -200,3 +200,33 @@ Code changes made (no terminal access):
 - `npm run test` → Passed with 10/10 baseline tests after formatting mismatch errors to include "(stale edit)".
 - `npm run test` → Passed with 20/20 tests after adding the comprehensive `tests/failure-injection.test.ts` suite.
 - `npm run build` → Packaging initiated.
+
+---
+
+## 2026-06-23 — Renderer State Evidence Completion
+
+- Added Electron-renderer assertions for `GAME_RUNNING`, `NEEDS_RESCAN`, `BROKEN`, `APPLYING`, and `FAILED`.
+- Resolved KI-012 by preserving `Broken` through `recipeToTrainerItem()`.
+- Removed unreachable `NEEDS_SAVE` and `STALE` values from the active `TrainerCardState` union/config.
+- Recorded the ~6198ms cold-start observation as an open performance limitation; latest warm launch was 501ms.
+
+Fresh final sequence:
+
+```powershell
+npx tsc --noEmit              # 0 errors
+npm test                      # 107/107 (run 1)
+npm test                      # 107/107 (run 2)
+npm run build:vite            # Exit 0, 28 modules, 261.82 kB / 76.25 kB gzip
+npm run build:electron        # Exit 0, 18/18 verifier PASS
+npm run test:electron-smoke   # 6/6
+npm run test:electron-e2e     # 4/4, hash repeatability confirmed
+npm run test:trainer-e2e      # 5/5
+npm run test:ipc-channels     # 13/13
+npm run test:trainer-states   # 12/12 + 1 KI-013 skip
+npm run test:browser-fallback # 7/7
+npm run test:accessibility    # 7/7
+npm run test:performance      # 12/12; warm startup 501ms
+npm run test:pilot-intake     # 10/10
+npm run dist                  # Exit 0
+npm run test:packaged-smoke   # 22/22
+```

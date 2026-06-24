@@ -67,7 +67,8 @@ Priority order (highest wins):
 5. **GAME_RUNNING** — if the read-only process check reports the game is open
 6. **READY** — default
 
-Note: `NEEDS_SAVE`, `STALE` transients do not lock — they are informational and let normal priority flow proceed.
+`NEEDS_SAVE` and `STALE` are future concepts, not active `TrainerCardState` values. They were
+removed from the production union because no state-machine or IPC branch emitted them.
 
 ## Apply Flow
 

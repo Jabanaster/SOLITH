@@ -44,13 +44,25 @@ function deriveCardState(
 }
 
 const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
-  const [items, setItems] = useState<TrainerItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [gameRunning, setGameRunning] = useState(false);
-  const [gameRunningEvidence, setGameRunningEvidence] = useState('');
+  const e2eState = (window as any).electronAPI?.e2eTrainerState as TrainerCardState | null;
+  const fixtureItem: TrainerItem = {
+    id: 'e2e-renderer-card', name: 'Renderer Test Item', description: 'E2E state fixture',
+    category: 'PLAYER', source: 'fixture.json', target: 'fixture.json', path: 'player.hp',
+    risk: 'Safe', status: e2eState === 'NEEDS_RESCAN' ? 'Needs Rescan' : e2eState === 'BROKEN' ? 'Broken' : 'Ready',
+    confidence: 100, currentValue: 100, inputType: 'number', min: 0, max: 999,
+  };
+  const fixtureTransient = e2eState && ['APPLYING', 'FAILED'].includes(e2eState)
+    ? { [fixtureItem.id]: e2eState }
+    : {};
+  const [items, setItems] = useState<TrainerItem[]>(e2eState ? [fixtureItem] : []);
+  const [loading, setLoading] = useState(!e2eState);
+  const [gameRunning, setGameRunning] = useState(e2eState === 'GAME_RUNNING');
+  const [gameRunningEvidence, setGameRunningEvidence] = useState(
+    e2eState === 'GAME_RUNNING' ? 'E2E renderer process evidence' : ''
+  );
 
-  const [values, setValues] = useState<Record<string, any>>({});
-  const [transientStates, setTransientStates] = useState<Record<string, TrainerCardState>>({});
+  const [values, setValues] = useState<Record<string, any>>(e2eState ? { [fixtureItem.id]: 101 } : {});
+  const [transientStates, setTransientStates] = useState<Record<string, TrainerCardState>>(fixtureTransient);
   const [backupIds, setBackupIds] = useState<Record<string, string>>({});
   const [lastOpMessages, setLastOpMessages] = useState<Record<string, string>>({});
 
@@ -60,6 +72,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
   const apiAvailable = typeof window !== 'undefined' && !!(window as any).electronAPI;
 
   const loadItems = useCallback(async () => {
+    if (e2eState) return;
     if (!apiAvailable) { setLoading(false); return; }
     setLoading(true);
     try {
@@ -79,9 +92,10 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
     } finally {
       setLoading(false);
     }
-  }, [gameId, apiAvailable]);
+  }, [gameId, apiAvailable, e2eState]);
 
   const checkGameRunning = useCallback(async () => {
+    if (e2eState) return;
     if (!apiAvailable) return;
     try {
       const result = await (window as any).electronAPI.checkGameRunning(gameId);
@@ -90,7 +104,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
     } catch {
       setGameRunning(false);
     }
-  }, [gameId, apiAvailable]);
+  }, [gameId, apiAvailable, e2eState]);
 
   useEffect(() => {
     loadItems();

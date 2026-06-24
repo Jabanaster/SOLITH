@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Deterministic renderer-state fixture. This is unavailable in normal builds/runs.
+  e2eTrainerState: process.env.NODE_ENV === 'test'
+    ? (process.env.RESOURCEFORGE_E2E_TRAINER_STATE ?? null)
+    : null,
+
   // Database operations
   getGames: () => ipcRenderer.invoke('get-games'),
   addGame: (gameData: any) => ipcRenderer.invoke('add-game', gameData),

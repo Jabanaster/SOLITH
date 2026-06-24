@@ -43,13 +43,13 @@ The only remaining blocker is a real commercial save file that the user must pro
 | Gate / Suite | Command | Result |
 |--------------|---------|--------|
 | TypeScript | `npx tsc --noEmit` | 0 errors |
-| Unit tests (×2) | `npm test` | **109/109** (includes pilot-intake ×10) |
+| Unit tests (×2) | `npm test` | **107/107** (includes pilot-intake ×10) |
 | Electron output verifier | `npm run build:electron` | 18/18 |
 | Gate 10 bundled smoke | `npm run test:electron-smoke` | 6/6 |
 | Gate 13 Electron E2E | `npm run test:electron-e2e` | 4/4, hash chain CONFIRMED |
 | Trainer E2E | `npm run test:trainer-e2e` | 5/5 |
 | IPC channels E2E | `npm run test:ipc-channels` | **13/13** (4 edge cases added) |
-| Trainer states E2E | `npm run test:trainer-states` | **7/7** + 3 documented skips |
+| Trainer states E2E | `npm run test:trainer-states` | **12/12** + 1 KI-013 skip; five renderer-state assertions |
 | Browser fallback E2E | `npm run test:browser-fallback` | 7/7 |
 | Accessibility E2E | `npm run test:accessibility` | **7/7** (NEW — Playwright DOM checks) |
 | Performance E2E | `npm run test:performance` | **12/12** (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
@@ -71,11 +71,11 @@ Non-user-data closeout decision: **BLOCKED (pilot awaiting user data)**. See `Do
 ## Additional Architecture Notes (Closeout Session)
 
 - `recipeToTrainerItem` (line 460) only produces `inputType = 'toggle'` or `'number'` — slider/dropdown unreachable via IPC
-- `verifyRecipeSafety` returning `'Broken'` → `recipeToTrainerItem` maps to `statusBadge = 'Blocked'` — BROKEN state unreachable via IPC
+- `verifyRecipeSafety` returning `'Broken'` is preserved by `recipeToTrainerItem`; KI-012 resolved
 - All 7 renderer page components have `if (!window.electronAPI)` / `const apiAvailable = !!window.electronAPI` guards verified
 - Pilot intake pipeline: `src/core/pilot/intake.ts` + `src/core/pilot/manifest.ts` — safe copy, SHA-256 hash chain, Zod manifest
 - New .gitignore entries: `.local-pilot-data/`, `.local-pilot-workspaces/`, `.local-pilot-backups/`, `.local-pilot-reports/`
-- Coverage gaps documented as skip tests in `tests/trainer-states-controls.e2e.test.ts` — KI-012, KI-013
+- Remaining control coverage gap is KI-013 (slider/dropdown); all active card states have Electron assertions
 
 ## What Is Needed to Unblock Outcome C
 

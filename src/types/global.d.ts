@@ -4,6 +4,7 @@ declare module 'sql.js';
 
 interface Window {
   electronAPI: {
+    e2eTrainerState: string | null;
     // Games
     getGames: () => Promise<any[]>;
     addGame: (gameData: any) => Promise<any>;

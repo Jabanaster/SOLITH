@@ -53,8 +53,11 @@ const WORKSHOP_PAGES: { id: View; label: string }[] = [
 ];
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('library');
-  const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(null);
+  const e2eTrainerState = (window as any).electronAPI?.e2eTrainerState as string | null;
+  const [currentView, setCurrentView] = useState<View>(e2eTrainerState ? 'trainer' : 'library');
+  const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(
+    e2eTrainerState ? { id: 'e2e-renderer-state-fixture', name: 'Renderer State Fixture' } : null
+  );
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [appMode, setAppMode] = useState<AppMode>(() => {
     try { return (localStorage.getItem('rf-app-mode') as AppMode) ?? 'trainer'; } catch { return 'trainer'; }

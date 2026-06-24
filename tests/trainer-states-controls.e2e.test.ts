@@ -12,20 +12,14 @@
  *     APPLIED     — after applyProposal succeeds
  *     RESTORED    — after restoreBackup succeeds
  *
- *   States NOT reachable via current recipeToTrainerItem mapping (documented as PARTIAL):
- *     BROKEN      — recipeToTrainerItem maps broken files to 'Blocked', not 'Broken'
- *     NEEDS_RESCAN — requires file hash mismatch after recipe creation
- *     NEEDS_SAVE  — not produced by recipeToTrainerItem
- *     STALE       — not produced by recipeToTrainerItem
- *     GAME_RUNNING — requires isGameRunning(profile) to return true
- *     APPLYING    — transient during IPC call, not observable in this test shape
- *     FAILED      — transient on IPC error, requires failing apply
+ *   Deterministic Electron renderer fixtures cover the five formerly unit-only
+ *   states: GAME_RUNNING, NEEDS_RESCAN, BROKEN, APPLYING, and FAILED.
  *
  *   Control types reachable via current IPC pipeline:
  *     toggle      — recipe valueType='boolean' → inputType='toggle'
  *     number      — recipe valueType='number'  → inputType='number' (default)
  *
- *   Control types NOT reachable via current IPC pipeline (documented as PARTIAL):
+ *   Control types NOT reachable via current IPC pipeline (KI-013):
  *     slider      — recipeToTrainerItem does not produce inputType='slider'
  *     dropdown    — recipeToTrainerItem does not produce inputType='dropdown'
  */
@@ -40,7 +34,7 @@ const MAIN_BUNDLE = path.join('dist-electron', 'main.js');
 const DEMO_GAME   = 'demo-game-quest-id-000000000000';
 const FIXTURE_CONTENT = JSON.stringify({ player: { hp: 100, gold: 150 } });
 
-async function launchFresh(label: string) {
+async function launchFresh(label: string, rendererState?: string) {
   if (!fs.existsSync(MAIN_BUNDLE)) return null;
   const runId      = `states-${label}-${Date.now()}`;
   const userDataDir = path.join(os.tmpdir(), runId, 'userData');
@@ -55,7 +49,14 @@ async function launchFresh(label: string) {
 
   const app = await electron.launch({
     args: [MAIN_BUNDLE],
-    env: { ...process.env, ELECTRON_USER_DATA_PATH: userDataDir, APPDATA: appDataDir, USERPROFILE: appDataDir, NODE_ENV: 'test' },
+    env: {
+      ...process.env,
+      ELECTRON_USER_DATA_PATH: userDataDir,
+      APPDATA: appDataDir,
+      USERPROFILE: appDataDir,
+      NODE_ENV: 'test',
+      ...(rendererState ? { RESOURCEFORGE_E2E_TRAINER_STATE: rendererState } : {}),
+    },
   });
   const win = await app.firstWindow();
   await win.waitForLoadState('domcontentloaded');
@@ -136,7 +137,7 @@ test('states-02 — BLOCKED: recipe with risk=Blocked → getRecipes returns sta
   } finally { await cleanup(ctx!); }
 });
 
-test('states-03 — BLOCKED via missing file: recipe targeting non-existent file → status=Blocked', async () => {
+test('states-03 — BROKEN via missing file: recipe targeting non-existent file → status=Broken', async () => {
   if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
   const ctx = await launchFresh('blocked-missing');
   try {
@@ -157,8 +158,7 @@ test('states-03 — BLOCKED via missing file: recipe targeting non-existent file
     );
     const item = items.find((i: any) => i.name === 'Missing');
     expect(item, 'Missing item returned').toBeTruthy();
-    // verifyRecipeSafety returns 'Broken' → recipeToTrainerItem maps to status='Blocked'
-    expect(item.status, 'missing file → status Blocked (broken maps to Blocked in recipeToTrainerItem)').toBe('Blocked');
+    expect(item.status, 'missing file → status Broken').toBe('Broken');
   } finally { await cleanup(ctx!); }
 });
 
@@ -298,16 +298,52 @@ test('controls-02 — number control: valueType=number → inputType=number in T
   } finally { await cleanup(ctx!); }
 });
 
-// ── Coverage gaps documented as explicit skip tests ──────────────────────────
+// ── Electron renderer state assertions ──────────────────────────────────────
 
-test('coverage-gap — BROKEN state: recipeToTrainerItem maps broken files to Blocked, not Broken', () => {
-  // verifyRecipeSafety() returns 'Broken' when target file is missing.
-  // recipeToTrainerItem() maps this to statusBadge='Blocked' (not 'Broken').
-  // Therefore deriveCardState() never reaches the 'broken' branch via current IPC pipeline.
-  // The BROKEN TrainerCardState is implemented in TrainerCard.tsx but unreachable via IPC.
-  // This is a known implementation gap documented in KNOWN_ISSUES.md (KI-012).
-  test.skip(true, 'PARTIAL: BROKEN state unreachable via recipeToTrainerItem — maps broken files to status=Blocked');
-});
+const rendererStates = [
+  { state: 'GAME_RUNNING', label: 'Game Running', explanation: 'Close the game before modifying this save.', control: 'disabled' },
+  { state: 'NEEDS_RESCAN', label: 'Needs Rescan', explanation: 'The save structure changed after a game update.', control: 'enabled' },
+  { state: 'BROKEN', label: 'Broken', explanation: 'Target file not found or inaccessible.', control: 'absent' },
+  { state: 'APPLYING', label: 'Applying…', explanation: 'Writing change atomically. Do not close.', control: 'disabled' },
+  { state: 'FAILED', label: 'Failed', explanation: 'Apply failed. Original file is unchanged.', control: 'enabled' },
+] as const;
+
+for (const spec of rendererStates) {
+  test(`renderer-${spec.state.toLowerCase()} — label, explanation, actions, and error-free render`, async () => {
+    if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+    const ctx = await launchFresh(`renderer-${spec.state.toLowerCase()}`, spec.state);
+    const rendererErrors: string[] = [];
+    ctx!.win.on('pageerror', error => rendererErrors.push(error.message));
+    try {
+      const card = ctx!.win.locator('.trainer-card-v2');
+      await expect(card).toHaveCount(1);
+      await expect(card.locator('.tc-state-badge')).toHaveText(spec.label);
+      await expect(card.locator('.tc-state-msg')).toHaveText(spec.explanation);
+      await expect(ctx!.win.getByRole('button', { name: 'Rescan', exact: true })).toBeEnabled();
+
+      const input = card.locator('input[type="number"]');
+      const apply = card.locator('.tc-apply-btn');
+      if (spec.control === 'absent') {
+        await expect(input).toHaveCount(0);
+        await expect(apply).toHaveCount(0);
+      } else if (spec.control === 'disabled') {
+        await expect(input).toBeDisabled();
+        await expect(apply).toBeDisabled();
+      } else {
+        await expect(input).toBeEnabled();
+        await expect(apply).toBeEnabled();
+      }
+
+      if (spec.state === 'GAME_RUNNING') {
+        await expect(ctx!.win.getByRole('alert')).toContainText('Game is running');
+      }
+      if (spec.state === 'APPLYING') await expect(apply).toHaveText('…');
+
+      await ctx!.win.waitForTimeout(250);
+      expect(rendererErrors, `renderer errors for ${spec.state}: ${rendererErrors.join('; ')}`).toHaveLength(0);
+    } finally { await cleanup(ctx!); }
+  });
+}
 
 test('coverage-gap — slider/dropdown controls: recipeToTrainerItem only produces toggle|number', () => {
   // recipeToTrainerItem line 460: inputType = valueType === 'boolean' ? 'toggle' : 'number'
@@ -315,15 +351,4 @@ test('coverage-gap — slider/dropdown controls: recipeToTrainerItem only produc
   // Unit tests 25-27 verify the component renders correctly for these types.
   // E2E Electron coverage is PARTIAL for slider and PARTIAL for dropdown.
   test.skip(true, 'PARTIAL: slider/dropdown controls unreachable via recipeToTrainerItem — only toggle|number produced');
-});
-
-test('coverage-gap — GAME_RUNNING/APPLYING/FAILED/NEEDS_RESCAN/NEEDS_SAVE/STALE states', () => {
-  // GAME_RUNNING: requires isGameRunning(profile) to return true; process detection is read-only
-  // APPLYING: transient lock during applyProposal, observable only within the IPC call
-  // FAILED: transient on apply failure; requires a deliberately failing write
-  // NEEDS_RESCAN: requires file hash change after recipe creation
-  // NEEDS_SAVE: not produced by recipeToTrainerItem
-  // STALE: not produced by recipeToTrainerItem
-  // All 6 states are unit-tested in tests/trainer-ui.test.ts via deriveCardState().
-  test.skip(true, 'PARTIAL: 6 states unreachable via automated E2E; verified by unit tests (trainer-ui.test.ts tests 1-18)');
 });

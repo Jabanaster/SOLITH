@@ -76,12 +76,12 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | Trainer E2E | **PASSING** | tests/trainer.e2e.test.ts — 5/5, 28 assertion points |
 | Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 20/20 |
 | IPC channel E2E | **PASSING** | tests/ipc-channels.e2e.test.ts — 13/13 (4 edge-case tests added) |
-| Trainer states E2E | **PASSING** | tests/trainer-states-controls.e2e.test.ts — 7/7 + 3 documented skips |
+| Trainer states E2E | **PASSING** | tests/trainer-states-controls.e2e.test.ts — 12/12 + 1 KI-013 skip; all active states have Electron evidence |
 | Browser fallback E2E | **PASSING** | tests/browser-fallback.e2e.test.ts — 7/7 |
 | Accessibility E2E (new) | **PASSING** | tests/accessibility.e2e.test.ts — 7/7 DOM-level checks |
 | Performance E2E (new) | **PASSING** | tests/performance.e2e.test.ts — 12/12 (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
 | Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 22/22 (expanded from 20) |
-| Total (npm test) | **109/109** | All unit suites pass |
+| Total (npm test) | **107/107** | All unit suites pass; two unreachable reserved-state cases removed with the states |
 
 ## TypeScript
 

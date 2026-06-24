@@ -6,8 +6,8 @@ import type { TrainerItem } from '../src/shared/types/index.js';
 // ── Replicated from TrainerPage.tsx for unit testing ──────────────────────────
 
 type TrainerCardState =
-  | 'READY' | 'NEEDS_SAVE' | 'GAME_RUNNING' | 'NEEDS_RESCAN'
-  | 'STALE' | 'BROKEN' | 'BLOCKED' | 'APPLYING' | 'APPLIED' | 'RESTORED' | 'FAILED';
+  | 'READY' | 'GAME_RUNNING' | 'NEEDS_RESCAN'
+  | 'BROKEN' | 'BLOCKED' | 'APPLYING' | 'APPLIED' | 'RESTORED' | 'FAILED';
 
 function deriveCardState(
   item: TrainerItem,
@@ -107,17 +107,6 @@ describe('deriveCardState — Trainer UX state machine', () => {
     assert.strictEqual(deriveCardState(item, 'FAILED', true), 'FAILED');
   });
 
-  test('13. NEEDS_SAVE transient does NOT lock (only transition-phase states do)', () => {
-    const item = makeItem({ risk: 'Safe', status: 'Ready' });
-    // NEEDS_SAVE is not in the locking set, so normal logic proceeds
-    assert.strictEqual(deriveCardState(item, 'NEEDS_SAVE', false), 'READY');
-  });
-
-  test('14. STALE transient does NOT lock — status drives state', () => {
-    const item = makeItem({ risk: 'Safe', status: 'Needs Rescan' });
-    assert.strictEqual(deriveCardState(item, 'STALE', false), 'NEEDS_RESCAN');
-  });
-
   test('15. BLOCKED status beats GAME_RUNNING', () => {
     const item = makeItem({ risk: 'Safe', status: 'Blocked' });
     assert.strictEqual(deriveCardState(item, null, true), 'BLOCKED');
@@ -141,18 +130,16 @@ describe('deriveCardState — Trainer UX state machine', () => {
 
 // ── STATE_CONFIG completeness check ──────────────────────────────────────────
 
-describe('STATE_CONFIG — all 11 states defined', () => {
+describe('STATE_CONFIG — all active states defined', () => {
   const ALL_STATES: TrainerCardState[] = [
-    'READY', 'NEEDS_SAVE', 'GAME_RUNNING', 'NEEDS_RESCAN',
-    'STALE', 'BROKEN', 'BLOCKED', 'APPLYING', 'APPLIED', 'RESTORED', 'FAILED',
+    'READY', 'GAME_RUNNING', 'NEEDS_RESCAN',
+    'BROKEN', 'BLOCKED', 'APPLYING', 'APPLIED', 'RESTORED', 'FAILED',
   ];
 
   const STATE_CONFIG: Record<TrainerCardState, { label: string; color: string; explanation: string }> = {
     READY:        { label: 'Ready',        color: 'safe',    explanation: '' },
-    NEEDS_SAVE:   { label: 'No Save',      color: 'caution', explanation: 'No save file detected. Run a scan first.' },
     GAME_RUNNING: { label: 'Game Running', color: 'caution', explanation: 'Close the game before modifying this save.' },
     NEEDS_RESCAN: { label: 'Needs Rescan', color: 'caution', explanation: 'The save structure changed after a game update.' },
-    STALE:        { label: 'Stale',        color: 'caution', explanation: 'Recipe may be outdated — rescan to verify.' },
     BROKEN:       { label: 'Broken',       color: 'risky',   explanation: 'Target file not found or inaccessible.' },
     BLOCKED:      { label: 'Blocked',      color: 'blocked', explanation: 'This target is protected and cannot be edited safely.' },
     APPLYING:     { label: 'Applying…',    color: 'info',    explanation: 'Writing change atomically. Do not close.' },
@@ -161,7 +148,7 @@ describe('STATE_CONFIG — all 11 states defined', () => {
     FAILED:       { label: 'Failed',       color: 'risky',   explanation: 'Apply failed. Original file is unchanged.' },
   };
 
-  test('19. All 11 TrainerCardState values are in STATE_CONFIG', () => {
+  test('19. All active TrainerCardState values are in STATE_CONFIG', () => {
     for (const s of ALL_STATES) {
       assert.ok(s in STATE_CONFIG, `Missing state: ${s}`);
     }
@@ -186,7 +173,7 @@ describe('STATE_CONFIG — all 11 states defined', () => {
 
   test('23. All warning states have non-empty explanation', () => {
     const warningStates: TrainerCardState[] = [
-      'NEEDS_SAVE', 'GAME_RUNNING', 'NEEDS_RESCAN', 'STALE', 'BROKEN', 'BLOCKED', 'APPLYING', 'FAILED',
+      'GAME_RUNNING', 'NEEDS_RESCAN', 'BROKEN', 'BLOCKED', 'APPLYING', 'FAILED',
     ];
     for (const s of warningStates) {
       assert.ok(STATE_CONFIG[s].explanation.length > 0, `Missing explanation for ${s}`);
