@@ -2,9 +2,14 @@
 
 ## Real-World Pilot Status
 
-**Status: BLOCKED_PENDING_USER_DATA**
+**Status: `BLOCKED — first real-world save remains read-only`**
 
-No real-world game save files have been tested. All validation is against synthetic fixtures only.
+Atomfall 1.23.105.0 (Xbox) has real-world sandbox evidence at `READ_ONLY`. Hash-verified
+copying and source preservation passed. Its extensionless 4 MiB save is an unknown sparse
+proprietary binary with possible integrity metadata, so no writable compatibility is claimed.
+
+Atomfall must not be promoted to `SUPPORTED` or `EXPERIMENTAL`, and its trailer/checksum must
+not be guessed, removed, regenerated, or repacked.
 
 ## What Is Required to Validate a Real Game
 
@@ -32,13 +37,16 @@ The user must nominate a specific game. Criteria for a good pilot candidate:
 - At least one numeric field that is safe to change and verify
 - Game can be closed during testing
 
-## Games That Cannot Be Piloted
+## Games That Cannot Be Used for the Writable Pilot
 
 - Games with encrypted, signed, or packed saves
 - Online-only games with server-authoritative state
 - Games with anti-cheat that scans save files on launch
 - Games that validate save file checksums on load
 - Games distributed through stores that maintain cloud sync without local-copy isolation
+
+Xbox container saves like the observed Atomfall format remain read-only unless a deterministic,
+versioned adapter understands their full structure and integrity rules.
 
 ## After a Successful Pilot
 

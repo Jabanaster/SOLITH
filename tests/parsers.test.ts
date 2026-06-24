@@ -2,6 +2,8 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
 
 import { parseSaveFile } from '../src/core/saves/index.ts';
 import { JsonAdapter } from '../src/core/adapters/json.ts';
@@ -187,5 +189,31 @@ describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
     // BuildOutput should fail/block writes
     const buildRes = await adapter.buildOutput(beforeBin, 'offset_0x04', 150);
     assert.strictEqual(buildRes.success, false, 'Binary adapter must reject output building');
+  });
+
+  test('7. Sparse extensionless binary with integrity-like trailer remains read-only', async () => {
+    const adapter = new BinaryAdapter();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-sparse-binary-'));
+    const sparsePath = path.join(tempDir, 'synthetic-slot');
+    const content = Buffer.alloc(4 * 1024 * 1024, 0);
+    content.set([0x01, 0x00, 0x00, 0x80, 0x10, 0x20, 0x30, 0x40], 0);
+    content.set([0xAA, 0xBB, 0xCC, 0xDD], content.length - 4);
+    fs.writeFileSync(sparsePath, content);
+    const beforeHash = crypto.createHash('sha256').update(content).digest('hex');
+
+    try {
+      assert.strictEqual(adapter.supports(sparsePath), true, 'null-containing extensionless binary must be detected');
+      const normalized = await adapter.parseAndNormalize(sparsePath);
+      assert.strictEqual(normalized.editable, false, 'unknown sparse binary must remain read-only');
+
+      const buildRes = await adapter.buildOutput(sparsePath, 'offset_0x04', 1234);
+      assert.strictEqual(buildRes.success, false, 'trailer presence must never enable guessed binary writes');
+      assert.match(buildRes.error ?? '', /unsupported/i);
+
+      const afterHash = crypto.createHash('sha256').update(fs.readFileSync(sparsePath)).digest('hex');
+      assert.strictEqual(afterHash, beforeHash, 'read-only inspection must preserve the source bytes');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

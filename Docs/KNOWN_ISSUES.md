@@ -38,6 +38,14 @@ The trainer cards list in `TrainerPage.tsx` renders all recipes without paginati
 ### KI-013: slider and dropdown inputTypes unreachable via recipeToTrainerItem
 `recipeToTrainerItem()` (`src/core/recipes/index.ts` line 460) only produces `inputType = 'toggle'` (for `valueType === 'boolean'`) or `inputType = 'number'` (all other types). The `slider` and `dropdown` control branches in `TrainerCard.tsx` are implemented and unit-tested (trainer-ui.test.ts tests 25-27) but are not reachable via the `getRecipes` IPC call. Resolving this requires adding `inputType`, `min`, `max`, and `options` to the recipe creation IPC or overriding them in `recipeToTrainerItem`.
 
+### KI-014: Atomfall Xbox save format is read-only
+
+Atomfall 1.23.105.0 uses an extensionless, fixed-size, sparse proprietary binary container
+with possible integrity metadata. Real-world sandbox copying and source-hash preservation are
+verified, but no parser, serializer, checksum rules, or format-version validator exists.
+Compatibility is locked to `READ_ONLY`; blind offsets, trailer manipulation, checksum guessing,
+repacking, apply, and restore are prohibited.
+
 ## Resolved
 
 | Issue | Resolution |
@@ -58,4 +66,4 @@ The trainer cards list in `TrainerPage.tsx` renders all recipes without paginati
 1. **Binary Files**: Safe structures are verified but bitwise parsing and validations for unknown binary file types are not supported in V1.
 2. **Offline AI Connection**: If local AI services (Ollama/LM Studio) are not running, rule-based fallback explanations are used.
 3. **Reparse Points/Junction Escapes**: Symbolic links and junctions at the target path are actively detected and rejected, but testing of complex Windows volume mount points depends on native OS permissions.
-4. **Real-World Compatibility**: No commercial save files have been tested. All gate evidence is fixture-based (Tier 2). Tier 1 evidence requires user-provided save files.
+4. **Real-World Compatibility**: Atomfall has `REAL_WORLD_SANDBOX` read-only evidence. No writable real-game pilot has passed; fixture evidence remains the only apply/restore evidence.

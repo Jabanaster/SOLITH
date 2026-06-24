@@ -1,10 +1,14 @@
 # Next Actions
 
-**Updated:** 2026-06-23 — V1 Trainer UX + Compatibility Pilot Verification Checkpoint
+**Updated:** 2026-06-24 — Atomfall real-world read-only compatibility result
 
 ## Blocked — Waiting for User
 
-- [ ] **Outcome C: Real-world compatibility pilot** — Non-user-data closeout is COMPLETE (see `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`). User nominates a single-player offline game with a JSON, INI, XML, CSV, or plain-text save. Provide game title, version, store, and save path to begin intake. See `Docs/Guides/REAL_WORLD_PILOT_INTAKE.md` for required fields and `Docs/Compatibility/REAL_WORLD_PILOT_CHECKLIST.md` for the full checklist.
+- [x] Record Atomfall 1.23.105.0 Xbox as `REAL_WORLD_SANDBOX / READ_ONLY`; source-copy hashes matched and the original remained unchanged.
+- [ ] **Outcome C: writable real-world compatibility pilot** — Select a second, normal Windows PC game with a deterministic structured local save. Prefer JSON, INI, XML, CSV, text, or safely supported unencrypted SQLite under Documents, Saved Games, or AppData. Avoid Xbox containers.
+
+The milestone remains blocked until the second candidate passes parse → safe round-trip →
+candidate confirmation → backup → sandbox apply → validation → restore → two-run hash repeatability.
 
 ## Short-term (unblocked, no user data needed)
 

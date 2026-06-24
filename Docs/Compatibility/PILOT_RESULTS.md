@@ -1,15 +1,33 @@
 # Compatibility Pilot Results
 
-## Status: BLOCKED_PENDING_USER_DATA
+## Status
 
-No real-world game save files have been submitted for pilot testing.
+```text
+BLOCKED — first real-world save remains read-only
+```
+
+## Atomfall — real-world read-only result
+
+| Field | Result |
+|---|---|
+| Game / version | Atomfall 1.23.105.0 |
+| Platform | Xbox |
+| Evidence tier | `REAL_WORLD_SANDBOX` |
+| Format | Unknown proprietary binary, extensionless, 4,194,304 bytes |
+| Profile status | `READ_ONLY` |
+| Source-copy hash equality | PASS |
+| Original unchanged after copy and inspection | PASS |
+| Parser / serializer | None |
+| Trainer target | None |
+| Apply / restore | Not attempted — prohibited without format understanding |
+
+The full source hash and personal paths are intentionally excluded from Git. Atomfall proves
+the unknown-binary safety boundary, but it does not satisfy the writable real-game pilot.
 
 ## Required to Unblock
 
-The user must provide:
-1. The name and platform of a single-player game with a readable save format
-2. A save file (or consent to copy one from their install)
-3. Confirmation the game is closed during testing
+The next candidate must be a normal Windows PC game with a deterministic structured local
+save such as JSON, INI, XML, CSV, plain text, or safely supported unencrypted SQLite.
 
 ## What Will Be Recorded Here
 
