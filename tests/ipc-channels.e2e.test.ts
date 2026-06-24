@@ -188,3 +188,67 @@ test('ipc-09 — renderer errors: none during IPC channel calls', async () => {
     expect(rendererErrors, `renderer errors: ${rendererErrors.join('; ')}`).toHaveLength(0);
   } finally { await cleanup(ctx); }
 });
+
+// ── Additional edge cases ─────────────────────────────────────────────────────
+
+test('ipc-10 — check-game-running: null input → Zod catch, safe response (no crash)', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('cgr-null');
+  try {
+    const result = await ctx!.win.evaluate(() =>
+      (window as any).electronAPI.checkGameRunning(null)
+    );
+    // Zod rejects null → handler catches → returns safe shape
+    expect(typeof result?.running).toBe('boolean');
+    expect(typeof result?.evidence).toBe('string');
+    expect(result.running).toBe(false);
+    expect(result.evidence).not.toMatch(/at\s+\w+\s*\(.*:\d+:\d+\)/);
+  } finally { await cleanup(ctx); }
+});
+
+test('ipc-11 — get-all-profiles: idempotent across consecutive calls', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('gap-idempotent');
+  try {
+    const [r1, r2] = await ctx!.win.evaluate(() => Promise.all([
+      (window as any).electronAPI.getAllProfiles(),
+      (window as any).electronAPI.getAllProfiles(),
+    ]));
+    expect(Array.isArray(r1)).toBe(true);
+    expect(Array.isArray(r2)).toBe(true);
+    // Both calls to a fresh DB must return empty arrays and match each other
+    expect(r1.length).toBe(r2.length);
+    expect(JSON.stringify(r1)).toBe(JSON.stringify(r2));
+  } finally { await cleanup(ctx); }
+});
+
+test('ipc-12 — get-compatibility-profile: very long string input → null (Zod rejects, no crash)', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('gcp-long');
+  try {
+    const result = await ctx!.win.evaluate(() =>
+      (window as any).electronAPI.getCompatibilityProfile('x'.repeat(500))
+    );
+    expect(result).toBeNull();
+  } finally { await cleanup(ctx); }
+});
+
+test('ipc-13 — wrong-type inputs (number instead of string) → handlers recover, no crash', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('ipc-wrong-type');
+  const rendererErrors: string[] = [];
+  ctx!.win.on('pageerror', (err: Error) => rendererErrors.push(err.message));
+
+  try {
+    const [cgr, gcp, gap] = await ctx!.win.evaluate(() => Promise.all([
+      (window as any).electronAPI.checkGameRunning(42),
+      (window as any).electronAPI.getCompatibilityProfile(42),
+      (window as any).electronAPI.getAllProfiles(),
+    ]));
+    expect(typeof cgr?.running).toBe('boolean');
+    expect(cgr.running).toBe(false);
+    expect(gcp).toBeNull();
+    expect(Array.isArray(gap)).toBe(true);
+    expect(rendererErrors, `renderer errors: ${rendererErrors.join('; ')}`).toHaveLength(0);
+  } finally { await cleanup(ctx); }
+});

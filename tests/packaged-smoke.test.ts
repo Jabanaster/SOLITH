@@ -101,7 +101,7 @@ test.afterAll(async () => {
   console.log(`resources_path      = ${resourcesPath}`);
   console.log(`preload_path        = ${preloadPath}`);
   console.log(`db_path             = ${dbPath}`);
-  console.log(`ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave, getAllProfiles, getRecipes, checkGameRunning`);
+  console.log(`ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave, getAllProfiles, getRecipes, checkGameRunning(invoked), getCompatibilityProfile(invoked)`);
   console.log(`exit_code           = ${exitCode}`);
   console.log(`renderer_errors     = ${rendererErrors.length}`);
   console.log(`main_errors         = ${mainErrors.length}`);
@@ -304,4 +304,29 @@ test('point 20 — getRecipes IPC succeeds in packaged app', async () => {
     gameId
   );
   expect(Array.isArray(recipes), 'getRecipes returns array in packaged app').toBe(true);
+});
+
+// ── Points 21-22: actually invoke new IPC channels (not just existence) ───────
+
+test('point 21 — checkGameRunning is actually invoked in packaged app (not just presence)', async () => {
+  // Point 18 checks typeof === 'function'. This point calls the channel and verifies
+  // it returns the documented shape: { running: boolean, evidence: string }
+  const result = await win.evaluate(() =>
+    (window as any).electronAPI.checkGameRunning('demo-game-quest-id-000000000000')
+  );
+  expect(typeof result?.running,  'running is boolean').toBe('boolean');
+  expect(typeof result?.evidence, 'evidence is string').toBe('string');
+  expect(result.running, 'demo game not running in packaged app').toBe(false);
+  // Evidence must be safe — no raw stack traces
+  expect(result.evidence, 'no stack trace in evidence').not.toMatch(/at\s+\w+\s*\(.*:\d+:\d+\)/);
+});
+
+test('point 22 — getCompatibilityProfile is actually invoked in packaged app', async () => {
+  // Point 18 checks typeof === 'function'. This point calls the channel and verifies
+  // it returns null for a fresh DB (no profiles committed — BLOCKED_PENDING_USER_DATA)
+  const result = await win.evaluate(() =>
+    (window as any).electronAPI.getCompatibilityProfile('demo-game-quest-id-000000000000')
+  );
+  // Fresh packaged DB has no profiles — must return null, not throw or return undefined
+  expect(result, 'getCompatibilityProfile returns null for fresh DB').toBeNull();
 });

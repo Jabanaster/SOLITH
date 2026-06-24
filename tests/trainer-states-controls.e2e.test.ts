@@ -95,7 +95,7 @@ test('states-01 — READY: recipe with valid file, risk=Safe → getRecipes retu
       }),
       [ctx!.gameId, ctx!.saveFile]
     );
-    expect(recipe?.id, 'recipe created').toBeTruthy();
+    expect(recipe?.recipe?.id, 'recipe created').toBeTruthy();
 
     const items = await ctx!.win.evaluate(
       (gid: string) => (window as any).electronAPI.getRecipes(gid),
@@ -123,7 +123,7 @@ test('states-02 — BLOCKED: recipe with risk=Blocked → getRecipes returns sta
       }),
       [ctx!.gameId, ctx!.saveFile]
     );
-    expect(recipe?.id).toBeTruthy();
+    expect(recipe?.recipe?.id).toBeTruthy();
 
     const items = await ctx!.win.evaluate(
       (gid: string) => (window as any).electronAPI.getRecipes(gid),
@@ -149,7 +149,7 @@ test('states-03 — BLOCKED via missing file: recipe targeting non-existent file
       }),
       [ctx!.gameId, ctx!.saveFile, missingFile]
     );
-    expect(recipe?.id).toBeTruthy();
+    expect(recipe?.recipe?.id).toBeTruthy();
 
     const items = await ctx!.win.evaluate(
       (gid: string) => (window as any).electronAPI.getRecipes(gid),
@@ -168,12 +168,12 @@ test('states-04 — APPLIED: apply flow produces APPLIED transient (IPC success)
   try {
     const recipe = await ctx!.win.evaluate(
       ([gid, file]: [string, string]) => (window as any).electronAPI.createRecipe({
-        gameId: gid, name: 'Gold', category: 'CURRENCY', source: file, target: file,
+        gameId: gid, name: 'Gold', category: 'STATS', source: file, target: file,
         path: 'player.gold', valueType: 'number', risk: 'Safe', requiresBackup: true, confidence: 90,
       }),
       [ctx!.gameId, ctx!.saveFile]
     );
-    expect(recipe?.id).toBeTruthy();
+    expect(recipe?.recipe?.id).toBeTruthy();
 
     const items = await ctx!.win.evaluate(
       (gid: string) => (window as any).electronAPI.getRecipes(gid),
@@ -211,7 +211,7 @@ test('states-05 — RESTORED: restore flow succeeds, file reverts to original', 
   try {
     const recipe = await ctx!.win.evaluate(
       ([gid, file]: [string, string]) => (window as any).electronAPI.createRecipe({
-        gameId: gid, name: 'Gold2', category: 'CURRENCY', source: file, target: file,
+        gameId: gid, name: 'Gold2', category: 'STATS', source: file, target: file,
         path: 'player.gold', valueType: 'number', risk: 'Safe', requiresBackup: true, confidence: 90,
       }),
       [ctx!.gameId, ctx!.saveFile]
@@ -264,7 +264,7 @@ test('controls-01 — toggle control: valueType=boolean → inputType=toggle in 
       }),
       [ctx!.gameId, ctx!.saveFile]
     );
-    expect(recipe?.id).toBeTruthy();
+    expect(recipe?.recipe?.id).toBeTruthy();
 
     const items = await ctx!.win.evaluate(
       (gid: string) => (window as any).electronAPI.getRecipes(gid),
@@ -287,7 +287,7 @@ test('controls-02 — number control: valueType=number → inputType=number in T
       }),
       [ctx!.gameId, ctx!.saveFile]
     );
-    expect(recipe?.id).toBeTruthy();
+    expect(recipe?.recipe?.id).toBeTruthy();
 
     const items = await ctx!.win.evaluate(
       (gid: string) => (window as any).electronAPI.getRecipes(gid),
