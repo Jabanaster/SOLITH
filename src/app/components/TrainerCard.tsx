@@ -38,6 +38,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
   item, state, value, selected, onSelect, onValueChange, onApply
 }) => {
   const stateInfo = STATE_CONFIG[state];
+  const stateDescriptionId = `trainer-state-${item.id}`;
   const isBlocked = state === 'BLOCKED' || state === 'BROKEN';
   const isDisabled = isBlocked || state === 'APPLYING' || state === 'GAME_RUNNING';
   const inputType = item.inputType ?? 'number';
@@ -62,32 +63,47 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
       case 'slider':
         return (
           <div className="trainer-slider-wrap" onClick={e => e.stopPropagation()}>
+            <label htmlFor={`trainer-slider-${item.id}`} className="tc-label">
+              {item.name}
+            </label>
             <input
+              id={`trainer-slider-${item.id}`}
               type="range"
               min={item.min ?? 0}
               max={item.max ?? 100}
+              step={item.step ?? 1}
               value={value ?? item.min ?? 0}
               disabled={isDisabled}
               onChange={e => onValueChange(Number(e.target.value))}
               className="trainer-slider"
+              aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
             />
-            <span className="slider-val">{value ?? 0}</span>
+            <span className="slider-val">{value ?? 0}{item.unit ? ` ${item.unit}` : ''}</span>
           </div>
         );
 
       case 'dropdown':
         return (
-          <select
-            value={value ?? ''}
-            disabled={isDisabled}
-            onChange={e => onValueChange(e.target.value)}
-            className="trainer-select"
-            onClick={e => e.stopPropagation()}
-          >
-            {(item.options ?? []).map(opt => (
-              <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
-            ))}
-          </select>
+          <div onClick={e => e.stopPropagation()}>
+            <label htmlFor={`trainer-dropdown-${item.id}`} className="tc-label">
+              {item.name}
+            </label>
+            <select
+              id={`trainer-dropdown-${item.id}`}
+              value={String(value ?? '')}
+              disabled={isDisabled}
+              onChange={e => onValueChange(e.target.value)}
+              className="trainer-select"
+              onClick={e => e.stopPropagation()}
+              aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
+            >
+              {(item.options ?? []).map(opt => (
+                <option key={`${typeof opt.value}:${String(opt.value)}`} value={String(opt.value)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         );
 
       default:
@@ -102,6 +118,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
             disabled={isDisabled}
             onChange={e => onValueChange(Number(e.target.value))}
             onClick={e => e.stopPropagation()}
+            aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
           />
         );
     }
@@ -125,7 +142,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
       </div>
 
       {stateInfo.explanation && (
-        <p className="tc-state-msg">{stateInfo.explanation}</p>
+        <p className="tc-state-msg" id={stateDescriptionId}>{stateInfo.explanation}</p>
       )}
 
       <div className="tc-value-row">
@@ -143,6 +160,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
             disabled={isDisabled || value === '' || value === undefined || value === null}
             onClick={onApply}
             aria-label={`Apply ${item.name}`}
+            aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
           >
             {state === 'APPLYING' ? '…' : 'Apply'}
           </button>

@@ -68,6 +68,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [applyPending, setApplyPending] = useState<ApplyPending | null>(null);
+  const [applyBusy, setApplyBusy] = useState(false);
 
   const apiAvailable = typeof window !== 'undefined' && !!(window as any).electronAPI;
 
@@ -121,10 +122,16 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
     setApplyPending({ item, value: val });
   };
 
+  const handleDialogCancel = useCallback(() => {
+    if (!applyBusy) {
+      setApplyPending(null);
+    }
+  }, [applyBusy]);
+
   const handleApplyConfirm = async () => {
     if (!applyPending || !apiAvailable) { setApplyPending(null); return; }
     const { item, value } = applyPending;
-    setApplyPending(null);
+    setApplyBusy(true);
 
     setTransientStates(prev => ({ ...prev, [item.id]: 'APPLYING' }));
 
@@ -148,8 +155,9 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
 
       if (res?.success) {
         setTransientStates(prev => ({ ...prev, [item.id]: 'APPLIED' }));
-        if (res.backupId) {
-          setBackupIds(prev => ({ ...prev, [item.id]: res.backupId }));
+        const backupId = res?.backup?.id ?? res?.backupId;
+        if (backupId) {
+          setBackupIds(prev => ({ ...prev, [item.id]: backupId }));
         }
         const ts = new Date().toLocaleTimeString();
         setLastOpMessages(prev => ({
@@ -166,6 +174,9 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
       console.error('[TrainerPage] apply error:', e);
       setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
       setLastOpMessages(prev => ({ ...prev, [item.id]: `Error: ${String(e).slice(0, 80)}` }));
+    } finally {
+      setApplyBusy(false);
+      setApplyPending(null);
     }
   };
 
@@ -279,7 +290,8 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
           item={applyPending.item}
           value={applyPending.value}
           onConfirm={handleApplyConfirm}
-          onCancel={() => setApplyPending(null)}
+          onCancel={handleDialogCancel}
+          isBusy={applyBusy}
         />
       )}
     </div>
