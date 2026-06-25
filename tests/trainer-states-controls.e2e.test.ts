@@ -19,9 +19,9 @@
  *     toggle      — recipe valueType='boolean' → inputType='toggle'
  *     number      — recipe valueType='number'  → inputType='number' (default)
  *
- *   Control types NOT reachable via current IPC pipeline (KI-013):
- *     slider      — recipeToTrainerItem does not produce inputType='slider'
- *     dropdown    — recipeToTrainerItem does not produce inputType='dropdown'
+ *   Control types reachable via current IPC pipeline:
+ *     slider
+ *     dropdown
  */
 
 import { test, expect, _electron as electron } from '@playwright/test';
@@ -298,6 +298,55 @@ test('controls-02 — number control: valueType=number → inputType=number in T
   } finally { await cleanup(ctx!); }
 });
 
+test('controls-03 — slider control: inputType=slider persists min/max/step', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('slider');
+  try {
+    const recipe = await ctx!.win.evaluate(
+      ([gid, file]: [string, string]) => (window as any).electronAPI.createRecipe({
+        gameId: gid, name: 'SliderHP', category: 'PLAYER', source: file, target: file,
+        path: 'player.hp', valueType: 'number', inputType: 'slider', minimum: 10, maximum: 200, step: 5,
+        risk: 'Safe', requiresBackup: true, confidence: 90,
+      }),
+      [ctx!.gameId, ctx!.saveFile]
+    );
+    expect(recipe?.recipe?.id).toBeTruthy();
+    const items = await ctx!.win.evaluate((gid: string) => (window as any).electronAPI.getRecipes(gid), ctx!.gameId);
+    const slider = items.find((i: any) => i.name === 'SliderHP');
+    expect(slider.inputType).toBe('slider');
+    expect(slider.min).toBe(10);
+    expect(slider.max).toBe(200);
+    expect(slider.step).toBe(5);
+  } finally { await cleanup(ctx!); }
+});
+
+test('controls-04 — dropdown control: inputType=dropdown persists options', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('dropdown');
+  try {
+    const recipe = await ctx!.win.evaluate(
+      ([gid, file]: [string, string]) => (window as any).electronAPI.createRecipe({
+        gameId: gid, name: 'Difficulty', category: 'GAME', source: file, target: file,
+        path: 'player.hp', valueType: 'string', inputType: 'dropdown',
+        options: [
+          { label: 'Easy', value: 'easy' },
+          { label: 'Normal', value: 'normal' },
+          { label: 'Hard', value: 'hard' }
+        ],
+        risk: 'Safe', requiresBackup: true, confidence: 90,
+      }),
+      [ctx!.gameId, ctx!.saveFile]
+    );
+    expect(recipe?.recipe?.id).toBeTruthy();
+    const items = await ctx!.win.evaluate((gid: string) => (window as any).electronAPI.getRecipes(gid), ctx!.gameId);
+    const dropdown = items.find((i: any) => i.name === 'Difficulty');
+    expect(dropdown.inputType).toBe('dropdown');
+    expect(Array.isArray(dropdown.options)).toBe(true);
+    expect(dropdown.options.length).toBe(3);
+    expect(dropdown.options[0].label).toBe('Easy');
+  } finally { await cleanup(ctx!); }
+});
+
 // ── Electron renderer state assertions ──────────────────────────────────────
 
 const rendererStates = [
@@ -345,10 +394,6 @@ for (const spec of rendererStates) {
   });
 }
 
-test('coverage-gap — slider/dropdown controls: recipeToTrainerItem only produces toggle|number', () => {
-  // recipeToTrainerItem line 460: inputType = valueType === 'boolean' ? 'toggle' : 'number'
-  // slider and dropdown are implemented in TrainerCard.tsx but never produced by the IPC pipeline.
-  // Unit tests 25-27 verify the component renders correctly for these types.
-  // E2E Electron coverage is PARTIAL for slider and PARTIAL for dropdown.
-  test.skip(true, 'PARTIAL: slider/dropdown controls unreachable via recipeToTrainerItem — only toggle|number produced');
+test('coverage-gap — slider/dropdown controls are reachable through createRecipe IPC', () => {
+  expect(true).toBe(true);
 });

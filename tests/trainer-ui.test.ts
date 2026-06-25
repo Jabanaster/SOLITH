@@ -210,9 +210,17 @@ describe('TrainerItem — shape and field constraints', () => {
   });
 
   test('27. inputType dropdown requires options array', () => {
-    const item = makeItem({ inputType: 'dropdown', options: ['Easy', 'Normal', 'Hard'], currentValue: 'Normal' });
+    const item = makeItem({
+      inputType: 'dropdown',
+      options: [
+        { label: 'Easy', value: 'easy' },
+        { label: 'Normal', value: 'normal' },
+        { label: 'Hard', value: 'hard' }
+      ],
+      currentValue: 'normal'
+    });
     assert.ok(Array.isArray(item.options), 'options is array');
-    assert.ok((item.options as string[]).includes(item.currentValue as string), 'currentValue in options');
+    assert.ok((item.options as Array<{ label: string; value: string }>).some(o => o.value === item.currentValue), 'currentValue in options');
   });
 
   test('28. Items with no path can still be valid', () => {

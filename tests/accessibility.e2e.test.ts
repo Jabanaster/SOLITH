@@ -72,7 +72,6 @@ test('a11y-01 — all <img> elements have non-empty alt or role="presentation"',
     expect(violations, `Images missing alt: ${violations.join(' | ')}`).toHaveLength(0);
   } finally { await cleanup(ctx); }
 });
-
 // ── a11y-02: buttons have accessible names ────────────────────────────────────
 
 test('a11y-02 — all <button> elements have accessible names', async () => {
@@ -94,7 +93,6 @@ test('a11y-02 — all <button> elements have accessible names', async () => {
     expect(violations, `Buttons without names: ${violations.join(' | ')}`).toHaveLength(0);
   } finally { await cleanup(ctx); }
 });
-
 // ── a11y-03: mode toggle buttons have aria-pressed ────────────────────────────
 
 test('a11y-03 — Trainer/Workshop mode toggle buttons have aria-pressed attribute', async () => {
