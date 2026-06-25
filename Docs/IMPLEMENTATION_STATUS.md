@@ -26,7 +26,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | Multi-format Save Parsers | **VERIFIED** | Supports JSON, XML, INI, CSV, TXT, Lua. Validated in unit tests. |
 | In-Memory Database (sql.js) | **VERIFIED** | Persisted to `data/resourceforge.db` on disk. |
 | Save File Comparison | **VERIFIED** | Discovery lab comparison and confidence scoring. |
-| Recipe CRUD & Validations | **VERIFIED** | Strict Zod schema validation, safety filters checking for arbitrary JS/SQL/shell/IPC, conflict detection. |
+| Recipe CRUD & Validations | **VERIFIED** | Strict Zod schema validation, safety filters checking for arbitrary JS/SQL/shell/IPC, conflict detection, and validated slider/dropdown control configuration. |
 | Proposals Engine | **VERIFIED** | pending, approved, rejected state transitions. |
 | Backups & Rollbacks | **VERIFIED** | Double hash verification and storage in SQLite database. |
 | Offline AI Explanations | **VERIFIED** | Connects to Ollama/LM Studio with deterministic fallback. |
@@ -40,7 +40,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | ---- | ------ | ----- |
 | tsup bundling | **COMPLETE** | main.ts + preload.ts → dist-electron/main.js + preload.js |
 | Output verification | **COMPLETE** | scripts/verify-electron-output.mjs — 18 checks, runs after every build |
-| fix-esm-imports removed from build | **COMPLETE** | No longer in any script; kept for historical reference |
+| fix-esm-imports removed from build | **COMPLETE** | No longer in any script; historical helper files deleted from repo root |
 | Unified dev command | **COMPLETE** | `npm run dev` starts Vite + tsup watch + Electron |
 
 ## Electron Runtime
@@ -76,7 +76,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | Trainer E2E | **PASSING** | tests/trainer.e2e.test.ts — 5/5, 28 assertion points |
 | Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 20/20 |
 | IPC channel E2E | **PASSING** | tests/ipc-channels.e2e.test.ts — 13/13 (4 edge-case tests added) |
-| Trainer states E2E | **PASSING** | tests/trainer-states-controls.e2e.test.ts — 12/12 + 1 KI-013 skip; all active states have Electron evidence |
+| Trainer states E2E | **PASSING** | tests/trainer-states-controls.e2e.test.ts — 15/15; all active states plus slider/dropdown controls have Electron evidence |
 | Browser fallback E2E | **PASSING** | tests/browser-fallback.e2e.test.ts — 7/7 |
 | Accessibility E2E (new) | **PASSING** | tests/accessibility.e2e.test.ts — 7/7 DOM-level checks |
 | Performance E2E (new) | **PASSING** | tests/performance.e2e.test.ts — 12/12 (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |

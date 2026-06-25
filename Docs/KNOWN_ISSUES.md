@@ -11,12 +11,6 @@ npm install && npx playwright install
 ```
 This is a one-time setup step per machine.
 
-### KI-003: fix-esm-imports.mjs / .ps1 in repo root (dead code)
-These files are no longer referenced by any build script. They can be deleted:
-```powershell
-Remove-Item "fix-esm-imports.mjs", "fix-esm-imports.ps1"
-```
-
 ### KI-006: Apply dialog does not trap focus
 Pressing Tab past the last button in `ApplyDialog.tsx` exits the modal. A focus trap with cycle-back behavior should be added. Escape key does not close the dialog either.
 
@@ -34,9 +28,6 @@ CSS `prefers-reduced-motion` is respected in `index.css` global transitions, but
 
 ### KI-011: No pagination on trainer cards
 The trainer cards list in `TrainerPage.tsx` renders all recipes without pagination or virtual scrolling. This is acceptable for small recipe sets (< 50 items) but will degrade for games with 100+ recipes.
-
-### KI-013: slider and dropdown inputTypes unreachable via recipeToTrainerItem
-`recipeToTrainerItem()` (`src/core/recipes/index.ts` line 460) only produces `inputType = 'toggle'` (for `valueType === 'boolean'`) or `inputType = 'number'` (all other types). The `slider` and `dropdown` control branches in `TrainerCard.tsx` are implemented and unit-tested (trainer-ui.test.ts tests 25-27) but are not reachable via the `getRecipes` IPC call. Resolving this requires adding `inputType`, `min`, `max`, and `options` to the recipe creation IPC or overriding them in `recipeToTrainerItem`.
 
 ### KI-014: Atomfall Xbox save format is read-only
 
@@ -60,6 +51,8 @@ repacking, apply, and restore are prohibited.
 | KI-002: Installer not verified end-to-end | Gate 18 packaged smoke 20/20 — exe verified with Playwright |
 | TypeScript errors in 6 legacy page files | Fixed in commit `8c92dcd` |
 | KI-012: BROKEN state unreachable through IPC | `recipeToTrainerItem()` now preserves `status='Broken'`; Electron IPC and renderer assertions pass |
+| KI-003: dead `fix-esm-imports` scripts in repo root | Deleted `fix-esm-imports.mjs` and `fix-esm-imports.ps1`; build, dist, and packaged smoke pass without them |
+| KI-013: slider/dropdown unreachable via IPC | Added validated recipe control fields to IPC/domain/DB mapping; `test:trainer-states` now covers slider and dropdown as reachable controls |
 
 ## Architectural Limitations
 

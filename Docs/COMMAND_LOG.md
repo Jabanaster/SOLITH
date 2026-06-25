@@ -2,6 +2,40 @@
 
 This log records the commands run during baseline validation and final milestone verification.
 
+## 2026-06-25 — KI-013 + accessibility + dead-script cleanup
+
+Executed baseline and post-change verification command sets (using actual package scripts):
+
+```powershell
+npm test
+npm test
+npx tsc --noEmit
+npm run build:vite
+npm run build:electron
+npm run verify:electron-output
+npm run test:electron-smoke
+npm run test:electron-e2e
+npm run test:trainer-e2e
+npm run test:ipc-channels
+npm run test:trainer-states
+npm run test:browser-fallback
+npm run test:accessibility
+npm run test:performance
+npm run test:pilot-intake
+npm run build
+npm run dist
+npm run test:packaged-smoke
+git diff --check
+git status --short
+```
+
+Observed results include:
+- `npm test` pass count: **108/108**
+- `build:electron` verifier: **18/18**
+- `test:trainer-states`: **15/15**
+- `test:accessibility`: **7/7**
+- `test:packaged-smoke`: **22/22**
+
 ## 2026-06-23 — V1 Trainer UX + Compatibility Pilot Verification
 
 ### Commit A: `8c92dcd` — fix(types): restore zero-error TypeScript baseline

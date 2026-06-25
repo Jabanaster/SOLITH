@@ -13,15 +13,16 @@ candidate confirmation → backup → sandbox apply → validation → restore �
 ## Short-term (unblocked, no user data needed)
 
 - [ ] Add `@axe-core/playwright` to the Trainer E2E suite to automate accessibility audits
-- [ ] Add focus trap to `ApplyDialog.tsx` (Escape key + focus loop past last button)
-- [ ] Return focus to the card that triggered the dialog on close
+- [x] Add focus trap to `ApplyDialog.tsx` (Escape key + focus loop past last button)
+- [x] Return focus to the card that triggered the dialog on close
 - [ ] Add `aria-describedby` linking state badges to card descriptions
-- [ ] Add `<label>` element to slider control in `TrainerCard.tsx`
+- [x] Add `<label>` element to slider control in `TrainerCard.tsx`
 - [ ] Add `aria-disabled` and `aria-describedby` to disabled controls
 - [ ] Add `prefers-reduced-motion` detection to animation code paths
-- [ ] Add pagination / virtual scroll to trainer cards list for games with 100+ recipes
+- [ ] Add large-list benchmark fixtures (100/500/1000/5000) before deciding pagination or virtualization
 - [ ] Add onboarding wizard / first-run experience
-- [ ] Delete `fix-esm-imports.mjs` and `fix-esm-imports.ps1` (dead code — KI-003)
+- [x] Delete `fix-esm-imports.mjs` and `fix-esm-imports.ps1` (dead code — KI-003)
+- [x] Resolve KI-013 by making slider/dropdown controls reachable through validated recipe IPC and persistence
 
 ## New E2E Test Suites (run after build:electron)
 
