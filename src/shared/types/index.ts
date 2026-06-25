@@ -124,7 +124,12 @@ export interface TrainerItem {
   inputType?: 'number' | 'toggle' | 'slider' | 'dropdown';
   min?: number;
   max?: number;
-  options?: string[];
+  step?: number;
+  unit?: string;
+  options?: Array<{
+    label: string;
+    value: string | number | boolean;
+  }>;
 }
 
 export interface Recipe {
@@ -157,6 +162,11 @@ export interface Recipe {
   minimum?: number;
   maximum?: number;
   allowedValues?: any[];
+  step?: number;
+  resetValue?: string | number | boolean;
+  unit?: string;
+  maxLength?: number;
+  pattern?: string;
   preconditions?: any;
   validationRules?: any;
   fingerprintCompatibility?: string;

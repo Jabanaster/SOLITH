@@ -32,10 +32,55 @@ export const CreateRecipeSchema = z.object({
   target: z.string().min(1),
   path: z.string().min(1),
   valueType: z.string().min(1),
+  inputType: z.enum(['number', 'toggle', 'slider', 'dropdown']).optional(),
+  minimum: z.number().finite().optional(),
+  maximum: z.number().finite().optional(),
+  step: z.number().finite().positive().optional(),
+  unit: z.string().max(20).optional(),
+  resetValue: z.union([z.string(), z.number().finite(), z.boolean()]).optional(),
+  maxLength: z.number().int().positive().max(256).optional(),
+  pattern: z.string().max(200).optional(),
+  options: z.array(
+    z.object({
+      label: z.string().min(1).max(80),
+      value: z.union([z.string().max(120), z.number().finite(), z.boolean()])
+    })
+  ).max(50).optional(),
   risk: z.enum(['Safe', 'Caution', 'Risky', 'Blocked']),
   requiresBackup: z.boolean(),
   confidence: z.number().min(0).max(100),
   description: z.string().optional()
+}).superRefine((recipe, ctx) => {
+  const inputType = recipe.inputType ?? (recipe.valueType === 'boolean' ? 'toggle' : 'number');
+
+  if (inputType === 'slider') {
+    if (recipe.minimum === undefined || recipe.maximum === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Slider requires both minimum and maximum.' });
+    }
+    if (recipe.minimum !== undefined && recipe.maximum !== undefined && recipe.minimum >= recipe.maximum) {
+      ctx.addIssue({ code: 'custom', message: 'Slider minimum must be less than maximum.' });
+    }
+    if (recipe.step === undefined || recipe.step <= 0) {
+      ctx.addIssue({ code: 'custom', message: 'Slider step must be a positive number.' });
+    }
+  }
+
+  if (inputType === 'dropdown') {
+    const options = recipe.options ?? [];
+    if (options.length < 1) {
+      ctx.addIssue({ code: 'custom', message: 'Dropdown requires at least one option.' });
+      return;
+    }
+    const seen = new Set<string>();
+    for (const option of options) {
+      const key = `${typeof option.value}:${String(option.value)}`;
+      if (seen.has(key)) {
+        ctx.addIssue({ code: 'custom', message: 'Dropdown option values must be unique.' });
+        break;
+      }
+      seen.add(key);
+    }
+  }
 });
 
 export const DeleteRecipeSchema = z.object({
