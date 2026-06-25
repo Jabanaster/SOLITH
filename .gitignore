@@ -75,6 +75,14 @@ desktop.ini
 .env.*.local
 local.config.*
 
+# ── Real-world pilot data directories (MUST NOT be committed) ────────────────
+# These directories hold actual game saves captured during real-world compatibility
+# testing. Never commit any of these — they may contain personal save data.
+.local-pilot-data/
+.local-pilot-workspaces/
+.local-pilot-backups/
+.local-pilot-reports/
+
 # ── Demo game save files should not be committed if they contain real data ──
 # The demo-game directory is tracked as fixture data; exclude any accidentally
 # generated runtime copies:
