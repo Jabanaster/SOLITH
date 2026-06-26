@@ -11,6 +11,16 @@ npm install && npx playwright install
 ```
 This is a one-time setup step per machine.
 
+### KI-014: Accessibility E2E worker can transiently crash on Windows
+On some runs the Electron worker for `test:accessibility` has crashed
+(`code=3221226505`, a Windows access-violation in the GPU/worker process) before
+`a11y-01`. Investigation: this is an environment-level Electron/Chromium worker
+crash on Windows, not a code regression — it does not reproduce deterministically,
+the renderer/main assertions pass on a clean run, and no app code is on the crash
+path. During the Drill Core `master_volume` pilot the suite passed 7/7 with no
+crash. Mitigation if it recurs: ensure no other Electron instance holds the
+single-instance lock and re-run; do not mask it by looping until green.
+
 ### KI-006: Apply dialog does not trap focus
 Pressing Tab past the last button in `ApplyDialog.tsx` exits the modal. A focus trap with cycle-back behavior should be added. Escape key does not close the dialog either.
 

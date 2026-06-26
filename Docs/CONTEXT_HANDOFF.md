@@ -1,8 +1,29 @@
 # Context Handoff
 
-**Last Updated:** 2026-06-23 — V1 Trainer UX + Compatibility Pilot Verification Checkpoint
+**Last Updated:** 2026-06-25 — Drill Core `master_volume` writable sandbox pilot
 
 ## Current Branch
+
+`feature/v1-writable-real-world-pilot`
+
+## Drill Core writable sandbox pilot — handoff summary
+
+- Added narrow byte-preserving adapter `src/core/adapters/drill-core-settings.ts`
+  (registered ahead of the generic JSON adapter in `src/core/adapters/index.ts`).
+  Only authorized writable target: top-level `master_volume` integer 0–100.
+- Added sanitized fixture `tests/fixtures/drill-core-settings.fixture.json` and
+  24 regression tests `tests/drill-core-settings.test.ts` (wired into `npm test`
+  and a `test:drill-core` script).
+- Verified the full backup → apply → validate → restore pipeline through the real
+  `applyProposal` / `restoreBackup` engine and twice on real-format intake copies
+  (sandbox runner is local/ignored under `.local-pilot-data/`).
+- Live `%LOCALAPPDATA%\Drill_Core\settings.json` was never modified (hash unchanged).
+- **Open gate:** live in-game validation and `v0.3.0` await explicit user approval.
+- Reports: `Docs/Reports/DRILL_CORE_MASTER_VOLUME_SANDBOX_PILOT.md`,
+  `Docs/Reports/DRILL_CORE_MASTER_VOLUME_EVIDENCE.md`,
+  `Docs/Guides/REAL_WORLD_PILOT_EXECUTION.md`.
+
+## Prior Branch (historical)
 
 `feature/v1-trainer-ux-pilot`
 
