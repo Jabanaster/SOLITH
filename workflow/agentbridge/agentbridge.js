@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const store = require('./store');
 
 const PROJECT_ROOT = process.cwd();
@@ -16,29 +17,62 @@ let state = {
     tasks: new Map()
 };
 
+function nowIso() {
+    return new Date().toISOString();
+}
+
 function defaultTask(projectPath = PROJECT_ROOT) {
+    const created = nowIso();
     return {
         state: 'created',
         loopCount: 0,
         projectPath,
+        currentAgent: 'claude',
         claudeOutputs: [],
         chatgptReview: null,
         codexBuildResult: null,
         lastOutput: null,
         lastOutputPath: null,
         lastBuildResult: null,
-        unresolvedIssues: []
+        buildResultSummary: null,
+        unresolvedIssues: [],
+        promptPaths: { claude: null, chatgpt: null, codex: null },
+        outputPaths: { claude: [], chatgpt: [], codex: [] },
+        finalReportPath: null,
+        createdAt: created,
+        updatedAt: created
     };
+}
+
+function normalizeTask(task) {
+    const skeleton = defaultTask(task.projectPath || PROJECT_ROOT);
+    const merged = { ...skeleton, ...task };
+    merged.promptPaths = { ...skeleton.promptPaths, ...(task.promptPaths || {}) };
+    merged.outputPaths = { ...skeleton.outputPaths, ...(task.outputPaths || {}) };
+    if (!Array.isArray(merged.claudeOutputs)) {
+        merged.claudeOutputs = [];
+    }
+    if (!Array.isArray(merged.unresolvedIssues)) {
+        merged.unresolvedIssues = [];
+    }
+    return merged;
 }
 
 function initState() {
     store.initStore();
-    state.tasks = store.loadAllTasks();
+    const loaded = store.loadAllTasks();
+    const normalized = new Map();
+    for (const [taskId, task] of loaded) {
+        normalized.set(taskId, normalizeTask(task));
+    }
+    state.tasks = normalized;
 }
 
 function persistTask(taskId) {
     const task = state.tasks.get(taskId);
     if (task) {
+        task.updatedAt = nowIso();
+        task.currentAgent = getNextAgent(taskId);
         store.saveTask(taskId, task);
     }
 }
@@ -92,10 +126,15 @@ function getLastBuildResult(taskId) {
     return state.tasks.get(taskId)?.lastBuildResult;
 }
 
-function setLastBuildResult(taskId, result) {
+function setLastBuildResult(taskId, result, summary) {
     const task = ensureTask(taskId);
     task.lastBuildResult = result;
     task.codexBuildResult = result;
+    if (summary !== undefined) {
+        task.buildResultSummary = summary;
+    } else {
+        task.buildResultSummary = result;
+    }
     persistTask(taskId);
 }
 
@@ -195,6 +234,11 @@ function ingestFile(agent, filePath, taskId) {
         fs.copyFileSync(outputPath, path.join(CODEX_OUTPUT_DIR, outputFileName));
     }
 
+    const task = ensureTask(taskId);
+    if (task.outputPaths[agent]) {
+        task.outputPaths[agent].push(outputPath);
+    }
+
     setLastOutput(taskId, content, outputPath);
     return { content, outputPath };
 }
@@ -284,7 +328,16 @@ function writeFinalReport(taskId, reason) {
     content += `## Next Step\n${getNextStep(taskId)}\n`;
 
     fs.writeFileSync(reportFile, content);
+    task.finalReportPath = reportFile;
+    store.saveTask(taskId, task);
     return reportFile;
+}
+
+function recordPromptPath(taskId, agent, promptPath) {
+    const task = ensureTask(taskId);
+    task.promptPaths[agent] = promptPath;
+    persistTask(taskId);
+    return promptPath;
 }
 
 function getNextPromptPath(taskId) {
@@ -293,13 +346,13 @@ function getNextPromptPath(taskId) {
     switch (taskState) {
         case 'created':
             setTaskState(taskId, 'waiting_claude_code');
-            return generatePrompt(taskId, 'claude', `# Claude Code — ${taskId}\n\nWrite the implementation. No destructive commands. No package installs without approval.\n`);
+            return recordPromptPath(taskId, 'claude', generatePrompt(taskId, 'claude', `# Claude Code — ${taskId}\n\nWrite the implementation. No destructive commands. No package installs without approval.\n`));
         case 'waiting_chatgpt_review':
-            return generatePrompt(taskId, 'chatgpt', `# ChatGPT Review — ${taskId}\n\nReview Claude output. Reply APPROVED or list issues.\n`);
+            return recordPromptPath(taskId, 'chatgpt', generatePrompt(taskId, 'chatgpt', `# ChatGPT Review — ${taskId}\n\nReview Claude output. Reply APPROVED or list issues.\n`));
         case 'waiting_claude_fix':
-            return generatePrompt(taskId, 'claude', `# Claude Fix — ${taskId}\n\nFix issues from review or Codex build failure.\n`);
+            return recordPromptPath(taskId, 'claude', generatePrompt(taskId, 'claude', `# Claude Fix — ${taskId}\n\nFix issues from review or Codex build failure.\n`));
         case 'waiting_codex_build':
-            return generateCodexPrompt(taskId);
+            return recordPromptPath(taskId, 'codex', generateCodexPrompt(taskId));
         default:
             return null;
     }
@@ -452,6 +505,220 @@ function cmdIngest(agent, filePath, explicitTaskId) {
     console.log(`Next required agent: ${getNextAgent(taskId) || 'None'}`);
 }
 
+const DANGEROUS_COMMAND_PATTERNS = [
+    /\brm\s+-rf\b/i,
+    /\bdel\s+\/s\b/i,
+    /\brmdir\s+\/s\b/i,
+    /Remove-Item\s+-Recurse/i,
+    /\bgit\s+push\b/i,
+    /\bnpm\s+install\b/i,
+    /\bpnpm\s+add\b/i,
+    /\byarn\s+add\b/i,
+    /\bpip\s+install\b/i,
+    /curl\b[^\n]*\|\s*sh\b/i,
+    /Invoke-WebRequest/i,
+    /\biwr\b/i,
+    /powershell\s+-enc/i
+];
+
+function isDangerousCommand(command) {
+    return DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
+}
+
+function buildCodexRunContent(details) {
+    const { result, command, exitCode, note, stdout, stderr } = details;
+    const tail = (text) => {
+        const trimmed = (text || '').trim();
+        if (!trimmed) {
+            return 'NONE';
+        }
+        const lines = trimmed.split(/\r?\n/);
+        return lines.slice(-40).join('\n');
+    };
+
+    let content = `RESULT: ${result}\n\n`;
+    content += `COMMAND: ${command || 'NONE'}\n\n`;
+    content += `EXIT_CODE: ${exitCode === null || exitCode === undefined ? 'NONE' : exitCode}\n\n`;
+    content += `NOTE: ${note || 'NONE'}\n\n`;
+    content += `STDOUT:\n${tail(stdout)}\n\n`;
+    content += `STDERR:\n${tail(stderr)}\n\n`;
+    content += `LIKELY_CAUSE:\n${result === 'FAIL' ? (note || 'Command returned a nonzero exit code') : 'NONE'}\n`;
+    return content;
+}
+
+function runCodexBuild(taskId) {
+    const task = ensureTask(taskId);
+    const config = store.getCodexConfig();
+
+    let result = 'NOT_RUN';
+    let executed = false;
+    let blocked = false;
+    let exitCode = null;
+    let note = '';
+    let stdout = '';
+    let stderr = '';
+
+    if (!config.allowCodexCommandExecution) {
+        note = 'Codex command execution disabled (allowCodexCommandExecution=false)';
+    } else if (!config.codexBuildCommand) {
+        note = 'No codexBuildCommand configured';
+    } else if (isDangerousCommand(config.codexBuildCommand)) {
+        blocked = true;
+        note = `Dangerous command blocked: ${config.codexBuildCommand}`;
+    } else if (!fs.existsSync(task.projectPath)) {
+        note = `Project root does not exist: ${task.projectPath}`;
+    } else {
+        executed = true;
+        const execResult = spawnSync(config.codexBuildCommand, {
+            cwd: task.projectPath,
+            shell: true,
+            timeout: config.codexBuildTimeoutMs,
+            encoding: 'utf8',
+            maxBuffer: 10 * 1024 * 1024
+        });
+
+        stdout = execResult.stdout || '';
+        stderr = execResult.stderr || '';
+
+        if (execResult.error && execResult.error.code === 'ETIMEDOUT') {
+            result = 'FAIL';
+            note = `Command timed out after ${config.codexBuildTimeoutMs}ms`;
+        } else if (execResult.error) {
+            result = 'FAIL';
+            note = `Command failed to start: ${execResult.error.message}`;
+        } else if (execResult.status === 0) {
+            result = 'PASS';
+            exitCode = 0;
+        } else {
+            result = 'FAIL';
+            exitCode = execResult.status;
+            note = `Command exited with code ${execResult.status}`;
+        }
+    }
+
+    const content = buildCodexRunContent({
+        result,
+        command: config.codexBuildCommand,
+        exitCode,
+        note,
+        stdout,
+        stderr
+    });
+
+    fs.mkdirSync(CODEX_OUTPUT_DIR, { recursive: true });
+    const runFile = path.join(CODEX_OUTPUT_DIR, `${taskId}_run_${Date.now()}.md`);
+    fs.writeFileSync(runFile, content);
+
+    return { result, executed, blocked, exitCode, note, outputPath: runFile };
+}
+
+function cmdRunCodex(explicitTaskId) {
+    let taskId;
+    try {
+        taskId = resolveTaskId(explicitTaskId);
+    } catch (error) {
+        console.log('Usage: agentbridge run-codex <taskId>');
+        console.error(error.message);
+        process.exitCode = 1;
+        return null;
+    }
+
+    store.setActiveTaskId(taskId);
+    const config = store.getCodexConfig();
+    console.log(`Running Codex build for ${taskId}`);
+    console.log(`Command: ${config.codexBuildCommand || 'NONE'}`);
+    console.log(`Execution enabled: ${config.allowCodexCommandExecution}`);
+
+    const outcome = runCodexBuild(taskId);
+    console.log(`Codex result: ${outcome.result}`);
+    if (outcome.blocked) {
+        console.log('Command BLOCKED by dangerous pattern guard');
+    }
+    if (outcome.note) {
+        console.log(`Note: ${outcome.note}`);
+    }
+    console.log(`Codex output written: ${outcome.outputPath}`);
+
+    cmdIngest('codex', outcome.outputPath, taskId);
+    return outcome;
+}
+
+function formatTask(taskId, task) {
+    return {
+        taskId,
+        state: task.state,
+        projectPath: task.projectPath,
+        createdAt: task.createdAt || 'unknown',
+        updatedAt: task.updatedAt || 'unknown'
+    };
+}
+
+function cmdTasks(limitArg) {
+    const limit = limitArg ? parseInt(limitArg, 10) : 20;
+    const entries = [...state.tasks.entries()].map(([taskId, task]) => formatTask(taskId, task));
+    entries.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const recent = entries.slice(0, limit);
+
+    console.log('\n=== AgentBridge Tasks ===');
+    if (recent.length === 0) {
+        console.log('No tasks yet.');
+        return;
+    }
+    const activeTaskId = store.getActiveTaskId();
+    for (const entry of recent) {
+        const activeMarker = entry.taskId === activeTaskId ? ' *' : '';
+        console.log(`\n${entry.taskId}${activeMarker}`);
+        console.log(`  State:       ${entry.state}`);
+        console.log(`  Project:     ${entry.projectPath}`);
+        console.log(`  Created:     ${entry.createdAt}`);
+        console.log(`  Updated:     ${entry.updatedAt}`);
+    }
+}
+
+function cmdShow(explicitTaskId) {
+    let taskId;
+    try {
+        taskId = resolveTaskId(explicitTaskId);
+    } catch (error) {
+        console.log('Usage: agentbridge show <taskId>');
+        console.error(error.message);
+        process.exitCode = 1;
+        return;
+    }
+
+    const task = state.tasks.get(taskId);
+
+    console.log(`\n=== Task ${taskId} ===`);
+    console.log(`State:            ${task.state}`);
+    console.log(`Project path:     ${task.projectPath}`);
+    console.log(`Current step:     ${getNextStep(taskId)}`);
+    console.log(`Current agent:    ${getNextAgent(taskId) || 'None'}`);
+    console.log(`Loop count:       ${task.loopCount}`);
+    console.log(`Created:          ${task.createdAt || 'unknown'}`);
+    console.log(`Updated:          ${task.updatedAt || 'unknown'}`);
+    console.log(`Build result:     ${task.buildResultSummary || task.lastBuildResult || 'None'}`);
+    console.log('\nPrompt paths:');
+    console.log(`  claude:   ${task.promptPaths?.claude || 'None'}`);
+    console.log(`  chatgpt:  ${task.promptPaths?.chatgpt || 'None'}`);
+    console.log(`  codex:    ${task.promptPaths?.codex || 'None'}`);
+    console.log('\nOutput paths:');
+    for (const agent of ['claude', 'chatgpt', 'codex']) {
+        const paths = task.outputPaths?.[agent] || [];
+        if (paths.length === 0) {
+            console.log(`  ${agent}: None`);
+        } else {
+            console.log(`  ${agent}:`);
+            paths.forEach((p) => console.log(`    - ${p}`));
+        }
+    }
+    const reportPath = task.finalReportPath;
+    if (reportPath && fs.existsSync(reportPath)) {
+        console.log(`\nFinal report:     ${reportPath}`);
+    } else {
+        console.log(`\nFinal report:     None`);
+    }
+}
+
 function cmdStatus(taskId) {
     if (!taskId) {
         const activeTaskId = store.getActiveTaskId();
@@ -520,6 +787,9 @@ function parseArgs() {
         console.log('  ingest <agent> <file> [taskId]  Ingest agent output');
         console.log('  status [taskId]              Show task status');
         console.log('  report [taskId]              Show final report');
+        console.log('  tasks [limit]                List recent tasks');
+        console.log('  show <taskId>                Show full task details');
+        console.log('  run-codex <taskId>           Run configured Codex build command');
         return;
     }
 
@@ -541,6 +811,15 @@ function parseArgs() {
         case 'report':
             cmdReport(commandArgs[0]);
             break;
+        case 'tasks':
+            cmdTasks(commandArgs[0]);
+            break;
+        case 'show':
+            cmdShow(commandArgs[0]);
+            break;
+        case 'run-codex':
+            cmdRunCodex(commandArgs[0]);
+            break;
         default:
             console.log(`Unknown command: ${command}`);
             console.log('Use "agentbridge" for help');
@@ -555,9 +834,15 @@ const exported = {
     cmdIngest,
     cmdStatus,
     cmdReport,
+    cmdTasks,
+    cmdShow,
+    cmdRunCodex,
+    runCodexBuild,
+    isDangerousCommand,
     getTaskState,
     getNextAgent,
     getLastBuildResult,
+    getLoopCount,
     taskExists,
     resolveTaskId,
     parseCodexResult,

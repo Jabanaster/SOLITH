@@ -62,6 +62,26 @@ function smokeChecks() {
     }
     console.log('OK codex-build template');
 
+    if (relay.isDangerousCommand('git push') !== true) {
+        fail('isDangerousCommand should flag git push');
+    }
+    if (relay.isDangerousCommand('node build.js') !== false) {
+        fail('isDangerousCommand should allow safe command');
+    }
+    console.log('OK dangerous command guard');
+
+    const codexConfig = relay.store.getCodexConfig();
+    if (typeof codexConfig.allowCodexCommandExecution !== 'boolean') {
+        fail('codex config missing allowCodexCommandExecution');
+    }
+    if (typeof codexConfig.codexBuildTimeoutMs !== 'number') {
+        fail('codex config missing codexBuildTimeoutMs');
+    }
+    if (codexConfig.allowCodexCommandExecution !== false) {
+        fail('codex command execution must default to disabled');
+    }
+    console.log('OK codex config defaults');
+
     console.log('OK relay module loads');
 }
 

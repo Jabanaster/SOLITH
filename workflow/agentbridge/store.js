@@ -8,6 +8,12 @@ const CONFIG_PATH = path.join(WORKFLOW_DIR, 'config.json');
 let db = null;
 let useSqlite = false;
 
+const CODEX_CONFIG_DEFAULTS = {
+    codexBuildCommand: '',
+    codexBuildTimeoutMs: 120000,
+    allowCodexCommandExecution: false
+};
+
 function initStore() {
     fs.mkdirSync(WORKFLOW_DIR, { recursive: true });
 
@@ -29,6 +35,16 @@ function initStore() {
         useSqlite = false;
         if (!fs.existsSync(CONFIG_PATH)) {
             fs.writeFileSync(CONFIG_PATH, JSON.stringify({ activeTaskId: null, nextTaskId: 0, tasks: {} }, null, 2));
+        }
+    }
+
+    seedCodexConfigDefaults();
+}
+
+function seedCodexConfigDefaults() {
+    for (const [key, value] of Object.entries(CODEX_CONFIG_DEFAULTS)) {
+        if (getConfig(key) === null) {
+            setConfig(key, String(value));
         }
     }
 }
@@ -113,13 +129,38 @@ function saveTask(taskId, taskData) {
     writeJsonConfig(config);
 }
 
+function getCodexConfig() {
+    const timeoutRaw = getConfig('codexBuildTimeoutMs');
+    return {
+        codexBuildCommand: getConfig('codexBuildCommand') || '',
+        codexBuildTimeoutMs: timeoutRaw ? parseInt(timeoutRaw, 10) : CODEX_CONFIG_DEFAULTS.codexBuildTimeoutMs,
+        allowCodexCommandExecution: getConfig('allowCodexCommandExecution') === 'true'
+    };
+}
+
+function setCodexConfig(partial) {
+    if (partial.codexBuildCommand !== undefined) {
+        setConfig('codexBuildCommand', String(partial.codexBuildCommand));
+    }
+    if (partial.codexBuildTimeoutMs !== undefined) {
+        setConfig('codexBuildTimeoutMs', String(partial.codexBuildTimeoutMs));
+    }
+    if (partial.allowCodexCommandExecution !== undefined) {
+        setConfig('allowCodexCommandExecution', String(Boolean(partial.allowCodexCommandExecution)));
+    }
+}
+
 module.exports = {
     initStore,
+    getConfig,
+    setConfig,
     getActiveTaskId,
     setActiveTaskId,
     getNextTaskIdCounter,
     setNextTaskIdCounter,
     loadAllTasks,
     saveTask,
+    getCodexConfig,
+    setCodexConfig,
     useSqlite: () => useSqlite
 };
