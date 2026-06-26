@@ -75,6 +75,11 @@ desktop.ini
 .env.*.local
 local.config.*
 
+# ── Machine-specific pilot evidence captures (MUST NOT be committed) ─────────
+# Wand-monitoring captures and CSV evidence generated on the local machine.
+# These are machine-specific process snapshots — not project source.
+Docs/pilot/wand-captures/
+
 # ── Real-world pilot data directories (MUST NOT be committed) ────────────────
 # These directories hold the user's actual game saves captured during real-world
 # compatibility testing. NEVER commit any of these — they may contain personal save data.
