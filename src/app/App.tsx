@@ -7,55 +7,82 @@ import Recipes from './pages/Recipes';
 import Backups from './pages/Backups';
 import Journal from './pages/Journal';
 import SaveLocations from './pages/SaveLocations';
+import CompatibilityDashboard from './pages/CompatibilityDashboard';
 
-type View = 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'recipes' | 'backups' | 'journal' | 'locations';
+type View =
+  | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
+  | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility';
 
-const TRAINER_CATEGORIES = [
-  { id: 'all', label: 'All Mods', icon: '⚡' },
-  { id: 'player', label: 'Player', icon: '🧑' },
-  { id: 'inventory', label: 'Inventory', icon: '🎒' },
-  { id: 'stats', label: 'Stats', icon: '📊' },
-  { id: 'enemies', label: 'Enemies', icon: '👾' },
-  { id: 'game', label: 'Game', icon: '🎮' },
-  { id: 'unlocks', label: 'Unlocks', icon: '🔓' },
-  { id: 'video', label: 'Video', icon: '🎥' },
-  { id: 'voice', label: 'Voice', icon: '🔊' },
-  { id: 'discovery', label: 'Discovered', icon: '🔍' },
+type AppMode = 'trainer' | 'workshop';
+
+const TRAINER_CATEGORIES: { id: string; label: string }[] = [
+  { id: 'all',           label: 'All Items' },
+  { id: 'player',        label: 'Player' },
+  { id: 'currency',      label: 'Currency' },
+  { id: 'inventory',     label: 'Inventory' },
+  { id: 'stats',         label: 'Stats' },
+  { id: 'skills',        label: 'Skills' },
+  { id: 'attributes',    label: 'Attributes' },
+  { id: 'health',        label: 'Health' },
+  { id: 'stamina',       label: 'Stamina' },
+  { id: 'mana',          label: 'Mana' },
+  { id: 'equipment',     label: 'Equipment' },
+  { id: 'weapons',       label: 'Weapons' },
+  { id: 'armor',         label: 'Armor' },
+  { id: 'experience',    label: 'Experience' },
+  { id: 'world',         label: 'World' },
+  { id: 'difficulty',    label: 'Difficulty' },
+  { id: 'game',          label: 'Game' },
+  { id: 'video',         label: 'Video' },
+  { id: 'audio',         label: 'Audio' },
+  { id: 'accessibility', label: 'Accessibility' },
+  { id: 'enemies',       label: 'Enemies' },
+  { id: 'unlocks',       label: 'Unlocks' },
+  { id: 'discovery',     label: 'Discovered' },
 ];
 
-const TOOL_PAGES: { id: View; label: string; icon: string }[] = [
-  { id: 'saves',     label: 'Save Editor',    icon: '💾' },
-  { id: 'data',      label: 'Data Editor',    icon: '📝' },
-  { id: 'discovery', label: 'Discovery Lab',  icon: '🔬' },
-  { id: 'locations', label: 'Save Locations', icon: '📂' },
-  { id: 'recipes',   label: 'Recipes',        icon: '📋' },
-  { id: 'backups',   label: 'Backups',        icon: '🗃️' },
-  { id: 'journal',   label: 'Journal',        icon: '📜' },
+const WORKSHOP_PAGES: { id: View; label: string }[] = [
+  { id: 'saves',         label: 'Save Editor' },
+  { id: 'data',          label: 'Data Editor' },
+  { id: 'discovery',     label: 'Discovery Lab' },
+  { id: 'locations',     label: 'Save Locations' },
+  { id: 'recipes',       label: 'Recipes' },
+  { id: 'backups',       label: 'Backups' },
+  { id: 'journal',       label: 'Journal' },
+  { id: 'compatibility', label: 'Compatibility' },
 ];
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('library');
-  const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(null);
+  const e2eTrainerState = (window as any).electronAPI?.e2eTrainerState as string | null;
+  const [currentView, setCurrentView] = useState<View>(e2eTrainerState ? 'trainer' : 'library');
+  const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(
+    e2eTrainerState ? { id: 'e2e-renderer-state-fixture', name: 'Renderer State Fixture' } : null
+  );
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [games, setGames] = useState<Array<{ id: string; name: string; path: string; dateAdded: string; lastScan: string; engine: string }>>([]);
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    try { return (localStorage.getItem('rf-app-mode') as AppMode) ?? 'trainer'; } catch { return 'trainer'; }
+  });
+  const [games, setGames] = useState<
+    Array<{ id: string; name: string; path: string; dateAdded: string; lastScan: string; engine: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadGames();
-  }, []);
+  useEffect(() => { loadGames(); }, []);
+
+  const switchMode = (mode: AppMode) => {
+    setAppMode(mode);
+    try { localStorage.setItem('rf-app-mode', mode); } catch { /* ignore */ }
+    if (mode === 'trainer' && selectedGame) setCurrentView('trainer');
+    if (mode === 'workshop') setCurrentView(selectedGame ? 'saves' : 'library');
+  };
 
   const loadGames = async () => {
     try {
-      if (!window.electronAPI) {
-        console.error('window.electronAPI unavailable — app must run inside Electron');
-        return;
-      }
-      const result = await window.electronAPI.getGames();
-      if (!result.error) {
-        setGames(result);
-      }
-    } catch (error) {
-      console.error('Error loading games:', error);
+      if (!(window as any).electronAPI) return;
+      const result = await (window as any).electronAPI.getGames();
+      if (Array.isArray(result)) setGames(result);
+    } catch (e) {
+      console.error('Error loading games:', e);
     } finally {
       setLoading(false);
     }
@@ -63,8 +90,8 @@ const App: React.FC = () => {
 
   const handleGameSelect = (gameId: string) => {
     const game = games.find(g => g.id === gameId);
-    setSelectedGame({ id: gameId, name: game?.name || 'Unknown Game' });
-    setCurrentView('trainer');
+    setSelectedGame({ id: gameId, name: game?.name ?? 'Unknown Game' });
+    setCurrentView(appMode === 'workshop' ? 'saves' : 'trainer');
   };
 
   const handleBackToLibrary = () => {
@@ -73,15 +100,9 @@ const App: React.FC = () => {
   };
 
   const handleAddGame = async (gameData: { name: string; path: string; engine?: string }) => {
-    try {
-      if (!window.electronAPI) return;
-      const result = await window.electronAPI.addGame(gameData);
-      if (result.success) {
-        await loadGames();
-      }
-    } catch (error) {
-      console.error('Error adding game:', error);
-    }
+    if (!(window as any).electronAPI) return;
+    const result = await (window as any).electronAPI.addGame(gameData);
+    if (result?.success) await loadGames();
   };
 
   const renderContent = () => {
@@ -90,11 +111,7 @@ const App: React.FC = () => {
         return <GameLibrary games={games} onSelect={handleGameSelect} onAddGame={handleAddGame} />;
       case 'trainer':
         return selectedGame ? (
-          <TrainerPage
-            gameId={selectedGame.id}
-            category={selectedCategory}
-            onBack={handleBackToLibrary}
-          />
+          <TrainerPage gameId={selectedGame.id} category={selectedCategory} onBack={handleBackToLibrary} />
         ) : null;
       case 'saves':
         return <SaveEditor gameId={selectedGame?.id ?? null} />;
@@ -110,6 +127,8 @@ const App: React.FC = () => {
         return <Journal gameId={selectedGame?.id ?? null} />;
       case 'locations':
         return <SaveLocations gameId={selectedGame?.id ?? null} />;
+      case 'compatibility':
+        return <CompatibilityDashboard />;
       default:
         return null;
     }
@@ -121,47 +140,79 @@ const App: React.FC = () => {
       <aside className="sidebar">
         <div className="app-title">
           <h1>ResourceForge</h1>
-          <p className="subtitle">Local Trainer & Discovery Lab</p>
+          <p className="subtitle">Local Trainer &amp; Discovery Lab</p>
         </div>
 
-        <nav className="nav-section">
+        {/* Mode toggle */}
+        <div className="mode-toggle-row">
+          <button
+            className={`mode-btn ${appMode === 'trainer' ? 'mode-active' : ''}`}
+            onClick={() => switchMode('trainer')}
+            aria-pressed={appMode === 'trainer'}
+            title="Trainer Mode — simple controls for common edits"
+          >
+            Trainer
+          </button>
+          <button
+            className={`mode-btn ${appMode === 'workshop' ? 'mode-active' : ''}`}
+            onClick={() => switchMode('workshop')}
+            aria-pressed={appMode === 'workshop'}
+            title="Workshop Mode — advanced discovery, recipes, and diagnostics"
+          >
+            Workshop
+          </button>
+        </div>
+
+        <nav className="nav-section" aria-label="Game library">
           <h3>Library</h3>
           <button
             onClick={() => setCurrentView('library')}
             className={currentView === 'library' ? 'active' : ''}
           >
-            🎮 Game Library
+            Game Library
           </button>
         </nav>
 
-        {selectedGame && (
-          <>
-            <nav className="nav-section">
-              <h3>Trainer</h3>
-              {TRAINER_CATEGORIES.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => { setSelectedCategory(cat.id); setCurrentView('trainer'); }}
-                  className={currentView === 'trainer' && selectedCategory === cat.id ? 'active' : ''}
-                >
-                  {cat.icon} {cat.label}
-                </button>
-              ))}
-            </nav>
+        {selectedGame && appMode === 'trainer' && (
+          <nav className="nav-section" aria-label="Trainer categories">
+            <h3>Trainer</h3>
+            {TRAINER_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => { setSelectedCategory(cat.id); setCurrentView('trainer'); }}
+                className={currentView === 'trainer' && selectedCategory === cat.id ? 'active' : ''}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </nav>
+        )}
 
-            <nav className="nav-section">
-              <h3>Tools</h3>
-              {TOOL_PAGES.map(page => (
-                <button
-                  key={page.id}
-                  onClick={() => setCurrentView(page.id)}
-                  className={currentView === page.id ? 'active' : ''}
-                >
-                  {page.icon} {page.label}
-                </button>
-              ))}
-            </nav>
-          </>
+        {selectedGame && appMode === 'trainer' && (
+          <nav className="nav-section" aria-label="Quick actions">
+            <h3>Actions</h3>
+            <button onClick={() => setCurrentView('backups')} className={currentView === 'backups' ? 'active' : ''}>
+              Backups
+            </button>
+            <button onClick={() => setCurrentView('journal')} className={currentView === 'journal' ? 'active' : ''}>
+              Journal
+            </button>
+          </nav>
+        )}
+
+        {appMode === 'workshop' && (
+          <nav className="nav-section" aria-label="Workshop tools">
+            <h3>Workshop</h3>
+            {WORKSHOP_PAGES.map(page => (
+              <button
+                key={page.id}
+                onClick={() => setCurrentView(page.id)}
+                className={currentView === page.id ? 'active' : ''}
+              >
+                {page.label}
+              </button>
+            ))}
+          </nav>
         )}
       </aside>
 
@@ -173,15 +224,22 @@ const App: React.FC = () => {
               <button onClick={handleBackToLibrary} className="back-btn">← Library</button>
               <h2 id="game-title">{selectedGame.name}</h2>
               <div className="header-actions">
-                <button className="btn-secondary" onClick={() => window.electronAPI.scanGame(selectedGame.id)}>
-                  🔍 Rescan
+                <button
+                  className="btn-secondary"
+                  onClick={() => (window as any).electronAPI?.scanGame(selectedGame.id)}
+                >
+                  Rescan
                 </button>
-                <button className="btn-secondary" onClick={() => setCurrentView('backups')}>
-                  🗃️ Backup
-                </button>
-                <button className="btn-primary" onClick={() => setCurrentView('discovery')}>
-                  🔬 Discovery Lab
-                </button>
+                {appMode === 'trainer' && (
+                  <button className="btn-secondary" onClick={() => switchMode('workshop')}>
+                    Workshop Mode
+                  </button>
+                )}
+                {appMode === 'workshop' && (
+                  <button className="btn-primary" onClick={() => { switchMode('trainer'); setCurrentView('trainer'); }}>
+                    Trainer Mode
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -189,18 +247,18 @@ const App: React.FC = () => {
           )}
         </header>
 
-        <main className="content-area">
+        <main className="content-area" id="main-content">
           {loading ? (
             <div className="loading-state">
-              <div className="loading-spinner" />
+              <div className="loading-spinner" aria-hidden="true" />
               <span>Loading ResourceForge…</span>
             </div>
           ) : renderContent()}
         </main>
       </div>
 
-      <div className="v2-notice">
-        ⚡ V1: File-backed edits only — No memory injection, no anti-cheat interaction — Live trainer mode coming in V2
+      <div className="v2-notice" role="status">
+        V1: File-backed edits only — No memory injection, no anti-cheat interaction
       </div>
     </div>
   );

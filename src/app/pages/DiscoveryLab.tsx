@@ -29,6 +29,14 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   const [recipeName, setRecipeName] = useState('');
   const [recipeCategory, setRecipeCategory] = useState('PLAYER');
   const [recipeDescription, setRecipeDescription] = useState('');
+  const [recipeInputType, setRecipeInputType] = useState<'number' | 'toggle' | 'slider' | 'dropdown'>('number');
+  const [sliderMin, setSliderMin] = useState('0');
+  const [sliderMax, setSliderMax] = useState('100');
+  const [sliderStep, setSliderStep] = useState('1');
+  const [sliderUnit, setSliderUnit] = useState('');
+  const [dropdownOptions, setDropdownOptions] = useState<Array<{ label: string; value: string }>>([
+    { label: 'Option 1', value: 'option-1' }
+  ]);
 
   useEffect(() => {
     if (gameId) {
@@ -42,6 +50,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
       setLoading(false);
       return;
     }
+    if (!gameId) { setLoading(false); return; }
     setLoading(true);
     try {
       const files = await window.electronAPI.detectSaveFiles(gameId);
@@ -82,6 +91,12 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
     setRecipeName(candidate.suggestedName || `Set ${candidate.path}`);
     setRecipeCategory(candidate.suggestedCategory || 'PLAYER');
     setRecipeDescription(candidate.description || '');
+    const vt = candidate.valueType || typeof candidate.newValue;
+    setRecipeInputType(vt === 'boolean' ? 'toggle' : vt === 'number' ? 'slider' : 'dropdown');
+    setDropdownOptions([
+      { label: String(candidate.oldValue ?? 'Current'), value: String(candidate.oldValue ?? '') },
+      { label: String(candidate.newValue ?? 'Proposed'), value: String(candidate.newValue ?? '') }
+    ]);
   };
 
   const handleCreateRecipe = async () => {
@@ -99,7 +114,17 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
         risk: selectedCandidate.risk ? selectedCandidate.risk.charAt(0).toUpperCase() + selectedCandidate.risk.slice(1) : 'Safe',
         requiresBackup: selectedCandidate.risk === 'risky' || selectedCandidate.risk === 'caution',
         confidence: selectedCandidate.confidence,
-        description: recipeDescription
+        description: recipeDescription,
+        inputType: recipeInputType,
+        minimum: recipeInputType === 'slider' ? Number(sliderMin) : undefined,
+        maximum: recipeInputType === 'slider' ? Number(sliderMax) : undefined,
+        step: recipeInputType === 'slider' ? Number(sliderStep) : undefined,
+        unit: recipeInputType === 'slider' && sliderUnit.trim() ? sliderUnit.trim() : undefined,
+        options: recipeInputType === 'dropdown'
+          ? dropdownOptions
+              .filter(o => o.label.trim().length > 0 && o.value.trim().length > 0)
+              .map(o => ({ label: o.label.trim(), value: o.value.trim() }))
+          : undefined
       };
       
       const res = await window.electronAPI.createRecipe(recipeData);
@@ -518,6 +543,42 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
                 }}
               />
             </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#8892b0', marginBottom: '6px', fontWeight: 600 }}>Control Type</label>
+              <select
+                value={recipeInputType}
+                onChange={(e) => setRecipeInputType(e.target.value as any)}
+                style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff', fontSize: '13px' }}
+              >
+                <option value="number">Number</option>
+                <option value="toggle">Toggle</option>
+                <option value="slider">Slider</option>
+                <option value="dropdown">Dropdown</option>
+              </select>
+            </div>
+
+            {recipeInputType === 'slider' && (
+              <div style={{ marginBottom: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <input type="number" aria-label="Slider minimum" value={sliderMin} onChange={(e) => setSliderMin(e.target.value)} placeholder="Minimum" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff' }} />
+                <input type="number" aria-label="Slider maximum" value={sliderMax} onChange={(e) => setSliderMax(e.target.value)} placeholder="Maximum" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff' }} />
+                <input type="number" aria-label="Slider step" value={sliderStep} onChange={(e) => setSliderStep(e.target.value)} placeholder="Step" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff' }} />
+                <input type="text" aria-label="Slider unit" value={sliderUnit} onChange={(e) => setSliderUnit(e.target.value)} placeholder="Unit (optional)" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff', gridColumn: '1 / span 3' }} />
+              </div>
+            )}
+
+            {recipeInputType === 'dropdown' && (
+              <div style={{ marginBottom: '16px' }}>
+                {dropdownOptions.map((option, index) => (
+                  <div key={`${index}-${option.value}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', marginBottom: '8px' }}>
+                    <input type="text" aria-label={`Dropdown option ${index + 1} label`} value={option.label} onChange={(e) => setDropdownOptions(prev => prev.map((p, i) => i === index ? { ...p, label: e.target.value } : p))} placeholder="Option label" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff' }} />
+                    <input type="text" aria-label={`Dropdown option ${index + 1} value`} value={option.value} onChange={(e) => setDropdownOptions(prev => prev.map((p, i) => i === index ? { ...p, value: e.target.value } : p))} placeholder="Option value" style={{ padding: '10px', borderRadius: '4px', border: '1px solid #2d3a5c', background: '#0d0d12', color: '#ffffff' }} />
+                    <button type="button" className="btn-secondary" onClick={() => setDropdownOptions(prev => prev.filter((_, i) => i !== index))} disabled={dropdownOptions.length <= 1}>Remove</button>
+                  </div>
+                ))}
+                <button type="button" className="btn-secondary" onClick={() => setDropdownOptions(prev => [...prev, { label: '', value: '' }])}>Add Option</button>
+              </div>
+            )}
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', color: '#8892b0', marginBottom: '6px', fontWeight: 600 }}>Category</label>

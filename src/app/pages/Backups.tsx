@@ -30,6 +30,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
       setLoading(false);
       return;
     }
+    if (!gameId) { setLoading(false); return; }
     setLoading(true);
     try {
       const result = await window.electronAPI.getBackups(gameId);

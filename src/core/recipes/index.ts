@@ -39,10 +39,58 @@ export const RecipeSchema = z.object({
   inputType: z.string().optional(),
   minimum: z.number().optional().nullable(),
   maximum: z.number().optional().nullable(),
+  step: z.number().optional().nullable(),
+  resetValue: z.union([z.string(), z.number(), z.boolean()]).optional().nullable(),
+  unit: z.string().optional().nullable(),
+  maxLength: z.number().optional().nullable(),
+  pattern: z.string().optional().nullable(),
   allowedValues: z.array(z.any()).optional().nullable(),
   preconditions: z.any().optional().nullable(),
   validationRules: z.any().optional().nullable(),
   fingerprintCompatibility: z.string().optional().nullable()
+}).superRefine((recipe, ctx) => {
+  const inputType = recipe.inputType ?? (recipe.valueType === 'boolean' ? 'toggle' : 'number');
+
+  if (inputType === 'slider') {
+    if (typeof recipe.minimum !== 'number' || typeof recipe.maximum !== 'number') {
+      ctx.addIssue({ code: 'custom', message: 'Slider recipes require minimum and maximum values.' });
+    } else if (recipe.minimum >= recipe.maximum) {
+      ctx.addIssue({ code: 'custom', message: 'Slider minimum must be less than maximum.' });
+    }
+    if (typeof recipe.step !== 'number' || !Number.isFinite(recipe.step) || recipe.step <= 0) {
+      ctx.addIssue({ code: 'custom', message: 'Slider step must be a finite positive number.' });
+    }
+  }
+
+  if (inputType === 'dropdown') {
+    const options = Array.isArray(recipe.allowedValues) ? recipe.allowedValues : [];
+    if (options.length < 1 || options.length > 50) {
+      ctx.addIssue({ code: 'custom', message: 'Dropdown options must contain between 1 and 50 entries.' });
+    } else {
+      const seen = new Set<string>();
+      for (const option of options) {
+        if (!option || typeof option !== 'object') {
+          ctx.addIssue({ code: 'custom', message: 'Dropdown options must be objects with label/value.' });
+          break;
+        }
+        if (typeof option.label !== 'string' || option.label.trim().length === 0) {
+          ctx.addIssue({ code: 'custom', message: 'Dropdown option labels must be non-empty strings.' });
+          break;
+        }
+        const optionValue = option.value;
+        if (!['string', 'number', 'boolean'].includes(typeof optionValue)) {
+          ctx.addIssue({ code: 'custom', message: 'Dropdown option values must be scalar (string|number|boolean).' });
+          break;
+        }
+        const key = `${typeof optionValue}:${String(optionValue)}`;
+        if (seen.has(key)) {
+          ctx.addIssue({ code: 'custom', message: 'Dropdown option values must be unique.' });
+          break;
+        }
+        seen.add(key);
+      }
+    }
+  }
 });
 
 // Checks all string fields for JS, Shell, SQL, IPC
@@ -131,12 +179,24 @@ export function checkRecipeConflict(gameId: string, targetFile: string, pathStr:
 // Map db row to typed Recipe object
 function mapRowToRecipe(row: any): Recipe {
   if (!row) return row;
+  let parsedResetValue: string | number | boolean | undefined;
+  if (row.resetValue !== null && row.resetValue !== undefined && row.resetValue !== '') {
+    if (row.resetValue === 'true') parsedResetValue = true;
+    else if (row.resetValue === 'false') parsedResetValue = false;
+    else if (!Number.isNaN(Number(row.resetValue))) parsedResetValue = Number(row.resetValue);
+    else parsedResetValue = String(row.resetValue);
+  }
   return {
     ...row,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
     updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : new Date(row.updatedAt).toISOString(),
     needsRescan: row.needsRescan === 1,
     requiresBackup: row.requiresBackup === 1,
+    step: row.step !== null && row.step !== undefined ? Number(row.step) : undefined,
+    resetValue: parsedResetValue,
+    unit: row.unit || undefined,
+    maxLength: row.maxLength !== null && row.maxLength !== undefined ? Number(row.maxLength) : undefined,
+    pattern: row.pattern || undefined,
     allowedValues: row.allowedValues ? JSON.parse(row.allowedValues) : undefined,
     preconditions: row.preconditions ? JSON.parse(row.preconditions) : undefined,
     validationRules: row.validationRules ? JSON.parse(row.validationRules) : undefined
@@ -244,7 +304,12 @@ export function createRecipe(recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedA
     inputType: recipe.inputType || (recipe.valueType === 'boolean' ? 'toggle' : 'number'),
     minimum: recipe.minimum,
     maximum: recipe.maximum,
-    allowedValues: recipe.allowedValues || [],
+    step: recipe.step,
+    resetValue: recipe.resetValue,
+    unit: recipe.unit,
+    maxLength: recipe.maxLength,
+    pattern: recipe.pattern,
+    allowedValues: recipe.allowedValues || (recipe as any).options || [],
     preconditions: recipe.preconditions || [],
     validationRules: recipe.validationRules || [],
     fingerprintCompatibility: recipe.fingerprintCompatibility || '*',
@@ -273,8 +338,8 @@ export function createRecipe(recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedA
       requiresBackup, confidence, description, fileHash, gameFingerprintHash, needsRescan,
       schemaVersion, adapterId, adapterVersion, targetStrategy, safeRelativePattern,
       structuredPath, inputType, minimum, maximum, allowedValues, preconditions,
-      validationRules, fingerprintCompatibility
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      step, resetValue, unit, maxLength, pattern, validationRules, fingerprintCompatibility
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   stmt.run(
@@ -304,6 +369,11 @@ export function createRecipe(recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedA
     validatedRecipe.maximum !== undefined ? validatedRecipe.maximum : null,
     JSON.stringify(validatedRecipe.allowedValues),
     JSON.stringify(validatedRecipe.preconditions),
+    validatedRecipe.step !== undefined ? validatedRecipe.step : null,
+    validatedRecipe.resetValue !== undefined ? String(validatedRecipe.resetValue) : null,
+    validatedRecipe.unit || null,
+    validatedRecipe.maxLength !== undefined ? validatedRecipe.maxLength : null,
+    validatedRecipe.pattern || null,
     JSON.stringify(validatedRecipe.validationRules),
     validatedRecipe.fingerprintCompatibility
   );
@@ -337,7 +407,7 @@ export function updateRecipe(recipeId: string, updates: Partial<Omit<Recipe, 'id
       description = ?, fileHash = ?, gameFingerprintHash = ?, needsRescan = ?,
       schemaVersion = ?, adapterId = ?, adapterVersion = ?, targetStrategy = ?,
       safeRelativePattern = ?, structuredPath = ?, inputType = ?, minimum = ?,
-      maximum = ?, allowedValues = ?, preconditions = ?, validationRules = ?,
+      maximum = ?, allowedValues = ?, preconditions = ?, step = ?, resetValue = ?, unit = ?, maxLength = ?, pattern = ?, validationRules = ?,
       fingerprintCompatibility = ?, updatedAt = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
@@ -367,6 +437,11 @@ export function updateRecipe(recipeId: string, updates: Partial<Omit<Recipe, 'id
     merged.maximum !== undefined ? merged.maximum : null,
     JSON.stringify(merged.allowedValues || []),
     JSON.stringify(merged.preconditions || []),
+    merged.step !== undefined ? merged.step : null,
+    merged.resetValue !== undefined ? String(merged.resetValue) : null,
+    merged.unit || null,
+    merged.maxLength !== undefined ? merged.maxLength : null,
+    merged.pattern || null,
     JSON.stringify(merged.validationRules || []),
     merged.fingerprintCompatibility || '*',
     recipeId
@@ -422,7 +497,7 @@ export function getRecipesNeedingRescan(gameId: string): Recipe[] {
 
 export function recipeToTrainerItem(recipe: Recipe): TrainerItem {
   const safety = verifyRecipeSafety(recipe);
-  const statusBadge = safety === 'Broken' ? 'Blocked' : safety === 'Needs Rescan' ? 'Needs Rescan' : 'Ready';
+  const statusBadge = safety === 'Broken' ? 'Broken' : safety === 'Needs Rescan' ? 'Needs Rescan' : 'Ready';
   
   // Extract current value from target file if available
   let currentValue: string | number | undefined = undefined;
@@ -457,9 +532,19 @@ export function recipeToTrainerItem(recipe: Recipe): TrainerItem {
     path: recipe.path,
     target: recipe.target,
     currentValue,
-    inputType: recipe.valueType === 'boolean' ? 'toggle' : 'number',
+    inputType: (recipe.inputType as any) || (recipe.valueType === 'boolean' ? 'toggle' : 'number'),
     min: recipe.minimum !== undefined ? recipe.minimum : 0,
-    max: recipe.maximum !== undefined ? recipe.maximum : 999999
+    max: recipe.maximum !== undefined ? recipe.maximum : 999999,
+    step: recipe.step !== undefined ? recipe.step : undefined,
+    unit: recipe.unit || undefined,
+    options: Array.isArray(recipe.allowedValues)
+      ? recipe.allowedValues
+          .filter((opt: any) => opt && typeof opt === 'object')
+          .map((opt: any) => ({
+            label: String(opt.label ?? opt.value),
+            value: opt.value
+          }))
+      : undefined
   };
 }
 

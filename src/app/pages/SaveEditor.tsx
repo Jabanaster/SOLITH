@@ -48,6 +48,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
       console.error('[SaveEditor] window.electronAPI unavailable — must run inside Electron');
       return;
     }
+    if (!gameId) return;
     setLoading(true);
     try {
       const files = await window.electronAPI.detectSaveFiles(gameId);

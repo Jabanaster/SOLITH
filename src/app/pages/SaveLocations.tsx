@@ -37,6 +37,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
       setLoading(false);
       return;
     }
+    if (!gameId) { setLoading(false); return; }
     setLoading(true);
     try {
       const result = await window.electronAPI.getSaveLocations(gameId);

@@ -2,6 +2,23 @@
 
 This document tracks the implementation and verification status of ResourceForge core modules and security hardening requirements.
 
+## V1 Trainer UX + Compatibility Pilot — Current Status
+
+**Overall: BLOCKED — real-world compatibility pilot requires approved user data**
+
+| Outcome | Description | Status |
+|---------|-------------|--------|
+| A | Polished Trainer Mode UI | COMPLETE |
+| B | Workshop Mode toggle | COMPLETE |
+| C | Real-world save compatibility | BLOCKED_PENDING_USER_DATA |
+| D | Compatibility Framework | COMPLETE |
+
+Branch: `feature/v1-trainer-ux-pilot`  
+Last verified commit: see `Docs/CONTEXT_HANDOFF.md` for latest commit  
+Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Reports/V1_NON_USER_DATA_CLOSEOUT.md`
+
+---
+
 ## Core Feature Areas
 
 | Feature Area | Status | Notes |
@@ -9,10 +26,13 @@ This document tracks the implementation and verification status of ResourceForge
 | Multi-format Save Parsers | **VERIFIED** | Supports JSON, XML, INI, CSV, TXT, Lua. Validated in unit tests. |
 | In-Memory Database (sql.js) | **VERIFIED** | Persisted to `data/resourceforge.db` on disk. |
 | Save File Comparison | **VERIFIED** | Discovery lab comparison and confidence scoring. |
-| Recipe CRUD & Validations | **VERIFIED** | Strict Zod schema validation, safety filters checking for arbitrary JS/SQL/shell/IPC, conflict detection. |
+| Recipe CRUD & Validations | **VERIFIED** | Strict Zod schema validation, safety filters checking for arbitrary JS/SQL/shell/IPC, conflict detection, and validated slider/dropdown control configuration. |
 | Proposals Engine | **VERIFIED** | pending, approved, rejected state transitions. |
 | Backups & Rollbacks | **VERIFIED** | Double hash verification and storage in SQLite database. |
 | Offline AI Explanations | **VERIFIED** | Connects to Ollama/LM Studio with deterministic fallback. |
+| Trainer Mode UI | **VERIFIED** | TrainerPage, TrainerCard, ApplyDialog, ContextPanel — Trainer E2E 5/5 |
+| Workshop Mode toggle | **VERIFIED** | AppMode + localStorage + aria-pressed; Trainer E2E 28-point coverage |
+| Compatibility Framework | **VERIFIED** | CompatibilityDashboard, 3 new IPC channels, Zod schemas |
 
 ## Build System
 
@@ -20,7 +40,7 @@ This document tracks the implementation and verification status of ResourceForge
 | ---- | ------ | ----- |
 | tsup bundling | **COMPLETE** | main.ts + preload.ts → dist-electron/main.js + preload.js |
 | Output verification | **COMPLETE** | scripts/verify-electron-output.mjs — 18 checks, runs after every build |
-| fix-esm-imports removed from build | **COMPLETE** | No longer in any script; kept for historical reference |
+| fix-esm-imports removed from build | **COMPLETE** | No longer in any script; historical helper files deleted from repo root |
 | Unified dev command | **COMPLETE** | `npm run dev` starts Vite + tsup watch + Electron |
 
 ## Electron Runtime
@@ -49,8 +69,25 @@ This document tracks the implementation and verification status of ResourceForge
 | Core module tests | **PASSING** | 30 tests in core.test.ts, parsers.test.ts, etc. |
 | Discovery test isolation | **FIXED** | Uses `resetForTesting()` with unique temp DB per run |
 | Consecutive-run regression | **ADDED** | Second describe block in discovery.test.ts proves isolation |
-| Electron smoke test | **WRITTEN** | tests/electron.smoke.test.ts — requires `npm install && npx playwright install` |
-| Playwright config | **WRITTEN** | playwright.config.ts |
+| Trainer unit tests | **PASSING** | tests/trainer-ui.test.ts — 33 tests |
+| Pilot intake unit tests | **PASSING** | tests/pilot-intake.test.ts — 10 dry-run tests (invented fixture) |
+| Gate 10 bundled smoke | **PASSING** | tests/electron.smoke.test.ts — 6/6 |
+| Gate 13 Electron E2E | **PASSING** | tests/electron.e2e.test.ts — 4/4, repeatability CONFIRMED |
+| Trainer E2E | **PASSING** | tests/trainer.e2e.test.ts — 5/5, 28 assertion points |
+| Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 20/20 |
+| IPC channel E2E | **PASSING** | tests/ipc-channels.e2e.test.ts — 13/13 (4 edge-case tests added) |
+| Trainer states E2E | **PASSING** | tests/trainer-states-controls.e2e.test.ts — 15/15; all active states plus slider/dropdown controls have Electron evidence |
+| Browser fallback E2E | **PASSING** | tests/browser-fallback.e2e.test.ts — 7/7 |
+| Accessibility E2E (new) | **PASSING** | tests/accessibility.e2e.test.ts — 7/7 DOM-level checks |
+| Performance E2E (new) | **PASSING** | tests/performance.e2e.test.ts — 12/12 (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
+| Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 22/22 (expanded from 20) |
+| Total (npm test) | **107/107** | All unit suites pass; two unreachable reserved-state cases removed with the states |
+
+## TypeScript
+
+`npx tsc --noEmit` → **0 errors**
+
+Pre-existing errors in Backups.tsx, DiscoveryLab.tsx, Journal.tsx, Recipes.tsx, SaveEditor.tsx, SaveLocations.tsx were fixed in commit `8c92dcd`.
 
 ## Security Hardening Requirements
 
@@ -67,3 +104,4 @@ This document tracks the implementation and verification status of ResourceForge
 | Scanner Transactions | **VERIFIED** | Transactional scans (BEGIN, COMMIT, ROLLBACK) with scan status tracking. |
 | Trainer Adapter Contract | **VERIFIED** | Common `TrainerAdapter` domain contract implemented. |
 | Failure-Injection suite | **VERIFIED** | 20 passing safety tests cover concurrent mods, locks, crashes, write failures, and cancellation. |
+| No-injection pilot constraint | **VERIFIED** | Game-running detection is read-only tasklist/ps; no memory write outside approved paths. |

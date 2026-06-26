@@ -48,7 +48,7 @@ const Journal: React.FC<JournalProps> = ({ gameId }) => {
       if (Array.isArray(result)) {
         setEvents(result);
       } else {
-        console.error('Failed to load journal:', result?.error);
+        console.error('Failed to load journal: unexpected response');
         setEvents([]);
       }
     } catch (e) {

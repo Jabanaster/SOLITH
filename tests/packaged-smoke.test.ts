@@ -101,7 +101,7 @@ test.afterAll(async () => {
   console.log(`resources_path      = ${resourcesPath}`);
   console.log(`preload_path        = ${preloadPath}`);
   console.log(`db_path             = ${dbPath}`);
-  console.log(`ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave`);
+  console.log(`ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave, getAllProfiles, getRecipes, checkGameRunning(invoked), getCompatibilityProfile(invoked)`);
   console.log(`exit_code           = ${exitCode}`);
   console.log(`renderer_errors     = ${rendererErrors.length}`);
   console.log(`main_errors         = ${mainErrors.length}`);
@@ -239,4 +239,94 @@ test('point 15 — app exits cleanly (close() resolves without timeout)', async 
   const isRunning = await electronApp.evaluate(({ app }) => !app.isReady() || true);
   expect(isRunning).toBe(true);
   // afterAll calls close() — if it hangs the test suite itself will timeout
+});
+
+// ── Points 16-20: Trainer UX survived packaging ───────────────────────────────
+
+test('point 16 — Trainer/Workshop mode toggle renders in packaged app', async () => {
+  const trainerBtn  = win.locator('button.mode-btn', { hasText: 'Trainer' });
+  const workshopBtn = win.locator('button.mode-btn', { hasText: 'Workshop' });
+  await expect(trainerBtn).toBeVisible();
+  await expect(workshopBtn).toBeVisible();
+  const pressed = await trainerBtn.getAttribute('aria-pressed');
+  expect(pressed, 'Trainer mode is default').toBe('true');
+});
+
+test('point 17 — Trainer mode can be toggled in packaged app', async () => {
+  // Switch to Workshop
+  await win.locator('button.mode-btn', { hasText: 'Workshop' }).click();
+  await win.waitForTimeout(300);
+  const workshopPressed = await win.locator('button.mode-btn', { hasText: 'Workshop' }).getAttribute('aria-pressed');
+  expect(workshopPressed, 'Workshop active after click').toBe('true');
+
+  // Switch back
+  await win.locator('button.mode-btn', { hasText: 'Trainer' }).click();
+  await win.waitForTimeout(300);
+  const trainerPressed = await win.locator('button.mode-btn', { hasText: 'Trainer' }).getAttribute('aria-pressed');
+  expect(trainerPressed, 'Trainer active after switching back').toBe('true');
+});
+
+test('point 18 — new Trainer IPC methods exposed in packaged preload', async () => {
+  const methods = await win.evaluate(() => {
+    const api = (window as any).electronAPI;
+    return {
+      checkGameRunning:        typeof api?.checkGameRunning        === 'function',
+      getCompatibilityProfile: typeof api?.getCompatibilityProfile === 'function',
+      getAllProfiles:           typeof api?.getAllProfiles           === 'function',
+    };
+  });
+  expect(methods.checkGameRunning,        'checkGameRunning exposed in packaged app').toBe(true);
+  expect(methods.getCompatibilityProfile, 'getCompatibilityProfile exposed in packaged app').toBe(true);
+  expect(methods.getAllProfiles,           'getAllProfiles exposed in packaged app').toBe(true);
+});
+
+test('point 19 — compatibility IPC succeeds in packaged app (empty → BLOCKED_PENDING_USER_DATA)', async () => {
+  const profiles = await win.evaluate(() => (window as any).electronAPI.getAllProfiles());
+  expect(Array.isArray(profiles), 'getAllProfiles returns array').toBe(true);
+  // Fresh packaged app database has no real-world profiles
+  expect(profiles.length, 'no profiles committed (BLOCKED_PENDING_USER_DATA)').toBe(0);
+});
+
+test('point 20 — getRecipes IPC succeeds in packaged app', async () => {
+  // Use the game already created in point 12
+  const gameDir = path.join(APP_DATA, 'smoke-game');
+  fs.mkdirSync(gameDir, { recursive: true });
+
+  const addRes = await win.evaluate(
+    (dir: string) => (window as any).electronAPI.addGame({ name: 'Packaged Trainer Test', path: dir }),
+    gameDir
+  );
+  expect(addRes?.success, 'addGame for trainer test').toBe(true);
+  const gameId = addRes.game.id;
+
+  const recipes = await win.evaluate(
+    (gid: string) => (window as any).electronAPI.getRecipes(gid),
+    gameId
+  );
+  expect(Array.isArray(recipes), 'getRecipes returns array in packaged app').toBe(true);
+});
+
+// ── Points 21-22: actually invoke new IPC channels (not just existence) ───────
+
+test('point 21 — checkGameRunning is actually invoked in packaged app (not just presence)', async () => {
+  // Point 18 checks typeof === 'function'. This point calls the channel and verifies
+  // it returns the documented shape: { running: boolean, evidence: string }
+  const result = await win.evaluate(() =>
+    (window as any).electronAPI.checkGameRunning('demo-game-quest-id-000000000000')
+  );
+  expect(typeof result?.running,  'running is boolean').toBe('boolean');
+  expect(typeof result?.evidence, 'evidence is string').toBe('string');
+  expect(result.running, 'demo game not running in packaged app').toBe(false);
+  // Evidence must be safe — no raw stack traces
+  expect(result.evidence, 'no stack trace in evidence').not.toMatch(/at\s+\w+\s*\(.*:\d+:\d+\)/);
+});
+
+test('point 22 — getCompatibilityProfile is actually invoked in packaged app', async () => {
+  // Point 18 checks typeof === 'function'. This point calls the channel and verifies
+  // it returns null for a fresh DB (no profiles committed — BLOCKED_PENDING_USER_DATA)
+  const result = await win.evaluate(() =>
+    (window as any).electronAPI.getCompatibilityProfile('demo-game-quest-id-000000000000')
+  );
+  // Fresh packaged DB has no profiles — must return null, not throw or return undefined
+  expect(result, 'getCompatibilityProfile returns null for fresh DB').toBeNull();
 });
