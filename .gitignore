@@ -76,8 +76,8 @@ desktop.ini
 local.config.*
 
 # ── Real-world pilot data directories (MUST NOT be committed) ────────────────
-# These directories hold user's actual game saves during real-world compatibility
-# testing. NEVER commit any of these — they may contain personal save data.
+# These directories hold the user's actual game saves captured during real-world
+# compatibility testing. NEVER commit any of these — they may contain personal save data.
 .local-pilot-data/
 .local-pilot-workspaces/
 .local-pilot-backups/
