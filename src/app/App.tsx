@@ -8,10 +8,12 @@ import Backups from './pages/Backups';
 import Journal from './pages/Journal';
 import SaveLocations from './pages/SaveLocations';
 import CompatibilityDashboard from './pages/CompatibilityDashboard';
+import SessionMonitorPage from './pages/SessionMonitorPage';
 
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
-  | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility';
+  | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
+  | 'session-monitor';
 
 type AppMode = 'trainer' | 'workshop';
 
@@ -50,6 +52,7 @@ const WORKSHOP_PAGES: { id: View; label: string }[] = [
   { id: 'backups',       label: 'Backups' },
   { id: 'journal',       label: 'Journal' },
   { id: 'compatibility', label: 'Compatibility' },
+  { id: 'session-monitor', label: 'Session Monitor (V2)' },
 ];
 
 const App: React.FC = () => {
@@ -129,6 +132,8 @@ const App: React.FC = () => {
         return <SaveLocations gameId={selectedGame?.id ?? null} />;
       case 'compatibility':
         return <CompatibilityDashboard />;
+      case 'session-monitor':
+        return <SessionMonitorPage />;
       default:
         return null;
     }

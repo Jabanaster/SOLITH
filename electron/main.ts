@@ -27,6 +27,7 @@ import {
   AddUserSelectedLocationSchema,
   CheckGameRunningSchema,
   GetCompatibilityProfileSchema,
+  V2MonitorStartSchema,
   validateIpcPathSafety
 } from './ipc-validation.js';
 
@@ -610,5 +611,72 @@ ipcMain.handle('get-all-profiles', async () => {
   } catch (error) {
     console.error('get-all-profiles error:', error);
     return [];
+  }
+});
+
+// ── V2 Session Lifecycle Monitor IPC ─────────────────────────────────────────
+// Read-only. Disabled by default (v2SessionMonitorEnabled setting).
+// No memory access. No injection. No writes to external files.
+
+ipcMain.handle('v2-monitor-start', async (event, payload: unknown) => {
+  try {
+    const parsed = V2MonitorStartSchema.parse(payload);
+
+    const settingsModule = await import('../src/core/settings/index.js');
+    if (!settingsModule.getSetting('v2SessionMonitorEnabled')) {
+      return { success: false, error: 'V2 session monitor is disabled. Enable v2SessionMonitorEnabled in settings.' };
+    }
+
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    const result = getSessionMonitor().start({
+      gameId: parsed.gameId,
+      executableName: parsed.executableName,
+      markerFilePath: parsed.markerFilePath,
+      pollIntervalMs: parsed.pollIntervalMs,
+    });
+    return result;
+  } catch (error) {
+    console.error('v2-monitor-start error:', error);
+    return { success: false, error: String(error).slice(0, 200) };
+  }
+});
+
+ipcMain.handle('v2-monitor-stop', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    getSessionMonitor().stop('user_stopped');
+    return { success: true };
+  } catch (error) {
+    console.error('v2-monitor-stop error:', error);
+    return { success: false, error: String(error).slice(0, 200) };
+  }
+});
+
+ipcMain.handle('v2-monitor-get-state', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    return getSessionMonitor().getStatus();
+  } catch (error) {
+    console.error('v2-monitor-get-state error:', error);
+    return { state: 'error', snapshot: null, config: null, isRunning: false, startedAt: null, timelineEntryCount: 0 };
+  }
+});
+
+ipcMain.handle('v2-monitor-clear-timeline', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    getSessionMonitor().clearTimeline();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error).slice(0, 200) };
+  }
+});
+
+ipcMain.handle('v2-monitor-export-diagnostics', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    return getSessionMonitor().exportDiagnostics();
+  } catch (error) {
+    return { error: String(error).slice(0, 200) };
   }
 });

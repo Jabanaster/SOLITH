@@ -192,6 +192,25 @@ export const GetCompatibilityProfileSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000'))
 });
 
+// ── V2 Session Lifecycle Monitor IPC Schemas ─────────────────────────────────
+
+const SAFE_EXECUTABLE_NAME = z.string().min(1).max(100).regex(
+  /^[\w\-. ]+$/,
+  'Executable name must contain only word characters, hyphens, spaces, and dots'
+);
+
+export const V2MonitorStartSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+  executableName: SAFE_EXECUTABLE_NAME,
+  /** Optional path to an external session-marker file to observe (read-only). */
+  markerFilePath: z.string().max(512).optional(),
+  pollIntervalMs: z.number().int().min(2000).max(60000).optional(),
+});
+
+export const V2MonitorStopSchema = z.object({});
+
+export const V2MonitorGetStateSchema = z.object({});
+
 /**
  * Validates a file path against a gameId's registered root directory.
  * Prevents path traversal and link-escapes inside IPC boundaries.

@@ -16,6 +16,7 @@
     "build:electron": "tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs",
     "build": "npm run build:vite && npm run build:electron && electron-builder",
     "test": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-binding.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts",
+    "test:v2-lifecycle": "tsx --test tests/v2-lifecycle.test.ts",
     "test:drill-core": "tsx --test tests/drill-core-settings.test.ts",
     "test:electron-smoke": "playwright test tests/electron.smoke.test.ts",
     "test:electron-e2e": "playwright test tests/electron.e2e.test.ts --config playwright.e2e.config.ts",

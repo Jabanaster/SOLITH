@@ -215,6 +215,8 @@ export interface Settings {
   v2LiveModeEnabled: boolean;
   v2HotkeysEnabled: boolean;
   v2OverlayEnabled: boolean;
+  /** V2 read-only session lifecycle monitor. Default: false. */
+  v2SessionMonitorEnabled: boolean;
 }
 
 export interface AIConfig {
