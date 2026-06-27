@@ -30,6 +30,8 @@ const STARDEW_SAVE_PATH =
   'C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288';
 const STARDEW_GAME_ID = 'demo-game-quest-id-000000000000';
 const MONEY_FIELD = 'SaveGame.player.0.money';
+const STAMINA_FIELD = 'SaveGame.player.0.stamina.0.float.0';
+const FARMING_XP_FIELD = 'SaveGame.player.0.experiencePoints.0.int.0';
 
 function buildControls(): TrainerControl[] {
   return [
@@ -50,6 +52,38 @@ function buildControls(): TrainerControl[] {
       },
     },
     {
+      id: 'stardew-stamina',
+      label: 'Stamina',
+      description: 'Current energy. Written via TrainerHost XML save workflow with backup + rollback.',
+      category: 'STAMINA',
+      controlType: 'number_input',
+      backend: 'save_field',
+      safetyStatus: 'requires_approval',
+      min: 0,
+      max: 508,
+      saveField: {
+        filePath: STARDEW_SAVE_PATH,
+        fieldPath: STAMINA_FIELD,
+        gameId: STARDEW_GAME_ID,
+      },
+    },
+    {
+      id: 'stardew-farming-xp',
+      label: 'Farming XP',
+      description: 'Farming skill experience points. Written via TrainerHost XML save workflow with backup + rollback.',
+      category: 'SKILLS',
+      controlType: 'number_input',
+      backend: 'save_field',
+      safetyStatus: 'requires_approval',
+      min: 0,
+      max: 15000,
+      saveField: {
+        filePath: STARDEW_SAVE_PATH,
+        fieldPath: FARMING_XP_FIELD,
+        gameId: STARDEW_GAME_ID,
+      },
+    },
+    {
       id: 'stardew-health',
       label: 'Health',
       description: 'Runtime memory control — not yet implemented.',
@@ -63,7 +97,7 @@ function buildControls(): TrainerControl[] {
     {
       id: 'stardew-energy',
       label: 'Energy / Magic',
-      description: 'Runtime memory control — not yet implemented.',
+      description: 'Runtime memory control — deferred to future milestone.',
       category: 'STAMINA',
       controlType: 'slider',
       backend: 'memory_write',

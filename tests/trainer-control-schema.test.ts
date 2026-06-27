@@ -227,8 +227,8 @@ describe('SAFETY_STATUS_LABELS', () => {
 describe('buildControls — TrainerControlPanel fixture set', () => {
   const controls = buildControls();
 
-  it('includes at least 6 controls', () => {
-    assert.ok(controls.length >= 6, `Expected >=6 controls, got ${controls.length}`);
+  it('includes at least 8 controls', () => {
+    assert.ok(controls.length >= 8, `Expected >=8 controls, got ${controls.length}`);
   });
 
   it('Money control is executable and requires approval', () => {
@@ -236,6 +236,24 @@ describe('buildControls — TrainerControlPanel fixture set', () => {
     assert.ok(money, 'Money control must be present');
     assert.strictEqual(isControlExecutable(money), true);
     assert.strictEqual(requiresApproval(money), true);
+  });
+
+  it('Stamina control is executable and requires approval', () => {
+    const stamina = controls.find(c => c.id === 'stardew-stamina');
+    assert.ok(stamina, 'Stamina control must be present');
+    assert.strictEqual(isControlExecutable(stamina), true);
+    assert.strictEqual(requiresApproval(stamina), true);
+    assert.strictEqual(stamina.backend, 'save_field');
+    assert.ok(stamina.saveField?.fieldPath.includes('stamina'), 'Stamina field path must reference stamina');
+  });
+
+  it('Farming XP control is executable and requires approval', () => {
+    const farmingXp = controls.find(c => c.id === 'stardew-farming-xp');
+    assert.ok(farmingXp, 'Farming XP control must be present');
+    assert.strictEqual(isControlExecutable(farmingXp), true);
+    assert.strictEqual(requiresApproval(farmingXp), true);
+    assert.strictEqual(farmingXp.backend, 'save_field');
+    assert.ok(farmingXp.saveField?.fieldPath.includes('experiencePoints'), 'Farming XP field path must reference experiencePoints');
   });
 
   it('all non-save_field controls are not executable', () => {
