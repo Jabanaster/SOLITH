@@ -41,7 +41,8 @@
     "verify:electron-output": "node scripts/verify-electron-output.mjs",
     "dist": "electron-builder",
     "dist:dir": "electron-builder --dir",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "test:milestone-j": "tsx --test tests/milestone-j-acceptance.test.ts"
   },
   "keywords": [
     "trainer",
