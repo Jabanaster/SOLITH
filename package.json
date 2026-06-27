@@ -21,6 +21,7 @@
     "test:relay": "node scripts/test-file-relay-flow.js",
     "test:codex-relay": "npx tsx scripts/test-codex-relay-flow.ts",
     "test:agentbridge-v11": "npx tsx scripts/test-agentbridge-v11.ts",
+    "test:router": "npx tsx scripts/test-router.ts",
     "compile": "tsc"
   },
   "keywords": [

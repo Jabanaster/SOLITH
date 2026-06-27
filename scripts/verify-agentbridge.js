@@ -82,6 +82,36 @@ function smokeChecks() {
     }
     console.log('OK codex config defaults');
 
+    const agents = relay.registry.loadAgents();
+    for (const id of ['claude', 'chatgpt', 'codex', 'local']) {
+        if (!agents.some((a) => a.id === id)) {
+            fail(`registry missing seeded agent: ${id}`);
+        }
+    }
+    const regConfig = relay.registry.getRegistryConfig();
+    if (regConfig.roleBindings.Verifier !== 'codex') {
+        fail('Verifier must be bound to codex');
+    }
+    if (regConfig.routerMode !== 'manual') {
+        fail('routerMode must default to manual');
+    }
+    if (regConfig.learningInfluenceEnabled !== false) {
+        fail('learning influence must default to disabled');
+    }
+    console.log('OK registry + router config defaults');
+
+    const samplePlan = relay.router.route(
+        { taskId: 'VERIFY', description: 'implement feature', state: 'created', projectPath: ROOT },
+        { agents, registryConfig: regConfig, codexConfig, stats: [], now: Date.now() }
+    );
+    if (samplePlan.effectiveAgents.verifier !== 'codex') {
+        fail('router must always select codex as verifier');
+    }
+    if (!Array.isArray(samplePlan.reasonCodes) || samplePlan.reasonCodes.length === 0) {
+        fail('router must emit reason codes');
+    }
+    console.log('OK router produces advisory plan');
+
     console.log('OK relay module loads');
 }
 

@@ -21,3 +21,4 @@ workflow/agentbridge/output/
 workflow/agentbridge/prompts/
 workflow/agentbridge/FINAL_REPORT_TASK_*.md
 workflow/agentbridge/config.json
+workflow/agentbridge/route-plans/

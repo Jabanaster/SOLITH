@@ -12,7 +12,9 @@ const ROOT = path.join(__dirname, '..');
 
 const AGENTBRIDGE_JS = [
     'workflow/agentbridge/agentbridge.js',
-    'workflow/agentbridge/store.js'
+    'workflow/agentbridge/store.js',
+    'workflow/agentbridge/registry.js',
+    'workflow/agentbridge/router.js'
 ];
 
 const REQUIRED_PATHS = [
@@ -20,7 +22,8 @@ const REQUIRED_PATHS = [
     'agents/codex/input',
     'agents/codex/output',
     'scripts/test-codex-relay-flow.ts',
-    'scripts/test-agentbridge-v11.ts'
+    'scripts/test-agentbridge-v11.ts',
+    'scripts/test-router.ts'
 ];
 
 function fail(message) {
@@ -61,6 +64,9 @@ function main() {
 
     console.log('\nRunning test:agentbridge-v11...\n');
     execSync('npm run test:agentbridge-v11', { cwd: ROOT, stdio: 'inherit' });
+
+    console.log('\nRunning test:router...\n');
+    execSync('npm run test:router', { cwd: ROOT, stdio: 'inherit' });
 
     console.log('\n=== build:agentbridge PASS ===');
 }

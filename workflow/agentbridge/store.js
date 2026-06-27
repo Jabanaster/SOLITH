@@ -150,10 +150,38 @@ function setCodexConfig(partial) {
     }
 }
 
+function getJson(key, fallback) {
+    const raw = getConfig(key);
+    if (raw === null || raw === undefined) {
+        return fallback;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return fallback;
+    }
+}
+
+function setJson(key, value) {
+    setConfig(key, JSON.stringify(value));
+}
+
+function recordOutcome(row) {
+    const stats = getJson('agentStats', []);
+    stats.push(row);
+    setJson('agentStats', stats);
+}
+
+function getAgentStats() {
+    return getJson('agentStats', []);
+}
+
 module.exports = {
     initStore,
     getConfig,
     setConfig,
+    getJson,
+    setJson,
     getActiveTaskId,
     setActiveTaskId,
     getNextTaskIdCounter,
@@ -162,5 +190,7 @@ module.exports = {
     saveTask,
     getCodexConfig,
     setCodexConfig,
+    recordOutcome,
+    getAgentStats,
     useSqlite: () => useSqlite
 };
