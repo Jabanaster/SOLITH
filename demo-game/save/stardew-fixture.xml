@@ -5,8 +5,20 @@
     <money>5000</money>
     <health>100</health>
     <maxHealth>100</maxHealth>
-    <stamina>270</stamina>
-    <maxStamina>270</maxStamina>
+    <stamina>
+      <float>270</float>
+    </stamina>
+    <maxStamina>
+      <float>270</float>
+    </maxStamina>
+    <experiencePoints>
+      <int>1500</int>
+      <int>100</int>
+      <int>500</int>
+      <int>50</int>
+      <int>0</int>
+      <int>0</int>
+    </experiencePoints>
     <farmingLevel>3</farmingLevel>
     <fishingLevel>1</fishingLevel>
     <miningLevel>2</miningLevel>
