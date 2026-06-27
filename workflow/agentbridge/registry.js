@@ -1,135 +1,112 @@
 const store = require('./store');
 
-const ROLES = ['PrimaryCoder', 'Reviewer', 'Verifier', 'Planner', 'Auditor', 'LocalCoder'];
+// V1.2 registry-first design.
+// Agents are data records. The router selects agents by role/priority/allowedTaskTypes
+// from this data only, so a new agent can be added without changing router logic.
+
+const AGENTS_KEY = 'registry.agents.v12';
+const CONFIG_KEY = 'registry.config.v12';
 
 const DEFAULT_AGENTS = [
     {
         id: 'claude',
         displayName: 'Claude',
-        roles: ['PrimaryCoder', 'Planner'],
-        languages: ['TypeScript', 'JavaScript', 'Python', 'C#', 'C++', 'Markdown'],
-        gameEngines: ['Unity', 'Unreal'],
-        strength: 95,
-        cost: 8,
-        local: false,
-        premium: true,
+        role: 'primary',
+        capabilities: ['implementation', 'planning', 'fix'],
+        allowedTaskTypes: ['implementation', 'fix', 'documentation', 'unknown'],
+        canVerify: false,
+        canExecute: false,
+        enabled: true,
         ready: true,
-        dailyBudget: 100,
-        hourlyBudget: 20,
-        usedToday: 0,
-        usedThisHour: 0,
-        cooldownUntil: '',
-        priority: 10,
-        estimatedContext: 200000,
-        estimatedSpeed: 5
+        priority: 100
     },
     {
         id: 'chatgpt',
         displayName: 'ChatGPT',
-        roles: ['Reviewer', 'Auditor', 'Planner'],
-        languages: ['TypeScript', 'JavaScript', 'Python', 'C#', 'C++', 'Markdown'],
-        gameEngines: ['Unity', 'Unreal'],
-        strength: 92,
-        cost: 7,
-        local: false,
-        premium: true,
+        role: 'reviewer',
+        capabilities: ['review', 'critique', 'advisory'],
+        allowedTaskTypes: ['review', 'documentation', 'implementation', 'unknown'],
+        canVerify: false,
+        canExecute: false,
+        enabled: true,
         ready: true,
-        dailyBudget: 100,
-        hourlyBudget: 20,
-        usedToday: 0,
-        usedThisHour: 0,
-        cooldownUntil: '',
-        priority: 9,
-        estimatedContext: 128000,
-        estimatedSpeed: 6
+        priority: 90
     },
     {
         id: 'codex',
         displayName: 'Codex',
-        roles: ['Verifier'],
-        languages: ['TypeScript', 'JavaScript', 'Python', 'C#', 'C++', 'Markdown'],
-        gameEngines: ['Unity', 'Unreal'],
-        strength: 90,
-        cost: 5,
-        local: false,
-        premium: false,
+        role: 'verifier',
+        capabilities: ['verification', 'build', 'test'],
+        allowedTaskTypes: ['verification', 'test', 'packaging'],
+        canVerify: true,
+        canExecute: false,
+        enabled: true,
         ready: true,
-        dailyBudget: 200,
-        hourlyBudget: 40,
-        usedToday: 0,
-        usedThisHour: 0,
-        cooldownUntil: '',
-        priority: 8,
-        estimatedContext: 128000,
-        estimatedSpeed: 7
+        priority: 80
     },
     {
         id: 'local',
         displayName: 'Local Model',
-        roles: ['LocalCoder', 'PrimaryCoder'],
-        languages: ['TypeScript', 'JavaScript', 'Python', 'C#'],
-        gameEngines: ['Unity'],
-        strength: 70,
-        cost: 1,
-        local: true,
-        premium: false,
+        role: 'primary',
+        capabilities: ['implementation'],
+        allowedTaskTypes: ['implementation', 'fix'],
+        canVerify: false,
+        canExecute: false,
+        enabled: false,
         ready: false,
-        dailyBudget: 1000,
-        hourlyBudget: 200,
-        usedToday: 0,
-        usedThisHour: 0,
-        cooldownUntil: '',
-        priority: 5,
-        estimatedContext: 32000,
-        estimatedSpeed: 3
+        priority: 10
     }
 ];
 
-const DEFAULT_REGISTRY_CONFIG = {
-    roleBindings: {
-        PrimaryCoder: 'claude',
-        Reviewer: 'chatgpt',
-        Verifier: 'codex',
-        Planner: 'claude',
-        Auditor: 'chatgpt',
-        LocalCoder: 'local'
+const DEFAULT_CONFIG = {
+    manual_default: true,
+    auto_advisory_only: true,
+    locked_verifier: 'codex',
+    learning: {
+        enabled: true,
+        influence_routing: false
     },
-    routerMode: 'manual',
-    learningInfluenceEnabled: false,
-    preferLocalWhenOverBudget: true,
-    minimumConfidenceForAuto: 75
+    local_model: {
+        enabled: false,
+        ready: false
+    }
 };
 
+const REQUIRED_STRING_FIELDS = ['id', 'displayName', 'role'];
+const REQUIRED_ARRAY_FIELDS = ['capabilities', 'allowedTaskTypes'];
+const REQUIRED_BOOLEAN_FIELDS = ['canVerify', 'canExecute', 'enabled'];
+
 function seed() {
-    if (store.getJson('agents', null) === null) {
-        store.setJson('agents', DEFAULT_AGENTS);
+    if (store.getJson(AGENTS_KEY, null) === null) {
+        store.setJson(AGENTS_KEY, DEFAULT_AGENTS);
     }
-    if (store.getJson('registryConfig', null) === null) {
-        store.setJson('registryConfig', DEFAULT_REGISTRY_CONFIG);
+    if (store.getJson(CONFIG_KEY, null) === null) {
+        store.setJson(CONFIG_KEY, DEFAULT_CONFIG);
     }
 }
 
 function loadAgents() {
     seed();
-    return store.getJson('agents', DEFAULT_AGENTS);
+    return store.getJson(AGENTS_KEY, DEFAULT_AGENTS);
 }
 
 function saveAgents(agents) {
-    store.setJson('agents', agents);
+    store.setJson(AGENTS_KEY, agents);
 }
 
-function getRegistryConfig() {
+function getRouterConfig() {
     seed();
-    const stored = store.getJson('registryConfig', {});
+    const stored = store.getJson(CONFIG_KEY, {});
     return {
-        ...DEFAULT_REGISTRY_CONFIG,
+        ...DEFAULT_CONFIG,
         ...stored,
-        roleBindings: { ...DEFAULT_REGISTRY_CONFIG.roleBindings, ...(stored.roleBindings || {}) }
+        learning: { ...DEFAULT_CONFIG.learning, ...(stored.learning || {}) },
+        local_model: { ...DEFAULT_CONFIG.local_model, ...(stored.local_model || {}) }
     };
 }
 
-function setRegistryConfig(config) {
-    store.setJson('registryConfig', config);
+function setRouterConfig(config) {
+    store.setJson(CONFIG_KEY, config);
 }
 
 function getAgent(id, agents) {
@@ -137,37 +114,106 @@ function getAgent(id, agents) {
     return list.find((agent) => agent.id === id) || null;
 }
 
-function getRoleBinding(role, config) {
-    const cfg = config || getRegistryConfig();
-    return cfg.roleBindings[role] || null;
-}
-
-function setRoleBinding(role, agentId) {
-    if (role === 'Verifier' && agentId !== 'codex') {
-        throw new Error('Verifier is locked to codex in V1.2');
-    }
-    const config = getRegistryConfig();
-    config.roleBindings[role] = agentId;
-    setRegistryConfig(config);
-    return config;
-}
-
-function findCandidates(role, agents) {
+// Enabled agents advertising the given role, sorted deterministically:
+// highest priority first, ties broken by id ascending.
+function agentsByRole(role, agents) {
     const list = agents || loadAgents();
-    return list.filter((agent) => Array.isArray(agent.roles) && agent.roles.includes(role));
+    return list
+        .filter((agent) => agent.enabled && agent.role === role)
+        .sort((a, b) => (b.priority - a.priority) || a.id.localeCompare(b.id));
+}
+
+function validateAgentEntry(agent, index) {
+    const errors = [];
+    const label = (agent && agent.id) ? agent.id : `entry[${index}]`;
+
+    if (!agent || typeof agent !== 'object') {
+        return [`${label}: not an object`];
+    }
+    for (const field of REQUIRED_STRING_FIELDS) {
+        if (typeof agent[field] !== 'string' || !agent[field].trim()) {
+            errors.push(`${label}: ${field} must be a non-empty string`);
+        }
+    }
+    for (const field of REQUIRED_ARRAY_FIELDS) {
+        if (!Array.isArray(agent[field])) {
+            errors.push(`${label}: ${field} must be an array`);
+        }
+    }
+    for (const field of REQUIRED_BOOLEAN_FIELDS) {
+        if (typeof agent[field] !== 'boolean') {
+            errors.push(`${label}: ${field} must be a boolean`);
+        }
+    }
+    if (typeof agent.priority !== 'number' || Number.isNaN(agent.priority)) {
+        errors.push(`${label}: priority must be a number`);
+    }
+    return errors;
+}
+
+// Validates the whole registry. Returns { ok, errors }.
+function validateRegistry(agents, config) {
+    const list = agents || loadAgents();
+    const cfg = config || getRouterConfig();
+    const errors = [];
+
+    if (!Array.isArray(list) || list.length === 0) {
+        return { ok: false, errors: ['registry must contain at least one agent'] };
+    }
+
+    const seenIds = new Set();
+    for (let i = 0; i < list.length; i += 1) {
+        const agent = list[i];
+        errors.push(...validateAgentEntry(agent, i));
+        if (agent && agent.id) {
+            if (seenIds.has(agent.id)) {
+                errors.push(`duplicate agent id: ${agent.id}`);
+            }
+            seenIds.add(agent.id);
+        }
+    }
+
+    // Workshop must never be an active/enabled agent.
+    const workshop = list.find((agent) => agent && agent.id === 'workshop');
+    if (workshop && workshop.enabled) {
+        errors.push('workshop must not be an enabled agent (removed/rejected)');
+    }
+
+    // Codex is the locked verifier.
+    const verifiers = list.filter((agent) => agent && agent.enabled && agent.canVerify);
+    if (verifiers.length === 0) {
+        errors.push('no enabled verifier agent found');
+    }
+    if (verifiers.length > 1) {
+        errors.push(`only one verifier allowed, found: ${verifiers.map((a) => a.id).join(', ')}`);
+    }
+    if (verifiers.length === 1 && verifiers[0].id !== cfg.locked_verifier) {
+        errors.push(`verifier must be the locked verifier "${cfg.locked_verifier}", found "${verifiers[0].id}"`);
+    }
+    if (cfg.locked_verifier !== 'codex') {
+        errors.push('locked_verifier must remain codex in V1.2');
+    }
+
+    // At least one enabled primary so the router can recommend a coder.
+    if (agentsByRole('primary', list).length === 0) {
+        errors.push('no enabled primary agent found');
+    }
+
+    return { ok: errors.length === 0, errors };
 }
 
 module.exports = {
-    ROLES,
+    AGENTS_KEY,
+    CONFIG_KEY,
     DEFAULT_AGENTS,
-    DEFAULT_REGISTRY_CONFIG,
+    DEFAULT_CONFIG,
     seed,
     loadAgents,
     saveAgents,
-    getRegistryConfig,
-    setRegistryConfig,
+    getRouterConfig,
+    setRouterConfig,
     getAgent,
-    getRoleBinding,
-    setRoleBinding,
-    findCandidates
+    agentsByRole,
+    validateAgentEntry,
+    validateRegistry
 };

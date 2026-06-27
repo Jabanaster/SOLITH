@@ -5,8 +5,6 @@ const store = require('./store');
 const registry = require('./registry');
 const router = require('./router');
 
-const ROUTE_PLANS_DIR = path.join(process.cwd(), 'workflow', 'agentbridge', 'route-plans');
-
 const PROJECT_ROOT = process.cwd();
 const WORKFLOW_DIR = path.join(PROJECT_ROOT, 'workflow', 'agentbridge');
 const PROMPTS_DIR = path.join(WORKFLOW_DIR, 'prompts');
@@ -345,31 +343,26 @@ function writeFinalReport(taskId, reason) {
     return reportFile;
 }
 
+// Records a learning record for a completed task. Storage only — never influences
+// routing unless routerConfig.learning.influence_routing is enabled (default false).
 function recordTaskOutcome(taskId, success) {
     const task = state.tasks.get(taskId);
     if (!task) {
         return;
     }
-    const plan = task.routePlan;
-    const projectType = task.projectProfile?.type || 'unknown';
-    const taskType = plan?.taskClassification?.class || 'unknown';
-    const agentsUsed = plan?.effectiveAgents || { coder: 'claude', reviewer: 'chatgpt', verifier: 'codex' };
-
-    for (const [role, agentId] of Object.entries(agentsUsed)) {
-        if (!agentId || agentId === 'skip') {
-            continue;
-        }
-        store.recordOutcome({
-            agentId,
-            role,
-            projectType,
-            taskType,
-            success,
-            loopCount: task.loopCount,
-            buildResult: task.lastBuildResult,
-            createdAt: nowIso()
-        });
+    const config = registry.getRouterConfig();
+    if (!config.learning || config.learning.enabled === false) {
+        return;
     }
+    const taskType = router.classifyTask(task.description || '');
+    store.recordOutcome({
+        taskType,
+        route: { primary: 'claude', reviewer: 'chatgpt', verifier: 'codex' },
+        outcome: success ? 'pass' : 'fail',
+        loopCount: task.loopCount,
+        buildResult: task.lastBuildResult || null,
+        timestamp: nowIso()
+    });
 }
 
 function recordPromptPath(taskId, agent, promptPath) {
@@ -762,168 +755,24 @@ function cmdShow(explicitTaskId) {
         console.log(`\nFinal report:     None`);
     }
 
-    if (task.projectProfile) {
-        console.log('\nProject profile:');
-        console.log(`  Type:    ${task.projectProfile.type}`);
-        console.log(`  Engine:  ${task.projectProfile.gameEngine}`);
-        console.log(`  Langs:   ${(task.projectProfile.languages || []).join(', ') || 'none'}`);
-    } else {
-        console.log('\nProject profile:  None (run: agentbridge detect)');
-    }
-
-    if (task.routePlan) {
-        const plan = task.routePlan;
-        console.log('\nRoute plan:');
-        console.log(`  Coder:          ${plan.effectiveAgents.coder}`);
-        console.log(`  Reviewer:       ${plan.effectiveAgents.reviewer}`);
-        console.log(`  Verifier:       ${plan.effectiveAgents.verifier}`);
-        console.log(`  Confidence:     ${plan.confidence}`);
-        console.log(`  Needs approval: ${plan.needsHumanApproval}`);
-        console.log(`  Reason codes:   ${plan.reasonCodes.join(', ')}`);
-    } else {
-        console.log('\nRoute plan:       None (run: agentbridge route)');
-    }
+    console.log('\nAdvisory route:   run `agentbridge router plan "<task>"` (router does not mutate task state)');
 }
 
-function cmdAgents() {
+// ── V1.2 registry-first advisory router CLI ───────────────────────────────────
+
+// Pure helper: builds the advisory plan for a task description. No writes, no
+// execution, no relay state mutation. Used by the CLI and by smoke checks.
+function planTask(taskText, projectPath) {
     const agents = registry.loadAgents();
-    console.log('\n=== Agent Registry ===');
-    for (const agent of agents) {
-        const tags = [
-            agent.ready ? 'ready' : 'not-ready',
-            agent.premium ? 'premium' : 'non-premium',
-            agent.local ? 'local' : 'remote'
-        ].join(', ');
-        console.log(`\n${agent.id} (${agent.displayName})`);
-        console.log(`  Roles:     ${agent.roles.join(', ')}`);
-        console.log(`  Strength:  ${agent.strength}  Cost: ${agent.cost}  Priority: ${agent.priority}`);
-        console.log(`  Flags:     ${tags}`);
-    }
-    const config = registry.getRegistryConfig();
-    console.log('\nRole bindings:');
-    for (const [role, agentId] of Object.entries(config.roleBindings)) {
-        console.log(`  ${role}: ${agentId}`);
-    }
-}
+    const routerConfig = registry.getRouterConfig();
+    const cwd = projectPath || process.cwd();
+    const projectProfile = router.detectProject(cwd);
+    const classification = router.classifyTask(taskText);
 
-function cmdAgent(id) {
-    if (!id) {
-        console.log('Usage: agentbridge agent <id>');
-        return;
-    }
-    const agent = registry.getAgent(id);
-    if (!agent) {
-        console.log(`Agent not found: ${id}`);
-        process.exitCode = 1;
-        return;
-    }
-    console.log(JSON.stringify(agent, null, 2));
-}
-
-function cmdDetect(explicitTaskId) {
-    let taskId;
-    try {
-        taskId = resolveTaskId(explicitTaskId);
-    } catch (error) {
-        console.log('Usage: agentbridge detect <taskId>');
-        console.error(error.message);
-        process.exitCode = 1;
-        return;
-    }
-    const task = state.tasks.get(taskId);
-    const profile = router.detectProject(task.projectPath);
-    task.projectProfile = profile;
-    persistTask(taskId);
-    console.log(`\n=== Project Profile ${taskId} ===`);
-    console.log(JSON.stringify(profile, null, 2));
-}
-
-function cmdClassify(explicitTaskId) {
-    let taskId;
-    try {
-        taskId = resolveTaskId(explicitTaskId);
-    } catch (error) {
-        console.log('Usage: agentbridge classify <taskId>');
-        console.error(error.message);
-        process.exitCode = 1;
-        return;
-    }
-    const task = state.tasks.get(taskId);
-    const classification = router.classifyTask(task);
-    console.log(`\n=== Classification ${taskId} ===`);
-    console.log(JSON.stringify(classification, null, 2));
-}
-
-function cmdRoute(explicitTaskId) {
-    let taskId;
-    try {
-        taskId = resolveTaskId(explicitTaskId);
-    } catch (error) {
-        console.log('Usage: agentbridge route <taskId>');
-        console.error(error.message);
-        process.exitCode = 1;
-        return;
-    }
-
-    const task = state.tasks.get(taskId);
-    const agents = registry.loadAgents();
-    const registryConfig = registry.getRegistryConfig();
-    const codexConfig = store.getCodexConfig();
-    const stats = store.getAgentStats();
-    const projectProfile = router.detectProject(task.projectPath);
-    const classification = router.classifyTask(task);
-
-    const plan = router.route(
-        { ...task, taskId },
-        { agents, registryConfig, codexConfig, stats, projectProfile, classification, now: Date.now() }
+    return router.route(
+        { description: taskText, projectPath: cwd },
+        { agents, routerConfig, projectProfile, classification }
     );
-
-    task.projectProfile = projectProfile;
-    task.routePlan = plan;
-    persistTask(taskId);
-
-    fs.mkdirSync(ROUTE_PLANS_DIR, { recursive: true });
-    const planFile = path.join(ROUTE_PLANS_DIR, `${taskId}.json`);
-    fs.writeFileSync(planFile, JSON.stringify(plan, null, 2));
-
-    console.log(`\n=== Route Plan ${taskId} ===`);
-    console.log(`Mode:              ${plan.mode}`);
-    console.log(`Coder:             ${plan.agents.coder} -> ${plan.effectiveAgents.coder}`);
-    console.log(`Reviewer:          ${plan.agents.reviewer} -> ${plan.effectiveAgents.reviewer}`);
-    console.log(`Verifier:          ${plan.effectiveAgents.verifier}`);
-    console.log(`Allow premium:     ${plan.allowPremium}`);
-    console.log(`Use local model:   ${plan.useLocalModel}`);
-    console.log(`Confidence:        ${plan.confidence}`);
-    console.log(`Needs approval:    ${plan.needsHumanApproval}`);
-    console.log(`Build source:      ${plan.buildCommandSource}`);
-    console.log(`Reason codes:      ${plan.reasonCodes.join(', ')}`);
-    console.log(`Plan written:      ${planFile}`);
-}
-
-// ── V1.2 CLI commands ─────────────────────────────────────────────────────────
-
-const REQUIRED_AGENT_FIELDS = ['id', 'displayName', 'roles', 'ready', 'priority'];
-
-function validateAgentEntry(agent) {
-    const errors = [];
-    for (const field of REQUIRED_AGENT_FIELDS) {
-        if (agent[field] === undefined || agent[field] === null) {
-            errors.push(`missing required field: ${field}`);
-        }
-    }
-    if (typeof agent.id !== 'string' || !agent.id.trim()) {
-        errors.push('id must be a non-empty string');
-    }
-    if (!Array.isArray(agent.roles) || agent.roles.length === 0) {
-        errors.push('roles must be a non-empty array');
-    }
-    if (typeof agent.ready !== 'boolean') {
-        errors.push('ready must be a boolean');
-    }
-    if (typeof agent.priority !== 'number') {
-        errors.push('priority must be a number');
-    }
-    return errors;
 }
 
 function cmdRouterPlan(taskText) {
@@ -932,189 +781,49 @@ function cmdRouterPlan(taskText) {
         process.exitCode = 1;
         return;
     }
-    const agents = registry.loadAgents();
-    const registryConfig = registry.getRegistryConfig();
-    const codexConfig = store.getCodexConfig();
-    const stats = store.getAgentStats();
-    const projectProfile = router.detectProject(process.cwd());
-    const classification = router.classifyTask({ description: taskText });
-
-    const plan = router.route(
-        { taskId: null, description: taskText, state: 'created', projectPath: process.cwd() },
-        { agents, registryConfig, codexConfig, stats, projectProfile, classification, now: Date.now() }
-    );
-
-    const advisory = {
-        task_type: classification.class,
-        project: { project_type: projectProfile.type },
-        mode: {
-            manual_default: registryConfig.routerMode === 'manual',
-            auto_advisory_only: true
-        },
-        agents: {
-            primary: plan.effectiveAgents.coder,
-            reviewer: plan.effectiveAgents.reviewer,
-            verifier: plan.effectiveAgents.verifier
-        },
-        steps: buildSteps(plan),
-        execution_allowed: false,
-        confidence: plan.confidence,
-        reason_codes: plan.reasonCodes
-    };
-
-    console.log(JSON.stringify(advisory, null, 2));
-}
-
-function buildSteps(plan) {
-    const steps = [];
-    steps.push(`${capitalize(plan.effectiveAgents.coder)} proposes or implements the change`);
-    if (plan.effectiveAgents.reviewer && plan.effectiveAgents.reviewer !== 'skip') {
-        steps.push(`${capitalize(plan.effectiveAgents.reviewer)} reviews the result`);
-    }
-    steps.push(`${capitalize(plan.effectiveAgents.verifier)} verifies with tests/build`);
-    steps.push('Human approves final acceptance');
-    return steps;
-}
-
-function capitalize(str) {
-    if (!str) return str;
-    return str.charAt(0).toUpperCase() + str.slice(1);
+    const plan = planTask(taskText);
+    console.log(JSON.stringify(plan, null, 2));
 }
 
 function cmdRegistryList() {
-    cmdAgents();
+    const agents = registry.loadAgents();
+    console.log(JSON.stringify(agents, null, 2));
 }
 
 function cmdRegistryValidate() {
     const agents = registry.loadAgents();
-    let allValid = true;
+    const config = registry.getRouterConfig();
+    const result = registry.validateRegistry(agents, config);
+
     console.log('\n=== Registry Validation ===');
-    for (const agent of agents) {
-        const errors = validateAgentEntry(agent);
-        if (errors.length > 0) {
-            console.log(`FAIL ${agent.id || '(no id)'}: ${errors.join('; ')}`);
-            allValid = false;
-        } else {
-            console.log(`OK   ${agent.id}`);
-        }
-    }
-    const config = registry.getRegistryConfig();
-    if (config.roleBindings.Verifier !== 'codex') {
-        console.log('FAIL Verifier role must be bound to codex');
-        allValid = false;
-    } else {
-        console.log('OK   Verifier locked to codex');
-    }
-    const workshop = agents.find((a) => a.id === 'workshop');
-    if (workshop) {
-        console.log('FAIL workshop must not appear as a registered agent');
-        allValid = false;
-    } else {
-        console.log('OK   workshop absent');
-    }
-    if (allValid) {
+    if (result.ok) {
+        console.log(`OK  ${agents.length} agent(s) valid`);
+        console.log(`OK  locked verifier: ${config.locked_verifier}`);
+        console.log('OK  workshop absent as enabled agent');
         console.log('\nRegistry: VALID');
     } else {
+        for (const error of result.errors) {
+            console.log(`FAIL ${error}`);
+        }
         console.log('\nRegistry: INVALID');
         process.exitCode = 1;
     }
 }
 
 function cmdLearningList() {
-    const stats = store.getAgentStats();
-    const config = registry.getRegistryConfig();
+    const records = store.getAgentStats();
+    const config = registry.getRouterConfig();
     console.log('\n=== Learning Records ===');
-    console.log(`Learning influence: ${config.learningInfluenceEnabled ? 'enabled' : 'disabled (default)'}`);
-    if (stats.length === 0) {
+    console.log(`Learning enabled:   ${config.learning.enabled}`);
+    console.log(`Influence routing:  ${config.learning.influence_routing} (default false)`);
+    if (records.length === 0) {
         console.log('No records yet.');
         return;
     }
-    for (const record of stats) {
-        console.log(`  [${record.createdAt || '?'}] agent=${record.agentId} role=${record.role} type=${record.taskType} success=${record.success} build=${record.buildResult}`);
+    for (const record of records) {
+        console.log(`  [${record.timestamp || '?'}] type=${record.taskType} outcome=${record.outcome} loops=${record.loopCount} build=${record.buildResult}`);
     }
-    console.log(`\nTotal: ${stats.length} record(s)`);
-}
-
-function cmdBudget() {
-    const agents = registry.loadAgents();
-    console.log('\n=== Budget / Usage ===');
-    for (const agent of agents) {
-        console.log(`\n${agent.id} (${agent.premium ? 'premium' : 'non-premium'}${agent.local ? ', local' : ''})`);
-        console.log(`  Daily:    ${agent.usedToday}/${agent.dailyBudget}`);
-        console.log(`  Hourly:   ${agent.usedThisHour}/${agent.hourlyBudget}`);
-        console.log(`  Cooldown: ${agent.cooldownUntil || 'none'}`);
-        console.log(`  Ready:    ${agent.ready}`);
-    }
-}
-
-function cmdConfig(action, key, value) {
-    const registryKeys = ['routerMode', 'learningInfluenceEnabled', 'preferLocalWhenOverBudget', 'minimumConfidenceForAuto'];
-    const codexKeys = ['codexBuildCommand', 'codexBuildTimeoutMs', 'allowCodexCommandExecution'];
-
-    if (action === 'get') {
-        const regConfig = registry.getRegistryConfig();
-        const codexConfig = store.getCodexConfig();
-        const all = { ...regConfig, ...codexConfig };
-        if (key) {
-            console.log(`${key} = ${JSON.stringify(all[key])}`);
-        } else {
-            console.log(JSON.stringify(all, null, 2));
-        }
-        return;
-    }
-
-    if (action === 'set') {
-        if (!key || value === undefined) {
-            console.log('Usage: agentbridge config set <key> <value>');
-            return;
-        }
-
-        if (key.startsWith('roleBindings.')) {
-            const role = key.split('.')[1];
-            try {
-                registry.setRoleBinding(role, value);
-                console.log(`Set ${key} = ${value}`);
-            } catch (error) {
-                console.error(error.message);
-                process.exitCode = 1;
-            }
-            return;
-        }
-
-        if (registryKeys.includes(key)) {
-            const config = registry.getRegistryConfig();
-            if (key === 'learningInfluenceEnabled' || key === 'preferLocalWhenOverBudget') {
-                config[key] = value === 'true';
-            } else if (key === 'minimumConfidenceForAuto') {
-                config[key] = parseInt(value, 10);
-            } else {
-                config[key] = value;
-            }
-            registry.setRegistryConfig(config);
-            console.log(`Set ${key} = ${config[key]}`);
-            return;
-        }
-
-        if (codexKeys.includes(key)) {
-            const partial = {};
-            if (key === 'allowCodexCommandExecution') {
-                partial[key] = value === 'true';
-            } else if (key === 'codexBuildTimeoutMs') {
-                partial[key] = parseInt(value, 10);
-            } else {
-                partial[key] = value;
-            }
-            store.setCodexConfig(partial);
-            console.log(`Set ${key} = ${value}`);
-            return;
-        }
-
-        console.log(`Unknown config key: ${key}`);
-        process.exitCode = 1;
-        return;
-    }
-
-    console.log('Usage: agentbridge config get [key] | config set <key> <value>');
+    console.log(`\nTotal: ${records.length} record(s)`);
 }
 
 function cmdStatus(taskId) {
@@ -1188,14 +897,7 @@ function parseArgs() {
         console.log('  tasks [limit]                List recent tasks');
         console.log('  show <taskId>                Show full task details');
         console.log('  run-codex <taskId>           Run configured Codex build command');
-        console.log('  agents                       List registry agents');
-        console.log('  agent <id>                   Show agent profile');
-        console.log('  detect <taskId>              Show/persist project profile');
-        console.log('  classify <taskId>            Show task classification');
-        console.log('  route <taskId>               Compute advisory route plan');
-        console.log('  budget                       Show per-agent usage/budget');
-        console.log('  config get|set <key> [value] Read/write router/codex config');
-        console.log('  router plan "<task>"         V1.2: advisory route plan from task text');
+        console.log('  router plan "<task>"         V1.2: advisory route plan (read-only)');
         console.log('  registry list                V1.2: list all registered agents');
         console.log('  registry validate            V1.2: validate registry entries');
         console.log('  learning list                V1.2: list learning records');
@@ -1228,27 +930,6 @@ function parseArgs() {
             break;
         case 'run-codex':
             cmdRunCodex(commandArgs[0]);
-            break;
-        case 'agents':
-            cmdAgents();
-            break;
-        case 'agent':
-            cmdAgent(commandArgs[0]);
-            break;
-        case 'detect':
-            cmdDetect(commandArgs[0]);
-            break;
-        case 'classify':
-            cmdClassify(commandArgs[0]);
-            break;
-        case 'route':
-            cmdRoute(commandArgs[0]);
-            break;
-        case 'budget':
-            cmdBudget();
-            break;
-        case 'config':
-            cmdConfig(commandArgs[0], commandArgs[1], commandArgs[2]);
             break;
         case 'router':
             if (commandArgs[0] === 'plan') {
@@ -1290,18 +971,11 @@ const exported = {
     cmdTasks,
     cmdShow,
     cmdRunCodex,
-    cmdAgents,
-    cmdAgent,
-    cmdDetect,
-    cmdClassify,
-    cmdRoute,
-    cmdBudget,
-    cmdConfig,
     cmdRouterPlan,
     cmdRegistryList,
     cmdRegistryValidate,
     cmdLearningList,
-    validateAgentEntry,
+    planTask,
     runCodexBuild,
     isDangerousCommand,
     recordTaskOutcome,

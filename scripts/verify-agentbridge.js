@@ -83,34 +83,45 @@ function smokeChecks() {
     console.log('OK codex config defaults');
 
     const agents = relay.registry.loadAgents();
-    for (const id of ['claude', 'chatgpt', 'codex', 'local']) {
+    for (const id of ['claude', 'chatgpt', 'codex']) {
         if (!agents.some((a) => a.id === id)) {
             fail(`registry missing seeded agent: ${id}`);
         }
     }
-    const regConfig = relay.registry.getRegistryConfig();
-    if (regConfig.roleBindings.Verifier !== 'codex') {
-        fail('Verifier must be bound to codex');
+    if (agents.some((a) => a.id === 'workshop' && a.enabled)) {
+        fail('workshop must not be an enabled agent');
     }
-    if (regConfig.routerMode !== 'manual') {
-        fail('routerMode must default to manual');
+    const local = agents.find((a) => a.id === 'local');
+    if (local && local.ready !== false) {
+        fail('local model must be a stub with ready:false');
     }
-    if (regConfig.learningInfluenceEnabled !== false) {
+    const regConfig = relay.registry.getRouterConfig();
+    if (regConfig.locked_verifier !== 'codex') {
+        fail('locked verifier must be codex');
+    }
+    if (regConfig.manual_default !== true) {
+        fail('manual mode must be the default');
+    }
+    if (regConfig.learning.influence_routing !== false) {
         fail('learning influence must default to disabled');
+    }
+    const validation = relay.registry.validateRegistry(agents, regConfig);
+    if (!validation.ok) {
+        fail(`default registry must validate: ${validation.errors.join('; ')}`);
     }
     console.log('OK registry + router config defaults');
 
-    const samplePlan = relay.router.route(
-        { taskId: 'VERIFY', description: 'implement feature', state: 'created', projectPath: ROOT },
-        { agents, registryConfig: regConfig, codexConfig, stats: [], now: Date.now() }
-    );
-    if (samplePlan.effectiveAgents.verifier !== 'codex') {
+    const samplePlan = relay.planTask('implement a new feature', ROOT);
+    if (samplePlan.agents.verifier !== 'codex') {
         fail('router must always select codex as verifier');
     }
-    if (!Array.isArray(samplePlan.reasonCodes) || samplePlan.reasonCodes.length === 0) {
-        fail('router must emit reason codes');
+    if (samplePlan.execution_allowed !== false) {
+        fail('router plan must be advisory only (execution_allowed=false)');
     }
-    console.log('OK router produces advisory plan');
+    if (!samplePlan.task_type || !Array.isArray(samplePlan.steps)) {
+        fail('router plan must include task_type and steps');
+    }
+    console.log('OK router produces advisory-only plan');
 
     console.log('OK relay module loads');
 }
