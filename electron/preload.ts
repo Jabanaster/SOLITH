@@ -50,4 +50,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   v2MonitorGetState: () => ipcRenderer.invoke('v2-monitor-get-state'),
   v2MonitorClearTimeline: () => ipcRenderer.invoke('v2-monitor-clear-timeline'),
   v2MonitorExportDiagnostics: () => ipcRenderer.invoke('v2-monitor-export-diagnostics'),
+
+  // TrainerHost (file-read-only, Milestone C)
+  trainerHostStart: () => ipcRenderer.invoke('trainer-host-start', {}),
+  trainerHostStop: () => ipcRenderer.invoke('trainer-host-stop'),
+  trainerHostGetStatus: () => ipcRenderer.invoke('trainer-host-get-status'),
+  trainerHostReadField: (payload: { gameId: string; filePath: string; field: string }) =>
+    ipcRenderer.invoke('trainer-host-read-field', payload),
+
+  // TrainerHost write workflow (Milestone D/E)
+  // propose → (user approves in UI) → approveAndWrite → rollback if needed
+  trainerHostProposeWrite: (payload: { gameId: string; filePath: string; field: string; currentValue: string; newValue: string }) =>
+    ipcRenderer.invoke('trainer-host-propose-write', payload),
+  trainerHostApproveAndWrite: (payload: { proposalId: string }) =>
+    ipcRenderer.invoke('trainer-host-approve-and-write', payload),
+  trainerHostRollback: (payload: { gameId: string; filePath: string; backupPath: string; field: string }) =>
+    ipcRenderer.invoke('trainer-host-rollback', payload),
 });

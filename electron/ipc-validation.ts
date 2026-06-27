@@ -211,6 +211,39 @@ export const V2MonitorStopSchema = z.object({});
 
 export const V2MonitorGetStateSchema = z.object({});
 
+// ── TrainerHost IPC Schemas ───────────────────────────────────────────────────
+
+export const TrainerHostStartSchema = z.object({});
+
+export const TrainerHostStopSchema = z.object({});
+
+export const TrainerHostGetStatusSchema = z.object({});
+
+export const TrainerHostReadFieldSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+  filePath: z.string().min(1).max(512),
+  field: z.string().min(1).max(200),
+});
+
+export const TrainerHostProposeWriteSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+  filePath: z.string().min(1).max(512),
+  field: z.string().min(1).max(200),
+  currentValue: z.string().min(0).max(1024),
+  newValue: z.string().min(0).max(1024),
+});
+
+export const TrainerHostApproveAndWriteSchema = z.object({
+  proposalId: z.string().min(1).max(128),
+});
+
+export const TrainerHostRollbackSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+  filePath: z.string().min(1).max(512),
+  backupPath: z.string().min(1).max(512),
+  field: z.string().min(1).max(200),
+});
+
 /**
  * Validates a file path against a gameId's registered root directory.
  * Prevents path traversal and link-escapes inside IPC boundaries.

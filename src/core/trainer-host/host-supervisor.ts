@@ -37,7 +37,7 @@ export interface ChildProcessLike {
 export type SpawnFn = (
   cmd: string,
   args: string[],
-  opts: { shell: boolean; windowsHide: boolean; stdio: string[] },
+  opts: { shell: boolean; windowsHide: boolean; stdio: string[]; env?: NodeJS.ProcessEnv },
 ) => ChildProcessLike;
 
 // ── Public types ──────────────────────────────────────────────────────────────

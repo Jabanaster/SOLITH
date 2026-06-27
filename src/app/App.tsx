@@ -9,11 +9,12 @@ import Journal from './pages/Journal';
 import SaveLocations from './pages/SaveLocations';
 import CompatibilityDashboard from './pages/CompatibilityDashboard';
 import SessionMonitorPage from './pages/SessionMonitorPage';
+import TrainerControlPanel from './pages/TrainerControlPanel';
 
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor';
+  | 'session-monitor' | 'controls';
 
 type AppMode = 'trainer' | 'workshop';
 
@@ -134,6 +135,8 @@ const App: React.FC = () => {
         return <CompatibilityDashboard />;
       case 'session-monitor':
         return <SessionMonitorPage />;
+      case 'controls':
+        return <TrainerControlPanel />;
       default:
         return null;
     }
@@ -196,6 +199,10 @@ const App: React.FC = () => {
         {selectedGame && appMode === 'trainer' && (
           <nav className="nav-section" aria-label="Quick actions">
             <h3>Actions</h3>
+            <button onClick={() => setCurrentView('controls')} className={currentView === 'controls' ? 'active' : ''}
+                    data-testid="nav-controls">
+              Trainer Controls
+            </button>
             <button onClick={() => setCurrentView('backups')} className={currentView === 'backups' ? 'active' : ''}>
               Backups
             </button>
