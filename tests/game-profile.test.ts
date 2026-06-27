@@ -1,5 +1,5 @@
-/**
- * tests/game-profile.test.ts — Milestone H
+﻿/**
+ * tests/game-profile.test.ts â€” Milestone H
  *
  * Tests for the game profile system: validation, loading, and control conversion.
  */
@@ -20,9 +20,9 @@ import { isControlExecutable, requiresApproval } from '../src/core/trainer-host/
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STARDEW_PROFILE_PATH = path.resolve(__dirname, '../src/core/game-profiles/profiles/stardew-valley.json');
 
-// ── Profile validation ────────────────────────────────────────────────────────
+// â”€â”€ Profile validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('validateGameProfile — structure validation', () => {
+describe('validateGameProfile â€” structure validation', () => {
   it('returns no errors for a valid minimal profile', () => {
     const validProfile: GameProfile = {
       profileVersion: '1.0.0',
@@ -159,9 +159,9 @@ describe('validateGameProfile — structure validation', () => {
   });
 });
 
-// ── Stardew profile loading ───────────────────────────────────────────────────
+// â”€â”€ Stardew profile loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('loadStardewProfile — Stardew Valley profile', () => {
+describe('loadStardewProfile â€” Stardew Valley profile', () => {
   it('loads without errors', () => {
     assert.doesNotThrow(() => {
       loadStardewProfile();
@@ -208,7 +208,8 @@ describe('loadStardewProfile — Stardew Valley profile', () => {
 
   it('includes Farming XP control with correct field path', () => {
     const profile = loadStardewProfile();
-    const farmingXp = profile.controls.find(c => c.id === 'stardew-farming-xp');
+    const farmingXp = profile.controls.find(c => c.id === 'stardew-farming-xp',
+      'stardew-max-stamina');
     assert.ok(farmingXp, 'Farming XP control must be present');
     assert.strictEqual(farmingXp.backend, 'save_field');
     assert.strictEqual(farmingXp.safetyStatus, 'requires_approval');
@@ -240,9 +241,9 @@ describe('loadStardewProfile — Stardew Valley profile', () => {
   });
 });
 
-// ── Control conversion ────────────────────────────────────────────────────────
+// â”€â”€ Control conversion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('loadTrainerControls — profile to TrainerControl conversion', () => {
+describe('loadTrainerControls â€” profile to TrainerControl conversion', () => {
   it('converts all Stardew controls to TrainerControl format', () => {
     const profile = loadStardewProfile();
     const controls = loadTrainerControls(profile);
@@ -276,13 +277,14 @@ describe('loadTrainerControls — profile to TrainerControl conversion', () => {
     assert.strictEqual(money.saveField.fieldPath, 'SaveGame.player.0.money');
   });
 
-  it('only 3 controls are executable (Money, Stamina, Farming XP)', () => {
+  it('only 4 controls are executable (Money, Stamina, Farming XP, Max Stamina)', () => {
     const profile = loadStardewProfile();
     const controls = loadTrainerControls(profile);
     const executable = controls.filter(c => isControlExecutable(c));
-    assert.strictEqual(executable.length, 3, `Expected 3 executable controls, got ${executable.length}`);
+    assert.strictEqual(executable.length, 4, `Expected 4 executable controls, got ${executable.length}`);
     const ids = executable.map(c => c.id).sort();
-    assert.deepStrictEqual(ids, ['stardew-farming-xp', 'stardew-money', 'stardew-stamina']);
+    assert.deepStrictEqual(ids, ['stardew-farming-xp',
+      'stardew-max-stamina', 'stardew-money', 'stardew-stamina']);
   });
 
   it('all executable controls require approval', () => {
@@ -334,3 +336,7 @@ describe('loadTrainerControls — profile to TrainerControl conversion', () => {
     }
   });
 });
+
+
+
+
