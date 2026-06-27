@@ -17,6 +17,7 @@
     "agentbridge": "node workflow/agentbridge/agentbridge.js",
     "build:agentbridge": "node scripts/build-agentbridge.js",
     "verify:agentbridge": "node scripts/verify-agentbridge.js",
+    "evidence:agentbridge": "node scripts/evidence-agentbridge.js",
     "smoke:agentbridge": "npx tsx scripts/smoke-agentbridge-real-task.ts",
     "test:relay": "node scripts/test-file-relay-flow.js",
     "test:codex-relay": "npx tsx scripts/test-codex-relay-flow.ts",

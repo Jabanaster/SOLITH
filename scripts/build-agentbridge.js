@@ -23,7 +23,9 @@ const REQUIRED_PATHS = [
     'agents/codex/output',
     'scripts/test-codex-relay-flow.ts',
     'scripts/test-agentbridge-v11.ts',
-    'scripts/test-router.ts'
+    'scripts/test-router.ts',
+    'scripts/evidence-agentbridge.js',
+    'Docs/AGENTBRIDGE_OPERATOR_RUNBOOK.md'
 ];
 
 function fail(message) {

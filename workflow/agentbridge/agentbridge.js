@@ -810,6 +810,21 @@ function cmdRegistryValidate() {
     }
 }
 
+// V1.3: advisory alias that runs the evidence pack generator as a child process.
+// Kept out-of-process so the generator owns store snapshot/restore cleanly.
+function cmdEvidence() {
+    const scriptPath = path.join(PROJECT_ROOT, 'scripts', 'evidence-agentbridge.js');
+    if (!fs.existsSync(scriptPath)) {
+        console.log('Evidence generator not found: scripts/evidence-agentbridge.js');
+        process.exitCode = 1;
+        return;
+    }
+    const result = spawnSync('node', [scriptPath], { cwd: PROJECT_ROOT, stdio: 'inherit' });
+    if (result.status !== 0) {
+        process.exitCode = result.status || 1;
+    }
+}
+
 function cmdLearningList() {
     const records = store.getAgentStats();
     const config = registry.getRouterConfig();
@@ -901,6 +916,7 @@ function parseArgs() {
         console.log('  registry list                V1.2: list all registered agents');
         console.log('  registry validate            V1.2: validate registry entries');
         console.log('  learning list                V1.2: list learning records');
+        console.log('  evidence                     V1.3: generate evidence pack + runbook');
         return;
     }
 
@@ -954,6 +970,9 @@ function parseArgs() {
                 console.log('Usage: agentbridge learning list');
             }
             break;
+        case 'evidence':
+            cmdEvidence();
+            break;
         default:
             console.log(`Unknown command: ${command}`);
             console.log('Use "agentbridge" for help');
@@ -975,6 +994,7 @@ const exported = {
     cmdRegistryList,
     cmdRegistryValidate,
     cmdLearningList,
+    cmdEvidence,
     planTask,
     runCodexBuild,
     isDangerousCommand,
