@@ -37,7 +37,7 @@ export interface ChildProcessLike {
 export type SpawnFn = (
   cmd: string,
   args: string[],
-  opts: { shell: boolean; windowsHide: boolean; stdio: string[] },
+  opts: { shell: boolean; windowsHide: boolean; stdio: string[]; env?: NodeJS.ProcessEnv },
 ) => ChildProcessLike;
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -177,6 +177,9 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
       shell: false,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
+      // ELECTRON_RUN_AS_NODE makes the packaged Electron binary behave like Node.js
+      // so it executes host-entry.js rather than reloading the ASAR app bundle.
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
     });
 
     // Record identity synchronously before any await

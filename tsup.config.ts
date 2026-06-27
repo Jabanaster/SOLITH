@@ -42,6 +42,36 @@ const __dirname = _pathDirname(__filename);
 `.trim(),
     },
   },
+  // TrainerHost child process — emitted as a standalone file so the main-process
+  // supervisor can spawn it with process.execPath. Must NOT be bundled into main.js
+  // because the OS needs a real filesystem path to exec. electron-builder's
+  // asarUnpack ensures this file lands in app.asar.unpacked/ in the packaged app.
+  {
+    entry: { 'host-entry': 'src/core/trainer-host/host-entry.ts' },
+    outDir: 'dist-electron',
+    format: ['esm'],
+    target: 'node22',
+    platform: 'node',
+    splitting: false,
+    sourcemap: true,
+    clean: false,
+    dts: false,
+    bundle: true,
+    external: [
+      'electron',
+      'better-sqlite3',
+    ],
+    banner: {
+      js: `
+import { createRequire } from 'module';
+import { fileURLToPath as _fileURLToPath } from 'url';
+import { dirname as _pathDirname } from 'path';
+const require = createRequire(import.meta.url);
+const __filename = _fileURLToPath(import.meta.url);
+const __dirname = _pathDirname(__filename);
+`.trim(),
+    },
+  },
   // Preload process bundle — MUST be CJS for Electron sandbox compatibility.
   // Electron's sandboxed preload loader requires CommonJS format when
   // sandbox: true is set. ESM preloads do not reliably expose contextBridge.

@@ -39,6 +39,7 @@ console.log('\n🔍 ResourceForge — Electron Output Verifier\n');
 console.log('── Required files');
 check('main.js exists', fileExists('main.js'));
 check('preload.cjs exists', fileExists('preload.cjs'));
+check('host-entry.js exists (TrainerHost child process)', fileExists('host-entry.js'));
 
 const mainText  = readBundleText('main.js');
 const preloadText = readBundleText('preload.cjs');
