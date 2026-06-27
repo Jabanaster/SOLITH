@@ -1,0 +1,153 @@
+{
+  "profileVersion": "1.0.0",
+  "gameId": "demo-game-quest-id-000000000000",
+  "displayName": "Stardew Valley",
+  "saveFormat": "xml",
+  "saveRootHints": {
+    "windows": "C:\\Users\\{USER}\\AppData\\Roaming\\StardewValley\\Saves"
+  },
+  "gameVersionNotes": "Tested with Stardew Valley 1.5+. Save format is stable across versions.",
+  "controls": [
+    {
+      "id": "stardew-money",
+      "label": "Money",
+      "description": "Ceriph's gold. Written via TrainerHost XML save workflow with backup + rollback.",
+      "category": "CURRENCY",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "requires_approval",
+      "saveField": {
+        "filePath": "C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288",
+        "fieldPath": "SaveGame.player.0.money",
+        "gameId": "demo-game-quest-id-000000000000"
+      },
+      "constraints": {
+        "min": 0,
+        "max": 2147483647
+      },
+      "metadata": {
+        "valueType": "int",
+        "safeTestValue": 12345,
+        "defaultValue": 500,
+        "riskNotes": "Low risk - simple scalar value, proven in Milestone E"
+      }
+    },
+    {
+      "id": "stardew-stamina",
+      "label": "Stamina",
+      "description": "Current energy. Written via TrainerHost XML save workflow with backup + rollback.",
+      "category": "STAMINA",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "requires_approval",
+      "saveField": {
+        "filePath": "C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288",
+        "fieldPath": "SaveGame.player.0.stamina.0.float.0",
+        "gameId": "demo-game-quest-id-000000000000"
+      },
+      "constraints": {
+        "min": 0,
+        "max": 508
+      },
+      "metadata": {
+        "valueType": "float",
+        "safeTestValue": 270,
+        "defaultValue": 270,
+        "riskNotes": "Low risk - simple nested float, independent stat"
+      }
+    },
+    {
+      "id": "stardew-farming-xp",
+      "label": "Farming XP",
+      "description": "Farming skill experience points. Written via TrainerHost XML save workflow with backup + rollback.",
+      "category": "SKILLS",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "requires_approval",
+      "saveField": {
+        "filePath": "C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288",
+        "fieldPath": "SaveGame.player.0.experiencePoints.0.int.0",
+        "gameId": "demo-game-quest-id-000000000000"
+      },
+      "constraints": {
+        "min": 0,
+        "max": 15000
+      },
+      "metadata": {
+        "valueType": "int",
+        "safeTestValue": 2000,
+        "defaultValue": 0,
+        "riskNotes": "Low risk - simple array element, XP is cumulative"
+      }
+    },
+    {
+      "id": "stardew-health",
+      "label": "Health",
+      "description": "Runtime memory control — not yet implemented.",
+      "category": "HEALTH",
+      "controlType": "number_input",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "constraints": {
+        "min": 0,
+        "max": 999
+      },
+      "metadata": {
+        "riskNotes": "Deferred - death state sensitive, requires runtime memory editing"
+      }
+    },
+    {
+      "id": "stardew-energy",
+      "label": "Energy / Magic",
+      "description": "Runtime memory control — deferred to future milestone.",
+      "category": "STAMINA",
+      "controlType": "slider",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "constraints": {
+        "min": 0,
+        "max": 508,
+        "step": 1
+      },
+      "metadata": {
+        "riskNotes": "Deferred - runtime memory editing not yet implemented"
+      }
+    },
+    {
+      "id": "stardew-resources",
+      "label": "Resources",
+      "description": "Inventory resource counts — save-backed but not mapped in Milestone E.",
+      "category": "INVENTORY",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "disabled",
+      "metadata": {
+        "riskNotes": "Deferred - complex inventory structure needs careful analysis"
+      }
+    },
+    {
+      "id": "stardew-godmode",
+      "label": "God Mode",
+      "description": "Invincibility — requires runtime memory write. Not implemented.",
+      "category": "GAME",
+      "controlType": "toggle",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "metadata": {
+        "riskNotes": "Deferred - requires Block 8 (Real-Time Trainer Engine)"
+      }
+    },
+    {
+      "id": "stardew-aimassist",
+      "label": "Aim Assist",
+      "description": "Targeting aid — requires runtime memory write. Not implemented.",
+      "category": "GAME",
+      "controlType": "toggle",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "metadata": {
+        "riskNotes": "Deferred - requires Block 8 (Real-Time Trainer Engine)"
+      }
+    }
+  ]
+}

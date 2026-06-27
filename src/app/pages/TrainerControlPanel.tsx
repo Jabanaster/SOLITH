@@ -1,15 +1,16 @@
 /**
- * TrainerControlPanel — Milestone E
+ * TrainerControlPanel — Milestone H
  *
- * Displays a curated set of trainer controls backed by the TrainerControl schema.
+ * Displays trainer controls loaded from game profiles.
+ * Controls are now data-driven, loaded from profile JSON files instead of hardcoded.
+ *
  * Only controls with backend='save_field' and safetyStatus='requires_approval'
  * or 'supported' can be executed; all others are shown in a disabled/future state.
  *
- * The Money control is the only live control in Milestone E:
+ * Workflow:
  *   proposeWrite → show diff/confirmation → approveAndWrite → verify → offer rollback
  *
- * Health, Energy, God Mode, Aim Assist, and Resources are displayed as
- * future-feature / disabled placeholders.
+ * Milestone H refactor: controls are now loaded from src/core/game-profiles/profiles/stardew-valley.json
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -23,118 +24,39 @@ import {
   BACKEND_LABELS,
   SAFETY_STATUS_LABELS,
 } from '../../core/trainer-host/trainer-control-schema.js';
+import type { GameProfile } from '../../core/game-profiles/types.js';
+import { validateGameProfile } from '../../core/game-profiles/types.js';
+import { loadTrainerControls } from '../../core/game-profiles/transform.js';
+// Renderer-safe: import the profile as data (bundled by Vite). We must NOT import
+// the fs-backed loader here, or Node built-ins get pulled into the browser bundle.
+import stardewProfileData from '../../core/game-profiles/profiles/stardew-valley.json';
 
-// ── Static control definitions ────────────────────────────────────────────────
+// ── Profile-driven control loading ───────────────────────────────────────────
 
-const STARDEW_SAVE_PATH =
-  'C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288';
-const STARDEW_GAME_ID = 'demo-game-quest-id-000000000000';
-const MONEY_FIELD = 'SaveGame.player.0.money';
-const STAMINA_FIELD = 'SaveGame.player.0.stamina.0.float.0';
-const FARMING_XP_FIELD = 'SaveGame.player.0.experiencePoints.0.int.0';
-
-function buildControls(): TrainerControl[] {
-  return [
-    {
-      id: 'stardew-money',
-      label: 'Money',
-      description: 'Ceriph\'s gold. Written via TrainerHost XML save workflow with backup + rollback.',
-      category: 'CURRENCY',
-      controlType: 'number_input',
-      backend: 'save_field',
-      safetyStatus: 'requires_approval',
-      min: 0,
-      max: 2147483647,
-      saveField: {
-        filePath: STARDEW_SAVE_PATH,
-        fieldPath: MONEY_FIELD,
-        gameId: STARDEW_GAME_ID,
-      },
-    },
-    {
-      id: 'stardew-stamina',
-      label: 'Stamina',
-      description: 'Current energy. Written via TrainerHost XML save workflow with backup + rollback.',
-      category: 'STAMINA',
-      controlType: 'number_input',
-      backend: 'save_field',
-      safetyStatus: 'requires_approval',
-      min: 0,
-      max: 508,
-      saveField: {
-        filePath: STARDEW_SAVE_PATH,
-        fieldPath: STAMINA_FIELD,
-        gameId: STARDEW_GAME_ID,
-      },
-    },
-    {
-      id: 'stardew-farming-xp',
-      label: 'Farming XP',
-      description: 'Farming skill experience points. Written via TrainerHost XML save workflow with backup + rollback.',
-      category: 'SKILLS',
-      controlType: 'number_input',
-      backend: 'save_field',
-      safetyStatus: 'requires_approval',
-      min: 0,
-      max: 15000,
-      saveField: {
-        filePath: STARDEW_SAVE_PATH,
-        fieldPath: FARMING_XP_FIELD,
-        gameId: STARDEW_GAME_ID,
-      },
-    },
-    {
-      id: 'stardew-health',
-      label: 'Health',
-      description: 'Runtime memory control — not yet implemented.',
-      category: 'HEALTH',
-      controlType: 'number_input',
-      backend: 'memory_write',
-      safetyStatus: 'future_feature',
-      min: 0,
-      max: 999,
-    },
-    {
-      id: 'stardew-energy',
-      label: 'Energy / Magic',
-      description: 'Runtime memory control — deferred to future milestone.',
-      category: 'STAMINA',
-      controlType: 'slider',
-      backend: 'memory_write',
-      safetyStatus: 'future_feature',
-      min: 0,
-      max: 508,
-      step: 1,
-    },
-    {
-      id: 'stardew-resources',
-      label: 'Resources',
-      description: 'Inventory resource counts — save-backed but not mapped in Milestone E.',
-      category: 'INVENTORY',
-      controlType: 'number_input',
-      backend: 'save_field',
-      safetyStatus: 'disabled',
-    },
-    {
-      id: 'stardew-godmode',
-      label: 'God Mode',
-      description: 'Invincibility — requires runtime memory write. Not implemented.',
-      category: 'GAME',
-      controlType: 'toggle',
-      backend: 'memory_write',
-      safetyStatus: 'future_feature',
-    },
-    {
-      id: 'stardew-aimassist',
-      label: 'Aim Assist',
-      description: 'Targeting aid — requires runtime memory write. Not implemented.',
-      category: 'GAME',
-      controlType: 'toggle',
-      backend: 'memory_write',
-      safetyStatus: 'future_feature',
-    },
-  ];
+/**
+ * Loads trainer controls from the Stardew Valley game profile.
+ * Replaces the hardcoded buildControls() from Milestone G.
+ *
+ * The profile is validated at build/runtime; an invalid profile yields no
+ * controls rather than rendering an unsafe/partial panel.
+ */
+export function buildControls(): TrainerControl[] {
+  const profile = stardewProfileData as GameProfile;
+  const errors = validateGameProfile(profile);
+  if (errors.length > 0) {
+    console.error('Stardew profile failed validation:', errors);
+    return [];
+  }
+  return loadTrainerControls(profile);
 }
+
+// Note: The rest of the panel implementation below remains unchanged.
+// Controls are now loaded from profile but the UI behavior is identical:
+//   - Money, Stamina, Farming XP are executable through save-backed workflow
+//   - Disabled/future controls cannot execute
+//   - Approval workflow enforced
+//   - Rollback available after successful write
+//   - Companion files remain untouched
 
 // ── Per-control state ─────────────────────────────────────────────────────────
 
@@ -565,4 +487,4 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
 };
 
 export default TrainerControlPanel;
-export { buildControls };
+// buildControls is already exported near the top of the file (line 35)

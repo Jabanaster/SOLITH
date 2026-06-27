@@ -1,0 +1,1139 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260627072331
+Username: DIS-IS-THE-WAE\chase
+RunAs User: DIS-IS-THE-WAE\chase
+Configuration Name: 
+Machine: DIS-IS-THE-WAE (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\scripts\verify-milestone-h.ps1
+Process ID: 18684
+PSVersion: 5.1.26100.8737
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8737
+BuildVersion: 10.0.26100.8737
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is Docs\Reports\MILESTONE_H_GATE_2026-06-27T07-23-31.txt
+
+============================================================
+REPO STATE
+============================================================
+ M package.json
+ M src/app/pages/TrainerControlPanel.tsx
+?? Docs/Reports/MILESTONE_H_GATE_2026-06-27T07-23-31.txt
+?? scripts/verify-milestone-h.ps1
+?? src/core/game-profiles/
+?? tests/game-profile.test.ts
+feature/milestone-e-controls-wip
+ad7ec81 (HEAD -> feature/milestone-e-controls-wip) merge: Milestones F and G into main development branch
+59b757b (tag: v1-milestone-g-save-controls-accepted, jabanaster-fix-packaged-spawn-electron-node) feat(milestone-g): add
+ Stamina and Farming XP save-backed controls
+3958b4c (tag: v1-milestone-f-backups-accepted) feat(milestone-f): implement real backup safety adapter
+1538144 Merge branch 'feature/milestone-e-controls-wip' into jabanaster-fix-packaged-spawn-electron-node
+37b44f7 fix(host): add ELECTRON_RUN_AS_NODE for packaged spawn
+
+============================================================
+VERIFY MILESTONE H FILES EXIST
+============================================================
+OK: src/core/game-profiles/index.ts
+OK: src/core/game-profiles/loader.ts
+OK: src/core/game-profiles/transform.ts
+OK: src/core/game-profiles/types.ts
+OK: src/core/game-profiles/profiles/stardew-valley.json
+OK: tests/game-profile.test.ts
+
+============================================================
+RUN REQUIRED GATES
+============================================================
+
+============================================================
+RUNNING: npx tsc --noEmit
+============================================================
+
+PASS: npx tsc --noEmit
+
+============================================================
+RUNNING: npm run test:game-profile
+============================================================
+
+> resourceforge@1.0.0 test:game-profile
+> tsx --test tests/game-profile.test.ts
+
+▶ validateGameProfile — structure validation
+  ✔ returns no errors for a valid minimal profile (1.2707ms)
+  ✔ rejects missing profileVersion (0.1417ms)
+  ✔ rejects missing gameId (0.0802ms)
+  ✔ rejects invalid saveFormat (0.0787ms)
+  ✔ rejects non-array controls (0.0686ms)
+  ✔ rejects duplicate control ids (0.0895ms)
+  ✔ requires saveField for executable save_field controls (0.077ms)
+  ✔ allows save_field controls without saveField if disabled (0.0773ms)
+✔ validateGameProfile — structure validation (2.5231ms)
+▶ loadStardewProfile — Stardew Valley profile
+  ✔ loads without errors (0.6815ms)
+  ✔ has correct gameId (0.3864ms)
+  ✔ has displayName Stardew Valley (0.2779ms)
+  ✔ has saveFormat xml (0.2628ms)
+  ✔ includes at least 8 controls (0.273ms)
+  ✔ includes Money control with correct field path (0.2752ms)
+  ✔ includes Stamina control with correct field path (0.2815ms)
+  ✔ includes Farming XP control with correct field path (0.5791ms)
+  ✔ includes Health as future_feature (0.2966ms)
+  ✔ includes God Mode as future_feature (0.2626ms)
+  ✔ includes Aim Assist as future_feature (0.2845ms)
+✔ loadStardewProfile — Stardew Valley profile (4.099ms)
+▶ loadTrainerControls — profile to TrainerControl conversion
+  ✔ converts all Stardew controls to TrainerControl format (0.3268ms)
+  ✔ preserves control id, label, description (0.2911ms)
+  ✔ converts constraints to min/max/step (0.2773ms)
+  ✔ converts saveField correctly (0.258ms)
+  ✔ only 3 controls are executable (Money, Stamina, Farming XP) (0.4676ms)
+  ✔ all executable controls require approval (0.3278ms)
+  ✔ memory_write controls are not executable (0.2845ms)
+  ✔ unsupported and non-save_field backends are never executable (0.2812ms)
+  ✔ disabled save_field controls are not executable (0.2995ms)
+✔ loadTrainerControls — profile to TrainerControl conversion (2.9613ms)
+ℹ tests 28
+ℹ suites 3
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 174.2884
+PASS: npm run test:game-profile
+
+============================================================
+RUNNING: npm run test:trainer-schema
+============================================================
+
+> resourceforge@1.0.0 test:trainer-schema
+> tsx --test tests/trainer-control-schema.test.ts
+
+▶ validateControl — required fields
+  ✔ returns no errors for a fully valid save_field control (0.6026ms)
+  ✔ returns error when id is missing (0.1009ms)
+  ✔ returns error when label is missing (0.065ms)
+  ✔ returns error for invalid controlType (0.062ms)
+  ✔ returns error for invalid backend (0.0454ms)
+  ✔ returns error when save_field control missing saveField (0.0507ms)
+  ✔ returns no errors for memory_write control without saveField (0.0371ms)
+  ✔ returns no errors for disabled save_field control without saveField (0.0459ms)
+✔ validateControl — required fields (1.4901ms)
+▶ isControlExecutable — execution eligibility
+  ✔ returns true for save_field + requires_approval (Money control) (0.1166ms)
+  ✔ returns true for save_field + supported (0.0838ms)
+  ✔ returns false for memory_write backend (Health) (0.0659ms)
+  ✔ returns false for save_field + disabled (Resources) (0.0238ms)
+  ✔ returns false for save_field + future_feature (0.0239ms)
+  ✔ returns false for unsupported backend (0.0304ms)
+  ✔ returns false for memory_observation backend regardless of status (0.0237ms)
+✔ isControlExecutable — execution eligibility (0.503ms)
+▶ requiresApproval
+  ✔ returns true for Money control (requires_approval) (0.0393ms)
+  ✔ returns false for a supported control (no approval gate) (0.0188ms)
+  ✔ returns false for a disabled control (0.0163ms)
+  ✔ returns false for a future_feature control (0.0149ms)
+✔ requiresApproval (0.13ms)
+▶ BACKEND_LABELS
+  ✔ has a label for every backend type (0.0431ms)
+  ✔ renders safe_field as "Save Field" (0.0162ms)
+  ✔ renders memory_write as "Memory Write" (0.0149ms)
+✔ BACKEND_LABELS (0.1022ms)
+▶ SAFETY_STATUS_LABELS
+  ✔ has a label for every safety status (0.0508ms)
+  ✔ renders requires_approval as "Requires Approval" (0.0172ms)
+  ✔ renders future_feature as "Future Feature" (0.0222ms)
+✔ SAFETY_STATUS_LABELS (0.1252ms)
+▶ buildControls — TrainerControlPanel fixture set
+  ✔ includes at least 8 controls (0.0403ms)
+  ✔ Money control is executable and requires approval (0.0261ms)
+  ✔ Stamina control is executable and requires approval (0.0255ms)
+  ✔ Farming XP control is executable and requires approval (0.0233ms)
+  ✔ all non-save_field controls are not executable (0.0299ms)
+  ✔ no memory_write control can execute (0.0246ms)
+  ✔ all controls pass schema validation (0.0543ms)
+  ✔ disabled controls are not executable (0.0493ms)
+  ✔ future_feature controls are not executable (0.0298ms)
+✔ buildControls — TrainerControlPanel fixture set (0.37ms)
+ℹ tests 34
+ℹ suites 6
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171.9653
+PASS: npm run test:trainer-schema
+
+============================================================
+RUNNING: npm run test:trainer-host
+============================================================
+
+> resourceforge@1.0.0 test:trainer-host
+> tsx --test tests/trainer-host/protocol.test.ts tests/trainer-host/read-save-field.test.ts tests/trainer-host/host-runt
+ime.test.ts tests/trainer-host/host-supervisor.test.ts tests/trainer-host/write-save-field.test.ts tests/trainer-host/e2
+e.test.ts
+
+▶ TrainerHost E2E (production spawn)
+  ✔ read-only: spawn → handshake → readSaveField → unknown method → shutdown → PID gone (138.6294ms)
+  ✔ write workflow: spawn → propose → execute → verify read → rollback → verify read → shutdown → PID gone (104.773ms)
+  ✔ propose rejects invalid path (file does not exist) (86.5785ms)
+  ✔ execute rejects invalid XML content (84.9174ms)
+✔ TrainerHost E2E (production spawn) (415.357ms)
+▶ startHostRuntime — handshake
+  ✔ sends handshake immediately on start (0.7908ms)
+  ✔ advertises all write capabilities (0.1207ms)
+✔ startHostRuntime — handshake (1.4304ms)
+▶ startHostRuntime — unknown method
+  ✔ returns error envelope for unknown method (0.2333ms)
+✔ startHostRuntime — unknown method (0.2881ms)
+▶ startHostRuntime — shutdown
+  ✔ replies and calls exit(0) on shutdown request (0.0957ms)
+✔ startHostRuntime — shutdown (0.1479ms)
+▶ startHostRuntime — parent loss
+  ✔ exits on stdin end (0.1018ms)
+  ✔ exits on stdin close (0.0608ms)
+✔ startHostRuntime — parent loss (0.2456ms)
+▶ startHostRuntime — readSaveField dispatch
+  ✔ dispatches readSaveField and returns result (60.8013ms)
+  ✔ returns error for invalid params (62.8824ms)
+✔ startHostRuntime — readSaveField dispatch (123.8552ms)
+▶ createTrainerHostSupervisor — start / handshake
+  ✔ returns running=false before start (0.3989ms)
+  ✔ resolves success after receiving handshake (1.1419ms)
+  ✔ returns already_running when called twice (0.3121ms)
+✔ createTrainerHostSupervisor — start / handshake (2.3784ms)
+▶ createTrainerHostSupervisor — stop
+  ✔ sends shutdown and clears running state (0.4002ms)
+✔ createTrainerHostSupervisor — stop (0.4636ms)
+▶ createTrainerHostSupervisor — approved-path gate
+  ✔ rejects readField when path is not approved (0.3861ms)
+✔ createTrainerHostSupervisor — approved-path gate (0.437ms)
+▶ createTrainerHostSupervisor — verifyExitOrKill
+  ✔ kills a still-running child (0.3403ms)
+  ✔ is a no-op when child is not running (0.1264ms)
+✔ createTrainerHostSupervisor — verifyExitOrKill (0.5674ms)
+▶ encodeRequest / encodeResponse / encodeError
+  ✔ produces newline-terminated JSON (0.7908ms)
+  ✔ round-trips request with params (0.3558ms)
+  ✔ round-trips response (0.0743ms)
+  ✔ round-trips error (0.0544ms)
+  ✔ omits params key when params is undefined (0.075ms)
+✔ encodeRequest / encodeResponse / encodeError (1.7859ms)
+▶ type guards
+  ✔ isRpcRequest identifies requests (0.0942ms)
+  ✔ isRpcResponse identifies ok responses (0.0494ms)
+  ✔ isRpcError identifies error responses (0.0556ms)
+✔ type guards (0.2831ms)
+▶ LineFramer
+  ✔ emits message when a complete line arrives in one chunk (0.1389ms)
+  ✔ buffers partial line and emits on subsequent chunk (0.0839ms)
+  ✔ emits multiple messages from one chunk (0.0598ms)
+  ✔ emits first message and buffers remainder when chunk has partial second line (0.0653ms)
+  ✔ skips empty lines (0.0544ms)
+  ✔ accepts string input (0.0373ms)
+  ✔ throws RpcFrameError on malformed JSON (0.2439ms)
+  ✔ RpcFrameError contains the offending raw line (0.0713ms)
+  ✔ retains buffered bytes after a throw (0.0409ms)
+✔ LineFramer (0.9238ms)
+▶ readSaveField
+  ✔ reads a known field from the XML fixture (2.6308ms)
+  ✔ reads a top-level string field (0.716ms)
+  ✔ reads a nested numeric field as string (0.6219ms)
+  ✔ returns found=false for a missing field path (0.6417ms)
+  ✔ returns found=false for a nonexistent file (0.1084ms)
+  ✔ throws on invalid params (missing filePath) (0.2778ms)
+  ✔ throws on invalid params (missing field) (0.2749ms)
+  ✔ throws on invalid params (null) (0.1532ms)
+  ✔ throws xml_safety error on DOCTYPE with SYSTEM reference (1.7711ms)
+✔ readSaveField (7.8493ms)
+▶ proposeWriteField
+  ✔ returns valid:true when file + field + currentValue are correct (3.3988ms)
+  ✔ throws file_not_found for non-existent path (0.3007ms)
+  ✔ throws value_mismatch when currentValue is wrong (0.9057ms)
+  ✔ throws field_not_found for non-existent field path (0.864ms)
+  ✔ throws invalid_params when params are missing required keys (0.1154ms)
+  ✔ throws xml_safety on DOCTYPE content (2.4937ms)
+✔ proposeWriteField (11.0062ms)
+▶ executeWriteField
+  ✔ writes new value, returns written:true + verifiedValue + backupPath (7.9035ms)
+  ✔ backup contains the original value (0.3855ms)
+  ✔ throws value_changed_since_proposal if currentValue no longer matches (0.7199ms)
+  ✔ throws file_not_found for missing file (0.1489ms)
+  ✔ throws invalid_params for missing newValue (0.0762ms)
+✔ executeWriteField (11.0383ms)
+▶ rollbackWriteField
+  ✔ restores original value, returns restored:true + verifiedValue (2.5203ms)
+  ✔ file contains original value after rollback (0.2286ms)
+  ✔ throws backup_not_found when backup is missing (0.1986ms)
+  ✔ throws invalid_params when field is missing (0.1353ms)
+✔ rollbackWriteField (8.9943ms)
+ℹ tests 60
+ℹ suites 17
+ℹ pass 60
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 637.7959
+PASS: npm run test:trainer-host
+
+============================================================
+RUNNING: npm test
+============================================================
+
+> resourceforge@1.0.0 test
+> tsx --test tests/core.test.ts tests/parsers.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/fai
+lure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-bindin
+g.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/v2-lifecycle.test.
+ts tests/command-runner.test.ts tests/v2-lifecycle-wiring.test.ts tests/trainer-host/protocol.test.ts tests/trainer-host
+/read-save-field.test.ts tests/trainer-host/host-runtime.test.ts tests/trainer-host/host-supervisor.test.ts tests/traine
+r-host/write-save-field.test.ts tests/trainer-host/e2e.test.ts tests/trainer-control-schema.test.ts tests/game-profile.t
+est.ts
+
+▶ command-runner
+  ✔ CR-01: abort signals child exactly once (1.6676ms)
+  ✔ CR-02: timeout signals child exactly once (14.2696ms)
+  ✔ CR-03: abort clears timeout so only one kill occurs (46.6068ms)
+  ✔ CR-04: abort listener removed after close settles promise (0.7433ms)
+  ✔ CR-05: close after abort does not double-settle (0.5921ms)
+  ✔ CR-06: error after abort does not double-settle (0.4906ms)
+  ✔ CR-07: abort after normal close is ignored (0.2948ms)
+  ✔ CR-08: oversized stdout rejects with output_size_exceeded (0.4294ms)
+  ✔ CR-09: oversized stderr is bounded and does not reject (0.4546ms)
+  ✔ CR-10: spawn error event rejects the promise (0.4022ms)
+  ✔ CR-11: stubborn child cannot keep promise pending forever (27.1905ms)
+  ✔ CR-12: spawn is always called with shell: false (0.4704ms)
+  ✔ CR-13: cmd and args are separate values in spawn call (0.9558ms)
+  ✔ CR-14: executable name reaches child via env var, not PowerShell source (0.4264ms)
+✔ command-runner (96.1144ms)
+▶ ResourceForge Core Modules Tests
+  ✔ 1. Scanner & Save Detection Checks (3.1146ms)
+  ✔ 2. Custom Parsers Tests (23.579ms)
+  ✔ 3. Binary Save Safe Analysis Checks (2.6964ms)
+  ✔ 4. Value Classification and Confidence Scoring (0.4774ms)
+  ✔ 5. Recipe Safety & Staleness Verification (9.6436ms)
+✔ ResourceForge Core Modules Tests (40.3638ms)
+▶ deleteGame — IPC Regression Tests
+  ✔ 1. valid deletion returns true (4.6312ms)
+  ✔ 2. deleted game is no longer found (1.2263ms)
+  ✔ 3. deleting a non-existent ID returns false (0.3136ms)
+  ✔ 4. Zod schema rejects malformed game ID (not UUID) (1.5928ms)
+  ✔ 5. Zod schema rejects empty string (0.2813ms)
+  ✔ 6. Zod schema accepts the demo game literal ID (0.2137ms)
+  ✔ 7. Zod schema accepts a valid UUID (0.1361ms)
+  ✔ 8. demo game deletion sets demoGameDeleted flag in settings (1.2722ms)
+✔ deleteGame — IPC Regression Tests (77.6793ms)
+Adapter comparison failed, using fallback: Error: ENOENT: no such file or directory, open 'C:\Users\chase\AppData\Local\
+Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
+    at Object.readFileSync (node:fs:441:20)
+    at compareSaves (G:\GAME TRAINER\src\core\discovery\index.ts:96:23)
+    at TestContext.<anonymous> (G:\GAME TRAINER\tests\discovery.test.ts:111:19)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\resourceforge-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
+}
+Adapter comparison failed, using fallback: Error: ENOENT: no such file or directory, open 'C:\Users\chase\AppData\Local\
+Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
+    at Object.readFileSync (node:fs:441:20)
+    at compareSaves (G:\GAME TRAINER\src\core\discovery\index.ts:96:23)
+    at TestContext.<anonymous> (G:\GAME TRAINER\tests\discovery.test.ts:147:26)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\resourceforge-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
+}
+Adapter comparison failed, using fallback: Error: ENOENT: no such file or directory, open 'C:\Users\chase\AppData\Local\
+Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
+    at Object.readFileSync (node:fs:441:20)
+    at compareSaves (G:\GAME TRAINER\src\core\discovery\index.ts:96:23)
+    at TestContext.<anonymous> (G:\GAME TRAINER\tests\discovery.test.ts:151:28)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\resourceforge-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
+}
+▶ ResourceForge Save Discovery, Locations, and Discovery Engine Tests
+  ✔ 1. Save Location Suggestions and Approvals (12.1144ms)
+  ✔ 2. Path Approval Containment Checks (6.4287ms)
+  ✔ 3. Discovery Engine Diffing & Confidence Scoring (6.6921ms)
+  ✔ 4. Known-Value Guided Matches & Repeated Session Boost (3.0655ms)
+  ✔ 5. End-to-End Save Edit & Restore Workflow (34.1188ms)
+✔ ResourceForge Save Discovery, Locations, and Discovery Engine Tests (122.1197ms)
+▶ Discovery Suite — Consecutive-Run Isolation Regression
+  ✔ Consecutive run: no recipe conflict from a prior run (2.1399ms)
+✔ Discovery Suite — Consecutive-Run Isolation Regression (12.5532ms)
+▶ drill-core-settings — valid edits
+  ✔ dc-valid-01 — 100.0 → 75.0 preserves decimal style and all other bytes (1.3043ms)
+  ✔ dc-valid-02 — 100 → 75 preserves integer style (0.1352ms)
+  ✔ dc-valid-03 — boundary 0 accepted (0.1162ms)
+  ✔ dc-valid-04 — boundary 100 accepted (no semantic change) (0.1064ms)
+  ✔ dc-valid-05 — UTF-8 content outside target is preserved (0.1715ms)
+  ✔ dc-valid-06 — single-line formatting preserved (no newlines introduced) (0.1129ms)
+✔ drill-core-settings — valid edits (2.6426ms)
+▶ drill-core-settings — invalid edits rejected
+  ✔ dc-invalid-01 — missing key (0.205ms)
+  ✔ dc-invalid-02 — duplicate key is ambiguous (0.1904ms)
+  ✔ dc-invalid-03 — nested-only key rejected (not top-level) (0.1365ms)
+  ✔ dc-invalid-04 — wrong types rejected (0.1571ms)
+  ✔ dc-invalid-05 — fractional proposal rejected (0.3936ms)
+  ✔ dc-invalid-06 — negative proposal rejected (0.0902ms)
+  ✔ dc-invalid-07 — above-range proposal rejected (0.0778ms)
+  ✔ dc-invalid-08 — malformed JSON rejected (0.1419ms)
+  ✔ dc-invalid-09 — trailing data rejected (2.9172ms)
+  ✔ dc-invalid-10 — unexpected BOM rejected (0.1101ms)
+  ✔ dc-invalid-11 — stale value rejected (0.1028ms)
+  ✔ dc-invalid-12 — adapter rejects wrong target path (4.9336ms)
+  ✔ dc-invalid-13 — adapter does not support non-settings filenames (2.0671ms)
+✔ drill-core-settings — invalid edits rejected (11.9917ms)
+▶ drill-core-settings — byte/value preservation
+  ✔ dc-pres-01 — unrelated bytes before/after token are identical (0.1693ms)
+  ✔ dc-pres-02 — only one region changes, length delta matches token delta (0.1236ms)
+✔ drill-core-settings — byte/value preservation (0.3746ms)
+▶ drill-core-settings — production apply/restore engine
+  ✔ dc-engine-01 — narrow adapter is selected for settings.json (0.2926ms)
+  ✔ dc-engine-02 — Master Volume slider recipe validates and persists (7.403ms)
+  ✔ dc-engine-03 — full proposal → backup → apply → validate → restore (34.2002ms)
+✔ drill-core-settings — production apply/restore engine (102.1392ms)
+Atomic write failed: Error: Temporary file validation failed: SyntaxError: Expected property name or '}' in JSON at posi
+tion 2 (line 1 column 3)
+    at atomicWrite (G:\GAME TRAINER\src\core\safety\atomic-write.ts:119:13)
+    at async TestContext.<anonymous> (G:\GAME TRAINER\tests\failure-injection.test.ts:177:17)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation ff19d51e-002c-411c-89fa-ca4aa67499ef (stuck in APPLYING) for target: C:\Users\chas
+e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_a.json
+[Crash Recovery] Case A: Current target matches original hash. Original was not replaced.
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 74049107-77e6-4e58-8dd4-f9a7e7686f4b (stuck in APPLYING) for target: C:\Users\chas
+e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_b.json
+[Crash Recovery] Case B: Current target matches expected final hash and is valid.
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 6684a133-b7a4-471b-8404-8fbabfa147a9 (stuck in APPLYING) for target: C:\Users\chas
+e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_d.json
+[Crash Recovery] Case D: Ambiguous target state (proposal missing or expected final hash uncomputable).
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 29453991-1e37-4908-931b-d5e1ecb59958 (stuck in APPLYING) for target: C:\Users\chas
+e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
+[Crash Recovery] Case E: Backup record not found in database.
+▶ ResourceForge Failure Injection & Security Invariant Tests
+  ✔ 1. Invalid IPC Payloads Validation (3.257ms)
+  ✔ 2. Recipe Validation, Safety Filters & Malicious Payload Rejection (6.3891ms)
+  ✔ 3. Recipe Conflict Detection (1.5813ms)
+  ✔ 4. Temporary Write & Validation Failures (23.5418ms)
+  ✔ 5. Atomic Replacement Failures (Windows Edge Case Simulation) (15.2464ms)
+  ✔ 6. Crash Recovery Case A (Target matches original hash) (12.9322ms)
+  ✔ 7. Crash Recovery Case B (Target matches expected final hash) (13.4472ms)
+  ✔ 8. Crash Recovery Case D (Ambiguous state: proposal missing) (17.6818ms)
+  ✔ 9. Crash Recovery Case E (Backup is invalid or missing) (2.9208ms)
+  ✔ 10. Scan Cancellation Support (4.511ms)
+✔ ResourceForge Failure Injection & Security Invariant Tests (158.4153ms)
+▶ validateGameProfile — structure validation
+  ✔ returns no errors for a valid minimal profile (0.9496ms)
+  ✔ rejects missing profileVersion (0.1316ms)
+  ✔ rejects missing gameId (0.0894ms)
+  ✔ rejects invalid saveFormat (0.0859ms)
+  ✔ rejects non-array controls (0.0886ms)
+  ✔ rejects duplicate control ids (0.0967ms)
+  ✔ requires saveField for executable save_field controls (0.0936ms)
+  ✔ allows save_field controls without saveField if disabled (0.0789ms)
+✔ validateGameProfile — structure validation (2.3873ms)
+▶ loadStardewProfile — Stardew Valley profile
+  ✔ loads without errors (0.6609ms)
+  ✔ has correct gameId (0.5417ms)
+  ✔ has displayName Stardew Valley (0.4139ms)
+  ✔ has saveFormat xml (0.4347ms)
+  ✔ includes at least 8 controls (0.4615ms)
+  ✔ includes Money control with correct field path (0.44ms)
+  ✔ includes Stamina control with correct field path (0.4257ms)
+  ✔ includes Farming XP control with correct field path (0.4263ms)
+  ✔ includes Health as future_feature (0.3693ms)
+  ✔ includes God Mode as future_feature (0.4127ms)
+  ✔ includes Aim Assist as future_feature (0.4198ms)
+✔ loadStardewProfile — Stardew Valley profile (5.9297ms)
+▶ loadTrainerControls — profile to TrainerControl conversion
+  ✔ converts all Stardew controls to TrainerControl format (0.5296ms)
+  ✔ preserves control id, label, description (0.4035ms)
+  ✔ converts constraints to min/max/step (0.3816ms)
+  ✔ converts saveField correctly (0.3786ms)
+  ✔ only 3 controls are executable (Money, Stamina, Farming XP) (0.476ms)
+  ✔ all executable controls require approval (0.3783ms)
+  ✔ memory_write controls are not executable (0.5217ms)
+  ✔ unsupported and non-save_field backends are never executable (0.3692ms)
+  ✔ disabled save_field controls are not executable (0.3897ms)
+✔ loadTrainerControls — profile to TrainerControl conversion (4.0725ms)
+▶ ResourceForge Parser Adapters Expansion & Safety Tests
+  ✔ 1. JSON Adapter Features & Safety (2.2927ms)
+  ✔ 2. INI / CFG Adapter Duplicate Keys (1.5723ms)
+  ✔ 3. XML Adapter Security & XXE Blocks (0.7572ms)
+  ✔ 4. CSV/TSV Dialects & Stable Row Selectors (0.7994ms)
+  ✔ 5. Lua-like Table Static Parser Check (0.6285ms)
+  ✔ 6. Binary Safe Read-Only Adapter Check (1.0678ms)
+  ✔ 7. Sparse extensionless binary with integrity-like trailer remains read-only (43.2253ms)
+✔ ResourceForge Parser Adapters Expansion & Safety Tests (78.4873ms)
+✔ intake-01 — JSON fixture: success, ACCEPTED, hash chain verified (23.6368ms)
+✔ intake-02 — INI fixture: ACCEPTED (14.7723ms)
+✔ intake-03 — XML fixture: ACCEPTED (16.0432ms)
+✔ intake-04 — CSV fixture: ACCEPTED (41.4336ms)
+✔ intake-05 — text fixture (.txt): ACCEPTED (20.1669ms)
+✔ intake-06 — binary fixture (.bin): REJECTED, intake still succeeds (19.5559ms)
+✔ intake-07 — missing source file: returns error (1.0945ms)
+✔ intake-08 — workspace copy survives source deletion (14.0772ms)
+✔ intake-09 — pilotId is unique across two intakes (32.6159ms)
+✔ intake-10 — confirmations round-trip through manifest and Zod schema (13.546ms)
+▶ Game-Running Detection
+  ✔ 1. Return false when no executable names registered (0.7776ms)
+  ✔ 2. Return false when executable not found in process list (5003.8881ms)
+  ✔ 3. Return string evidence on error (safe fallback) (5004.4908ms)
+  ✔ 4. Check is read-only (no side effects) (10015.2166ms)
+✔ Game-Running Detection (20025.2105ms)
+▶ Compatibility Profiles
+  ✔ 1. Create profile with required fields (89.0662ms)
+  ✔ 2. Retrieve profile by ID (13.9111ms)
+  ✔ 3. Get profile for a game (19.9814ms)
+  ✔ 4. Update profile (immutable — creates new version) (10.3787ms)
+  ✔ 5. Fingerprint computation is deterministic (0.4641ms)
+  ✔ 6. Drift detection: executable hash change (0.2095ms)
+  ✔ 7. Drift detection: save structure change (0.1271ms)
+  ✔ 8. Drift detection: no drift when fingerprints match (0.1701ms)
+  ✔ 9. Profile validation records status and drift (12.3614ms)
+  ✔ 10. Profile validation fails on drift (14.3706ms)
+  ✔ 11. Check profile drift directly (9.5577ms)
+  ✔ 12. Delete profile cascades to validations (9.7282ms)
+✔ Compatibility Profiles (181.5292ms)
+Apply failed, initiating rollback: Error: File "save_lock.json" is currently locked by another operation.
+    at applyProposal (G:\GAME TRAINER\src\core\saves\editor.ts:240:13)
+    at async TestContext.<anonymous> (G:\GAME TRAINER\tests\safety-integration.test.ts:101:17)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 8549ef99-e2bd-41cd-b390-463ca0fda9f8 (stuck in APPLYING) for target: C:\Users\chas
+e\AppData\Local\Temp\resourceforge-test-game\save_crash.json
+[Crash Recovery] Case C: Target is invalid/missing, but verified backup exists. Restoring...
+[Crash Recovery] Restoration successful. Marking operation as RESTORED.
+▶ ResourceForge Safety & Lifecycle Hardening Tests
+  ✔ 1. Path Containment and Safety Validation (9.067ms)
+  ✔ 2. Exclusive Write Locking (42.1533ms)
+  ✔ 3. Stale Value Verification (Concurrent Mod Protection) (4.4543ms)
+  ✔ 4. Atomic Write Integrity & Hash Validation Mismatch (15.3819ms)
+  ✔ 5. Interrupted Run (Crash Recovery) (11.1692ms)
+✔ ResourceForge Safety & Lifecycle Hardening Tests (134.694ms)
+✓ Single quotes round-trip correctly via parameter binding
+✓ SQL injection attempt safely handled by parameter binding
+✓ Special characters preserve correctly through parameter binding
+✓ Unicode characters preserved through parameter binding
+✓ Whitespace and newlines preserved through parameter binding
+✓ Update with hostile values works correctly
+✓ Delete with parameter binding and injection string works
+✓ Query with parameter binding retrieves rows correctly
+✓ Validation with parameter binding handles complex JSON
+✓ Complete create-retrieve-update-retrieve cycle successful
+▶ SQL Parameter Binding — Hostile Value Tests
+  ✔ 1. Parameter binding with single quotes in gameName (7.7134ms)
+  ✔ 2. Parameter binding with SQL-like injection strings in gameName (1.5258ms)
+  ✔ 3. Parameter binding with double quotes and special chars (1.5772ms)
+  ✔ 4. Parameter binding with Unicode characters (0.9415ms)
+  ✔ 5. Parameter binding with newlines and whitespace (0.7487ms)
+  ✔ 6. Update with parameter binding and hostile values (1.9645ms)
+  ✔ 7. Delete with parameter binding (1.7022ms)
+  ✔ 8. Query with parameter binding (getProfilesForGame) (1.2799ms)
+  ✔ 9. Validation with parameter binding (1.9055ms)
+  ✔ 10. Complete round-trip verification (1.2057ms)
+✔ SQL Parameter Binding — Hostile Value Tests (114.2663ms)
+▶ validateControl — required fields
+  ✔ returns no errors for a fully valid save_field control (0.919ms)
+  ✔ returns error when id is missing (0.1481ms)
+  ✔ returns error when label is missing (0.0981ms)
+  ✔ returns error for invalid controlType (0.0833ms)
+  ✔ returns error for invalid backend (0.0707ms)
+  ✔ returns error when save_field control missing saveField (0.07ms)
+  ✔ returns no errors for memory_write control without saveField (0.0592ms)
+  ✔ returns no errors for disabled save_field control without saveField (0.0715ms)
+✔ validateControl — required fields (2.2165ms)
+▶ isControlExecutable — execution eligibility
+  ✔ returns true for save_field + requires_approval (Money control) (0.1788ms)
+  ✔ returns true for save_field + supported (0.103ms)
+  ✔ returns false for memory_write backend (Health) (0.0742ms)
+  ✔ returns false for save_field + disabled (Resources) (0.0628ms)
+  ✔ returns false for save_field + future_feature (0.0443ms)
+  ✔ returns false for unsupported backend (0.0491ms)
+  ✔ returns false for memory_observation backend regardless of status (0.0486ms)
+✔ isControlExecutable — execution eligibility (0.7435ms)
+▶ requiresApproval
+  ✔ returns true for Money control (requires_approval) (0.0613ms)
+  ✔ returns false for a supported control (no approval gate) (0.0319ms)
+  ✔ returns false for a disabled control (0.0286ms)
+  ✔ returns false for a future_feature control (0.0287ms)
+✔ requiresApproval (0.233ms)
+▶ BACKEND_LABELS
+  ✔ has a label for every backend type (0.0793ms)
+  ✔ renders safe_field as "Save Field" (0.0301ms)
+  ✔ renders memory_write as "Memory Write" (0.0279ms)
+✔ BACKEND_LABELS (0.1904ms)
+▶ SAFETY_STATUS_LABELS
+  ✔ has a label for every safety status (0.0773ms)
+  ✔ renders requires_approval as "Requires Approval" (0.0274ms)
+  ✔ renders future_feature as "Future Feature" (0.0311ms)
+✔ SAFETY_STATUS_LABELS (0.1915ms)
+▶ buildControls — TrainerControlPanel fixture set
+  ✔ includes at least 8 controls (0.0719ms)
+  ✔ Money control is executable and requires approval (0.0446ms)
+  ✔ Stamina control is executable and requires approval (0.0455ms)
+  ✔ Farming XP control is executable and requires approval (0.0457ms)
+  ✔ all non-save_field controls are not executable (0.0595ms)
+  ✔ no memory_write control can execute (0.0682ms)
+  ✔ all controls pass schema validation (0.1227ms)
+  ✔ disabled controls are not executable (0.1096ms)
+  ✔ future_feature controls are not executable (0.07ms)
+✔ buildControls — TrainerControlPanel fixture set (0.7749ms)
+▶ TrainerHost E2E (production spawn)
+  ✔ read-only: spawn → handshake → readSaveField → unknown method → shutdown → PID gone (199.3143ms)
+  ✔ write workflow: spawn → propose → execute → verify read → rollback → verify read → shutdown → PID gone (219.8035ms)
+  ✔ propose rejects invalid path (file does not exist) (162.7293ms)
+  ✔ execute rejects invalid XML content (120.1635ms)
+✔ TrainerHost E2E (production spawn) (703.3912ms)
+▶ startHostRuntime — handshake
+  ✔ sends handshake immediately on start (1.0521ms)
+  ✔ advertises all write capabilities (0.1838ms)
+✔ startHostRuntime — handshake (1.9349ms)
+▶ startHostRuntime — unknown method
+  ✔ returns error envelope for unknown method (0.3347ms)
+✔ startHostRuntime — unknown method (0.4329ms)
+▶ startHostRuntime — shutdown
+  ✔ replies and calls exit(0) on shutdown request (0.1618ms)
+✔ startHostRuntime — shutdown (0.2426ms)
+▶ startHostRuntime — parent loss
+  ✔ exits on stdin end (0.148ms)
+  ✔ exits on stdin close (0.124ms)
+✔ startHostRuntime — parent loss (0.4024ms)
+▶ startHostRuntime — readSaveField dispatch
+  ✔ dispatches readSaveField and returns result (55.9101ms)
+  ✔ returns error for invalid params (69.634ms)
+✔ startHostRuntime — readSaveField dispatch (125.9558ms)
+▶ createTrainerHostSupervisor — start / handshake
+  ✔ returns running=false before start (0.6373ms)
+  ✔ resolves success after receiving handshake (1.5254ms)
+  ✔ returns already_running when called twice (0.5716ms)
+✔ createTrainerHostSupervisor — start / handshake (3.4448ms)
+▶ createTrainerHostSupervisor — stop
+  ✔ sends shutdown and clears running state (0.6929ms)
+✔ createTrainerHostSupervisor — stop (0.7972ms)
+▶ createTrainerHostSupervisor — approved-path gate
+  ✔ rejects readField when path is not approved (0.6696ms)
+✔ createTrainerHostSupervisor — approved-path gate (0.7548ms)
+▶ createTrainerHostSupervisor — verifyExitOrKill
+  ✔ kills a still-running child (0.594ms)
+  ✔ is a no-op when child is not running (0.179ms)
+✔ createTrainerHostSupervisor — verifyExitOrKill (0.9233ms)
+▶ encodeRequest / encodeResponse / encodeError
+  ✔ produces newline-terminated JSON (0.54ms)
+  ✔ round-trips request with params (0.5247ms)
+  ✔ round-trips response (0.1229ms)
+  ✔ round-trips error (0.0846ms)
+  ✔ omits params key when params is undefined (0.1194ms)
+✔ encodeRequest / encodeResponse / encodeError (2.0283ms)
+▶ type guards
+  ✔ isRpcRequest identifies requests (0.172ms)
+  ✔ isRpcResponse identifies ok responses (0.1008ms)
+  ✔ isRpcError identifies error responses (0.101ms)
+✔ type guards (0.5361ms)
+▶ LineFramer
+  ✔ emits message when a complete line arrives in one chunk (0.2623ms)
+  ✔ buffers partial line and emits on subsequent chunk (0.1327ms)
+  ✔ emits multiple messages from one chunk (0.1195ms)
+  ✔ emits first message and buffers remainder when chunk has partial second line (0.1269ms)
+  ✔ skips empty lines (0.0726ms)
+  ✔ accepts string input (0.0781ms)
+  ✔ throws RpcFrameError on malformed JSON (0.3488ms)
+  ✔ RpcFrameError contains the offending raw line (0.1064ms)
+  ✔ retains buffered bytes after a throw (0.0639ms)
+✔ LineFramer (1.55ms)
+▶ readSaveField
+  ✔ reads a known field from the XML fixture (3.5504ms)
+  ✔ reads a top-level string field (1.0937ms)
+  ✔ reads a nested numeric field as string (0.9763ms)
+  ✔ returns found=false for a missing field path (1.0058ms)
+  ✔ returns found=false for a nonexistent file (0.1956ms)
+  ✔ throws on invalid params (missing filePath) (0.7671ms)
+  ✔ throws on invalid params (missing field) (0.201ms)
+  ✔ throws on invalid params (null) (0.1995ms)
+  ✔ throws xml_safety error on DOCTYPE with SYSTEM reference (2.453ms)
+✔ readSaveField (11.4386ms)
+▶ proposeWriteField
+  ✔ returns valid:true when file + field + currentValue are correct (9.136ms)
+  ✔ throws file_not_found for non-existent path (0.4238ms)
+  ✔ throws value_mismatch when currentValue is wrong (1.5822ms)
+  ✔ throws field_not_found for non-existent field path (1.3405ms)
+  ✔ throws invalid_params when params are missing required keys (0.1595ms)
+  ✔ throws xml_safety on DOCTYPE content (2.7576ms)
+✔ proposeWriteField (19.4646ms)
+▶ executeWriteField
+  ✔ writes new value, returns written:true + verifiedValue + backupPath (14.1713ms)
+  ✔ backup contains the original value (0.6417ms)
+  ✔ throws value_changed_since_proposal if currentValue no longer matches (1.3271ms)
+  ✔ throws file_not_found for missing file (0.24ms)
+  ✔ throws invalid_params for missing newValue (0.1532ms)
+✔ executeWriteField (20.1456ms)
+▶ rollbackWriteField
+  ✔ restores original value, returns restored:true + verifiedValue (11.95ms)
+  ✔ file contains original value after rollback (0.3878ms)
+  ✔ throws backup_not_found when backup is missing (0.2414ms)
+  ✔ throws invalid_params when field is missing (0.175ms)
+✔ rollbackWriteField (23.9243ms)
+▶ deriveCardState — Trainer UX state machine
+  ✔ 1. READY when no transient, game closed, item ready (0.8968ms)
+  ✔ 2. GAME_RUNNING when game is open and item is otherwise ready (0.1194ms)
+  ✔ 3. BLOCKED when item risk is Blocked (0.0794ms)
+  ✔ 4. BLOCKED when status is "blocked" (case-insensitive) (0.088ms)
+  ✔ 5. BLOCKED when status is "BLOCKED" (upper) (0.1041ms)
+  ✔ 6. NEEDS_RESCAN when status is "needs rescan" (0.0654ms)
+  ✔ 7. NEEDS_RESCAN is not affected by game running (status wins) (0.0512ms)
+  ✔ 8. BROKEN when status is "broken" (0.0635ms)
+  ✔ 9. APPLYING transient takes precedence over READY (0.1233ms)
+  ✔ 10. APPLIED transient takes precedence over BLOCKED item risk (0.1715ms)
+  ✔ 11. RESTORED transient preserved (0.1333ms)
+  ✔ 12. FAILED transient preserved even when game running (0.0692ms)
+  ✔ 15. BLOCKED status beats GAME_RUNNING (0.0882ms)
+  ✔ 16. BROKEN status beats GAME_RUNNING (0.0858ms)
+  ✔ 17. Caution risk with Ready status yields READY (0.0606ms)
+  ✔ 18. Risky risk with Ready status yields READY (0.0737ms)
+✔ deriveCardState — Trainer UX state machine (3.2166ms)
+▶ STATE_CONFIG — all active states defined
+  ✔ 19. All active TrainerCardState values are in STATE_CONFIG (0.1945ms)
+  ✔ 20. Every STATE_CONFIG entry has a non-empty label (0.1058ms)
+  ✔ 21. Every STATE_CONFIG entry has a color (0.0754ms)
+  ✔ 22. READY has empty explanation (no warning needed) (0.0554ms)
+  ✔ 23. All warning states have non-empty explanation (0.056ms)
+✔ STATE_CONFIG — all active states defined (0.608ms)
+▶ TrainerItem — shape and field constraints
+  ✔ 24. makeItem produces valid TrainerItem (0.0758ms)
+  ✔ 25. inputType toggle maps to boolean control (0.0565ms)
+  ✔ 26. inputType slider requires min and max (0.0614ms)
+  ✔ 27. inputType dropdown requires options array (0.0604ms)
+  ✔ 28. Items with no path can still be valid (0.0643ms)
+  ✔ 29. Item with missing confidence still derives correct state (0.0372ms)
+✔ TrainerItem — shape and field constraints (0.4574ms)
+▶ Compatibility profile level taxonomy
+  ✔ 30. Six valid compatibility levels defined (0.07ms)
+  ✔ 31. VERIFIED is the highest tier (0.0879ms)
+  ✔ 32. BLOCKED is the lowest tier (0.0584ms)
+  ✔ 33. BLOCKED_PENDING_USER_DATA is not a valid profile level (is a dashboard note) (0.054ms)
+✔ Compatibility profile level taxonomy (0.3777ms)
+▶ lifecycle-wiring
+  ✔ LW-01: successful start records sender as owner (0.7973ms)
+  ✔ LW-02: failed start does not change ownership (0.1336ms)
+  ✔ LW-03: owner stop clears ownership (0.1155ms)
+  ✔ LW-04: owning webContents destruction stops monitoring (0.2043ms)
+  ✔ LW-05: unrelated webContents destruction does not stop monitoring (0.1583ms)
+  ✔ LW-06: window close stops monitoring (0.1486ms)
+  ✔ LW-07: app before-quit stops monitoring (0.1048ms)
+  ✔ LW-08: feature disable stops active monitoring (0.1441ms)
+  ✔ LW-09: feature disable while stopped is harmless (0.1375ms)
+  ✔ LW-10: multiple shutdown signals are idempotent (0.1909ms)
+  ✔ LW-11: createLifecycleWiring registers exactly one app listener (0.1231ms)
+  ✔ LW-12: wireWindow is idempotent per window object (0.0907ms)
+  ✔ LW-13: dispose removes before-quit listener (0.056ms)
+  ✔ LW-13b: dispose is idempotent (safe to call twice) (0.1322ms)
+  ✔ LW-13c: after dispose, app before-quit no longer stops the monitor (0.0735ms)
+  ✔ LW-14: ownership cleared after app quit (0.0464ms)
+  ✔ LW-15: same renderer can stop and restart, retaining ownership (0.0672ms)
+  ✔ LW-16: unrelated renderer cannot hijack an owned session (0.067ms)
+  ✔ LW-17: stale wc destruction cannot stop a newer owner (0.0705ms)
+  ✔ LW-18: cleanup calls monitor.stop() with a reason (0.0584ms)
+  ✔ LW-19: invalid sender is rejected without touching monitor (0.1233ms)
+  ✔ LW-20: disabled feature flag rejects start (0.053ms)
+✔ lifecycle-wiring (4.1051ms)
+▶ evaluator
+  ✔ T01 — feature disabled returns disabled state (feature flag off handled by caller) (0.7935ms)
+  ✔ T02 — game not running (0.0804ms)
+  ✔ T03 — game appears (0.131ms)
+  ✔ T04 — process identity includes pid and start time (0.0899ms)
+  ✔ T05 — PID reuse is detected (0.1045ms)
+  ✔ T06 — external marker appears (0.0853ms)
+  ✔ T07 — local listener appears (0.0796ms)
+  ✔ T08 — both sides of a local connection appear (0.1211ms)
+  ✔ T09 — external session becomes strongly observed (3 signals) (0.143ms)
+  ✔ T10 — listener disappears while marker still present (0.1584ms)
+  ✔ T11 — connection pair disappears (0.1196ms)
+  ✔ T12 — marker disappears along with endpoints (0.0847ms)
+  ✔ T13 — game remains running after session evidence disappears (0.0436ms)
+  ✔ T14 — state becomes session_ended_game_running (0.04ms)
+  ✔ T15 — game exits after session ends (0.0319ms)
+  ✔ T16 — game exits while session evidence is present (0.0323ms)
+  ✔ T17 — marker remains but process is gone (0.037ms)
+  ✔ T18 — stale marker is reported (0.0288ms)
+  ✔ T19 — permission-denied process observation returns game_not_running (0.0458ms)
+  ✔ T20 — endpoint observer unavailable still works (0.0323ms)
+  ✔ T21 — observer error on process does not crash evaluator (0.0301ms)
+✔ evaluator (3.3492ms)
+▶ timeline
+  ✔ T22 — poll cancellation — timeline starts empty (1.3404ms)
+  ✔ T23 — duplicate polling loops prevented — timeline records transitions (0.1391ms)
+  ✔ T24 — monitoring stop cleanup — clear resets timeline (0.0585ms)
+  ✔ T25 — timeline retention bound — oldest entries dropped (0.066ms)
+  ✔ T26 — diagnostic sanitization — export contains no secrets (0.0784ms)
+  ✔ T27 — no external files are modified by timeline operations (0.6936ms)
+  ✔ T28 — existing V1 functionality unaffected by V2 types import (0.0746ms)
+✔ timeline (2.5822ms)
+▶ session-monitor service
+  ✔ T-SM1 — default state is idle (0.1967ms)
+  ✔ T-SM2 — start requires executableName (0.2154ms)
+  ✔ T-SM3 — start succeeds with valid config (53.9516ms)
+  ✔ T-SM4 — second start while running returns error (25.979ms)
+  ✔ T-SM5 — stop transitions to stopped state (24.3861ms)
+  ✔ T-SM6 — clearTimeline resets entry count (21.6794ms)
+  ✔ T-SM7 — exportDiagnostics returns sanitized structure (0.189ms)
+✔ session-monitor service (126.8247ms)
+▶ lifecycle integration (mock evidence)
+  ✔ T-INT1 — full A→B→C→D→E lifecycle via evaluator (0.1371ms)
+  ✔ T-INT2 — session_ended_game_running message is correct (0.0337ms)
+  ✔ T-INT3 — verify timeline and state transitions recorded (0.0712ms)
+✔ lifecycle integration (mock evidence) (0.2975ms)
+▶ session-monitor: basic lifecycle (injected observers)
+  ✔ T-CONC1 — second start while running is rejected (0.2355ms)
+  ✔ T-CONC2 — stop sets isRunning=false and state=stopped immediately (0.1603ms)
+  ✔ T-CONC3 — start initialises state to game_not_running (0.1066ms)
+✔ session-monitor: basic lifecycle (injected observers) (0.5616ms)
+▶ session-monitor: immediate restart while old poll is unresolved
+  ✔ T-RST1 — new generation fires initial poll before old deferred resolves (9.8957ms)
+  ✔ T-RST2 — old generation result cannot overwrite new generation state (0.3801ms)
+  ✔ T-RST3 — pollInFlight is false after stop so new gen can start immediately (0.3396ms)
+✔ session-monitor: immediate restart while old poll is unresolved (10.7159ms)
+▶ session-monitor: abort signal and child-process cancellation
+  ✔ T-ABORT1 — stop() aborts the AbortSignal before awaited observers return (0.4368ms)
+  ✔ T-ABORT2 — abort signal fires on stop() even when poll is awaiting allSettled (0.3189ms)
+  ✔ T-ABORT3 — renderer destruction (stop) cancels active work (0.2479ms)
+  ✔ T-ABORT4 — app shutdown (stop) cancels active work (0.2367ms)
+✔ session-monitor: abort signal and child-process cancellation (1.3287ms)
+▶ session-monitor: partial observer failures (allSettled)
+  ✔ T-PART1 — only process observer rejects: endpoint evidence is preserved (0.4503ms)
+  ✔ T-PART2 — only endpoint observer rejects: process evidence is preserved (0.2476ms)
+  ✔ T-PART3 — both observers reject: normalized error state, no crash (0.2284ms)
+  ✔ T-PART4 — observer timeout (late rejection): result discarded cleanly (0.9433ms)
+✔ session-monitor: partial observer failures (allSettled) (2.0136ms)
+▶ session-monitor: recursive scheduling (exactly one poll per generation)
+  ✔ T-SCHED1 — next poll is scheduled after current poll completes (0.4089ms)
+  ✔ T-SCHED2 — no overlapping polls: second tick is dropped while first is in-flight (0.2765ms)
+  ✔ T-SCHED3 — stop cancels the pending next-poll timer (0.2088ms)
+  ✔ T-SCHED4 — stale generation poll from scheduler does not update state (0.2214ms)
+✔ session-monitor: recursive scheduling (exactly one poll per generation) (1.2681ms)
+ℹ tests 346
+ℹ suites 55
+ℹ pass 346
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20300.0807
+PASS: npm test
+
+============================================================
+RUNNING: npm run build:electron
+============================================================
+
+> resourceforge@1.0.0 build:electron
+> tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
+
+CLI Building entry: {"main":"electron/main.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"host-entry":"src/core/trainer-host/host-entry.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"preload":"electron/preload.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: G:\GAME TRAINER\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\GAME TRAINER\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\GAME TRAINER\tsup.config.ts
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+CJS Build start
+CLI Target: node22
+ESM Build start
+CJS dist-electron\preload.cjs     4.58 KB
+CJS dist-electron\preload.cjs.map 6.92 KB
+CJS ⚡⚡️ Build success in 23ms
+ESM dist-electron\host-entry.js     20.16 KB
+ESM dist-electron\host-entry.js.map 55.57 KB
+ESM ⚡⚡️ Build success in 26ms
+ESM dist-electron\main.js     287.40 KB
+ESM dist-electron\main.js.map 542.68 KB
+ESM ⚡⚡️ Build success in 531ms
+
+�� ResourceForge — Electron Output Verifier
+
+── Required files
+  ✅✅ PASS [1] main.js exists
+  ✅✅ PASS [2] preload.cjs exists
+  ✅✅ PASS [3] host-entry.js exists (TrainerHost child process)
+
+── No TypeScript leakage
+  ✅✅ PASS [4] main.js contains no .ts imports
+  ✅✅ PASS [5] preload.cjs contains no .ts imports
+
+── No bare relative imports
+  ✅✅ PASS [6] main.js has no bare relative imports
+  ✅✅ PASS [7] preload.cjs has no bare relative imports
+
+── No development-only paths
+  ✅✅ PASS [8] main.js does not import from .gemini
+  ✅✅ PASS [9] preload.cjs does not import from .gemini
+  ✅✅ PASS [10] main.js does not import a test runner
+
+── Security checks
+  ✅✅ PASS [11] preload.js uses contextBridge
+  ✅✅ PASS [12] preload.js uses exposeInMainWorld
+  ✅✅ PASS [13] main.js has nodeIntegration: false
+  ✅✅ PASS [14] main.js has contextIsolation: true
+  ✅✅ PASS [15] main.js has single-instance lock
+
+── Bundle sanity
+  ✅✅ PASS [16] main.js > 10 KB (not empty/stub)
+  ✅✅ PASS [17] main.js < 5 MB (not bloated)
+  ✅✅ PASS [18] preload.cjs > 100 bytes (not empty)
+  ✅✅ PASS [19] preload.cjs < 100 KB (not bloated)
+
+── Summary: 19/19 checks passed
+
+✅✅ All 19 checks passed. Electron output is verified.
+PASS: npm run build:electron
+
+============================================================
+RUNNING: npm run build
+============================================================
+
+> resourceforge@1.0.0 build
+> npm run build:vite && npm run build:electron && electron-builder
+
+
+> resourceforge@1.0.0 build:vite
+> vite build
+
+vite v8.0.16 building client environment for production...
+✓ 34 modules transformed.
+computing gzip size...
+dist-electron/dist/index.html                  1.92 kB │ gzip:  0.91 kB
+dist-electron/dist/assets/main-dVx_k9m9.css   33.50 kB │ gzip:  6.25 kB
+dist-electron/dist/assets/main-C8DBs5zT.js   291.75 kB │ gzip: 83.48 kB
+
+✓ built in 690ms
+
+> resourceforge@1.0.0 build:electron
+> tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
+
+CLI Building entry: {"main":"electron/main.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"host-entry":"src/core/trainer-host/host-entry.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"preload":"electron/preload.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: G:\GAME TRAINER\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\GAME TRAINER\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\GAME TRAINER\tsup.config.ts
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+CJS Build start
+CJS dist-electron\preload.cjs     4.58 KB
+CJS dist-electron\preload.cjs.map 6.92 KB
+CJS ⚡⚡️ Build success in 21ms
+ESM dist-electron\host-entry.js     20.16 KB
+ESM dist-electron\host-entry.js.map 55.57 KB
+ESM ⚡⚡️ Build success in 30ms
+ESM dist-electron\main.js     287.40 KB
+ESM dist-electron\main.js.map 542.68 KB
+ESM ⚡⚡️ Build success in 131ms
+
+�� ResourceForge — Electron Output Verifier
+
+── Required files
+  ✅✅ PASS [1] main.js exists
+  ✅✅ PASS [2] preload.cjs exists
+  ✅✅ PASS [3] host-entry.js exists (TrainerHost child process)
+
+── No TypeScript leakage
+  ✅✅ PASS [4] main.js contains no .ts imports
+  ✅✅ PASS [5] preload.cjs contains no .ts imports
+
+── No bare relative imports
+  ✅✅ PASS [6] main.js has no bare relative imports
+  ✅✅ PASS [7] preload.cjs has no bare relative imports
+
+── No development-only paths
+  ✅✅ PASS [8] main.js does not import from .gemini
+  ✅✅ PASS [9] preload.cjs does not import from .gemini
+  ✅✅ PASS [10] main.js does not import a test runner
+
+── Security checks
+  ✅✅ PASS [11] preload.js uses contextBridge
+  ✅✅ PASS [12] preload.js uses exposeInMainWorld
+  ✅✅ PASS [13] main.js has nodeIntegration: false
+  ✅✅ PASS [14] main.js has contextIsolation: true
+  ✅✅ PASS [15] main.js has single-instance lock
+
+── Bundle sanity
+  ✅✅ PASS [16] main.js > 10 KB (not empty/stub)
+  ✅✅ PASS [17] main.js < 5 MB (not bloated)
+  ✅✅ PASS [18] preload.cjs > 100 bytes (not empty)
+  ✅✅ PASS [19] preload.cjs < 100 KB (not bloated)
+
+── Summary: 19/19 checks passed
+
+✅✅ All 19 checks passed. Electron output is verified.
+
+  • electron-builder  version=26.15.3 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • writing effective config  file=dist\builder-effective-config.yaml
+  • executing @electron/rebuild  electronVersion=42.4.1 arch=x64 buildFromSource=false workspaceRoot=G:\GAME TRAINER pro
+jectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • preparing       moduleName=better-sqlite3 arch=x64
+  • finished        moduleName=better-sqlite3 arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=42.4.1 appOutDir=dist\win-unpacked
+  • downloading     label=electron
+    [=================================================================================================] 100% | electron
+  • downloaded electron zip extracted successfully  output=G:\GAME TRAINER\dist\win-unpacked
+  • searching for node modules  pm=npm searchDir=G:\GAME TRAINER
+  • duplicate dependency references  dependencies=["@types/react@19.2.17","once@1.4.0","once@1.4.0","pump@3.0.4","string
+_decoder@1.1.1","end-of-stream@1.4.5"]
+  • updating asar integrity executable resource  executablePath=dist\win-unpacked\ResourceForge.exe
+  • default Electron icon is used  reason=application icon is not set
+  • signing with signtool.exe  path=dist\win-unpacked\ResourceForge.exe
+  • building        target=nsis file=dist\ResourceForge Setup 1.0.0.exe archs=x64 oneClick=true perMachine=false
+  • signing with signtool.exe  path=dist\win-unpacked\resources\elevate.exe
+  • signing with signtool.exe  path=dist\ResourceForge Setup 1.0.0.__uninstaller.exe
+  • signing with signtool.exe  path=dist\ResourceForge Setup 1.0.0.exe
+  • building block map  blockMapFile=dist\ResourceForge Setup 1.0.0.exe.blockmap
+PASS: npm run build
+
+============================================================
+RUNNING: node scripts/validate-packaged-host.mjs
+============================================================
+Using host-entry: G:\GAME TRAINER\dist\win-unpacked\resources\app.asar.unpacked\dist-electron\host-entry.js
+
+�� Packaged TrainerHost — Write Workflow Validation
+
+  ✅✅ PASS  [1] handshake ok
+  ✅✅ PASS  [2] protocolVersion=1
+  ✅✅ PASS  [3] capabilities include proposeWriteField
+  ✅✅ PASS  [4] capabilities include executeWriteField
+  ✅✅ PASS  [5] capabilities include rollbackWriteField
+  ✅✅ PASS  [6] propose ok
+  ✅✅ PASS  [7] propose.valid=true
+  ✅✅ PASS  [8] propose did not mutate file
+  ✅✅ PASS  [9] execute ok
+  ✅✅ PASS  [10] execute.written=true
+  ✅✅ PASS  [11] execute.verifiedValue=12345
+  ✅✅ PASS  [12] backupPath returned
+  ✅✅ PASS  [13] backup file exists on disk
+  ✅✅ PASS  [14] backup contains original value
+  ✅✅ PASS  [15] read after write ok
+  ✅✅ PASS  [16] read returns new value
+  ✅✅ PASS  [17] rollback ok
+  ✅✅ PASS  [18] rollback.restored=true
+  ✅✅ PASS  [19] rollback.verifiedValue=5000
+  ✅✅ PASS  [20] read after rollback ok
+  ✅✅ PASS  [21] read returns original value
+  ✅✅ PASS  [22] unknown method rejected
+  ✅✅ PASS  [23] shutdown ack
+PASS: node scripts/validate-packaged-host.mjs
+
+============================================================
+RUNNING: node scripts/orphan-check.mjs
+============================================================
+Spawned PID: 37124
+Before shutdown — alive: true
+Process closed with code: 0
+PASS: PID 37124 is gone — no orphan
+PASS: node scripts/orphan-check.mjs
+
+============================================================
+RUNNING: npm run test:milestone-e
+============================================================
+
+> resourceforge@1.0.0 test:milestone-e
+> playwright test tests/milestone-e-acceptance.test.ts --config playwright.e2e.config.ts
+
+
+Running 15 tests using 1 worker
+
+  ok  1 …estone-e-acceptance.test.ts:56:1 › preflight — packaged exe exists at dist/win-unpacked/ResourceForge.exe (1ms)
+  ok  2 tests\milestone-e-acceptance.test.ts:63:1 › preflight — stardew fixture exists (1ms)
+  ok  3 …ne-e-acceptance.test.ts:122:1 › gate A — Controls panel renders in packaged app (all 6 controls present) (1.2s)
+  ok  4 …estone-e-acceptance.test.ts:170:1 › gate B — disabled and future_feature controls have no propose button (13ms)
+  ok  5 tests\milestone-e-acceptance.test.ts:190:1 › gate C — Money preload channels are present in packaged app (2ms)
+  ok  6 tests\milestone-e-acceptance.test.ts:215:1 › gate D — TrainerHost start succeeds in packaged app (139ms)
+  ok  7 tests\milestone-e-acceptance.test.ts:224:1 › gate D2 — TrainerHost can read the fixture field after start (8ms)
+  ok  8 tests\milestone-e-acceptance.test.ts:240:1 › gate E — proposeWrite validates field + returns proposalId (6ms)
+  ok  9 …stone-e-acceptance.test.ts:265:1 › gate F — approveAndWrite executes the proposal and verifies the value (14ms)
+  ok 10 tests\milestone-e-acceptance.test.ts:289:1 › gate G — companion files are untouched after write (1ms)
+  ok 11 tests\milestone-e-acceptance.test.ts:299:1 › gate H — rollback returns verifiedValue = 5000 (8ms)
+  ok 12 tests\milestone-e-acceptance.test.ts:320:1 › gate I — file reverted to original content after rollback (1ms)
+  ok 13 tests\milestone-e-acceptance.test.ts:328:1 › gate J — packaged host entry resolves to app.asar.unpacked (3ms)
+  ok 14 tests\milestone-e-acceptance.test.ts:344:1 › gate K — TrainerHost stops cleanly with no orphan process (806ms)
+  ok 15 …ts\milestone-e-acceptance.test.ts:379:1 › final — zero uncaught renderer errors throughout acceptance run (0ms)
+
+  15 passed (3.4s)
+
+To open last HTML report run:
+
+  npx playwright show-report
+PASS: npm run test:milestone-e
+
+============================================================
+PROFILE CONTENT CHECKS
+============================================================
+OK profile contains: SaveGame.player.0.money
+OK profile contains: SaveGame.player.0.stamina.0.float.0
+OK profile contains: SaveGame.player.0.experiencePoints.0.int.0
+OK profile contains: Money
+OK profile contains: Stamina
+OK profile contains: Farming XP
+OK profile contains: God Mode
+OK profile contains: Aim Assist
+
+============================================================
+SPAWN FIX CHECK
+============================================================
+OK host-supervisor contains: process.execPath
+OK host-supervisor contains: shell: false
+OK host-supervisor contains: ELECTRON_RUN_AS_NODE
+OK host-supervisor contains: app.asar.unpacked
+
+============================================================
+PACKAGED HOST FILE CHECK
+============================================================
+OK packaged host exists: dist\win-unpacked\resources\app.asar.unpacked\dist-electron\host-entry.js
+
+============================================================
+MILESTONE H GATES PASSED
+============================================================
+FINAL_STATUS=ACCEPTED
+REPORT_PATH=Docs\Reports\MILESTONE_H_GATE_2026-06-27T07-23-31.txt
+**********************
+Windows PowerShell transcript end
+End time: 20260627072448
+**********************
