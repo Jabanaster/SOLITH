@@ -17,6 +17,31 @@ Compatibility profiles record how well ResourceForge works with a specific game'
 
 `BLOCKED_PENDING_USER_DATA` is not a profile level — it is a dashboard display note indicating no real-world pilot data has been submitted yet.
 
+## Narrow profile: Drill Core `settings.json`
+
+The first writable real-world pilot uses a deliberately narrow profile:
+
+```text
+Game:                     Drill Core
+Developer:                Hungry Couch
+Tested executable version: 1.0.0.0
+Configuration path:       %LOCALAPPDATA%\Drill_Core\settings.json
+Format:                   UTF-8 JSON without BOM (single-line)
+Supported adapter:        drill-core-settings@1.0.0
+Supported target:         master_volume
+Supported range:          0–100
+Evidence tier:            REAL_WORLD_SANDBOX
+Live-file writing:        Not authorized
+Limitation:               Validated only for the tested Drill Core settings
+                          structure and the master_volume target.
+```
+
+The `drill-core-settings` adapter is byte-preserving: it replaces only the
+`master_volume` numeric token and keeps GameMaker's `N.0` real-number style and
+single-line layout intact, rather than reserializing the whole document. It is
+not a generic JSON editor — every other filename, target, type, bound, or
+malformed input is rejected.
+
 ## Evidence Tiers
 
 Evidence quality governs which gates a profile can satisfy:

@@ -2,6 +2,42 @@
 
 This log records the commands run during baseline validation and final milestone verification.
 
+## 2026-06-25 — Drill Core `master_volume` writable sandbox pilot
+
+Repository precheck (branch `feature/v1-writable-real-world-pilot`, clean tree,
+HEAD = master = origin/master = `2642a23`, no `v0.3.0` tag). Verified prior
+`settings.json` intake evidence (719 bytes, UTF-8 no BOM, strict parse OK,
+semantic round-trip MATCH, original unmodified). Local cosmetic evidence timestamp
+to use: `$EvidenceTimestamp = (Get-Date).ToString("o")`.
+
+```powershell
+# Sandbox runs (local, ignored runner using the production adapter)
+npx tsx .local-pilot-data/sandbox-run.ts   # run-01 + run-02: all assertions PASS
+
+# Verification (all PASS)
+npx tsc --noEmit
+npm test                      # 132/132 (incl. 24 new adapter tests)
+npm test                      # 132/132 (idempotent)
+npm run test:drill-core       # 24/24
+npm run build:vite
+npm run build:electron        # output verifier 18/18
+npm run test:electron-smoke   # 6/6
+npm run test:electron-e2e     # 4/4
+npm run test:ipc-channels     # 13/13
+npm run test:trainer-states   # 15/15
+npm run test:trainer-e2e      # 5/5
+npm run test:browser-fallback # 7/7
+npm run test:performance      # 12/12
+npm run test:accessibility    # 7/7 (no worker crash this run)
+npm run test:pilot-intake     # 10/10
+npm run dist                  # electron-builder OK
+npm run test:packaged-smoke   # 22/22
+git diff --check              # only benign LF/CRLF notices
+```
+
+Result: `READY FOR IN-GAME VALIDATION — Drill Core master_volume sandbox workflow passed`.
+Live original modified: No. Real pilot data committed: No. `v0.3.0` not created/pushed.
+
 ## 2026-06-25 — KI-013 + accessibility + dead-script cleanup
 
 Executed baseline and post-change verification command sets (using actual package scripts):

@@ -1,14 +1,16 @@
 # Next Actions
 
-**Updated:** 2026-06-24 — Atomfall real-world read-only compatibility result
+**Updated:** 2026-06-25 — Drill Core `master_volume` writable sandbox pilot passed
 
-## Blocked — Waiting for User
+## Waiting for User — in-game validation authorization
 
 - [x] Record Atomfall 1.23.105.0 Xbox as `REAL_WORLD_SANDBOX / READ_ONLY`; source-copy hashes matched and the original remained unchanged.
-- [ ] **Outcome C: writable real-world compatibility pilot** — Select a second, normal Windows PC game with a deterministic structured local save. Prefer JSON, INI, XML, CSV, text, or safely supported unencrypted SQLite under Documents, Saved Games, or AppData. Avoid Xbox containers.
+- [x] **Outcome C: writable real-world sandbox pilot** — Drill Core `settings.json` → `master_volume` passed parse → backup → sandbox apply → validation → exact restore across two independent runs with byte preservation and live-original integrity.
+- [ ] **Authorize live in-game validation** — With explicit approval, apply `master_volume` to the live `%LOCALAPPDATA%\Drill_Core\settings.json` (after verified backup), launch Drill Core, confirm the slider reflects the change, then restore from backup and verify exact SHA-256 equality.
+- [ ] **`v0.3.0` release gate** — Do not create or push `v0.3.0` until the user explicitly approves after merge.
 
-The milestone remains blocked until the second candidate passes parse → safe round-trip →
-candidate confirmation → backup → sandbox apply → validation → restore → two-run hash repeatability.
+The complete writable real-world pilot is **not** accepted until live in-game
+loading and restoration are authorized and verified.
 
 ## Short-term (unblocked, no user data needed)
 

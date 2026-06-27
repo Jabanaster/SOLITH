@@ -8,7 +8,8 @@ export function getSettings(): Settings {
     'onboardingCompleted', 'aiProvider', 'aiEndpoint', 'aiModel',
     'scanSizeLimitMB', 'backupMode', 'backupLocation', 'backupRetentionCount',
     'theme', 'safetyAcknowledged', 'externalSaveScanEnabled',
-    'v2LiveModeEnabled', 'v2HotkeysEnabled', 'v2OverlayEnabled'
+    'v2LiveModeEnabled', 'v2HotkeysEnabled', 'v2OverlayEnabled',
+    'v2SessionMonitorEnabled'
   ];
   
   keys.forEach(key => {
@@ -37,7 +38,8 @@ export function getSettings(): Settings {
     externalSaveScanEnabled: settings.externalSaveScanEnabled ?? false,
     v2LiveModeEnabled: settings.v2LiveModeEnabled ?? false,
     v2HotkeysEnabled: settings.v2HotkeysEnabled ?? false,
-    v2OverlayEnabled: settings.v2OverlayEnabled ?? false
+    v2OverlayEnabled: settings.v2OverlayEnabled ?? false,
+    v2SessionMonitorEnabled: settings.v2SessionMonitorEnabled ?? false
   };
 }
 

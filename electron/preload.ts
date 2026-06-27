@@ -42,4 +42,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Compatibility profiles
   getCompatibilityProfile: (gameId: string) => ipcRenderer.invoke('get-compatibility-profile', gameId),
   getAllProfiles: () => ipcRenderer.invoke('get-all-profiles'),
+
+  // V2 Session Lifecycle Monitor (read-only, disabled by default)
+  v2MonitorStart: (payload: { gameId: string; executableName: string; markerFilePath?: string; pollIntervalMs?: number }) =>
+    ipcRenderer.invoke('v2-monitor-start', payload),
+  v2MonitorStop: () => ipcRenderer.invoke('v2-monitor-stop'),
+  v2MonitorGetState: () => ipcRenderer.invoke('v2-monitor-get-state'),
+  v2MonitorClearTimeline: () => ipcRenderer.invoke('v2-monitor-clear-timeline'),
+  v2MonitorExportDiagnostics: () => ipcRenderer.invoke('v2-monitor-export-diagnostics'),
 });
