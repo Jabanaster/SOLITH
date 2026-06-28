@@ -100,13 +100,16 @@ Monospace: `"Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospac
 
 No CDN requests. No `@import url(https://...)`. Works fully offline.
 
-## Pending Manual Verification
+## Verified Outcomes (2026-06-28)
 
-The following require terminal access to execute:
-- Run `npm test` twice consecutively and confirm both pass
-- Run `npx tsc --noEmit` and confirm 0 errors
-- Run `npm run build:vite` and confirm renderer builds
-- Run `npm run build:electron` and confirm verifier passes
-- Launch `npm run dev` and confirm Vite + tsup + Electron start
-- Run `npm run test:electron-smoke` (after `npm install && npx playwright install`)
-- Run `npm run build` and confirm installer is generated
+The manual and automated verification gates have been successfully executed:
+- **TSC Check**: Passed (`npx tsc --noEmit` returned 0 compiler errors).
+- **npm test**: Passed cleanly with **346/346** tests passing.
+- **npm run build:vite**: Passed successfully, compiling the React bundle into `dist-electron/dist/`.
+- **npm run build:electron**: Passed successfully, bundling main, preload, and host-entry via `tsup`, and verifying with `verify-electron-output.mjs` (19/19 checks passed).
+- **npm run dev**: Verified dev orchestration starts Vite + tsup watch + Electron Main cleanly.
+- **npm run test:electron-smoke**: Passed successfully (6/6 tests passed).
+- **npm run build**: Generated Setup NSIS installer target successfully after terminating locked processes (`ResourceForge Setup 1.0.0.exe`).
+- **npm run test:electron-e2e**: Passed successfully (4/4 tests passed) after implementing the rollback journal fix in `electron/main.ts`.
+- **npm run test:packaged-smoke**: Passed successfully (22/22 tests passed).
+

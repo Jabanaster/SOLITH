@@ -37,15 +37,14 @@ npm run test:browser-fallback  # 7 tests — all 7 guarded pages without electro
 ## Gate Sequence to Run Before Any New Milestone Acceptance
 
 ```powershell
-npm test                         # 109 unit tests (includes pilot-intake)
+npm test                         # 346 unit/integration tests
 npx tsc --noEmit
 npm run build:vite
-npm run build:electron           # output verifier 18/18
+npm run build:electron           # output verifier 19/19
 npm run test:electron-smoke      # Gate 10, 6/6
 npm run test:electron-e2e        # Gate 13, 4/4
-npm run test:trainer-e2e         # 5/5
 npm run dist:dir
-npm run test:packaged-smoke      # Gate 18, 20/20
+npm run test:packaged-smoke      # Gate 18, 22/22
 ```
 
 All must pass before declaring a milestone ACCEPTED. Outcome C remains BLOCKED until Tier 1 real-world save evidence is collected.

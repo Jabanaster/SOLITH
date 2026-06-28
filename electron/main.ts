@@ -369,9 +369,30 @@ ipcMain.handle('restore-backup', async (event, backupId: string) => {
     const parsed = RestoreBackupSchema.parse({ backupId });
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
+    const dbInstance = dbModule.default;
+    
+    // Retrieve backup details before restore to log to the journal
+    const backupRow = dbInstance.prepare('SELECT gameId, recipeId, metadata FROM backups WHERE id = ?').get(parsed.backupId);
     
     const backupsModule = await import('../src/core/backups/index.js');
     const success = backupsModule.restoreBackupById(parsed.backupId);
+    
+    if (success && backupRow) {
+      const journalModule = await import('../src/core/journal/index.js');
+      const metadata = JSON.parse(backupRow.metadata || '{}');
+      journalModule.logEvent({
+        gameId: backupRow.gameId || undefined,
+        recipeId: backupRow.recipeId || undefined,
+        type: 'rollback',
+        description: `Restored backup: ${path.basename(metadata.filePath || '')}`,
+        details: JSON.stringify({
+          backupId: parsed.backupId,
+          filePath: metadata.filePath,
+          originalHash: metadata.originalHash
+        })
+      });
+    }
+    
     return { success };
   } catch (error) {
     console.error('restore-backup error:', error);

@@ -2,6 +2,53 @@
 
 This log records the commands run during baseline validation and final milestone verification.
 
+## 2026-06-28 — Electron Runtime, Build Pipeline & Complete Workflow Verification
+
+Executed complete baseline and post-change verification command sets to prove that ResourceForge works as a real Electron application, using tsup bundler, strict local-only CSP, system font fallbacks, single-instance dev safeguards, and Playwright verification tests.
+
+### Verification Sequence:
+```powershell
+# 1. Baseline status checks (branch: master, HEAD: e11d95e)
+git rev-parse --show-toplevel; git status --short; git branch --show-current; git log --oneline -5
+
+# 2. TypeScript compilation (zero errors)
+npx tsc --noEmit
+
+# 3. Main core tests (346/346 tests passed)
+npm test
+
+# 4. Compile main, preload, and host-entry (tsup bundler)
+npm run build:electron
+
+# 5. Output Verification Check (19/19 checks passed)
+node scripts/verify-electron-output.mjs
+
+# 6. Production frontend Vite build
+npm run build:vite
+
+# 7. Package distribution build (after terminating locked background ResourceForge instances)
+npm run build
+
+# 8. Playwright Electron window smoke checks (6/6 passed)
+npm run test:electron-smoke
+
+# 9. Playwright Electron full E2E workflow checks (4/4 passed - after rollback journal fix)
+npm run test:electron-e2e
+
+# 10. Playwright Packaged Installer verification (22/22 passed)
+npm run test:packaged-smoke
+```
+
+### Observed Verification Results:
+- `npm test` pass count: **346/346**
+- `npx tsc --noEmit`: **0 errors**
+- `build:electron` output verifier: **19/19**
+- `test:electron-smoke`: **6/6**
+- `test:electron-e2e`: **4/4**
+- `test:packaged-smoke`: **22/22**
+
+---
+
 ## 2026-06-25 — Drill Core `master_volume` writable sandbox pilot
 
 Repository precheck (branch `feature/v1-writable-real-world-pilot`, clean tree,

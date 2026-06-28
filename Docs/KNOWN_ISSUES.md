@@ -70,3 +70,7 @@ repacking, apply, and restore are prohibited.
 2. **Offline AI Connection**: If local AI services (Ollama/LM Studio) are not running, rule-based fallback explanations are used.
 3. **Reparse Points/Junction Escapes**: Symbolic links and junctions at the target path are actively detected and rejected, but testing of complex Windows volume mount points depends on native OS permissions.
 4. **Real-World Compatibility**: Atomfall has `REAL_WORLD_SANDBOX` read-only evidence. No writable real-game pilot has passed; fixture evidence remains the only apply/restore evidence.
+
+## Transitional Technical Debt
+- **tsup configuration for CJS preload**: While the main process compiles as native ES module (`main.js`), the Electron preload script compiles to CommonJS (`preload.cjs`) to align with Electron context isolation guidelines. All preload references inside `main.ts` map to `preload.cjs` accordingly.
+- **Better-SQLite3 packaging**: Because of binary linkage, `better-sqlite3` and `sql.js` are configured under `asarUnpack` in the `build` parameters in `package.json`.

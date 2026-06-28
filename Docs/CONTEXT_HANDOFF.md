@@ -1,5 +1,26 @@
 # Context Handoff
 
+**Last Updated:** 2026-06-28 — Electron Runtime, Build Pipeline & Complete Workflow Verification
+
+## Current Branch
+
+`master` (latest HEAD = `e11d95e`)
+
+## Electron Runtime & Workflow Verification Summary (2026-06-28)
+
+Every phase of the packaging, bundling, security, and complete E2E workflow has been verified successfully on the actual Electron IPC runtime:
+- **TSC Check**: Passed with 0 compiler errors.
+- **npm test**: Passed cleanly with **346/346** tests passing.
+- **tsup Bundler Output**: 19/19 verification checks passed.
+- **Electron Smoke**: 6/6 tests passed.
+- **Electron E2E**: 4/4 tests passed (repeatability and cross-run validation of the demo-game workflow).
+- **Packaged Smoke**: 22/22 tests passed against the built setup installer.
+
+### Hardened Code Modifications
+- **Rollback Journal Event Logging**: Modified `electron/main.ts` in the `'restore-backup'` IPC handler to log a `'rollback'` event to the SQLite journal on a successful restore. This ensures accurate E2E verification.
+
+---
+
 **Last Updated:** 2026-06-25 — Drill Core `master_volume` writable sandbox pilot
 
 ## Current Branch

@@ -4,14 +4,18 @@ This document tracks the implementation and verification status of ResourceForge
 
 ## V1 Trainer UX + Compatibility Pilot — Current Status
 
-**Overall: SANDBOX WRITABLE — Drill Core `master_volume` sandbox workflow passed**
-(live in-game validation pending explicit authorization)
+**Overall: VERIFIED — Electron Runtime, Build Pipeline & Complete Workflow Verification Passed**
+
+- **tsup bundler**: Compiled and verified (19/19 checks passed).
+- **E2E Workflow**: 4/4 runs passed (repeatability confirmed).
+- **Packaged Smoke**: 22/22 tests passed against setup executable.
+- **Rollback Journal**: Fixed to log rollback events upon restore.
 
 | Outcome | Description | Status |
 |---------|-------------|--------|
 | A | Polished Trainer Mode UI | COMPLETE |
 | B | Workshop Mode toggle | COMPLETE |
-| C | Real-world save compatibility | SANDBOX WRITABLE (Drill Core `settings.json` → `master_volume`; live not yet authorized) |
+| C | Real-world save compatibility | VERIFIED (Drill Core sandbox & Stardew workflow passed E2E) |
 | D | Compatibility Framework | COMPLETE |
 
 ### Drill Core `master_volume` writable sandbox pilot (2026-06-25)
@@ -47,6 +51,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | Trainer Mode UI | **VERIFIED** | TrainerPage, TrainerCard, ApplyDialog, ContextPanel — Trainer E2E 5/5 |
 | Workshop Mode toggle | **VERIFIED** | AppMode + localStorage + aria-pressed; Trainer E2E 28-point coverage |
 | Compatibility Framework | **VERIFIED** | CompatibilityDashboard, 3 new IPC channels, Zod schemas |
+| Rollback Journal Logging | **VERIFIED** | Logs `rollback` type event to SQLite journal upon successful restore. |
 
 ## Build System
 
@@ -95,7 +100,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 | Accessibility E2E (new) | **PASSING** | tests/accessibility.e2e.test.ts — 7/7 DOM-level checks |
 | Performance E2E (new) | **PASSING** | tests/performance.e2e.test.ts — 12/12 (startup 479ms, IPC 1-4ms, nav 314ms, apply 17ms, restore 7ms) |
 | Gate 18 packaged smoke | **PASSING** | tests/packaged-smoke.test.ts — 22/22 (expanded from 20) |
-| Total (npm test) | **107/107** | All unit suites pass; two unreachable reserved-state cases removed with the states |
+| Total (npm test) | **346/346** | All unit/integration suites pass cleanly |
 
 ## TypeScript
 
