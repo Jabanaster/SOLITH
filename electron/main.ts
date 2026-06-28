@@ -36,7 +36,8 @@ import {
   TrainerHostProposeWriteSchema,
   TrainerHostApproveAndWriteSchema,
   TrainerHostRollbackSchema,
-  validateIpcPathSafety
+  validateIpcPathSafety,
+  validateSaveDataFileAccess
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 
@@ -423,15 +424,14 @@ ipcMain.handle('detect-save-files', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('parse-save', async (event, filePath: string) => {
+ipcMain.handle('parse-save', async (event, gameId: string, filePath: string) => {
   try {
-    const parsedInput = ParseSaveSchema.parse({ filePath });
+    const parsedInput = ParseSaveSchema.parse({ gameId, filePath });
     
-    const safetyModule = await import('../src/core/safety/path-safety.js');
-    const safety = safetyModule.validatePathSafety(parsedInput.filePath);
+    const safety = validateSaveDataFileAccess(parsedInput.gameId, parsedInput.filePath);
     if (!safety.safe) {
-      console.error(`parse-save blocked: ${safety.reason}`);
-      return null;
+      console.error('parse-save blocked: file is not approved for this game.');
+      return { error: safety.error || 'File is not approved for this game.' };
     }
 
     const dbModule = await import('../src/core/database/index.js');
@@ -457,12 +457,11 @@ ipcMain.handle('compare-saves', async (event, savePathA: string, savePathB: stri
   try {
     const parsed = CompareSavesSchema.parse({ savePathA, savePathB, gameId, knownOldValue, knownNewValue });
     
-    const safetyModule = await import('../src/core/safety/path-safety.js');
-    const safetyA = safetyModule.validatePathSafety(parsed.savePathA);
-    const safetyB = safetyModule.validatePathSafety(parsed.savePathB);
+    const safetyA = validateSaveDataFileAccess(parsed.gameId, parsed.savePathA);
+    const safetyB = validateSaveDataFileAccess(parsed.gameId, parsed.savePathB);
     if (!safetyA.safe || !safetyB.safe) {
-      console.error(`compare-saves blocked: A=${safetyA.reason}, B=${safetyB.reason}`);
-      return [];
+      console.error('compare-saves blocked: one or more files are not approved for this game.');
+      return { error: 'One or more files are not approved for this game.' };
     }
 
     const dbModule = await import('../src/core/database/index.js');
@@ -534,15 +533,14 @@ ipcMain.handle('apply-proposal', async (event, proposal: any) => {
   }
 });
 
-ipcMain.handle('suggest-data-edits', async (event, filePath: string) => {
+ipcMain.handle('suggest-data-edits', async (event, gameId: string, filePath: string) => {
   try {
-    const parsed = SuggestDataEditsSchema.parse({ filePath });
+    const parsed = SuggestDataEditsSchema.parse({ gameId, filePath });
     
-    const safetyModule = await import('../src/core/safety/path-safety.js');
-    const safety = safetyModule.validatePathSafety(parsed.filePath);
+    const safety = validateSaveDataFileAccess(parsed.gameId, parsed.filePath);
     if (!safety.safe) {
-      console.error(`suggest-data-edits blocked: ${safety.reason}`);
-      return [];
+      console.error('suggest-data-edits blocked: file is not approved for this game.');
+      return { error: safety.error || 'File is not approved for this game.' };
     }
 
     const dbModule = await import('../src/core/database/index.js');

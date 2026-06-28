@@ -25,11 +25,11 @@ interface Window {
     restoreBackup: (backupId: string) => Promise<any>;
     // Saves & Discovery
     detectSaveFiles: (gameId: string) => Promise<any[]>;
-    parseSave: (filePath: string) => Promise<any>;
-    compareSaves: (a: string, b: string, gameId?: string, old?: any, nw?: any) => Promise<any[]>;
+    parseSave: (gameId: string, filePath: string) => Promise<any>;
+    compareSaves: (a: string, b: string, gameId: string, old?: any, nw?: any) => Promise<any[] | { error: string }>;
     createProposalForEdit: (gameId: string, filePath: string, path: string, oldValue: any, newValue: any, recipeId?: string) => Promise<any>;
     applyProposal: (proposal: any) => Promise<any>;
-    suggestDataEdits: (filePath: string) => Promise<any[]>;
+    suggestDataEdits: (gameId: string, filePath: string) => Promise<any[] | { error: string }>;
     discoverSaveLocations: (gameId: string) => Promise<any[]>;
     getSaveLocations: (gameId: string) => Promise<any[]>;
     approveSaveLocation: (locationId: string) => Promise<any>;

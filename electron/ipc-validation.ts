@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
-import { validatePathSafety } from '../src/core/safety/path-safety.js';
+import { isContainedWithin, validatePathSafety } from '../src/core/safety/path-safety.js';
 import { getGameById } from '../src/core/games/index.js';
 import { isPathApproved } from '../src/core/saves/locations.js';
 
@@ -121,13 +121,14 @@ export const DetectSaveFilesSchema = z.object({
 });
 
 export const ParseSaveSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
   filePath: z.string().min(1)
 });
 
 export const CompareSavesSchema = z.object({
   savePathA: z.string().min(1),
   savePathB: z.string().min(1),
-  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')).optional(),
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
   knownOldValue: z.any().optional(),
   knownNewValue: z.any().optional()
 });
@@ -160,6 +161,7 @@ export const ApplyProposalSchema = z.object({
 });
 
 export const SuggestDataEditsSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
   filePath: z.string().min(1)
 });
 
@@ -253,5 +255,44 @@ export function validateIpcPathSafety(filePath: string, gameId: string): boolean
     return isPathApproved(filePath, gameId);
   } catch {
     return false;
+  }
+}
+
+export interface IpcFileAccessResult {
+  safe: boolean;
+  error?: string;
+}
+
+const UNAPPROVED_FILE_ERROR = 'File is not approved for this game.';
+const DEMO_GAME_ID = 'demo-game-quest-id-000000000000';
+
+function isApprovedDemoGameFile(gameId: string, filePath: string): boolean {
+  if (gameId !== DEMO_GAME_ID) return false;
+  const demoRoot = path.resolve(process.cwd(), 'demo-game');
+  return fs.existsSync(demoRoot) && isContainedWithin(filePath, demoRoot);
+}
+
+/**
+ * Validates save/data IPC file access against registered game roots or approved
+ * save locations. The error is intentionally generic to avoid path disclosure.
+ */
+export function validateSaveDataFileAccess(gameId: string, filePath: string): IpcFileAccessResult {
+  try {
+    if (!gameId || !filePath) {
+      return { safe: false, error: UNAPPROVED_FILE_ERROR };
+    }
+
+    const safety = validatePathSafety(filePath);
+    if (!safety.safe && !isApprovedDemoGameFile(gameId, filePath)) {
+      return { safe: false, error: UNAPPROVED_FILE_ERROR };
+    }
+
+    if (!isApprovedDemoGameFile(gameId, filePath) && !isPathApproved(filePath, gameId)) {
+      return { safe: false, error: UNAPPROVED_FILE_ERROR };
+    }
+
+    return { safe: true };
+  } catch {
+    return { safe: false, error: UNAPPROVED_FILE_ERROR };
   }
 }

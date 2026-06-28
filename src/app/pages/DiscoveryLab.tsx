@@ -69,14 +69,14 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   };
 
   const handleCompare = async () => {
-    if (!saveA || !saveB || !window.electronAPI) return;
+    if (!saveA || !saveB || !gameId || !window.electronAPI) return;
     setComparing(true);
     try {
       const valA = knownValueA.trim() !== '' ? (isNaN(Number(knownValueA)) ? knownValueA : Number(knownValueA)) : undefined;
       const valB = knownValueB.trim() !== '' ? (isNaN(Number(knownValueB)) ? knownValueB : Number(knownValueB)) : undefined;
 
-      const results = await window.electronAPI.compareSaves(saveA, saveB, gameId || undefined, valA, valB);
-      setCandidates(results || []);
+      const results = await window.electronAPI.compareSaves(saveA, saveB, gameId, valA, valB);
+      setCandidates(Array.isArray(results) ? results : []);
       setActiveStep(3); // Go to step 3 on comparison success
     } catch (err) {
       console.error('Compare failed:', err);

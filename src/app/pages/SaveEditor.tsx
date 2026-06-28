@@ -63,7 +63,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI || !gameId) return;
     const filePath = e.target.value;
     setSelectedFile(filePath);
     if (!filePath) {
@@ -74,14 +74,14 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
 
     setLoading(true);
     try {
-      const res = await window.electronAPI.parseSave(filePath);
-      if (res) {
+      const res = await window.electronAPI.parseSave(gameId, filePath);
+      if (res && !res.error) {
         setFields(res.values || []);
         
         // Fetch suggestions if in data mode
         if (mode === 'data') {
-          const sug = await window.electronAPI.suggestDataEdits(filePath);
-          setSuggestions(sug || []);
+          const sug = await window.electronAPI.suggestDataEdits(gameId, filePath);
+          setSuggestions(Array.isArray(sug) ? sug : []);
         } else {
           setSuggestions([]);
         }
