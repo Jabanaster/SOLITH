@@ -181,9 +181,24 @@ describe('rollbackWriteField', () => {
   });
 
   test('throws backup_not_found when backup is missing', async () => {
+    const missingTmp = makeTmp('-rollback-missing');
+    fs.copyFileSync(FIXTURE, missingTmp);
+    try {
+      await assert.rejects(
+        () => rollbackWriteField({ filePath: missingTmp, backupPath: missingTmp + '.trainer-backup', field: FIELD }),
+        /backup_not_found/,
+      );
+    } finally {
+      for (const p of [missingTmp, missingTmp + '.trainer-restore-tmp']) {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
+    }
+  });
+
+  test('throws backup_path_invalid for an arbitrary backup path', async () => {
     await assert.rejects(
-      () => rollbackWriteField({ filePath: tmp, backupPath: '/no/backup.xml', field: FIELD }),
-      /backup_not_found/,
+      () => rollbackWriteField({ filePath: tmp, backupPath: path.join(os.tmpdir(), 'not-owned-backup.xml'), field: FIELD }),
+      /backup_path_invalid/,
     );
   });
 

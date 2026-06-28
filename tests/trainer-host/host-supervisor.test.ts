@@ -1,7 +1,12 @@
 import { describe, test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createTrainerHostSupervisor, ChildProcessLike } from '../../src/core/trainer-host/host-supervisor.js';
 import { encodeResponse } from '../../src/core/trainer-host/protocol.js';
+import { initDatabase } from '../../src/core/database/index.js';
+import { addGame } from '../../src/core/games/index.js';
 
 // ── Fake child process ────────────────────────────────────────────────────────
 
@@ -110,6 +115,117 @@ describe('createTrainerHostSupervisor — approved-path gate', () => {
     const result = await sup.readField('demo-game-quest-id-000000000000', '/etc/passwd', 'root');
     assert.equal(result.success, false);
     assert.equal(result.error, 'path_not_approved');
+  });
+});
+
+describe('createTrainerHostSupervisor — rollback backup ownership gate', () => {
+  async function createOwnedBackupScenario() {
+    await initDatabase();
+
+    const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-host-rollback-'));
+    const gameDir = path.join(testRoot, 'game');
+    fs.mkdirSync(gameDir, { recursive: true });
+    const targetFile = path.join(gameDir, 'save.xml');
+    const otherTargetFile = path.join(gameDir, 'other-save.xml');
+    const backupPath = targetFile + '.trainer-backup';
+    fs.writeFileSync(targetFile, '<SaveGame><player><money>5000</money></player></SaveGame>', 'utf-8');
+    fs.writeFileSync(otherTargetFile, '<SaveGame><player><money>100</money></player></SaveGame>', 'utf-8');
+
+    const game = addGame({ name: `Rollback Ownership ${Date.now()}`, path: gameDir, engine: 'Test' });
+    const { proc, writtenLines } = makeFakeChild(process.pid);
+    const sup = createTrainerHostSupervisor(() => proc as any);
+    const startP = sup.start();
+    proc.triggerData(encodeResponse('handshake', { protocolVersion: 1, capabilities: ['proposeWriteField', 'executeWriteField', 'rollbackWriteField'] }));
+    await startP;
+
+    const proposeP = sup.proposeWrite(game.id, targetFile, 'SaveGame.player.0.money', '5000', '9999');
+    let line = writtenLines().find(l => l.includes('"proposeWriteField"'));
+    assert.ok(line, 'proposeWrite must send child RPC');
+    proc.triggerData(encodeResponse(JSON.parse(line.trim()).id, { valid: true }));
+    const proposeResult = await proposeP;
+    assert.equal(proposeResult.success, true);
+    assert.ok(proposeResult.proposalId);
+
+    const approveP = sup.approveAndWrite(proposeResult.proposalId);
+    line = writtenLines().find(l => l.includes('"executeWriteField"'));
+    assert.ok(line, 'approveAndWrite must send child RPC');
+    proc.triggerData(encodeResponse(JSON.parse(line.trim()).id, {
+      written: true,
+      verifiedValue: '9999',
+      backupPath,
+    }));
+    const approveResult = await approveP;
+    assert.equal(approveResult.success, true);
+    assert.equal(approveResult.backupPath, backupPath);
+
+    return { testRoot, game, sup, proc, writtenLines, targetFile, otherTargetFile, backupPath };
+  }
+
+  test('rejects rollback when backupPath was not created for the approved target', async () => {
+    await initDatabase();
+
+    const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-host-rollback-'));
+    const gameDir = path.join(testRoot, 'game');
+    fs.mkdirSync(gameDir, { recursive: true });
+    const targetFile = path.join(gameDir, 'save.xml');
+    const hostileBackupPath = path.join(testRoot, 'hostile-backup.xml');
+    fs.writeFileSync(targetFile, '<SaveGame><player><money>5000</money></player></SaveGame>', 'utf-8');
+    fs.writeFileSync(hostileBackupPath, '<SaveGame><player><money>999999</money></player></SaveGame>', 'utf-8');
+
+    try {
+      const game = addGame({ name: `Rollback Ownership ${Date.now()}`, path: gameDir, engine: 'Test' });
+      const { proc, writtenLines } = makeFakeChild(process.pid);
+      const sup = createTrainerHostSupervisor(() => proc as any);
+      const startP = sup.start();
+      proc.triggerData(encodeResponse('handshake', { protocolVersion: 1, capabilities: ['rollbackWriteField'] }));
+      await startP;
+
+      const rollbackP = sup.rollback(targetFile, hostileBackupPath, 'SaveGame.player.0.money', game.id);
+
+      const rollbackLine = writtenLines().find(l => l.includes('"rollbackWriteField"'));
+      if (rollbackLine) {
+        const id = JSON.parse(rollbackLine.trim()).id;
+        proc.triggerData(encodeResponse(id, { restored: true, verifiedValue: '999999' }));
+      }
+
+      const result = await rollbackP;
+      assert.equal(result.success, false);
+      assert.equal(result.error, 'backup_not_owned');
+      assert.equal(rollbackLine, undefined, 'unowned backup rollback must be rejected before child RPC');
+    } finally {
+      fs.rmSync(testRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects rollback when owned backup belongs to a different target', async () => {
+    const ctx = await createOwnedBackupScenario();
+    try {
+      const beforeCount = ctx.writtenLines().filter(l => l.includes('"rollbackWriteField"')).length;
+      const result = await ctx.sup.rollback(ctx.otherTargetFile, ctx.backupPath, 'SaveGame.player.0.money', ctx.game.id);
+      const afterCount = ctx.writtenLines().filter(l => l.includes('"rollbackWriteField"')).length;
+
+      assert.equal(result.success, false);
+      assert.equal(result.error, 'backup_target_mismatch');
+      assert.equal(afterCount, beforeCount, 'different-target rollback must be rejected before child RPC');
+    } finally {
+      fs.rmSync(ctx.testRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('allows rollback for an owned backup created for the same target', async () => {
+    const ctx = await createOwnedBackupScenario();
+    try {
+      const rollbackP = ctx.sup.rollback(ctx.targetFile, ctx.backupPath, 'SaveGame.player.0.money', ctx.game.id);
+      const rollbackLine = ctx.writtenLines().find(l => l.includes('"rollbackWriteField"'));
+      assert.ok(rollbackLine, 'owned backup rollback must reach child RPC');
+      ctx.proc.triggerData(encodeResponse(JSON.parse(rollbackLine.trim()).id, { restored: true, verifiedValue: '5000' }));
+
+      const result = await rollbackP;
+      assert.equal(result.success, true);
+      assert.equal(result.verifiedValue, '5000');
+    } finally {
+      fs.rmSync(ctx.testRoot, { recursive: true, force: true });
+    }
   });
 });
 

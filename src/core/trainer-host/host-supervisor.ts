@@ -107,13 +107,25 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
   // Pending write proposals — created by proposeWrite, consumed by approveAndWrite.
   // Existence in this map IS the approval gate. No entry → write refused.
   interface PendingProposal {
+    gameId: string;
     filePath: string;
     field: string;
     currentValue: string;
     newValue: string;
   }
+  interface OwnedBackup {
+    gameId: string;
+    filePath: string;
+    field: string;
+    backupPath: string;
+  }
   const pendingProposals = new Map<string, PendingProposal>();
+  const ownedBackups = new Map<string, OwnedBackup>();
   let _proposalCounter = 0;
+
+  function canonicalKey(filePath: string): string {
+    return path.resolve(filePath).toLowerCase();
+  }
 
   function isRunning(): boolean {
     if (!child || childPid === null) return false;
@@ -280,7 +292,7 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
     try {
       await sendRpc('proposeWriteField', { filePath, field, currentValue, newValue });
       const proposalId = `prop-${++_proposalCounter}-${Date.now()}`;
-      pendingProposals.set(proposalId, { filePath, field, currentValue, newValue });
+      pendingProposals.set(proposalId, { gameId, filePath, field, currentValue, newValue });
       return { success: true, proposalId };
     } catch (e) {
       return { success: false, error: String(e) };
@@ -305,6 +317,14 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
         currentValue: proposal.currentValue,
         newValue: proposal.newValue,
       });
+      if (typeof result.backupPath === 'string' && result.backupPath.length > 0) {
+        ownedBackups.set(canonicalKey(result.backupPath), {
+          gameId: proposal.gameId,
+          filePath: proposal.filePath,
+          field: proposal.field,
+          backupPath: result.backupPath,
+        });
+      }
       return { success: true, verifiedValue: result.verifiedValue, backupPath: result.backupPath };
     } catch (e) {
       return { success: false, error: String(e) };
@@ -320,8 +340,20 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
     if (!isRunning()) return { success: false, error: 'not_running' };
     if (!isPathApproved(filePath, gameId)) return { success: false, error: 'path_not_approved' };
 
+    const backupRecord = ownedBackups.get(canonicalKey(backupPath));
+    if (!backupRecord) return { success: false, error: 'backup_not_owned' };
+    if (backupRecord.gameId !== gameId) return { success: false, error: 'backup_target_mismatch' };
+    if (canonicalKey(backupRecord.filePath) !== canonicalKey(filePath)) {
+      return { success: false, error: 'backup_target_mismatch' };
+    }
+    if (backupRecord.field !== field) return { success: false, error: 'backup_target_mismatch' };
+    if (path.dirname(canonicalKey(backupRecord.backupPath)) !== path.dirname(canonicalKey(filePath))) {
+      return { success: false, error: 'backup_path_invalid' };
+    }
+
     try {
       const result = await sendRpc('rollbackWriteField', { filePath, backupPath, field });
+      ownedBackups.delete(canonicalKey(backupPath));
       return { success: true, verifiedValue: result.verifiedValue };
     } catch (e) {
       return { success: false, error: String(e) };

@@ -152,6 +152,15 @@ export async function rollbackWriteField(params: unknown): Promise<RollbackResul
   assertValidParams(params, ['filePath', 'backupPath', 'field']);
   const { filePath, backupPath, field } = params as Record<string, string>;
 
+  const expectedBackupPath = path.resolve(filePath + '.trainer-backup');
+  const resolvedBackupPath = path.resolve(backupPath);
+  if (resolvedBackupPath.toLowerCase() !== expectedBackupPath.toLowerCase()) {
+    throw new Error('backup_path_invalid');
+  }
+  if (path.dirname(resolvedBackupPath).toLowerCase() !== path.dirname(path.resolve(filePath)).toLowerCase()) {
+    throw new Error('backup_path_invalid');
+  }
+
   if (!fs.existsSync(backupPath)) throw new Error('backup_not_found');
 
   const tmpPath = path.join(path.dirname(filePath), path.basename(filePath) + '.trainer-restore-tmp');
