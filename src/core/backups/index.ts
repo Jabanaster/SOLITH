@@ -3,6 +3,9 @@ import path from 'path';
 import crypto from 'crypto';
 import type { Backup } from '../../shared/types/index.js';
 import db from '../database/index.js';
+import { getGameById } from '../games/index.js';
+import { acquireFileLock, releaseFileLock } from '../safety/file-lock.js';
+import { getCanonicalPath, validatePathSafety as validateCentralPathSafety } from '../safety/path-safety.js';
 
 // Re-export Backup type for consumers
 export type { Backup } from '../../shared/types/index.js';
@@ -163,30 +166,99 @@ export function createBackup(
  * @returns true if restore succeeded, false otherwise
  */
 export function restoreBackup(backup: Backup): boolean {
+  const targetPath = path.resolve(backup.filePath);
+  const backupPath = path.resolve(backup.backupPath);
+  const canonicalTarget = getCanonicalPath(targetPath);
+  let tmpPath = '';
+  let lockAcquired = false;
+
   try {
-    validatePathSafety(backup.backupPath);
-    validatePathSafety(backup.filePath);
+    validatePathSafety(backupPath);
+    validatePathSafety(targetPath);
+
+    const backupRow = db.prepare(`
+      SELECT gameId, metadata
+      FROM backups
+      WHERE id = ?
+    `).get(backup.id) as { gameId: string; metadata: string } | undefined;
+
+    if (!backupRow) {
+      throw new Error(`Backup record not found: ${backup.id}`);
+    }
+
+    const metadata = JSON.parse(backupRow.metadata || '{}') as {
+      backupPath?: string;
+      filePath?: string;
+      originalHash?: string;
+    };
+    const ownedBackupPath = metadata.backupPath ? path.resolve(metadata.backupPath) : '';
+    const ownedFilePath = metadata.filePath ? path.resolve(metadata.filePath) : '';
+
+    if (
+      ownedBackupPath.toLowerCase() !== backupPath.toLowerCase() ||
+      ownedFilePath.toLowerCase() !== targetPath.toLowerCase() ||
+      metadata.originalHash !== backup.originalHash
+    ) {
+      throw new Error(`Backup ownership check failed for ${backup.id}`);
+    }
+
+    const game = getGameById(backupRow.gameId);
+    if (!game) {
+      throw new Error(`Game not found for backup: ${backup.id}`);
+    }
+
+    const targetSafety = validateCentralPathSafety(targetPath, [game.path]);
+    if (!targetSafety.safe) {
+      throw new Error(targetSafety.reason || 'Target path failed containment validation.');
+    }
+
+    const backupSafety = validateCentralPathSafety(backupPath);
+    if (!backupSafety.safe) {
+      throw new Error(backupSafety.reason || 'Backup path failed safety validation.');
+    }
+
+    lockAcquired = acquireFileLock(canonicalTarget);
+    if (!lockAcquired) {
+      throw new Error(`File "${path.basename(targetPath)}" is currently locked by another operation.`);
+    }
     
     // Verify backup exists
-    if (!fs.existsSync(backup.backupPath)) {
-      throw new Error(`Backup file not found: ${backup.backupPath}`);
+    if (!fs.existsSync(backupPath)) {
+      throw new Error(`Backup file not found: ${backupPath}`);
     }
     
     // Verify backup integrity
-    const currentHash = computeHash(backup.backupPath);
+    const currentHash = computeHash(backupPath);
     if (currentHash !== backup.originalHash) {
       throw new Error(`Backup integrity check failed for ${backup.id}: hash mismatch`);
     }
-    
-    // Restore file (overwrite target)
-    fs.copyFileSync(backup.backupPath, backup.filePath);
-    
-    // Verify restore
-    if (!fs.existsSync(backup.filePath)) {
-      throw new Error(`Restore failed: ${backup.filePath} was not created`);
+
+    const targetExists = fs.existsSync(targetPath);
+    if (targetExists) {
+      const targetStat = fs.statSync(targetPath);
+      if (!targetStat.isFile()) {
+        throw new Error(`Restore target is not a file: ${targetPath}`);
+      }
     }
     
-    const restoredHash = computeHash(backup.filePath);
+    // Restore through a sibling temp file and atomic replacement.
+    tmpPath = path.join(
+      path.dirname(targetPath),
+      `${path.basename(targetPath)}.resourceforge-restore-${backup.id}.tmp`
+    );
+    fs.copyFileSync(backupPath, tmpPath);
+    if (targetExists) {
+      fs.chmodSync(tmpPath, fs.statSync(targetPath).mode);
+    }
+    fs.renameSync(tmpPath, targetPath);
+    tmpPath = '';
+    
+    // Verify restore
+    if (!fs.existsSync(targetPath)) {
+      throw new Error(`Restore failed: ${targetPath} was not created`);
+    }
+    
+    const restoredHash = computeHash(targetPath);
     if (restoredHash !== backup.originalHash) {
       throw new Error(`Restore verification failed for ${backup.id}: hash mismatch after restore`);
     }
@@ -195,6 +267,17 @@ export function restoreBackup(backup: Backup): boolean {
   } catch (error) {
     console.error('Restore failed:', error);
     return false;
+  } finally {
+    if (tmpPath && fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+        // Ignore cleanup failure.
+      }
+    }
+    if (lockAcquired) {
+      releaseFileLock(canonicalTarget);
+    }
   }
 }
 

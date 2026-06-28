@@ -10,7 +10,7 @@ import { applyProposal } from '../src/core/saves/editor.ts';
 import { recoverInterruptedOperations } from '../src/core/safety/operations.ts';
 import { atomicWrite } from '../src/core/safety/atomic-write.ts';
 import { validatePathSafety } from '../src/core/safety/path-safety.ts';
-import { createBackup } from '../src/core/backups/index.ts';
+import { createBackup, restoreBackup } from '../src/core/backups/index.ts';
 import { Proposal } from '../src/shared/types/index.ts';
 import { acquireFileLock, releaseFileLock } from '../src/core/safety/file-lock.ts';
 
@@ -222,5 +222,100 @@ describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
     const opRow = db.prepare('SELECT status FROM operations WHERE id = ?').get(opId);
     assert.ok(opRow);
     assert.strictEqual(opRow.status, 'RESTORED');
+  });
+
+  test('6. Backup restore succeeds through locked atomic replacement', () => {
+    const targetFile = path.join(testGameDir, 'save_restore_normal.json');
+    const backupDir = path.join(testGameDir, 'backups');
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
+
+    const backup = createBackup(gameId, targetFile, backupDir);
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 250 }));
+
+    const restored = restoreBackup(backup);
+
+    assert.strictEqual(restored, true);
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(targetFile, 'utf-8')), { gold: 100 });
+  });
+
+  test('7. Backup restore fails cleanly when physical backup is missing', () => {
+    const targetFile = path.join(testGameDir, 'save_restore_missing.json');
+    const backupDir = path.join(testGameDir, 'backups');
+    const changed = JSON.stringify({ gold: 250 });
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
+
+    const backup = createBackup(gameId, targetFile, backupDir);
+    fs.writeFileSync(targetFile, changed);
+    fs.unlinkSync(backup.backupPath);
+
+    const restored = restoreBackup(backup);
+
+    assert.strictEqual(restored, false);
+    assert.strictEqual(fs.readFileSync(targetFile, 'utf-8'), changed);
+  });
+
+  test('8. Backup restore fails cleanly on hash mismatch and preserves current target', () => {
+    const targetFile = path.join(testGameDir, 'save_restore_corrupt.json');
+    const backupDir = path.join(testGameDir, 'backups');
+    const changed = JSON.stringify({ gold: 250 });
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
+
+    const backup = createBackup(gameId, targetFile, backupDir);
+    fs.writeFileSync(targetFile, changed);
+    fs.writeFileSync(backup.backupPath, JSON.stringify({ gold: 999 }));
+
+    const restored = restoreBackup(backup);
+
+    assert.strictEqual(restored, false);
+    assert.strictEqual(fs.readFileSync(targetFile, 'utf-8'), changed);
+  });
+
+  test('9. Backup restore rejects target outside the approved game root', () => {
+    const targetFile = path.join(testGameDir, 'save_restore_contained.json');
+    const backupDir = path.join(testGameDir, 'backups');
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-restore-outside-'));
+    const outsideTarget = path.join(outsideDir, 'outside-save.json');
+    const outsideContent = JSON.stringify({ gold: 777 });
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
+    fs.writeFileSync(outsideTarget, outsideContent);
+
+    try {
+      const backup = createBackup(gameId, targetFile, backupDir);
+      const restored = restoreBackup({ ...backup, filePath: outsideTarget });
+
+      assert.strictEqual(restored, false);
+      assert.strictEqual(fs.readFileSync(outsideTarget, 'utf-8'), outsideContent);
+    } finally {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  test('10. Backup restore rejects symlink target escape when practical', (t) => {
+    const targetFile = path.join(testGameDir, 'save_restore_symlink_source.json');
+    const backupDir = path.join(testGameDir, 'backups');
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-restore-link-'));
+    const outsideTarget = path.join(outsideDir, 'outside-save.json');
+    const linkTarget = path.join(testGameDir, 'linked-outside-save.json');
+    const outsideContent = JSON.stringify({ gold: 777 });
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
+    fs.writeFileSync(outsideTarget, outsideContent);
+
+    try {
+      try {
+        fs.symlinkSync(outsideTarget, linkTarget, 'file');
+      } catch (error) {
+        t.skip(`symlink creation unavailable on this Windows host: ${String(error)}`);
+        return;
+      }
+
+      const backup = createBackup(gameId, targetFile, backupDir);
+      const restored = restoreBackup({ ...backup, filePath: linkTarget });
+
+      assert.strictEqual(restored, false);
+      assert.strictEqual(fs.readFileSync(outsideTarget, 'utf-8'), outsideContent);
+    } finally {
+      if (fs.existsSync(linkTarget)) fs.rmSync(linkTarget, { force: true });
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 });
