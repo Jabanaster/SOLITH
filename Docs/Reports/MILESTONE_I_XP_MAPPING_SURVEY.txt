@@ -1,0 +1,46 @@
+=== XP MAPPING SEARCH ===
+demo-game\save\stardew-fixture.xml:    <experiencePoints>
+demo-game\save\stardew-fixture.xml:    </experiencePoints>
+demo-game\save\stardew-fixture.xml:    <farmingLevel>3</farmingLevel>
+demo-game\save\stardew-fixture.xml:    <fishingLevel>1</fishingLevel>
+demo-game\save\stardew-fixture.xml:    <miningLevel>2</miningLevel>
+demo-game\save\save2.json:    "skills": [
+demo-game\save\save2.json:        "id": "skill_001",
+demo-game\save\save1.json:    "skills": [
+demo-game\save\save1.json:        "id": "skill_001",
+tests\game-profile.test.ts:    assert.strictEqual(farmingXp.saveField?.fieldPath, 'SaveGame.player.0.experiencePoints.0.int.0');
+src\app\App.tsx:  { id: 'skills',        label: 'Skills' },
+tests\trainer-control-schema.test.ts:    assert.ok(farmingXp.saveField?.fieldPath.includes('experiencePoints'), 'Farming XP field path must reference experiencePoints');
+src\shared\constants\index.ts:  'cooldown', 'xp', 'exp', 'experience', 'level', 'skill', 'skill_points',
+tests\trainer-host\read-save-field.test.ts:    const result = await readSaveField({ filePath: FIXTURE, field: 'SaveGame.player.0.farmingLevel' });
+src\core\game-profiles\profiles\stardew-valley.json:      "description": "Farming skill experience points. Written via TrainerHost XML save workflow with backup + rollback.",
+src\core\game-profiles\profiles\stardew-valley.json:        "fieldPath": "SaveGame.player.0.experiencePoints.0.int.0",
+src\core\saves\editor.ts:    // Unlock recipe / skill
+src\core\saves\editor.ts:        description: `Unlock skill or crafting recipe automatically`,
+
+=== STARDew FIXTURE CONTEXT ===
+      <health>100</health>
+      <maxHealth>100</maxHealth>
+      <stamina>
+        <float>270</float>
+      </stamina>
+      <maxStamina>
+        <float>270</float>
+      </maxStamina>
+>     <experiencePoints>
+        <int>1500</int>
+        <int>100</int>
+        <int>500</int>
+        <int>50</int>
+        <int>0</int>
+        <int>0</int>
+>     </experiencePoints>
+>     <farmingLevel>3</farmingLevel>
+>     <fishingLevel>1</fishingLevel>
+>     <miningLevel>2</miningLevel>
+    </player>
+    <farmName>TestFarm</farmName>
+    <year>1</year>
+    <currentSeason>spring</currentSeason>
+    <dayOfMonth>1</dayOfMonth>
+  </SaveGame>

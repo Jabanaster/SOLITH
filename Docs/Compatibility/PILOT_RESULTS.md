@@ -3,6 +3,34 @@
 ## Status
 
 ```text
+SANDBOX WRITABLE — Drill Core master_volume sandbox workflow passed (live in-game validation not yet authorized)
+```
+
+## Drill Core — `master_volume` real-world sandbox result (2026-06-25)
+
+| Field | Result |
+|---|---|
+| Game / version | Drill Core 1.0.0.0 (Hungry Couch, GameMaker) |
+| Store | Steam |
+| Save format | UTF-8 JSON, no BOM, single-line, 719 bytes |
+| Adapter | `drill-core-settings@1.0.0` (byte-preserving) |
+| Field tested | `master_volume` (`100 → 75`, restore `→ 100`) |
+| Evidence tier | `REAL_WORLD_SANDBOX` |
+| source_hash | `10824febeb53ab516d5a08b10a56b6b489feeeb45d0e577f03ef533f77f7957e` |
+| workspace_before | `10824febeb53ab516d5a08b10a56b6b489feeeb45d0e577f03ef533f77f7957e` |
+| workspace_applied | byte-preserving (`100.0 → 75.0`, 1 changed token, span `[334,338]`) |
+| workspace_restored | `10824febeb53ab516d5a08b10a56b6b489feeeb45d0e577f03ef533f77f7957e` (exact) |
+| all_invariants | PASS (run-01 and run-02) |
+| live original modified | No (hash unchanged before/after) |
+| profile_level | `REAL_WORLD_SANDBOX` (sandbox-writable; not yet in-game validated) |
+| date | 2026-06-25 |
+
+Full evidence: `Docs/Reports/DRILL_CORE_MASTER_VOLUME_EVIDENCE.md`. Real save
+contents, full paths, and local evidence files are intentionally excluded from Git.
+
+### Prior status (historical)
+
+```text
 BLOCKED — first real-world save remains read-only
 ```
 

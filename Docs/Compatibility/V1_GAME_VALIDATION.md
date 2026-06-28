@@ -2,7 +2,16 @@
 
 ## Real-World Pilot Status
 
-**Status: `BLOCKED — first real-world save remains read-only`**
+**Status: `SANDBOX WRITABLE — Drill Core master_volume sandbox workflow passed`**
+(live in-game validation not yet authorized)
+
+Drill Core 1.0.0.0 (Steam, Hungry Couch, GameMaker) is the first writable
+sandbox-validated game. Its `settings.json` `master_volume` target completed the
+backup → apply → validate → restore pipeline twice on real-format copies, with
+byte-preserving edits (`100.0 → 75.0`) and exact SHA-256 restore. The live file
+was only read for hash verification and remained byte-for-byte unchanged. This is
+sandbox evidence; the game has not yet been launched to confirm it loads the
+modified value. See `Docs/Reports/DRILL_CORE_MASTER_VOLUME_SANDBOX_PILOT.md`.
 
 Atomfall 1.23.105.0 (Xbox) has real-world sandbox evidence at `READ_ONLY`. Hash-verified
 copying and source preservation passed. Its extensionless 4 MiB save is an unknown sparse

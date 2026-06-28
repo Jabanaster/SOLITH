@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -27,8 +28,17 @@ import {
   AddUserSelectedLocationSchema,
   CheckGameRunningSchema,
   GetCompatibilityProfileSchema,
+  V2MonitorStartSchema,
+  TrainerHostStartSchema,
+  TrainerHostStopSchema,
+  TrainerHostGetStatusSchema,
+  TrainerHostReadFieldSchema,
+  TrainerHostProposeWriteSchema,
+  TrainerHostApproveAndWriteSchema,
+  TrainerHostRollbackSchema,
   validateIpcPathSafety
 } from './ipc-validation.js';
+import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -60,6 +70,15 @@ app.on('second-instance', () => {
 });
 
 let mainWindow: BrowserWindow | null = null;
+
+// V2 lifecycle wiring — initialised once in app.whenReady(), after the session
+// monitor is available. Null until then so IPC handlers can detect unready state.
+let lifecycleWiring: LifecycleWiring | null = null;
+
+// TrainerHost supervisor — initialised lazily on first start IPC call.
+let trainerHostSupervisor: TrainerHostSupervisor | null = null;
+// Tracks the webContentsId that owns the current TrainerHost session.
+let trainerHostOwner: number | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -98,18 +117,34 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Wire per-window lifecycle (idempotent — WeakSet guard inside wiring).
+  // Must happen after mainWindow is assigned so the reference is valid.
+  if (lifecycleWiring) lifecycleWiring.wireWindow(mainWindow);
 }
 
 app.whenReady().then(async () => {
   try {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
-    
+
     const operationsModule = await import('../src/core/safety/operations.js');
     await operationsModule.recoverInterruptedOperations();
   } catch (error) {
     console.error('Failed to run crash recovery on startup:', error);
   }
+
+  // Initialise V2 lifecycle wiring once, before the window is created.
+  // ipcMain.handle registrations for V2 channels are at module level (below)
+  // so they are never duplicated on window recreation.
+  try {
+    const { createLifecycleWiring } = await import('../src/core/v2/lifecycle-wiring.js');
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    lifecycleWiring = createLifecycleWiring(getSessionMonitor(), app);
+  } catch (error) {
+    console.error('Failed to initialise V2 lifecycle wiring:', error);
+  }
+
   createWindow();
 });
 
@@ -117,6 +152,16 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+// Remove the app-level 'before-quit' listener installed by lifecycle wiring.
+// This prevents a stale listener from being invoked if the wiring object is
+// ever recreated during the same process lifetime (e.g. in E2E tests that
+// reconstruct the app). Called on will-quit, which fires on all platforms
+// after all windows are closed and just before the process exits.
+app.on('will-quit', () => {
+  if (lifecycleWiring) lifecycleWiring.dispose();
+  if (trainerHostSupervisor) trainerHostSupervisor.verifyExitOrKill();
 });
 
 app.on('activate', () => {
@@ -273,9 +318,16 @@ ipcMain.handle('set-setting', async (event, key: any, value: any) => {
     const parsed = SetSettingSchema.parse({ key, value });
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
-    
+
     const settingsModule = await import('../src/core/settings/index.js');
     settingsModule.setSetting(parsed.key as any, parsed.value);
+
+    // If the V2 feature flag was just disabled, stop any active monitoring session
+    // immediately in the main process — do not rely solely on renderer cleanup.
+    if (parsed.key === 'v2SessionMonitorEnabled' && parsed.value === false && lifecycleWiring) {
+      lifecycleWiring.notifyFeatureChanged(false);
+    }
+
     return { success: true };
   } catch (error) {
     console.error('set-setting error:', error);
@@ -610,5 +662,211 @@ ipcMain.handle('get-all-profiles', async () => {
   } catch (error) {
     console.error('get-all-profiles error:', error);
     return [];
+  }
+});
+
+// ── V2 Session Lifecycle Monitor IPC ─────────────────────────────────────────
+// Read-only. Disabled by default (v2SessionMonitorEnabled setting).
+// No memory access. No injection. No writes to external files.
+//
+// OWNERSHIP: event.sender.id is used as the owner identifier — never a value
+// supplied in the IPC payload. This prevents one renderer from impersonating
+// another or interfering with its monitoring session.
+//
+// These handlers are registered exactly once at module level. Recreating a
+// BrowserWindow does not re-register them.
+
+ipcMain.handle('v2-monitor-start', async (event, payload: unknown) => {
+  try {
+    if (!lifecycleWiring) {
+      return { success: false, error: 'Monitor not initialised yet.' };
+    }
+
+    // Reject destroyed senders before parsing the payload.
+    if (event.sender.isDestroyed()) {
+      return { success: false, error: 'sender_invalid' };
+    }
+
+    const parsed = V2MonitorStartSchema.parse(payload);
+
+    const settingsModule = await import('../src/core/settings/index.js');
+    // better-sqlite3 stores boolean true as integer 1, so accept both representations.
+    const rawFeatureFlag = settingsModule.getSetting('v2SessionMonitorEnabled');
+    const featureEnabled = rawFeatureFlag === true || rawFeatureFlag === 1;
+
+    // senderId is derived from the Electron IPC event, never from payload.
+    return lifecycleWiring.handleStart(event.sender.id, {
+      gameId: parsed.gameId,
+      executableName: parsed.executableName,
+      markerFilePath: parsed.markerFilePath,
+      pollIntervalMs: parsed.pollIntervalMs,
+    }, { featureEnabled, senderValid: true });
+  } catch (error) {
+    // Return a normalised error — no stack traces, paths, or usernames.
+    return { success: false, error: 'start_failed' };
+  }
+});
+
+ipcMain.handle('v2-monitor-stop', async (event) => {
+  try {
+    if (!lifecycleWiring) {
+      return { success: false, error: 'Monitor not initialised yet.' };
+    }
+    if (event.sender.isDestroyed()) {
+      return { success: false, error: 'sender_invalid' };
+    }
+    return lifecycleWiring.handleStop(event.sender.id);
+  } catch (error) {
+    return { success: false, error: 'stop_failed' };
+  }
+});
+
+ipcMain.handle('v2-monitor-get-state', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    return getSessionMonitor().getStatus();
+  } catch (error) {
+    return { state: 'error', snapshot: null, config: null, isRunning: false, startedAt: null, timelineEntryCount: 0 };
+  }
+});
+
+ipcMain.handle('v2-monitor-clear-timeline', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    getSessionMonitor().clearTimeline();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'clear_failed' };
+  }
+});
+
+ipcMain.handle('v2-monitor-export-diagnostics', async () => {
+  try {
+    const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
+    return getSessionMonitor().exportDiagnostics();
+  } catch (error) {
+    return { error: 'export_failed' };
+  }
+});
+
+// ── TrainerHost IPC Handlers ──────────────────────────────────────────────────
+//
+// Ownership model mirrors V2 session monitor: event.sender.id is the sole
+// owner identifier — never a value supplied in the IPC payload.
+// No memory access. No injection. File reads only from approved paths.
+
+ipcMain.handle('trainer-host-start', async (event, payload: unknown) => {
+  try {
+    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    TrainerHostStartSchema.parse(payload);
+
+    // Lazy-initialise supervisor on first call
+    if (!trainerHostSupervisor) {
+      const { getTrainerHostSupervisor } = await import('../src/core/trainer-host/index.js');
+      trainerHostSupervisor = getTrainerHostSupervisor();
+    }
+
+    const result = await trainerHostSupervisor.start();
+    if (result.success) {
+      trainerHostOwner = event.sender.id;
+    }
+    return result;
+  } catch {
+    return { success: false, error: 'start_failed' };
+  }
+});
+
+ipcMain.handle('trainer-host-stop', async (event) => {
+  try {
+    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
+      return { success: false, error: 'not_owner' };
+    }
+    if (!trainerHostSupervisor) return { success: true };
+    await trainerHostSupervisor.stop();
+    trainerHostOwner = null;
+    return { success: true };
+  } catch {
+    return { success: false, error: 'stop_failed' };
+  }
+});
+
+ipcMain.handle('trainer-host-get-status', async () => {
+  try {
+    if (!trainerHostSupervisor) return { running: false, pid: null, capabilities: [] };
+    return trainerHostSupervisor.getStatus();
+  } catch {
+    return { running: false, pid: null, capabilities: [] };
+  }
+});
+
+ipcMain.handle('trainer-host-read-field', async (event, payload: unknown) => {
+  try {
+    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
+      return { success: false, error: 'not_owner' };
+    }
+    if (!trainerHostSupervisor) return { success: false, error: 'not_running' };
+
+    const parsed = TrainerHostReadFieldSchema.parse(payload);
+    // Path approval is enforced inside supervisor.readField() via isPathApproved()
+    return await trainerHostSupervisor.readField(parsed.gameId, parsed.filePath, parsed.field);
+  } catch {
+    return { success: false, error: 'read_failed' };
+  }
+});
+
+// Propose a write — validates params and current value, creates a pending proposal.
+// The proposal must be explicitly approved by calling trainer-host-approve-and-write.
+ipcMain.handle('trainer-host-propose-write', async (event, payload: unknown) => {
+  try {
+    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
+      return { success: false, error: 'not_owner' };
+    }
+    if (!trainerHostSupervisor) return { success: false, error: 'not_running' };
+
+    const parsed = TrainerHostProposeWriteSchema.parse(payload);
+    return await trainerHostSupervisor.proposeWrite(
+      parsed.gameId, parsed.filePath, parsed.field,
+      parsed.currentValue, parsed.newValue,
+    );
+  } catch {
+    return { success: false, error: 'propose_failed' };
+  }
+});
+
+// Execute a previously proposed write. The proposalId must exist in the supervisor's
+// pending-proposal map — consuming it is the approval gate.
+ipcMain.handle('trainer-host-approve-and-write', async (event, payload: unknown) => {
+  try {
+    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
+      return { success: false, error: 'not_owner' };
+    }
+    if (!trainerHostSupervisor) return { success: false, error: 'not_running' };
+
+    const parsed = TrainerHostApproveAndWriteSchema.parse(payload);
+    return await trainerHostSupervisor.approveAndWrite(parsed.proposalId);
+  } catch {
+    return { success: false, error: 'write_failed' };
+  }
+});
+
+// Roll back a completed write using the backup created during execute.
+ipcMain.handle('trainer-host-rollback', async (event, payload: unknown) => {
+  try {
+    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
+      return { success: false, error: 'not_owner' };
+    }
+    if (!trainerHostSupervisor) return { success: false, error: 'not_running' };
+
+    const parsed = TrainerHostRollbackSchema.parse(payload);
+    return await trainerHostSupervisor.rollback(
+      parsed.filePath, parsed.backupPath, parsed.field, parsed.gameId,
+    );
+  } catch {
+    return { success: false, error: 'rollback_failed' };
   }
 });

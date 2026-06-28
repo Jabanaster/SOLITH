@@ -1,0 +1,277 @@
+=== FIELD SEARCH ===
+tests\core.test.ts:      stamina = 50
+tests\core.test.ts:      const brokenRecipe = { ...recipe, path: 'stamina' };
+demo-game\save\stardew-fixture.xml:    <money>5000</money>
+demo-game\save\stardew-fixture.xml:    <stamina>
+demo-game\save\stardew-fixture.xml:    </stamina>
+demo-game\save\stardew-fixture.xml:    <maxStamina>
+demo-game\save\stardew-fixture.xml:    </maxStamina>
+demo-game\save\stardew-fixture.xml:    <experiencePoints>
+demo-game\save\stardew-fixture.xml:    </experiencePoints>
+demo-game\save\save1.json:      "stamina": 50,
+src\app\App.tsx:  { id: 'stamina',       label: 'Stamina' },
+demo-game\save\save2.json:      "stamina": 50,
+tests\game-profile.test.ts:          id: 'money',
+tests\game-profile.test.ts:          id: 'money', // duplicate
+tests\game-profile.test.ts:          id: 'money',
+tests\game-profile.test.ts:    const money = profile.controls.find(c => c.id === 'stardew-money');
+tests\game-profile.test.ts:    assert.ok(money, 'Money control must be present');
+tests\game-profile.test.ts:    assert.strictEqual(money.backend, 'save_field');
+tests\game-profile.test.ts:    assert.strictEqual(money.safetyStatus, 'requires_approval');
+tests\game-profile.test.ts:    assert.strictEqual(money.saveField?.fieldPath, 'SaveGame.player.0.money');
+tests\game-profile.test.ts:    const stamina = profile.controls.find(c => c.id === 'stardew-stamina');
+tests\game-profile.test.ts:    assert.ok(stamina, 'Stamina control must be present');
+tests\game-profile.test.ts:    assert.strictEqual(stamina.backend, 'save_field');
+tests\game-profile.test.ts:    assert.strictEqual(stamina.safetyStatus, 'requires_approval');
+tests\game-profile.test.ts:    assert.strictEqual(stamina.saveField?.fieldPath, 'SaveGame.player.0.stamina.0.float.0');
+tests\game-profile.test.ts:    assert.strictEqual(farmingXp.saveField?.fieldPath, 'SaveGame.player.0.experiencePoints.0.int.0');
+tests\game-profile.test.ts:    const money = controls.find(c => c.id === 'stardew-money');
+tests\game-profile.test.ts:    assert.ok(money);
+tests\game-profile.test.ts:    assert.strictEqual(money.label, 'Money');
+tests\game-profile.test.ts:    assert.ok(money.description.length > 0);
+tests\game-profile.test.ts:    const money = controls.find(c => c.id === 'stardew-money');
+tests\game-profile.test.ts:    assert.ok(money);
+tests\game-profile.test.ts:    assert.strictEqual(money.min, 0);
+tests\game-profile.test.ts:    assert.strictEqual(money.max, 2147483647);
+tests\game-profile.test.ts:    const money = controls.find(c => c.id === 'stardew-money');
+tests\game-profile.test.ts:    assert.ok(money);
+tests\game-profile.test.ts:    assert.ok(money.saveField);
+tests\game-profile.test.ts:    assert.strictEqual(money.saveField.fieldPath, 'SaveGame.player.0.money');
+tests\game-profile.test.ts:    assert.deepStrictEqual(ids, ['stardew-farming-xp', 'stardew-money', 'stardew-stamina']);
+src\shared\constants\index.ts:  'health', 'hp', 'stamina', 'mana', 'spirit', 'gold', 'money', 'coin', 'coins',
+tests\milestone-e-acceptance.test.ts:    'stardew-money',
+tests\milestone-e-acceptance.test.ts:    [testGameId, fixtureInGame, 'SaveGame.player.0.money'] as [string, string, string]
+tests\milestone-e-acceptance.test.ts:  expect(String(readRes?.value), 'current money is 5000').toBe('5000');
+tests\milestone-e-acceptance.test.ts:    [testGameId, fixtureInGame, 'SaveGame.player.0.money'] as [string, string, string]
+tests\milestone-e-acceptance.test.ts:  expect(diskContent).toContain('<money>99999</money>');
+tests\milestone-e-acceptance.test.ts:    [testGameId, fixtureInGame, backupPath!, 'SaveGame.player.0.money'] as [string, string, string, string]
+tests\milestone-e-acceptance.test.ts:  expect(diskContent).toContain('<money>5000</money>');
+tests\milestone-e-acceptance.test.ts:  expect(diskContent).not.toContain('<money>99999</money>');
+src\core\ai\index.ts:  if (lowerPath.includes('gold') || lowerPath.includes('money') || lowerPath.includes('currency')) {
+src\core\ai\index.ts:  if (lowerPath.includes('gold') || lowerPath.includes('money') || lowerPath.includes('currency') || 
+src\core\ai\index.ts:  if (lowerPath.includes('health') || lowerPath.includes('stamina') || lowerPath.includes('mana') || 
+src\core\ai\index.ts:  if (lowerPath.includes('gold') || lowerPath.includes('money') || lowerPath.includes('currency')) {
+src\core\ai\index.ts:  if (lowerPath.includes('stamina') || lowerPath.includes('mana')) {
+src\core\discovery\index.ts:  const highConfidenceKeys = ['player', 'inventory', 'items', 'weapon', 'armor', 'ammo', 'gold', 'money', 'health', 'level', 'xp'];
+src\core\discovery\index.ts:  if (lowerPath.includes('money') || lowerPath.includes('gold') || lowerPath.includes('currency') || lowerPath.includes('coin')) {
+src\core\discovery\index.ts:  if (lowerPath.includes('damage') || lowerPath.includes('defense') || lowerPath.includes('armor') || lowerPath.includes('stamina')) {
+src\core\discovery\index.ts:  if (lower.includes('health') || lower.includes('hp') || lower.includes('stamina') || lower.includes('mana')) {
+src\core\discovery\index.ts:  if (lower.includes('xp') || lower.includes('level') || lower.includes('experience') || lower.includes('gold') || lower.includes('money')) {
+tests\trainer-control-schema.test.ts:  id: 'stardew-money',
+tests\trainer-control-schema.test.ts:    fieldPath: 'SaveGame.player.0.money',
+tests\trainer-control-schema.test.ts:    const money = controls.find(c => c.id === 'stardew-money');
+tests\trainer-control-schema.test.ts:    assert.ok(money, 'Money control must be present');
+tests\trainer-control-schema.test.ts:    assert.strictEqual(isControlExecutable(money), true);
+tests\trainer-control-schema.test.ts:    assert.strictEqual(requiresApproval(money), true);
+tests\trainer-control-schema.test.ts:    const stamina = controls.find(c => c.id === 'stardew-stamina');
+tests\trainer-control-schema.test.ts:    assert.ok(stamina, 'Stamina control must be present');
+tests\trainer-control-schema.test.ts:    assert.strictEqual(isControlExecutable(stamina), true);
+tests\trainer-control-schema.test.ts:    assert.strictEqual(requiresApproval(stamina), true);
+tests\trainer-control-schema.test.ts:    assert.strictEqual(stamina.backend, 'save_field');
+tests\trainer-control-schema.test.ts:    assert.ok(stamina.saveField?.fieldPath.includes('stamina'), 'Stamina field path must reference stamina');
+tests\trainer-control-schema.test.ts:    assert.ok(farmingXp.saveField?.fieldPath.includes('experiencePoints'), 'Farming XP field path must reference experiencePoints');
+src\core\trainer-host\read-save-field.ts: *   "SaveGame.player.money" G�� xml["SaveGame"]["player"]["money"]
+tests\trainer-host\e2e.test.ts:const FIELD = 'SaveGame.player.0.money';
+tests\trainer-host\e2e.test.ts:    assert.ok(afterPropose.includes(`<money>${FIXTURE_VALUE}</money>`), 'propose must not mutate file');
+tests\trainer-host\host-runtime.test.ts:        field: 'SaveGame.player.0.money',
+src\core\game-profiles\profiles\stardew-valley.json:      "id": "stardew-money",
+src\core\game-profiles\profiles\stardew-valley.json:        "fieldPath": "SaveGame.player.0.money",
+src\core\game-profiles\profiles\stardew-valley.json:      "id": "stardew-stamina",
+src\core\game-profiles\profiles\stardew-valley.json:        "fieldPath": "SaveGame.player.0.stamina.0.float.0",
+src\core\game-profiles\profiles\stardew-valley.json:        "fieldPath": "SaveGame.player.0.experiencePoints.0.int.0",
+src\core\saves\editor.ts:    if (lowerPath.includes('player') && (lowerPath.includes('gold') || lowerPath.includes('stamina') || lowerPath.includes('health'))) {
+tests\trainer-host\protocol.test.ts:    const line = encodeRequest('r1', 'readSaveField', { filePath: '/a', field: 'player.money' });
+tests\trainer-host\protocol.test.ts:    assert.deepEqual(parsed, { id: 'r1', method: 'readSaveField', params: { filePath: '/a', field: 'player.money' } });
+tests\trainer-host\read-save-field.test.ts:    const result = await readSaveField({ filePath: FIXTURE, field: 'SaveGame.player.0.money' });
+tests\trainer-host\read-save-field.test.ts:    const result = await readSaveField({ filePath: '/no/such/file.xml', field: 'SaveGame.player.money' });
+tests\trainer-host\read-save-field.test.ts:      () => readSaveField({ field: 'SaveGame.player.money' }),
+tests\trainer-host\write-save-field.test.ts:const FIELD = 'SaveGame.player.0.money';
+tests\trainer-host\write-save-field.test.ts:    assert.ok(content.includes(`<money>${KNOWN_VALUE}</money>`), 'backup should have original money value');
+tests\trainer-host\write-save-field.test.ts:    assert.ok(content.includes(`<money>${KNOWN_VALUE}</money>`));
+
+=== STARDew FIXTURE SNIPPETS ===
+  <?xml version="1.0" encoding="utf-8"?>
+  <SaveGame>
+    <player>
+      <name>TestFarmer</name>
+>     <money>5000</money>
+      <health>100</health>
+      <maxHealth>100</maxHealth>
+>     <stamina>
+        <float>270</float>
+>     </stamina>
+>     <maxStamina>
+        <float>270</float>
+>     </maxStamina>
+>     <experiencePoints>
+        <int>1500</int>
+        <int>100</int>
+        <int>500</int>
+        <int>50</int>
+        <int>0</int>
+        <int>0</int>
+>     </experiencePoints>
+      <farmingLevel>3</farmingLevel>
+      <fishingLevel>1</fishingLevel>
+      <miningLevel>2</miningLevel>
+    </player>
+    <farmName>TestFarm</farmName>
+    <year>1</year>
+    <currentSeason>spring</currentSeason>
+    <dayOfMonth>1</dayOfMonth>
+  </SaveGame>
+
+=== CURRENT PROFILE ===
+{
+  "profileVersion": "1.0.0",
+  "gameId": "demo-game-quest-id-000000000000",
+  "displayName": "Stardew Valley",
+  "saveFormat": "xml",
+  "saveRootHints": {
+    "windows": "C:\\Users\\{USER}\\AppData\\Roaming\\StardewValley\\Saves"
+  },
+  "gameVersionNotes": "Tested with Stardew Valley 1.5+. Save format is stable across versions.",
+  "controls": [
+    {
+      "id": "stardew-money",
+      "label": "Money",
+      "description": "Ceriph's gold. Written via TrainerHost XML save workflow with backup + rollback.",
+      "category": "CURRENCY",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "requires_approval",
+      "saveField": {
+        "filePath": "C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288",
+        "fieldPath": "SaveGame.player.0.money",
+        "gameId": "demo-game-quest-id-000000000000"
+      },
+      "constraints": {
+        "min": 0,
+        "max": 2147483647
+      },
+      "metadata": {
+        "valueType": "int",
+        "safeTestValue": 12345,
+        "defaultValue": 500,
+        "riskNotes": "Low risk - simple scalar value, proven in Milestone E"
+      }
+    },
+    {
+      "id": "stardew-stamina",
+      "label": "Stamina",
+      "description": "Current energy. Written via TrainerHost XML save workflow with backup + rollback.",
+      "category": "STAMINA",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "requires_approval",
+      "saveField": {
+        "filePath": "C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288",
+        "fieldPath": "SaveGame.player.0.stamina.0.float.0",
+        "gameId": "demo-game-quest-id-000000000000"
+      },
+      "constraints": {
+        "min": 0,
+        "max": 508
+      },
+      "metadata": {
+        "valueType": "float",
+        "safeTestValue": 270,
+        "defaultValue": 270,
+        "riskNotes": "Low risk - simple nested float, independent stat"
+      }
+    },
+    {
+      "id": "stardew-farming-xp",
+      "label": "Farming XP",
+      "description": "Farming skill experience points. Written via TrainerHost XML save workflow with backup + rollback.",
+      "category": "SKILLS",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "requires_approval",
+      "saveField": {
+        "filePath": "C:\\Users\\chase\\AppData\\Roaming\\StardewValley\\Saves\\Smith_272931288\\Smith_272931288",
+        "fieldPath": "SaveGame.player.0.experiencePoints.0.int.0",
+        "gameId": "demo-game-quest-id-000000000000"
+      },
+      "constraints": {
+        "min": 0,
+        "max": 15000
+      },
+      "metadata": {
+        "valueType": "int",
+        "safeTestValue": 2000,
+        "defaultValue": 0,
+        "riskNotes": "Low risk - simple array element, XP is cumulative"
+      }
+    },
+    {
+      "id": "stardew-health",
+      "label": "Health",
+      "description": "Runtime memory control — not yet implemented.",
+      "category": "HEALTH",
+      "controlType": "number_input",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "constraints": {
+        "min": 0,
+        "max": 999
+      },
+      "metadata": {
+        "riskNotes": "Deferred - death state sensitive, requires runtime memory editing"
+      }
+    },
+    {
+      "id": "stardew-energy",
+      "label": "Energy / Magic",
+      "description": "Runtime memory control — deferred to future milestone.",
+      "category": "STAMINA",
+      "controlType": "slider",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "constraints": {
+        "min": 0,
+        "max": 508,
+        "step": 1
+      },
+      "metadata": {
+        "riskNotes": "Deferred - runtime memory editing not yet implemented"
+      }
+    },
+    {
+      "id": "stardew-resources",
+      "label": "Resources",
+      "description": "Inventory resource counts — save-backed but not mapped in Milestone E.",
+      "category": "INVENTORY",
+      "controlType": "number_input",
+      "backend": "save_field",
+      "safetyStatus": "disabled",
+      "metadata": {
+        "riskNotes": "Deferred - complex inventory structure needs careful analysis"
+      }
+    },
+    {
+      "id": "stardew-godmode",
+      "label": "God Mode",
+      "description": "Invincibility — requires runtime memory write. Not implemented.",
+      "category": "GAME",
+      "controlType": "toggle",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "metadata": {
+        "riskNotes": "Deferred - requires Block 8 (Real-Time Trainer Engine)"
+      }
+    },
+    {
+      "id": "stardew-aimassist",
+      "label": "Aim Assist",
+      "description": "Targeting aid — requires runtime memory write. Not implemented.",
+      "category": "GAME",
+      "controlType": "toggle",
+      "backend": "memory_write",
+      "safetyStatus": "future_feature",
+      "metadata": {
+        "riskNotes": "Deferred - requires Block 8 (Real-Time Trainer Engine)"
+      }
+    }
+  ]
+}

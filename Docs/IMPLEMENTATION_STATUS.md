@@ -4,14 +4,28 @@ This document tracks the implementation and verification status of ResourceForge
 
 ## V1 Trainer UX + Compatibility Pilot — Current Status
 
-**Overall: BLOCKED — real-world compatibility pilot requires approved user data**
+**Overall: SANDBOX WRITABLE — Drill Core `master_volume` sandbox workflow passed**
+(live in-game validation pending explicit authorization)
 
 | Outcome | Description | Status |
 |---------|-------------|--------|
 | A | Polished Trainer Mode UI | COMPLETE |
 | B | Workshop Mode toggle | COMPLETE |
-| C | Real-world save compatibility | BLOCKED_PENDING_USER_DATA |
+| C | Real-world save compatibility | SANDBOX WRITABLE (Drill Core `settings.json` → `master_volume`; live not yet authorized) |
 | D | Compatibility Framework | COMPLETE |
+
+### Drill Core `master_volume` writable sandbox pilot (2026-06-25)
+
+- Narrow byte-preserving adapter `drill-core-settings@1.0.0` added and registered.
+- Master Volume slider recipe (Audio, 0–100, step 1, reset 100).
+- Two independent sandbox runs passed: proposal → approval → verified backup →
+  atomic byte-preserving apply (`100.0 → 75.0`) → validation → exact SHA-256 restore.
+- Live original verified byte-for-byte unchanged.
+- 24 new adapter tests; full suite 132/132; tsc clean; Electron build 18/18;
+  all e2e suites (smoke, e2e, ipc, trainer-states, trainer-e2e, browser-fallback,
+  performance, accessibility) and packaged-smoke (22/22) pass.
+- Reports: `Docs/Reports/DRILL_CORE_MASTER_VOLUME_SANDBOX_PILOT.md`,
+  `Docs/Reports/DRILL_CORE_MASTER_VOLUME_EVIDENCE.md`.
 
 Branch: `feature/v1-trainer-ux-pilot`  
 Last verified commit: see `Docs/CONTEXT_HANDOFF.md` for latest commit  

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SaveGame>
+  <player>
+    <name>TestFarmer</name>
+    <money>5000</money>
+    <health>100</health>
+    <maxHealth>100</maxHealth>
+    <stamina>
+      <float>270</float>
+    </stamina>
+    <maxStamina>
+      <float>270</float>
+    </maxStamina>
+    <experiencePoints>
+      <int>1500</int>
+      <int>100</int>
+      <int>500</int>
+      <int>50</int>
+      <int>0</int>
+      <int>0</int>
+    </experiencePoints>
+    <farmingLevel>3</farmingLevel>
+    <fishingLevel>1</fishingLevel>
+    <miningLevel>2</miningLevel>
+  </player>
+  <farmName>TestFarm</farmName>
+  <year>1</year>
+  <currentSeason>spring</currentSeason>
+  <dayOfMonth>1</dayOfMonth>
+</SaveGame>
