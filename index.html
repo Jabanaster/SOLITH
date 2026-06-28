@@ -10,7 +10,7 @@
       - style-src 'self' 'unsafe-inline': Vite injects inline styles during HMR
       - font-src 'self' data:: local font files and base64-encoded fonts only
       - img-src 'self' data:: local images and inline data URIs
-      - connect-src: dev server (localhost:3000) only during development
+      - connect-src 'self': no network origins in production HTML
       - No remote scripts, no remote fonts, no remote images, no eval
     -->
     <meta http-equiv="Content-Security-Policy" content="
@@ -19,7 +19,7 @@
       style-src 'self' 'unsafe-inline';
       font-src 'self' data:;
       img-src 'self' data:;
-      connect-src 'self' http://localhost:3000 ws://localhost:3000 http://127.0.0.1:3000 ws://127.0.0.1:3000 http://localhost:11434 http://localhost:1234;
+      connect-src 'self';
       frame-src 'none';
       object-src 'none';
     " />
