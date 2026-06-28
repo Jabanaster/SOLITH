@@ -4,6 +4,31 @@ import crypto from 'crypto';
 import { ParsedSave, SaveValue } from '../../shared/types';
 import { SAFE_KEYWORDS, RISKY_KEYWORDS } from '../../shared/constants';
 
+export const MAX_SAVE_FILE_BYTES = 8 * 1024 * 1024;
+
+export class SaveFileTooLargeError extends Error {
+  constructor(sizeBytes: number, maxBytes: number = MAX_SAVE_FILE_BYTES) {
+    super(`Save file is too large to parse safely (${sizeBytes} bytes > ${maxBytes} bytes; limit ${formatBytes(maxBytes)}).`);
+    this.name = 'SaveFileTooLargeError';
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${bytes} bytes`;
+}
+
+function assertFileSizeWithinLimit(filePath: string): void {
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile()) {
+    throw new Error('Save path is not a file.');
+  }
+  if (stat.size > MAX_SAVE_FILE_BYTES) {
+    throw new SaveFileTooLargeError(stat.size);
+  }
+}
+
 // Helper to strip JSON comments safely
 function stripJSONComments(jsonString: string): string {
   return jsonString.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g) => g ? "" : m);
@@ -139,65 +164,74 @@ export function extractStringsFromBinary(buffer: Buffer): string[] {
 
 export function parseSaveFile(filePath: string): ParsedSave | null {
   try {
-    if (!fs.existsSync(filePath)) return null;
-    const lowerName = filePath.toLowerCase();
-    
-    // Check if it is a binary file extension
-    const isBinaryExt = lowerName.endsWith('.sav') || lowerName.endsWith('.dat') || lowerName.endsWith('.bin');
-    
-    // Read buffer first
-    const buffer = fs.readFileSync(filePath);
-    
-    // If it's a binary file extension or contains NULL bytes, treat it as binary save
-    const hasNullBytes = buffer.slice(0, 1024).includes(0x00);
-    
-    if (isBinaryExt || hasNullBytes) {
-      const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-      const extracted = extractStringsFromBinary(buffer);
-      return {
-        format: 'binary',
-        path: filePath,
-        data: {
-          isBinary: true,
-          size: buffer.length,
-          hash,
-          strings: extracted,
-          rawBase64: buffer.toString('base64')
-        }
-      };
-    }
-
-    const content = buffer.toString('utf-8');
-
-    if (lowerName.endsWith('.json')) {
-      const cleanContent = stripJSONComments(content);
-      return { data: JSON.parse(cleanContent), format: 'json', path: filePath };
-    } else if (lowerName.endsWith('.xml')) {
-      let parseResult: any = null;
-      let parseError: any = null;
-      const parser = new xml2js.Parser({ async: false });
-      parser.parseString(content, (err: any, result: any) => {
-        parseError = err;
-        parseResult = result;
-      });
-      if (parseError) throw parseError;
-      return { data: parseResult, format: 'xml', path: filePath };
-    } else if (lowerName.endsWith('.ini') || lowerName.endsWith('.cfg') || lowerName.endsWith('.conf')) {
-      return { data: parseIni(content), format: 'ini', path: filePath };
-    } else if (lowerName.endsWith('.csv')) {
-      return { data: parseCSV(content, ','), format: 'csv', path: filePath };
-    } else if (lowerName.endsWith('.tsv')) {
-      return { data: parseCSV(content, '\t'), format: 'tsv', path: filePath };
-    } else if (content.trim().startsWith('{') && content.trim().includes('=')) {
-      // Looks like a Lua table
-      return { data: parseLuaLikeTable(content), format: 'lua', path: filePath };
-    } else {
-      // Plain text - key-value
-      return { data: parseKeyValue(content), format: 'text', path: filePath };
-    }
+    return parseSaveFileStrict(filePath);
   } catch (error) {
-    console.error('Parse error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to parse save file.';
+    console.error(`Parse error: ${message}`);
     return null;
+  }
+}
+
+export function parseSaveFileStrict(filePath: string): ParsedSave {
+  if (!fs.existsSync(filePath)) {
+    throw new Error('Save file not found.');
+  }
+  assertFileSizeWithinLimit(filePath);
+
+  const lowerName = filePath.toLowerCase();
+  
+  // Check if it is a binary file extension
+  const isBinaryExt = lowerName.endsWith('.sav') || lowerName.endsWith('.dat') || lowerName.endsWith('.bin');
+  
+  // Read buffer only after the size guard passes.
+  const buffer = fs.readFileSync(filePath);
+  
+  // If it's a binary file extension or contains NULL bytes, treat it as binary save
+  const hasNullBytes = buffer.slice(0, 1024).includes(0x00);
+  
+  if (isBinaryExt || hasNullBytes) {
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    const extracted = extractStringsFromBinary(buffer);
+    return {
+      format: 'binary',
+      path: filePath,
+      data: {
+        isBinary: true,
+        size: buffer.length,
+        hash,
+        strings: extracted,
+        rawBase64: buffer.toString('base64')
+      }
+    };
+  }
+
+  const content = buffer.toString('utf-8');
+
+  if (lowerName.endsWith('.json')) {
+    const cleanContent = stripJSONComments(content);
+    return { data: JSON.parse(cleanContent), format: 'json', path: filePath };
+  } else if (lowerName.endsWith('.xml')) {
+    let parseResult: any = null;
+    let parseError: any = null;
+    const parser = new xml2js.Parser({ async: false });
+    parser.parseString(content, (err: any, result: any) => {
+      parseError = err;
+      parseResult = result;
+    });
+    if (parseError) throw parseError;
+    return { data: parseResult, format: 'xml', path: filePath };
+  } else if (lowerName.endsWith('.ini') || lowerName.endsWith('.cfg') || lowerName.endsWith('.conf')) {
+    return { data: parseIni(content), format: 'ini', path: filePath };
+  } else if (lowerName.endsWith('.csv')) {
+    return { data: parseCSV(content, ','), format: 'csv', path: filePath };
+  } else if (lowerName.endsWith('.tsv')) {
+    return { data: parseCSV(content, '\t'), format: 'tsv', path: filePath };
+  } else if (content.trim().startsWith('{') && content.trim().includes('=')) {
+    // Looks like a Lua table
+    return { data: parseLuaLikeTable(content), format: 'lua', path: filePath };
+  } else {
+    // Plain text - key-value
+    return { data: parseKeyValue(content), format: 'text', path: filePath };
   }
 }
 

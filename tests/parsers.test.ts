@@ -5,7 +5,7 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 
-import { parseSaveFile } from '../src/core/saves/index.ts';
+import { MAX_SAVE_FILE_BYTES, SaveFileTooLargeError, parseSaveFile, parseSaveFileStrict } from '../src/core/saves/index.ts';
 import { JsonAdapter } from '../src/core/adapters/json.ts';
 import { IniAdapter } from '../src/core/adapters/ini.ts';
 import { XmlAdapter, validateXmlSafety } from '../src/core/adapters/xml.ts';
@@ -215,5 +215,85 @@ describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+
+  test('8. parseSaveFile rejects oversized JSON before full parse with sanitized error', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-oversize-json-'));
+    const hugeJson = path.join(tempDir, 'private-character-save.json');
+    try {
+      fs.writeFileSync(hugeJson, Buffer.alloc(MAX_SAVE_FILE_BYTES + 1, 0x7b));
+
+      assert.throws(
+        () => parseSaveFileStrict(hugeJson),
+        (error: unknown) => {
+          assert.ok(error instanceof SaveFileTooLargeError);
+          assert.match(error.message, /Save file is too large/i);
+          assert.equal(error.message.includes(hugeJson), false, 'error must not leak full filesystem path');
+          return true;
+        },
+      );
+      assert.equal(parseSaveFile(hugeJson), null);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('9. parseSaveFile rejects oversized XML before full parse with sanitized error', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-oversize-xml-'));
+    const hugeXml = path.join(tempDir, 'private-character-save.xml');
+    try {
+      fs.writeFileSync(hugeXml, Buffer.alloc(MAX_SAVE_FILE_BYTES + 1, 0x3c));
+
+      assert.throws(
+        () => parseSaveFileStrict(hugeXml),
+        (error: unknown) => {
+          assert.ok(error instanceof SaveFileTooLargeError);
+          assert.match(error.message, /Save file is too large/i);
+          assert.equal(error.message.includes(hugeXml), false, 'error must not leak full filesystem path');
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('10. parseSaveFile rejects oversized binary before base64 encoding with sanitized error', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-oversize-bin-'));
+    const hugeBin = path.join(tempDir, 'private-character-save.dat');
+    try {
+      fs.writeFileSync(hugeBin, Buffer.alloc(MAX_SAVE_FILE_BYTES + 1, 0x00));
+
+      assert.throws(
+        () => parseSaveFileStrict(hugeBin),
+        (error: unknown) => {
+          assert.ok(error instanceof SaveFileTooLargeError);
+          assert.match(error.message, /Save file is too large/i);
+          assert.equal(error.message.includes(hugeBin), false, 'error must not leak full filesystem path');
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('11. parseSaveFile still parses normal JSON, XML, and binary saves', () => {
+    const jsonPath = path.join(FIXTURES_DIR, 'json/valid/save.json');
+    const xmlPath = path.join(FIXTURES_DIR, 'xml/valid/save.xml');
+    const binaryPath = path.join(FIXTURES_DIR, 'binary/before.dat');
+
+    const json = parseSaveFileStrict(jsonPath);
+    const xml = parseSaveFileStrict(xmlPath);
+    const binary = parseSaveFileStrict(binaryPath);
+
+    assert.equal(json.format, 'json');
+    assert.equal(json.data.player.hp, 100);
+    assert.equal(xml.format, 'xml');
+    assert.equal(xml.data.save.hp[0], '100');
+    assert.equal(binary.format, 'binary');
+    assert.equal(binary.data.isBinary, true);
+    assert.equal(typeof binary.data.hash, 'string');
+    assert.equal(binary.data.rawBase64, fs.readFileSync(binaryPath).toString('base64'));
   });
 });
