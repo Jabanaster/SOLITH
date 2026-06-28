@@ -6,6 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -19,6 +20,21 @@ import { isControlExecutable, requiresApproval } from '../src/core/trainer-host/
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STARDEW_PROFILE_PATH = path.resolve(__dirname, '../src/core/game-profiles/profiles/stardew-valley.json');
+const SHIPPED_PROFILES_DIR = path.resolve(__dirname, '../src/core/game-profiles/profiles');
+
+function loadShippedProfileFiles(): Array<{ filePath: string; raw: string; profile: GameProfile }> {
+  return fs.readdirSync(SHIPPED_PROFILES_DIR)
+    .filter(file => file.endsWith('.json'))
+    .map(file => {
+      const filePath = path.join(SHIPPED_PROFILES_DIR, file);
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      return { filePath, raw, profile: JSON.parse(raw) as GameProfile };
+    });
+}
+
+function shippedControlText(control: GameProfile['controls'][0]): string {
+  return JSON.stringify(control).toLowerCase();
+}
 
 // â”€â”€ Profile validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -183,9 +199,15 @@ describe('loadStardewProfile â€” Stardew Valley profile', () => {
     assert.strictEqual(profile.saveFormat, 'xml');
   });
 
-  it('includes at least 8 controls', () => {
+  it('includes only the 4 accepted executable controls', () => {
     const profile = loadStardewProfile();
-    assert.ok(profile.controls.length >= 8, `Expected >=8 controls, got ${profile.controls.length}`);
+    const ids = profile.controls.map(c => c.id).sort();
+    assert.deepStrictEqual(ids, [
+      'stardew-farming-xp',
+      'stardew-max-stamina',
+      'stardew-money',
+      'stardew-stamina',
+    ]);
   });
 
   it('includes Money control with correct field path', () => {
@@ -216,28 +238,76 @@ describe('loadStardewProfile â€” Stardew Valley profile', () => {
     assert.strictEqual(farmingXp.saveField?.fieldPath, 'SaveGame.player.0.experiencePoints.0.int.0');
   });
 
-  it('includes Health as future_feature', () => {
+  it('does not include Health as a shipped control', () => {
     const profile = loadStardewProfile();
     const health = profile.controls.find(c => c.id === 'stardew-health');
-    assert.ok(health, 'Health control must be present');
-    assert.strictEqual(health.backend, 'memory_write');
-    assert.strictEqual(health.safetyStatus, 'future_feature');
+    assert.equal(health, undefined);
   });
 
-  it('includes God Mode as future_feature', () => {
+  it('does not include God Mode as a shipped control', () => {
     const profile = loadStardewProfile();
     const godmode = profile.controls.find(c => c.id === 'stardew-godmode');
-    assert.ok(godmode, 'God Mode control must be present');
-    assert.strictEqual(godmode.backend, 'memory_write');
-    assert.strictEqual(godmode.safetyStatus, 'future_feature');
+    assert.equal(godmode, undefined);
   });
 
-  it('includes Aim Assist as future_feature', () => {
+  it('does not include Aim Assist as a shipped control', () => {
     const profile = loadStardewProfile();
     const aimassist = profile.controls.find(c => c.id === 'stardew-aimassist');
-    assert.ok(aimassist, 'Aim Assist control must be present');
-    assert.strictEqual(aimassist.backend, 'memory_write');
-    assert.strictEqual(aimassist.safetyStatus, 'future_feature');
+    assert.equal(aimassist, undefined);
+  });
+});
+
+describe('shipped game profiles â€” hygiene gates', () => {
+  it('reject shipped profile text containing C:\\Users paths', () => {
+    for (const shipped of loadShippedProfileFiles()) {
+      assert.equal(
+        /c:(?:\\|\\\\)users(?:\\|\\\\)/i.test(shipped.raw),
+        false,
+        `${path.basename(shipped.filePath)} must not contain C:\\Users paths`,
+      );
+    }
+  });
+
+  it('reject shipped profile saveField paths with user-specific absolute paths', () => {
+    const windowsUserAbsolutePath = /^[a-z]:\\users\\/i;
+    for (const shipped of loadShippedProfileFiles()) {
+      for (const control of shipped.profile.controls) {
+        const filePath = control.saveField?.filePath ?? '';
+        assert.equal(
+          windowsUserAbsolutePath.test(filePath),
+          false,
+          `${control.id} must not ship a user-specific absolute saveField path`,
+        );
+      }
+    }
+  });
+
+  it('reject shipped profile memory_write controls', () => {
+    for (const shipped of loadShippedProfileFiles()) {
+      const memoryControls = shipped.profile.controls.filter(control => control.backend === 'memory_write');
+      assert.deepStrictEqual(
+        memoryControls.map(control => control.id),
+        [],
+        `${path.basename(shipped.filePath)} must not contain memory_write controls`,
+      );
+    }
+  });
+
+  it('reject shipped profile online or multiplayer cheat-style controls', () => {
+    const blockedTerms = ['god mode', 'godmode', 'aim assist', 'aimassist', 'online', 'multiplayer'];
+    for (const shipped of loadShippedProfileFiles()) {
+      for (const control of shipped.profile.controls) {
+        const text = shippedControlText(control);
+        const matched = blockedTerms.filter(term => text.includes(term));
+        assert.deepStrictEqual(matched, [], `${control.id} contains unsupported control terms: ${matched.join(', ')}`);
+      }
+    }
+  });
+
+  it('loads and validates the cleaned Stardew profile', () => {
+    assert.doesNotThrow(() => loadGameProfile(STARDEW_PROFILE_PATH));
+    const profile = loadGameProfile(STARDEW_PROFILE_PATH);
+    assert.deepStrictEqual(validateGameProfile(profile), []);
   });
 });
 
@@ -296,14 +366,11 @@ describe('loadTrainerControls â€” profile to TrainerControl conversion', ()
     }
   });
 
-  it('memory_write controls are not executable', () => {
+  it('shipped Stardew profile contains no memory_write controls', () => {
     const profile = loadStardewProfile();
     const controls = loadTrainerControls(profile);
     const memoryControls = controls.filter(c => c.backend === 'memory_write');
-    assert.ok(memoryControls.length > 0, 'Expected at least one memory_write control');
-    for (const c of memoryControls) {
-      assert.strictEqual(isControlExecutable(c), false, `${c.id} (memory_write) must not be executable`);
-    }
+    assert.deepStrictEqual(memoryControls, []);
   });
 
   it('unsupported and non-save_field backends are never executable', () => {
