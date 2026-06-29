@@ -58,6 +58,7 @@ coverage/
 
 # AI context / brain files — these are local planning artifacts only
 .gemini/
+.junie/
 .brain/
 *.brain.md
 CURRENT_STATE.md
