@@ -23,6 +23,31 @@ interface DataSuggestion {
   risk: string;
 }
 
+const DEMO_GAME_ID = 'demo-game-quest-id-000000000000';
+
+function riskDisplayLabel(risk: string): string {
+  const normalized = risk.toLowerCase();
+  if (normalized === 'safe') return 'Low risk';
+  if (normalized === 'caution') return 'Caution';
+  if (normalized === 'risky') return 'Risky';
+  if (normalized === 'blocked') return 'Blocked';
+  return risk || 'Unreviewed';
+}
+
+function riskClassName(risk: string): string {
+  const normalized = risk.toLowerCase();
+  if (normalized === 'safe') return 'safe';
+  if (normalized === 'caution') return 'caution';
+  if (normalized === 'risky') return 'risky';
+  if (normalized === 'blocked') return 'blocked';
+  return 'caution';
+}
+
+function isElevatedRisk(risk: string): boolean {
+  const normalized = risk.toLowerCase();
+  return normalized === 'caution' || normalized === 'risky';
+}
+
 const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   const [saveFiles, setSaveFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState('');
@@ -144,6 +169,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
     f.path.toLowerCase().includes(filterText.toLowerCase()) ||
     String(f.value).toLowerCase().includes(filterText.toLowerCase())
   );
+  const isDemoGame = gameId === DEMO_GAME_ID;
 
   return (
     <div className="save-editor-container">
@@ -158,6 +184,9 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
 
       <div className="file-selector-panel glass">
         <label>Select target file:</label>
+        <div className={`badge ${isDemoGame ? 'risk-caution' : 'risk-safe'}`}>
+          {isDemoGame ? 'Demo fixture edit' : 'Registered game edit'}
+        </div>
         {loading && saveFiles.length === 0 ? (
           <select disabled><option>Loading detected files...</option></select>
         ) : (
@@ -186,8 +215,8 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
                   <span>Suggested: <strong className="highlight">{String(sug.suggestedValue)}</strong></span>
                 </div>
                 <div className="suggestion-card-footer">
-                  <span className="badge risk-safe">Safe</span>
-                  <button className="btn-action btn-sm">Apply Tweak</button>
+                  <span className={`badge risk-${riskClassName(sug.risk)}`}>{riskDisplayLabel(sug.risk)}</span>
+                  <button className="btn-action btn-sm">Review and Apply Edit</button>
                 </div>
               </div>
             ))}
@@ -234,7 +263,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
                         <td><span className="type-badge">{field.type}</span></td>
                         <td>
                           <span className={`badge risk-${field.risk.toLowerCase()}`}>
-                            {field.risk}
+                            {riskDisplayLabel(field.risk)}
                           </span>
                         </td>
                         <td>
@@ -260,13 +289,24 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
         <div className="modal-overlay">
           <div className="modal-content glass">
             <h3>Modify Parameter</h3>
-            <p className="modal-description">ResourceForge will create a backup before applying this local edit.</p>
+            <p className="modal-description">
+              This will modify a local save/data file. Confirm you have a backup or rollback point before continuing.
+            </p>
+            <p className={`modal-description ${isDemoGame ? 'risk-caution' : 'risk-safe'}`}>
+              {isDemoGame ? 'Demo fixture edit' : 'Registered game edit'}
+            </p>
             
             <div className="recipe-details-box">
               <div><strong>Path:</strong> <code>{editingField.path}</code></div>
               <div><strong>Current Value:</strong> {String('value' in editingField ? editingField.value : editingField.currentValue)}</div>
-              <div><strong>Risk assessment:</strong> <span className={`badge risk-${editingField.risk.toLowerCase()}`}>{editingField.risk}</span></div>
+              <div><strong>Risk assessment:</strong> <span className={`badge risk-${riskClassName(editingField.risk)}`}>{riskDisplayLabel(editingField.risk)}</span></div>
             </div>
+
+            {isElevatedRisk(editingField.risk) && (
+              <div className={`recipe-details-box risk-${riskClassName(editingField.risk)}`}>
+                <strong>{riskDisplayLabel(editingField.risk)} edit:</strong> review the target value carefully before applying.
+              </div>
+            )}
 
             <div className="input-group">
               <label>New Value</label>
@@ -283,7 +323,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
                 className="btn-primary"
                 disabled={applying}
               >
-                {applying ? 'Applying tweak...' : 'Apply Safe Edit'}
+                {applying ? 'Applying edit...' : 'Review and Apply Edit'}
               </button>
               <button onClick={() => setEditingField(null)} className="btn-secondary">Cancel</button>
             </div>
