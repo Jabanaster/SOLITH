@@ -73,26 +73,17 @@ describe('Milestone J acceptance — release-candidate control workflow contract
     assert.strictEqual(maxStamina.metadata?.safeTestValue, 304);
   });
 
-  it('memory_write controls are not part of the accepted executable set', () => {
+  it('shipped controls do not include memory_write controls', () => {
     const memoryWriteControls = profile.controls.filter((control) => control.backend === 'memory_write');
 
-    assert.ok(memoryWriteControls.length > 0, 'expected at least one memory_write future control');
-
-    for (const control of memoryWriteControls) {
-      assert.ok(!acceptedExecutableIds.includes(control.id), `${control.id} must not be accepted executable`);
-      assert.notStrictEqual(control.safetyStatus, 'requires_approval', `${control.id} must not be approval executable`);
-    }
+    assert.deepStrictEqual(memoryWriteControls, []);
   });
 
-  it('future_feature, disabled, and unsupported controls are not accepted executable controls', () => {
+  it('shipped controls do not include future, disabled, or unsupported controls', () => {
     const blockedControls = profile.controls.filter((control) =>
       ['future_feature', 'disabled', 'unsupported'].includes(control.safetyStatus),
     );
 
-    assert.ok(blockedControls.length > 0, 'expected blocked controls');
-
-    for (const control of blockedControls) {
-      assert.ok(!acceptedExecutableIds.includes(control.id), `${control.id} must not be accepted executable`);
-    }
+    assert.deepStrictEqual(blockedControls, []);
   });
 });
