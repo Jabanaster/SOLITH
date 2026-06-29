@@ -1,28 +1,55 @@
 # ResourceForge Roadmap
 
-## Current Status
+## Current Baseline
 
 ResourceForge is a local-only, offline-only, single-player focused trainer/save-editor application.
 
-The Phase 9 full code/test/build gate passed live at HEAD `6d4b806724baa3ddb2d1c10eb03fca7dc93fdce2`. This means the code/test/build gate is accepted for that commit.
+Current baseline: `v1.0.1`.
 
-Documentation, release tag creation, push, and public release publication may still be pending unless separately completed and verified. Do not treat this roadmap as evidence that a tag, push, merge, or public release has happened.
+Remote `master` points to commit `6e340c765e21396f8936f6c493824a08c3b23b9f`.
 
-## V1.0 Release Lock
+Remote `v1.0.1` tag object: `7c71dd68421c869c5ec19cb3224c65521ba0f0e3`.
 
-- Complete Phase 10 documentation honesty pass.
-- Ensure docs match live Phase 9 evidence.
-- Commit docs.
-- Create release tag only after docs are accurate.
-- Optional: push tag only after local release lock is verified.
+Remote `v1.0.1` peeled commit: `6e340c765e21396f8936f6c493824a08c3b23b9f`.
 
-## Fresh Clone Verification
+`v1.0.1` is accepted, tagged, and pushed. `v1.0.0` remains unchanged, but it is superseded by `v1.0.1` for fresh-clone reproducibility. Do not erase the `v1.0.0` history; future work should treat `v1.0.1` as the corrected reproducible release baseline.
 
-- Clone repo fresh.
-- Run `npm ci`.
-- Run the full release gate from scratch.
-- Verify packaged app starts without dev server.
-- Verify no local-only developer paths are required.
+## v1.0.1 Patch Release - Fresh Clone Reproducibility
+
+The `v1.0.1` patch release fixes release reproducibility from a clean clone.
+
+- `.junie/` assistant metadata is ignored through `.gitignore`; `.junie/` contents were not committed.
+- Cleanup commit: `6e340c765e21396f8936f6c493824a08c3b23b9f`.
+- `npm run test:trainer-host` now builds required Electron host output first.
+- This prevents clean clones from failing on missing `dist-electron/host-entry.js`.
+- `npm run test:milestone-e` now builds the packaged app first.
+- This prevents clean clones from failing on missing `dist/win-unpacked/ResourceForge.exe`.
+- Fresh-clone gates now build required artifacts instead of relying on stale local `dist` or `dist-electron` output.
+
+## Verified v1.0.1 Gate Results
+
+- `npm ci`: PASS
+- `npx tsc --noEmit`: PASS
+- `npm run test:game-profile`: PASS, 33/33
+- `npm run test:trainer-schema`: PASS, 35/35
+- `npm run test:trainer-host`: PASS, Electron output 19/19, tests 64/64
+- `npm run test:milestone-e`: PASS, packaged build ran first, 15/15
+- `npm run test:milestone-j`: PASS, 5/5
+
+## Next Required Step Before V1.1
+
+- Optional final confirmation: clone from remote `v1.0.1` tag and run the full release gate.
+- If that passes, V1.1 planning may begin from `v1.0.1`.
+- No V1.1 feature work should begin from `v1.0.0`.
+
+## V1.1 Entry Criteria
+
+- Must start from clean `v1.0.1`.
+- Must preserve local-only, offline-only, single-player scope.
+- Must not reintroduce memory-write controls.
+- Must not reintroduce unsafe shipped profile placeholders.
+- Must keep fresh-clone reproducibility intact.
+- Any new milestone test that needs build artifacts must build them through explicit npm script prerequisites.
 
 ## Compatibility Pilot
 
