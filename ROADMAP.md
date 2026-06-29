@@ -15,7 +15,8 @@ ResourceForge's current pushed release baseline is **v1.0.1**.
 A local **v1.0.2 hygiene candidate** has also been prepared, but it is not tagged or pushed yet.
 
 * Prepared candidate: `v1.0.2`
-* Candidate commit: `e0539a14163fb25b4ef045c6001b5273fcc72f9b`
+* Line-ending hygiene fix commit: `e0539a14163fb25b4ef045c6001b5273fcc72f9b`
+* Current release-candidate HEAD includes the line-ending hygiene fix plus roadmap status correction.
 * Status: local candidate only; not tagged, not pushed.
 
 ## v1.0.1 Patch Release — Fresh Clone Reproducibility
@@ -74,9 +75,11 @@ Known v1.0.1 verification note:
 
 A local `v1.0.2` hygiene candidate has been prepared to fix the v1.0.1 line-ending noise.
 
-Candidate commit:
+Line-ending hygiene fix commit:
 
 `e0539a14163fb25b4ef045c6001b5273fcc72f9b`
+
+The `v1.0.2` release-candidate HEAD includes this line-ending hygiene fix plus the roadmap status correction. `v1.0.2` should be tagged from the verified HEAD after the roadmap correction commit, not from the hygiene-only commit.
 
 Fix:
 
@@ -114,7 +117,7 @@ Status:
 Preferred path:
 
 1. Explicitly authorize `v1.0.2` tag and push.
-2. Tag `v1.0.2` from commit `e0539a14163fb25b4ef045c6001b5273fcc72f9b`.
+2. Tag `v1.0.2` from the verified release-candidate HEAD that includes the line-ending hygiene fix and roadmap status correction.
 3. Push branch and tag.
 4. Run remote-tag fresh clone verification against `v1.0.2`.
 5. Begin V1.1 planning only after remote-tag verification passes.
