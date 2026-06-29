@@ -29,6 +29,7 @@
     "test:electron-e2e": "playwright test tests/electron.e2e.test.ts --config playwright.e2e.config.ts",
     "test:trainer-e2e": "playwright test tests/trainer.e2e.test.ts --config playwright.e2e.config.ts",
     "test:packaged-smoke": "playwright test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts",
+    "pretest:milestone-e": "npm run build",
     "test:milestone-e": "playwright test tests/milestone-e-acceptance.test.ts --config playwright.e2e.config.ts",
     "test:ipc-channels": "playwright test tests/ipc-channels.e2e.test.ts --config playwright.e2e.config.ts",
     "test:ipc-e2e": "playwright test tests/ipc-channels.e2e.test.ts --config playwright.e2e.config.ts",
