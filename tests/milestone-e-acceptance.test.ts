@@ -2,8 +2,8 @@
  * tests/milestone-e-acceptance.test.ts — Milestone E Packaged UI Acceptance
  *
  * Validates the Milestone E deliverables in the real packaged ResourceForge.exe:
- *   1. Controls view navigates and renders all 6 controls
- *   2. Disabled/future controls have no executable path
+ *   1. Controls view navigates and renders the accepted shipped controls
+ *   2. Removed unsafe/future controls are absent from the shipped UI
  *   3. Money IPC workflow: propose → approve → verify → rollback → verify
  *   4. Companion files are untouched
  *   5. TrainerHost packaged path uses app.asar.unpacked/dist-electron/host-entry.js
@@ -11,7 +11,7 @@
  *
  * Validation gates:
  *   A — Controls panel renders in packaged app
- *   B — Disabled/future controls are not executable (no propose button)
+ *   B — Removed unsafe/future controls are absent and have no propose button
  *   C — Money preload IPC channels present
  *   D — TrainerHost start/stop round-trip succeeds in packaged app
  *   E — Propose write returns proposalId (validation + approval gate works)
@@ -119,7 +119,7 @@ test.afterAll(async () => {
 
 // ── Gate A: Controls panel renders in packaged app ───────────────────────────
 
-test('gate A — Controls panel renders in packaged app (all 6 controls present)', async () => {
+test('gate A — Controls panel renders in packaged app (accepted controls present)', async () => {
   if (!electronApp) test.skip(true, 'App not launched');
 
   // Navigate to Game Library first, then reload to pick up the newly-added game
@@ -149,14 +149,12 @@ test('gate A — Controls panel renders in packaged app (all 6 controls present)
   const panel = win.locator('[data-testid="trainer-control-panel"]');
   await expect(panel).toBeVisible({ timeout: 10_000 });
 
-  // All 6 expected controls
+  // Accepted shipped V1 controls
   const expectedIds = [
     'stardew-money',
-    'stardew-health',
-    'stardew-energy',
-    'stardew-resources',
-    'stardew-godmode',
-    'stardew-aimassist',
+    'stardew-stamina',
+    'stardew-farming-xp',
+    'stardew-max-stamina',
   ];
   for (const id of expectedIds) {
     await expect(win.locator(`[data-testid="control-${id}"]`)).toBeVisible(
@@ -165,12 +163,12 @@ test('gate A — Controls panel renders in packaged app (all 6 controls present)
   }
 });
 
-// ── Gate B: Disabled/future controls have no propose/execute button ───────────
+// ── Gate B: Removed unsafe/future controls are absent ─────────────────────────
 
-test('gate B — disabled and future_feature controls have no propose button', async () => {
+test('gate B — removed unsafe and future controls are absent from shipped UI', async () => {
   if (!electronApp) test.skip(true, 'App not launched');
 
-  const disabledIds = [
+  const removedIds = [
     'stardew-health',
     'stardew-energy',
     'stardew-resources',
@@ -178,9 +176,9 @@ test('gate B — disabled and future_feature controls have no propose button', a
     'stardew-aimassist',
   ];
 
-  for (const id of disabledIds) {
-    // Must have disabled-note, must NOT have a propose button
-    await expect(win.locator(`[data-testid="disabled-note-${id}"]`)).toBeVisible();
+  for (const id of removedIds) {
+    await expect(win.locator(`[data-testid="control-${id}"]`)).toHaveCount(0);
+    await expect(win.locator(`[data-testid="disabled-note-${id}"]`)).toHaveCount(0);
     await expect(win.locator(`[data-testid="propose-btn-${id}"]`)).toHaveCount(0);
   }
 });
