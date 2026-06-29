@@ -1,0 +1,10 @@
+# Parser fixtures are rewritten by parser tests; keep their checkout form stable
+# under Windows core.autocrlf so test runs do not leave line-ending-only dirt.
+tests/fixtures/parsers/**/*.csv text eol=lf
+tests/fixtures/parsers/**/*.ini text eol=lf
+tests/fixtures/parsers/**/*.json text eol=lf
+tests/fixtures/parsers/**/*.lua text eol=lf
+tests/fixtures/parsers/**/*.tsv text eol=lf
+tests/fixtures/parsers/**/*.txt text eol=lf
+tests/fixtures/parsers/**/*.xml text eol=lf
+tests/fixtures/parsers/**/*.dat -text
