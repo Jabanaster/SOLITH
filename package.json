@@ -19,6 +19,7 @@
     "test:v2-lifecycle": "tsx --test tests/v2-lifecycle.test.ts",
     "test:command-runner": "tsx --test tests/command-runner.test.ts",
     "test:lifecycle-wiring": "tsx --test tests/v2-lifecycle-wiring.test.ts",
+    "pretest:trainer-host": "npm run build:electron",
     "test:trainer-host": "tsx --test tests/trainer-host/protocol.test.ts tests/trainer-host/read-save-field.test.ts tests/trainer-host/host-runtime.test.ts tests/trainer-host/host-supervisor.test.ts tests/trainer-host/write-save-field.test.ts tests/trainer-host/e2e.test.ts",
     "test:trainer-schema": "tsx --test tests/trainer-control-schema.test.ts",
     "test:game-profile": "tsx --test tests/game-profile.test.ts",
