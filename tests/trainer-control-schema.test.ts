@@ -227,8 +227,16 @@ describe('SAFETY_STATUS_LABELS', () => {
 describe('buildControls — TrainerControlPanel fixture set', () => {
   const controls = buildControls();
 
-  it('includes at least 8 controls', () => {
-    assert.ok(controls.length >= 8, `Expected >=8 controls, got ${controls.length}`);
+  it('includes only the 4 accepted shipped V1 controls', () => {
+    assert.deepStrictEqual(
+      controls.map(c => c.id).sort(),
+      [
+        'stardew-farming-xp',
+        'stardew-max-stamina',
+        'stardew-money',
+        'stardew-stamina',
+      ]
+    );
   });
 
   it('Money control is executable and requires approval', () => {
@@ -256,6 +264,15 @@ describe('buildControls — TrainerControlPanel fixture set', () => {
     assert.ok(farmingXp.saveField?.fieldPath.includes('experiencePoints'), 'Farming XP field path must reference experiencePoints');
   });
 
+  it('Max Stamina control is executable and requires approval', () => {
+    const maxStamina = controls.find(c => c.id === 'stardew-max-stamina');
+    assert.ok(maxStamina, 'Max Stamina control must be present');
+    assert.strictEqual(isControlExecutable(maxStamina), true);
+    assert.strictEqual(requiresApproval(maxStamina), true);
+    assert.strictEqual(maxStamina.backend, 'save_field');
+    assert.ok(maxStamina.saveField?.fieldPath.includes('maxStamina'), 'Max Stamina field path must reference maxStamina');
+  });
+
   it('all non-save_field controls are not executable', () => {
     const nonSaveField = controls.filter(c => c.backend !== 'save_field');
     for (const c of nonSaveField) {
@@ -266,12 +283,9 @@ describe('buildControls — TrainerControlPanel fixture set', () => {
     }
   });
 
-  it('no memory_write control can execute', () => {
+  it('ships no memory_write controls', () => {
     const memoryControls = controls.filter(c => c.backend === 'memory_write');
-    assert.ok(memoryControls.length > 0, 'Expected at least one memory_write control in the panel');
-    for (const c of memoryControls) {
-      assert.strictEqual(isControlExecutable(c), false);
-    }
+    assert.deepStrictEqual(memoryControls, []);
   });
 
   it('all controls pass schema validation', () => {
@@ -291,11 +305,8 @@ describe('buildControls — TrainerControlPanel fixture set', () => {
     }
   });
 
-  it('future_feature controls are not executable', () => {
+  it('ships no future_feature controls', () => {
     const future = controls.filter(c => c.safetyStatus === 'future_feature');
-    assert.ok(future.length > 0, 'Expected at least one future_feature control');
-    for (const c of future) {
-      assert.strictEqual(isControlExecutable(c), false);
-    }
+    assert.deepStrictEqual(future, []);
   });
 });
