@@ -1,6 +1,8 @@
 # Milestone L Contract Review
 
-This review covers the accepted ResourceForge V1 Stardew trainer contract at HEAD 3738ecba925d6a43325af781856e7b5656ee6404.
+This historical review covered the ResourceForge V1 Stardew trainer contract at HEAD 3738ecba925d6a43325af781856e7b5656ee6404.
+
+Current release-readiness evidence is recorded in `Docs/Reports/V1_0_0_TAG_READINESS_REPORT.md` at HEAD `6d4b806724baa3ddb2d1c10eb03fca7dc93fdce2`.
 
 ## Accepted Executable Controls
 
@@ -37,7 +39,7 @@ Repo inspection and tests confirm these categories are not part of the accepted 
 
 Runtime memory editing enabled: NO.
 
-The Stardew profile contains memory_write controls only as future_feature placeholders. The execution predicate only returns executable for save_field controls with supported or requires_approval safety status, and the accepted executable Stardew set is limited to the four save-backed controls listed above.
+The current shipped Stardew profile contains no memory_write controls and no future_feature controls. The execution predicate only returns executable for save_field controls with supported or requires_approval safety status, and the accepted executable Stardew set is limited to the four save-backed controls listed above.
 
 ## Safety Boundary Summary
 

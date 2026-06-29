@@ -1,3 +1,5 @@
+HISTORICAL NOTICE: This Milestone I field survey predates the Phase 4/9 shipped-profile cleanup at HEAD 6d4b806724baa3ddb2d1c10eb03fca7dc93fdce2. References below to God Mode, Aim Assist, memory_write, or future_feature controls are historical survey data only and do not describe the current shipped Stardew profile. Current release-readiness evidence is in Docs/Reports/V1_0_0_TAG_READINESS_REPORT.md.
+
 === FIELD SEARCH ===
 tests\core.test.ts:      stamina = 50
 tests\core.test.ts:      const brokenRecipe = { ...recipe, path: 'stamina' };

@@ -4,13 +4,6 @@ This document records the current known bugs, design limitations, and trade-offs
 
 ## Open Issues
 
-### KI-001: Playwright not installed — smoke tests require manual install step
-`@playwright/test` is in `devDependencies` but browsers must be downloaded before tests run:
-```powershell
-npm install && npx playwright install
-```
-This is a one-time setup step per machine.
-
 ### KI-014: Accessibility E2E worker can transiently crash on Windows
 On some runs the Electron worker for `test:accessibility` has crashed
 (`code=3221226505`, a Windows access-violation in the GPU/worker process) before
@@ -51,6 +44,7 @@ repacking, apply, and restore are prohibited.
 
 | Issue | Resolution |
 |-------|-----------|
+| KI-001: Playwright local dependency gate | Resolved in Phase 8/9 release-gate evidence: `npm ci` restored local project dependencies, `@playwright/test@1.61.0` and nested `playwright@1.61.0` were installed locally, and `npm run test:milestone-e` passed 15/15 without global installs |
 | Node ESM bare imports crashing at runtime | Replaced tsc + fix-esm-imports with tsup bundling |
 | Shared database singleton causing test failures across runs | Added `resetForTesting()` with unique temp DB per suite |
 | Remote Google Fonts CDN reference in index.html | Removed; local system font stacks only |

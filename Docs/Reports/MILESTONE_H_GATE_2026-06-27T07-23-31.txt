@@ -1137,3 +1137,4 @@ REPORT_PATH=Docs\Reports\MILESTONE_H_GATE_2026-06-27T07-23-31.txt
 Windows PowerShell transcript end
 End time: 20260627072448
 **********************
+HISTORICAL NOTICE: This Milestone H transcript predates the Phase 4/9 shipped-profile cleanup at HEAD 6d4b806724baa3ddb2d1c10eb03fca7dc93fdce2. References below to God Mode, Aim Assist, memory_write, or future_feature controls are historical evidence only and do not describe the current shipped Stardew profile. Current release-readiness evidence is in Docs/Reports/V1_0_0_TAG_READINESS_REPORT.md.
