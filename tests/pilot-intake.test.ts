@@ -24,7 +24,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { intakePilotSave } from '../src/core/pilot/intake.js';
-import { RealWorldPilotManifestSchema } from '../src/core/pilot/manifest.js';
+import { RealWorldPilotManifestSchema, assessPilotReadiness } from '../src/core/pilot/manifest.js';
 
 const FIXTURE_JSON  = JSON.stringify({ player: { hp: 100, gold: 150, level: 5 } });
 const FIXTURE_INI   = '[player]\nhp = 100\ngold = 150\n';
@@ -314,6 +314,62 @@ test('intake-10 — confirmations round-trip through manifest and Zod schema', a
   // Full Zod parse
   const parsed = RealWorldPilotManifestSchema.safeParse(manifest);
   assert.equal(parsed.success, true, 'manifest validates with Zod');
+
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.rmSync(wrkDir, { recursive: true, force: true });
+});
+
+test('intake-11 — high cloud-sync risk requires disabled sync before pilot readiness', async () => {
+  const srcDir = makeWorkspace('src-cloud-risk');
+  const wrkDir = makeWorkspace('wrk-cloud-risk');
+  const src = makeFixture(srcDir, 'save.json', FIXTURE_JSON);
+
+  const result = await intakePilotSave({
+    gameName: 'Test Quest',
+    gameVersion: '1.0',
+    gameStore: 'steam',
+    sourceSavePath: src,
+    workspaceRootDir: wrkDir,
+    cloudSyncRisk: 'high',
+    confirmations: BASE_CONFIRMATIONS,
+  });
+
+  assert.equal(result.success, false);
+  if (!result.success) {
+    assert.match(result.error, /high_cloud_sync_risk_requires_disabled_sync/);
+  }
+
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.rmSync(wrkDir, { recursive: true, force: true });
+});
+
+test('intake-12 — pilot readiness accepts copied local text formats and rejects binary formats', async () => {
+  const srcDir = makeWorkspace('src-ready');
+  const wrkDir = makeWorkspace('wrk-ready');
+  const src = makeFixture(srcDir, 'save.json', FIXTURE_JSON);
+
+  const result = await intakePilotSave({
+    gameName: 'Test Quest',
+    gameVersion: '1.0',
+    gameStore: 'steam',
+    sourceSavePath: src,
+    workspaceRootDir: wrkDir,
+    cloudSyncRisk: 'none',
+    confirmations: BASE_CONFIRMATIONS,
+  });
+
+  assert.equal(result.success, true);
+  if (!result.success) return;
+  assert.deepEqual(assessPilotReadiness(result.manifest), { ready: true, reasons: [] });
+
+  const rejected = RealWorldPilotManifestSchema.parse({
+    ...result.manifest,
+    save: { ...result.manifest.save, format: 'binary' },
+    formatStatus: 'REJECTED',
+  });
+  const readiness = assessPilotReadiness(rejected);
+  assert.equal(readiness.ready, false);
+  assert.ok(readiness.reasons.includes('save_format_not_ready_for_pilot'));
 
   fs.rmSync(srcDir, { recursive: true, force: true });
   fs.rmSync(wrkDir, { recursive: true, force: true });

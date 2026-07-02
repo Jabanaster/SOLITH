@@ -6,6 +6,7 @@ import {
   RealWorldPilotManifestSchema,
   REJECTED_FORMATS,
   PILOT_SCHEMA_VERSION,
+  assessPilotReadiness,
 } from './manifest.js';
 import { validatePathSafety } from '../safety/path-safety.js';
 
@@ -158,8 +159,16 @@ export async function intakePilotSave(
       cloudSyncDisabled: confirmations.cloudSyncDisabled,
     },
 
-    formatStatus: REJECTED_FORMATS.has(format) ? 'REJECTED' : 'ACCEPTED',
+    formatStatus: REJECTED_FORMATS.has(format) || (input.cloudSyncRisk === 'high' && !confirmations.cloudSyncDisabled)
+      ? 'REJECTED'
+      : 'ACCEPTED',
   });
+
+  const readiness = assessPilotReadiness(manifest);
+  if (!readiness.ready && !REJECTED_FORMATS.has(format)) {
+    fs.rmSync(path.join(workspaceRootDir, pilotId), { recursive: true, force: true });
+    return { success: false, error: `Pilot intake rejected: ${readiness.reasons.join(', ')}` };
+  }
 
   // 13. Write manifest
   const manifestPath = path.join(workspaceRootDir, pilotId, 'manifest.json');

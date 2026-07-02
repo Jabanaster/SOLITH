@@ -45,3 +45,39 @@ export const REJECTED_FORMATS = new Set([
 ]);
 
 export const PILOT_SCHEMA_VERSION = '1.0' as const;
+
+export interface PilotReadinessResult {
+  ready: boolean;
+  reasons: string[];
+}
+
+export function assessPilotReadiness(manifest: RealWorldPilotManifest): PilotReadinessResult {
+  const reasons: string[] = [];
+
+  if (!manifest.game.singlePlayerConfirmed) {
+    reasons.push('single_player_not_confirmed');
+  }
+  if (!manifest.confirmations.gameClosed) {
+    reasons.push('game_must_be_closed');
+  }
+  if (!manifest.confirmations.userOwned) {
+    reasons.push('user_ownership_not_confirmed');
+  }
+  if (!manifest.confirmations.copyPermission) {
+    reasons.push('copy_permission_not_confirmed');
+  }
+  if (!manifest.confirmations.noGit) {
+    reasons.push('source_must_not_be_git_tracked');
+  }
+  if (manifest.save.cloudSyncRisk === 'high' && !manifest.confirmations.cloudSyncDisabled) {
+    reasons.push('high_cloud_sync_risk_requires_disabled_sync');
+  }
+  if (REJECTED_FORMATS.has(manifest.save.format)) {
+    reasons.push('save_format_not_ready_for_pilot');
+  }
+  if (manifest.formatStatus !== 'ACCEPTED') {
+    reasons.push('format_status_not_accepted');
+  }
+
+  return { ready: reasons.length === 0, reasons };
+}
