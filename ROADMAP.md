@@ -2,163 +2,401 @@
 
 ## Current Baseline
 
-ResourceForge's current pushed release baseline is **v1.0.1**.
+ResourceForge's current pushed release baseline is **v1.0.2**.
 
-* Current pushed baseline: `v1.0.1`
-* `v1.0.1` tag object: `7c71dd68421c869c5ec19cb3224c65521ba0f0e3`
-* `v1.0.1` peeled commit: `6e340c765e21396f8936f6c493824a08c3b23b9f`
-* Remote `master` target after v1.0.1: `6e340c765e21396f8936f6c493824a08c3b23b9f`
-* Status: accepted, tagged locally, and pushed.
+* Current pushed release: `v1.0.2`
+* Commit: `d84b155a8f6729f8428b5c777f0784853c65d419`
+* Tag object: `9e618998e103e475daf7cff7ff667e515a9e5074`
+* Remote `master`: `d84b155a8f6729f8428b5c777f0784853c65d419`
+* Status: accepted, tagged locally, pushed, and remote-tag verified.
 
-`v1.0.0` remains unchanged, but it is superseded by `v1.0.1` for fresh-clone reproducibility.
+Older release tags remain unchanged:
 
-A local **v1.0.2 hygiene candidate** has also been prepared, but it is not tagged or pushed yet.
+* `v1.0.0`: left unchanged; superseded for fresh-clone reproducibility.
+* `v1.0.1`: left unchanged; accepted functionally, superseded by `v1.0.2` for line-ending hygiene.
+* `v1.0.2`: clean release baseline for V1.1 development.
 
-* Prepared candidate: `v1.0.2`
-* Line-ending hygiene fix commit: `e0539a14163fb25b4ef045c6001b5273fcc72f9b`
-* Current release-candidate HEAD includes the line-ending hygiene fix plus roadmap status correction.
-* Status: local candidate only; not tagged, not pushed.
+## Current Development State
 
-## v1.0.1 Patch Release — Fresh Clone Reproducibility
+V1.1 development has started from the locked `v1.0.2` baseline.
 
-`v1.0.1` corrected fresh-clone reproducibility problems found after the original `v1.0.0` release lock.
+Current local development state:
+
+* Latest accepted local V1.1 bite: **V1.1 Bite 2**
+* Commit: `5f6d1ad590ece1cf38eeb19b158488372d348fc2`
+* Status: accepted locally and fresh local-clone verified.
+* Not tagged.
+* Not pushed as a release.
+* Working tree after verification: clean.
+
+Fresh local-clone verification for Bite 2 passed from:
+
+`G:\RESOURCEFORGE_V11_BITE2_VERIFY`
+
+Bite 2 verification results:
+
+* `npm ci`: PASS
+* `npx tsc --noEmit`: PASS
+* `npm run test:game-profile`: PASS, 33/33
+* `npm run test:trainer-schema`: PASS, 35/35
+* `npm run test:trainer-host`: PASS, 73/73
+* `npm run test:milestone-e`: PASS, 15/15
+* `npm run test:milestone-j`: PASS, 5/5
+* `npm test`: PASS, 381/381
+* Final fresh-clone `git status --short`: clean
+* Final `git diff --quiet`: PASS
+
+## Release History
+
+### v1.0.0 - Original Release Lock
+
+`v1.0.0` remains published and unchanged.
+
+It is no longer the recommended baseline because later fresh-clone verification found reproducibility issues that depended on leftover local artifacts.
+
+### v1.0.1 - Fresh Clone Reproducibility Patch
+
+`v1.0.1` fixed fresh-clone artifact dependency issues.
 
 Fixes included:
 
 * Ignored `.junie/` assistant metadata through `.gitignore`.
-* Added a self-contained trainer-host test prerequisite.
+* Added self-contained trainer-host test prerequisites.
 
-  * `npm run test:trainer-host` now builds required Electron host output first.
-  * This prevents clean clones from failing on missing `dist-electron/host-entry.js`.
-* Added a self-contained Milestone E packaged-app prerequisite.
+  * `npm run test:trainer-host` builds required Electron host output first.
+  * Prevents clean clones from failing on missing `dist-electron/host-entry.js`.
+* Added self-contained Milestone E packaged-app prerequisites.
 
-  * `npm run test:milestone-e` now builds the packaged app first.
-  * This prevents clean clones from failing on missing `dist/win-unpacked/ResourceForge.exe`.
-* Fresh clone verification no longer depends on stale local `dist/` or `dist-electron/` artifacts.
+  * `npm run test:milestone-e` builds the packaged app first.
+  * Prevents clean clones from failing on missing `dist/win-unpacked/ResourceForge.exe`.
 
-## Verified v1.0.1 Gate Results
+Known note:
 
-Final v1.0.1 verification passed:
+* Remote-tag `v1.0.1` verification passed all gates, but final status showed parser fixture line-ending noise.
+* No content diff existed.
+* This was corrected in `v1.0.2`.
+
+### v1.0.2 - Line-Ending Hygiene Patch
+
+`v1.0.2` is the current pushed release baseline.
+
+Fixes included:
+
+* Added `.gitattributes`.
+* Stabilized parser fixture line endings.
+* Prevented fresh-clone verification from ending with phantom modified parser fixture files.
+* Preserved existing app behavior.
+* Preserved parser logic.
+* Preserved test expectations.
+
+Final state:
+
+* Accepted.
+* Tagged locally.
+* Pushed.
+* Remote verified.
+* Clean baseline for V1.1.
+
+## V1.1 Status
+
+V1.1 is focused on safe save-format expansion and compatibility pilot readiness.
+
+V1.1 must remain:
+
+* Local-only.
+* Offline-first.
+* Single-player only.
+* Save/data-file focused.
+* Backup/rollback protected.
+* Explicitly guarded against unsafe trainer behavior.
+
+V1.1 must not add:
+
+* Online game cheating.
+* Multiplayer manipulation.
+* Anti-cheat bypass.
+* Process injection.
+* Live memory writing.
+* Memory scanning.
+* Debugger attachment.
+* Unsafe shipped profile placeholders.
+* New executable game controls unless separately scoped and verified.
+
+## V1.1 Bite 1 - Save Format Capability Layer
+
+Status: **Accepted locally and fresh local-clone verified**
+
+Commit:
+
+`da5c67f819c0cf81ccb97f88d9878af58e1009b8`
+
+Bite 1 added:
+
+* Save-format capability/error model.
+* Explicit `UnsupportedSaveFormatError`.
+* Unsupported-format guards in TrainerHost save-field read/write paths.
+* Focused save-format tests.
+* TrainerHost unsupported-format rejection tests.
+* `package.json` test coverage updates.
+
+Verification passed:
+
+* `npx tsc --noEmit`: PASS
+* `npm run test:game-profile`: PASS, 33/33
+* `npm run test:trainer-schema`: PASS, 35/35
+* `npm run test:trainer-host`: PASS, 66/66
+* `npm run test:milestone-e`: PASS, 15/15
+* `npm run test:milestone-j`: PASS, 5/5
+* `npm test`: PASS, 373/373
+
+Fresh local-clone verification also passed.
+
+Behavior preserved:
+
+* Existing Stardew XML controls unchanged.
+* Existing XML read/write/rollback behavior unchanged.
+* No JSON or INI write expansion added.
+
+## V1.1 Bite 2 - JSON Read-Only Save-Field Support
+
+Status: **Accepted locally and fresh local-clone verified**
+
+Commit:
+
+`5f6d1ad590ece1cf38eeb19b158488372d348fc2`
+
+Bite 2 added:
+
+* JSON read-only save-field support.
+* Simple dot-path JSON field reads.
+* JSON proposal validation/preview.
+* Malformed JSON handling.
+* Missing JSON field handling.
+* Oversized JSON safety coverage.
+* JSON write execution rejection through `UnsupportedSaveFormatError`.
+
+Scope boundaries preserved:
+
+* JSON writes are still not allowed.
+* JSON execution/mutation is still rejected.
+* Existing XML/Stardew read/write/rollback behavior remains unchanged.
+* No new shipped game controls were added.
+* No INI support was added yet.
+* No memory writing or process scanning was added.
+
+Verification passed:
+
+* `npx tsc --noEmit`: PASS
+* `npm run test:game-profile`: PASS, 33/33
+* `npm run test:trainer-schema`: PASS, 35/35
+* `npm run test:trainer-host`: PASS, 73/73
+* `npm run test:milestone-e`: PASS, 15/15
+* `npm run test:milestone-j`: PASS, 5/5
+* `npm test`: PASS, 381/381
+
+Fresh local-clone verification also passed:
 
 * `npm ci`: PASS
 * `npx tsc --noEmit`: PASS
 * `npm run test:game-profile`: PASS, 33/33
 * `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, Electron output 19/19, tests 64/64
-* `npm run test:milestone-e`: PASS, packaged build ran first, 15/15
+* `npm run test:trainer-host`: PASS, 73/73
+* `npm run test:milestone-e`: PASS, 15/15
 * `npm run test:milestone-j`: PASS, 5/5
+* `npm test`: PASS, 381/381
+* Final clone status: clean
 
-Remote-tag v1.0.1 verification also passed the full gate:
+## Next Bite - V1.1 Bite 3
 
-* `npm ci`: PASS
-* `npx tsc --noEmit`: PASS
-* `npm run test:game-profile`: PASS, 33/33
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, Electron output 19/19, tests 64/64
-* `npm run test:milestone-e`: PASS, packaged build ran first, 15/15
-* `npm run test:milestone-j`: PASS, 5/5
-* `npm test`: PASS, 365/365
-* `npm run build:electron`: PASS, Electron output 19/19
-* `npm run build`: PASS
-* `node scripts/verify-electron-output.mjs`: PASS, 19/19
-* `node scripts/validate-packaged-host.mjs`: PASS, 23/23
-* `node scripts/orphan-check.mjs`: PASS
+Recommended next scope:
 
-Known v1.0.1 verification note:
+**JSON write proposal hardening only**
 
-* The remote-tag v1.0.1 verification passed all gates, but final `git status --short` showed parser fixture files modified.
-* `git diff --quiet` returned `0`.
-* No content diff was found.
-* The issue appeared to be line-ending / CRLF normalization noise.
+Bite 3 must not add actual JSON write execution.
 
-## v1.0.2 Candidate — Line-Ending Hygiene
+Goals:
 
-A local `v1.0.2` hygiene candidate has been prepared to fix the v1.0.1 line-ending noise.
+* Strengthen JSON proposed-edit previews.
+* Validate proposed JSON edits without mutating files.
+* Confirm current value before previewing a change.
+* Preserve type compatibility where possible.
+* Reject unsafe type changes unless explicitly allowed.
+* Reject unsupported paths clearly.
+* Keep JSON write execution blocked.
+* Keep XML write execution unchanged.
 
-Line-ending hygiene fix commit:
+Allowed:
 
-`e0539a14163fb25b4ef045c6001b5273fcc72f9b`
+* Proposal preview logic.
+* Validation-only JSON edit model.
+* Type-safety checks.
+* Better user-safe error messages.
+* Tests for rejected proposal cases.
 
-The `v1.0.2` release-candidate HEAD includes this line-ending hygiene fix plus the roadmap status correction. `v1.0.2` should be tagged from the verified HEAD after the roadmap correction commit, not from the hygiene-only commit.
+Not allowed:
 
-Fix:
+* Actual JSON file mutation.
+* JSON rollback workflow.
+* New shipped JSON game profiles.
+* New executable controls.
+* INI support.
+* Array mutation.
+* JSONPath support.
+* Automatic profile inference.
 
-* Adds `.gitattributes`.
-* Stabilizes parser fixture line endings.
-* Prevents fresh clone verification from ending with phantom modified parser fixture files.
-* Does not change app behavior.
-* Does not change parser logic.
-* Does not change test expectations.
+Bite 3 acceptance should require:
 
-Fresh local-clone verification path:
+* JSON proposal validation tests.
+* JSON write execution rejection tests.
+* Existing JSON read-only tests.
+* Existing XML/Stardew tests.
+* TrainerHost tests.
+* Milestone E/J tests.
+* Full `npm test`.
+* Fresh local-clone verification after commit.
 
-`G:\RESOURCEFORGE_LINE_ENDING_VERIFY`
+## V1.1 Future Bite Plan
 
-Verification results for the candidate:
+### Bite 3 - JSON Write Proposal Hardening
 
-* `npm ci`: PASS
-* `npx tsc --noEmit`: PASS
-* `npm run test:game-profile`: PASS, 33/33
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, Electron output 19/19, tests 64/64
-* `npm run test:milestone-e`: PASS, packaged build ran first, 15/15
-* `npm run test:milestone-j`: PASS, 5/5
-* Final fresh-clone `git status --short`: clean
-* Final `git diff --quiet`: returned `0`
+Status: pending
 
-Status:
+Purpose:
 
-* `v1.0.2` is not tagged.
-* `v1.0.2` is not pushed.
-* It is suitable for a hygiene tag after explicit tag/push authorization.
+Make JSON proposed-edit previews safer before any future write support is considered.
 
-## Next Required Step Before V1.1
+Scope:
 
-Preferred path:
+* Validate proposed value type.
+* Validate simple object dot paths.
+* Reject arrays unless explicitly supported later.
+* Reject missing parent objects.
+* Reject unsupported write execution.
+* Keep preview-only semantics.
 
-1. Explicitly authorize `v1.0.2` tag and push.
-2. Tag `v1.0.2` from the verified release-candidate HEAD that includes the line-ending hygiene fix and roadmap status correction.
-3. Push branch and tag.
-4. Run remote-tag fresh clone verification against `v1.0.2`.
-5. Begin V1.1 planning only after remote-tag verification passes.
+### Bite 4 - XML Hardening Review
 
-Acceptable hold path:
+Status: pending
 
-* Keep `v1.0.1` as the current pushed baseline.
-* Accept that v1.0.1 passed all gates but may show line-ending noise in fresh clones.
-* Start V1.1 from `v1.0.1` only with awareness of that hygiene limitation.
+Purpose:
 
-No V1.1 feature work should begin from `v1.0.0`.
+Strengthen XML safety without changing accepted Stardew behavior.
 
-## V1.1 Entry Criteria
+Scope:
 
-V1.1 should start from a clean release baseline.
+* Review hostile XML handling.
+* Preserve existing Stardew field paths.
+* Preserve write/rollback behavior.
+* Add missing malformed XML tests if gaps exist.
+* Ensure XML errors are user-safe.
 
-Preferred:
+Non-goals:
 
-* Start from `v1.0.2` after it is tagged, pushed, and remote-tag verified.
+* No profile expansion.
+* No new controls.
+* No behavior drift in accepted Stardew controls.
 
-Fallback:
+### Bite 5 - INI/Config Read-Only Support
 
-* Start from `v1.0.1` only if the team chooses to hold the v1.0.2 hygiene patch.
+Status: pending
 
-Mandatory entry criteria:
+Purpose:
 
-* Preserve local-only, offline, single-player scope.
-* Do not reintroduce memory-write controls.
-* Do not reintroduce unsafe shipped profile placeholders.
-* Do not reintroduce developer-machine absolute paths.
-* Do not reintroduce online-game or multiplayer manipulation paths.
-* Keep fresh-clone reproducibility intact.
-* Any milestone test requiring build artifacts must build them through explicit npm script prerequisites.
-* Any generated local assistant/IDE metadata must be ignored or excluded from commits.
-* Any fixture files must remain line-ending stable after clone, test, and build runs.
+Add conservative read-only support for simple INI/config save files.
+
+Scope:
+
+* Flat section/key reads.
+* User-safe malformed INI errors.
+* Unsupported ambiguous formats rejected.
+* Proposal preview only if safe.
+
+Non-goals:
+
+* No INI write execution.
+* No nested or custom parser magic.
+* No shipped game profile expansion.
+
+### Bite 6 - Runtime Save-Location Binding
+
+Status: pending
+
+Purpose:
+
+Bind runtime save locations through approved local paths only.
+
+Scope:
+
+* Validate resolved paths.
+* Require approved game root or registered save path.
+* Reject traversal.
+* Reject developer-machine absolute paths in shipped profiles.
+* Keep backup/rollback ownership intact.
+
+### Bite 7 - Profile Authoring Safety
+
+Status: pending
+
+Purpose:
+
+Make profile creation safer and more deterministic.
+
+Scope:
+
+* Profile validation UI or CLI helper.
+* Format declaration checks.
+* Fixture-backed profile validation.
+* Reject unsupported executable controls.
+* Reject placeholder/future controls.
+* Reject unsafe paths.
+
+### Bite 8 - Compatibility Pilot Readiness
+
+Status: pending
+
+Purpose:
+
+Prepare pilot validation for real offline single-player games without shipping unsafe controls.
+
+Scope:
+
+* Pilot report format.
+* Fixture capture process.
+* Read-only compatibility checks.
+* Manual approval checklist.
+* No executable controls enabled by default.
+
+## Compatibility Pilot
+
+The compatibility pilot should only begin after V1.1 safety infrastructure is stable.
+
+Pilot rules:
+
+* Offline games only.
+* Single-player games only.
+* Save/data-file workflows only.
+* No process memory manipulation.
+* No anti-cheat interaction.
+* No online-mode support.
+* No default executable controls for unverified games.
+* Backup/rollback required before any future write path.
+* Every profile must have test coverage before being treated as supported.
+
+Suggested pilot order:
+
+1. Demo game fixture.
+2. Stardew Valley existing XML save profile.
+3. One simple JSON-save game.
+4. One simple XML-save game.
+5. One simple INI/config-style game.
 
 ## Fresh Clone Verification Policy
 
+Every accepted bite that changes source, tests, package scripts, or build behavior should receive fresh local-clone verification before the next bite begins.
+
 Every release candidate must pass from a fresh clone with no prior `node_modules`, `dist`, or `dist-electron` artifacts.
 
-Required gate order:
+Standard gate order:
 
 1. `npm ci`
 2. `npx tsc --noEmit`
@@ -178,123 +416,64 @@ Required gate order:
 
 A release candidate is not cleanly reproducible unless both the gate commands pass and the final working tree is clean.
 
-## Compatibility Pilot
+## Release Gate Policy
 
-Goal:
+Every milestone must preserve:
 
-Test ResourceForge against a small set of real offline/single-player games without expanding unsafe scope.
+* TypeScript correctness.
+* Existing profile tests.
+* Existing trainer schema tests.
+* Existing trainer-host tests.
+* Milestone E acceptance.
+* Milestone J acceptance.
+* Full test suite.
+* Electron build.
+* Packaged build.
+* Packaged host validation.
+* Orphan process check.
+* Fresh clone clean-tree check.
 
-Pilot rules:
+No roadmap item is complete unless verified by live commands.
 
-* Save-file/data-file only.
-* No online games.
-* No multiplayer games.
-* No process memory manipulation.
-* No anti-cheat bypass.
-* No unsupported binary patching.
-* Backup and rollback required before every write.
-* Every profile must have test coverage before being treated as supported.
+## Files Likely Affected During V1.1
 
-Suggested pilot order:
+Likely source areas:
 
-1. Demo game fixture.
-2. Stardew Valley save-field profile.
-3. One simple JSON-save game.
-4. One simple XML-save game.
-5. One simple INI/config-style game.
+* `src/core/saves/*`
+* `src/core/trainer-host/*`
+* `src/core/game-profiles/*`
+* `src/core/trainer-control-schema/*`
+* `electron/ipc-validation.ts`, only if runtime binding requires IPC validation changes
+* `electron/main.ts`, only if runtime binding requires IPC changes
+* `src/types/global.d.ts`, only if exposed APIs change
 
-## V1.1 — Save Format Expansion
+Likely test areas:
 
-Add support for more local save/data formats:
+* `tests/save-format.test.ts`
+* `tests/parsers.test.ts`
+* `tests/trainer-host/read-save-field.test.ts`
+* `tests/trainer-host/write-save-field.test.ts`
+* `tests/game-profile.test.ts`
+* `tests/trainer-control-schema.test.ts`
+* New focused tests for JSON/XML/INI behavior if needed
 
-* JSON
-* XML
-* INI
-* simple text configs
-* clearly detected binary metadata only
-* parser adapters with file-size guards
-* clear unsupported-format errors
+Package files:
 
-Do not add blind binary editing unless safety, backup, validation, and rollback are proven.
+* `package.json` only if test scripts need explicit inclusion.
+* `package-lock.json` should not change unless dependencies are intentionally added.
 
-Required gates:
+## Must Remain Unchanged Unless Explicitly Scoped
 
-* Parser unit tests.
-* Oversized file rejection tests.
-* Unsupported-format tests.
-* Backup/rollback tests.
-* Fresh clone verification.
+The following must not be altered casually:
 
-## V1.2 — Discovery Lab Hardening
-
-Improve:
-
-* File comparison accuracy.
-* False-positive filtering.
-* Deterministic hash proof.
-* Large-file handling.
-* Binary-safe comparison.
-* Confidence scoring.
-* Explainable discovery results.
-* Safer "suggest edit" output.
-
-Discovery must remain advisory until a safe write path exists.
-
-## V1.3 — Profile Authoring
-
-Add tools for creating safe game profiles:
-
-* Profile validation UI.
-* Safe path selector.
-* Runtime save-location binding.
-* Preview before write.
-* Dry-run mode.
-* Fixture generator.
-* Profile test generator.
-
-Profiles must reject:
-
-* Developer-machine absolute paths.
-* `C:\Users\...`
-* `memory_write` controls.
-* Online/multiplayer cheat-style controls.
-* Unsupported future controls in shipped executable profiles.
-
-## V1.4 — UX / Reliability
-
-Improve:
-
-* Clearer demo vs real game labeling.
-* Better backup/rollback visibility.
-* Clearer edit risk labels.
-* Destructive action confirmation.
-* First-run safety tutorial.
-* Packaged app smoke checks.
-* Better failure messages without leaking full filesystem paths.
-
-## V1.5 — Packaging / Distribution
-
-Tasks:
-
-* Reproducible release build.
-* Signed installer if applicable.
-* Windows fresh-machine smoke test.
-* Clean uninstall behavior.
-* Release notes.
-* Checksum generation.
-* Rollback support verified in packaged app.
-
-## V2 — Advanced Trainer Ecosystem
-
-Only after V1 is stable:
-
-* Broader game profile library.
-* Community profile format.
-* Local-only profile import/export.
-* Richer discovery workflows.
-* Optional local AI assistance for explaining save fields.
-
-V2 must still exclude online-game cheating and multiplayer manipulation.
+* Existing Stardew accepted controls.
+* Existing Stardew field paths.
+* Existing XML write/rollback path.
+* `v1.0.0`, `v1.0.1`, and `v1.0.2` tags.
+* Local-only/offline/single-player safety model.
+* No-memory-write V1 policy.
+* No online/multiplayer policy.
+* No anti-cheat interaction policy.
 
 ## Explicit Non-Goals
 
@@ -305,25 +484,22 @@ ResourceForge should not support:
 * Anti-cheat bypass.
 * Process injection.
 * Live memory writing in V1.
+* Memory scanning in V1.
+* Debugger attachment.
 * Hidden cloud dependency.
 * Unsafe arbitrary file patching.
 * Fake disabled/future controls in shipped profiles.
 * Release gates that depend on stale local build artifacts.
 
-## Release Gate Policy
+## V2 Direction
 
-Every milestone must pass:
+Only after V1 is stable:
 
-* TypeScript.
-* Profile tests.
-* Trainer schema tests.
-* Trainer host tests.
-* Milestone acceptance tests.
-* Full test suite.
-* Electron build.
-* Renderer/package build.
-* Packaged host validation.
-* Orphan process check.
-* Fresh clone final clean-tree check.
+* Broader profile library.
+* Community profile format.
+* Local-only profile import/export.
+* Richer discovery workflows.
+* Optional local AI assistance for explaining save fields.
+* More advanced trainer workflows only if safety boundaries remain enforceable.
 
-No roadmap item is complete unless verified by live commands.
+V2 must still exclude online-game cheating, multiplayer manipulation, anti-cheat bypass, and unsafe memory editing.
