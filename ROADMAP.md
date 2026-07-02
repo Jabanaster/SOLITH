@@ -390,6 +390,37 @@ Suggested pilot order:
 4. One simple XML-save game.
 5. One simple INI/config-style game.
 
+## V1.3 Compatibility Pilot Process
+
+V1.3 makes ResourceForge safer for limited compatibility pilots without enabling new executable game controls by default.
+
+V1.3 scope:
+
+* Fixture-backed profile authoring validation.
+* Read-only JSON/INI/XML compatibility reporting.
+* Pilot readiness reports for offline single-player candidate games.
+* Manual review workflow before any profile is treated as supported.
+* Documentation of blocked operations and required manual checks.
+
+V1.3 does not add:
+
+* Online or multiplayer support.
+* Memory writing, memory scanning, process injection, debugger attachment, or anti-cheat interaction.
+* Automatic writes for candidate pilot games.
+* Shipped executable controls for unverified pilots.
+* Fake disabled or future controls in shipped profiles.
+
+Compatibility pilot workflow:
+
+1. Gather a safe sample or fixture from a user-owned offline single-player game.
+2. Classify the save/config format and reject unsupported or ambiguous formats.
+3. Run read-only validation against the fixture and profile declaration.
+4. Generate a pilot report with sample evidence, format support, cloud-sync risk, supported operations, blocked operations, and required manual checks.
+5. Manually approve any proposed profile only after fixture-backed validation passes.
+6. Consider write support only in a separate scoped bite with explicit approval, backup/rollback verification, and fresh-clone evidence.
+
+Pilot reports must keep executable controls disabled until separately accepted. A report alone cannot enable writes, rollback execution, runtime patching, or new shipped controls.
+
 ## Fresh Clone Verification Policy
 
 Every accepted bite that changes source, tests, package scripts, or build behavior should receive fresh local-clone verification before the next bite begins.
