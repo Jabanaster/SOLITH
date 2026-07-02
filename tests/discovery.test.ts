@@ -18,7 +18,7 @@ import {
   addUserSelectedLocation,
   isPathApproved
 } from '../src/core/saves/locations.ts';
-import { compareSaves, calculateScore } from '../src/core/discovery/index.ts';
+import { compareSaves, calculateScore, rankDiscoveries } from '../src/core/discovery/index.ts';
 import { createRecipe } from '../src/core/recipes/index.ts';
 import { createProposalForEdit, dryRunProposal, applyProposal } from '../src/core/saves/editor.ts';
 import { getBackupsForGame, restoreBackupById } from '../src/core/backups/index.ts';
@@ -154,6 +154,63 @@ describe('ResourceForge Save Discovery, Locations, and Discovery Engine Tests', 
 
     assert.ok(confidenceCorrect > confidenceWrong, 'Correct known-values should boost confidence');
     assert.strictEqual(confidenceCorrect, 98);
+  });
+
+  test('4b. Discovery comparison ignores unchanged files and orders ties deterministically', () => {
+    const docA = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'sameA.json'),
+      data: { player: { gold: 50, level: 2 } }
+    };
+    const docB = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'sameB.json'),
+      data: { player: { gold: 50, level: 2 } }
+    };
+
+    assert.deepStrictEqual(compareSaves(docA, docB), []);
+
+    const ranked = rankDiscoveries([
+      { path: 'player.zed', oldValue: 1, newValue: 2, confidence: 50, description: 'z' },
+      { path: 'player.alpha', oldValue: 1, newValue: 2, confidence: 50, description: 'a' },
+    ]);
+    assert.deepStrictEqual(ranked.map(r => r.path), ['player.alpha', 'player.zed']);
+  });
+
+  test('4c. Discovery handles binary differences as advisory results only', () => {
+    const docA = {
+      format: 'binary',
+      path: path.join(TEMP_ROOT, 'game', 'before.bin'),
+      data: { rawBase64: Buffer.from([1, 2, 3, 4]).toString('base64'), strings: [] }
+    };
+    const docB = {
+      format: 'binary',
+      path: path.join(TEMP_ROOT, 'game', 'after.bin'),
+      data: { rawBase64: Buffer.from([1, 2, 9, 4]).toString('base64'), strings: [] }
+    };
+
+    const diffs = compareSaves(docA, docB);
+    assert.ok(diffs.length > 0);
+    assert.ok(diffs.every(d => !('execute' in d)), 'Discovery output must not expose execution');
+    assert.ok(diffs.every(d => d.risk === 'caution'), 'Binary diffs remain advisory caution items');
+  });
+
+  test('4d. Discovery rejects oversized existing files without parsing', () => {
+    const largePath = path.join(TEMP_ROOT, 'game', 'large-save.json');
+    fs.writeFileSync(largePath, Buffer.alloc((8 * 1024 * 1024) + 1));
+
+    const docA = {
+      format: 'json',
+      path: largePath,
+      data: { player: { gold: 1 } }
+    };
+    const docB = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'normal-save.json'),
+      data: { player: { gold: 2 } }
+    };
+
+    assert.deepStrictEqual(compareSaves(docA, docB), []);
   });
 
   test('5. End-to-End Save Edit & Restore Workflow', async () => {

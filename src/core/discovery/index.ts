@@ -6,6 +6,8 @@ import db from '../database/index';
 import { generateId } from '../../shared/ids';
 import { buildParsedDocument, buildParsedNode } from '../saves/normalization';
 
+const MAX_DISCOVERY_COMPARE_BYTES = 8 * 1024 * 1024;
+
 const NOISE_KEYS = [
   'timestamp', 'time', 'date', 'modified', 'created', 'updated', 'saved_at', 'utc',
   'save_count', 'savecount', 'autosave', 'checkpoint_count', 'session', 'session_id', 'sessionid',
@@ -32,7 +34,7 @@ function diffNodes(
     
     const keysA = childrenA.map(c => c.key || c.path);
     const keysB = childrenB.map(c => c.key || c.path);
-    const allKeys = [...new Set([...keysA, ...keysB])];
+    const allKeys = [...new Set([...keysA, ...keysB])].sort((a, b) => a.localeCompare(b));
     
     allKeys.forEach(key => {
       const childA = childrenA.find(c => (c.key || c.path) === key);
@@ -74,6 +76,14 @@ function diffNodes(
   return diffs;
 }
 
+function isExistingLargeFile(filePath: string): boolean {
+  try {
+    return fs.existsSync(filePath) && fs.statSync(filePath).size > MAX_DISCOVERY_COMPARE_BYTES;
+  } catch {
+    return true;
+  }
+}
+
 export function compareSaves(
   saveA: ParsedSave,
   saveB: ParsedSave,
@@ -82,27 +92,16 @@ export function compareSaves(
   knownNewValue?: any
 ): DiscoveryResult[] {
   let results: DiscoveryResult[] = [];
+
+  if (isExistingLargeFile(saveA.path) || isExistingLargeFile(saveB.path)) {
+    return [];
+  }
   
   const adapterA = getAdapterForFile(saveA.path);
   const adapterB = getAdapterForFile(saveB.path);
   
   if (adapterA && adapterB && adapterA.id === adapterB.id) {
-    // Standard adapter-based normalized comparison
-    // Synchronously parse and normalize if possible, or execute via promises
-    // Wait, parseAndNormalize returns a Promise. Since compareSaves is currently synchronous,
-    // let's do synchronous read using fs.readFileSync and the adapter parser logic
     try {
-      // Create parsed doc synchronously for comparison
-      const rawA = fs.readFileSync(saveA.path, 'utf-8');
-      const rawB = fs.readFileSync(saveB.path, 'utf-8');
-      
-      // Let's resolve the promise synchronously since we're in the electron main process thread or tests
-      // We can use a trick or simply implement the sync version
-      // Let's call the parseAndNormalize method synchronously
-      // Wait, we can construct the normalized tree on the fly using buildParsedDocument
-      let parsedA: any = {};
-      let parsedB: any = {};
-      
       if (saveA.format === 'json') {
         const cleanA = saveA.data;
         const cleanB = saveB.data;
@@ -116,7 +115,7 @@ export function compareSaves(
         results = diffNodes(docA.root, docB.root, adapterA.id, saveA.path, saveB.path);
       }
     } catch (e) {
-      console.error('Adapter comparison failed, using fallback:', e);
+      // Discovery remains advisory; fall through to generic comparison.
     }
   }
 
@@ -318,7 +317,10 @@ export function rankDiscoveries(results: DiscoveryResult[]): DiscoveryResult[] {
   return filtered.sort((a, b) => {
     const aScore = calculateScore(a);
     const bScore = calculateScore(b);
-    return bScore - aScore;
+    if (bScore !== aScore) return bScore - aScore;
+    const byPath = a.path.localeCompare(b.path);
+    if (byPath !== 0) return byPath;
+    return String(a.sourceA || '').localeCompare(String(b.sourceA || ''));
   });
 }
 
