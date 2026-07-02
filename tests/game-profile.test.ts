@@ -173,6 +173,70 @@ describe('validateGameProfile â€” structure validation', () => {
     const errors = validateGameProfile(valid);
     assert.deepStrictEqual(errors, []);
   });
+
+  it('rejects executable memory backends in V1 profiles', () => {
+    const invalid: GameProfile = {
+      profileVersion: '1.0.0',
+      gameId: 'test',
+      displayName: 'Test',
+      saveFormat: 'json',
+      controls: [
+        {
+          id: 'memory-money',
+          label: 'Memory Money',
+          description: 'Unsafe',
+          category: 'TEST',
+          controlType: 'number_input',
+          backend: 'memory_write',
+          safetyStatus: 'requires_approval',
+        },
+      ],
+    };
+    const errors = validateGameProfile(invalid);
+    assert.ok(errors.some(e => e.message.includes('memory backends cannot be executable')));
+  });
+
+  it('rejects executable save_field profile paths with traversal or raw absolute paths', () => {
+    const invalid: GameProfile = {
+      profileVersion: '1.0.0',
+      gameId: 'test',
+      displayName: 'Test',
+      saveFormat: 'json',
+      controls: [
+        {
+          id: 'bad-path',
+          label: 'Bad Path',
+          description: 'Unsafe',
+          category: 'TEST',
+          controlType: 'number_input',
+          backend: 'save_field',
+          safetyStatus: 'requires_approval',
+          saveField: {
+            filePath: 'C:\\Users\\tester\\save.json',
+            fieldPath: 'player.money',
+            gameId: 'test',
+          },
+        },
+        {
+          id: 'traversal-path',
+          label: 'Traversal Path',
+          description: 'Unsafe',
+          category: 'TEST',
+          controlType: 'number_input',
+          backend: 'save_field',
+          safetyStatus: 'requires_approval',
+          saveField: {
+            filePath: '{SAVE_ROOT}\\..\\outside.json',
+            fieldPath: 'player.money',
+            gameId: 'test',
+          },
+        },
+      ],
+    };
+    const errors = validateGameProfile(invalid);
+    assert.ok(errors.some(e => e.message.includes('raw absolute path')));
+    assert.ok(errors.some(e => e.message.includes('path traversal')));
+  });
 });
 
 // â”€â”€ Stardew profile loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

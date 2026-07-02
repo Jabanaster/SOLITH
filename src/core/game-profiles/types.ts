@@ -16,6 +16,22 @@ import type {
   ControlType,
 } from '../trainer-host/trainer-control-schema.js';
 
+const EXECUTABLE_SAFETY_STATUSES = new Set<ControlSafetyStatus>([
+  'supported',
+  'requires_approval',
+  'requires_save_reload',
+  'requires_game_restart',
+  'rollback_available',
+]);
+
+function containsTraversal(pathValue: string): boolean {
+  return pathValue.split(/[\\/]+/).includes('..');
+}
+
+function isRawDeveloperAbsolutePath(pathValue: string): boolean {
+  return /^[a-z]:[\\/]/i.test(pathValue) || pathValue.startsWith('\\\\') || pathValue.startsWith('/');
+}
+
 // ── Profile Metadata ──────────────────────────────────────────────────────────
 
 export interface GameProfile {
@@ -188,11 +204,15 @@ export function validateGameProfile(profile: unknown): ProfileValidationError[] 
       errors.push({ field: `${prefix}.safetyStatus`, message: `safetyStatus must be one of: ${validSafetyStatuses.join(', ')}` });
     }
 
+    const executable = EXECUTABLE_SAFETY_STATUSES.has(c.safetyStatus as ControlSafetyStatus);
+    if (executable && (c.backend === 'memory_write' || c.backend === 'memory_observation')) {
+      errors.push({ field: `${prefix}.backend`, message: 'memory backends cannot be executable in V1 profiles' });
+    }
+
     // For save_field backend with executable status, saveField is required
     if (
       c.backend === 'save_field' &&
-      c.safetyStatus !== 'disabled' &&
-      c.safetyStatus !== 'future_feature'
+      executable
     ) {
       if (typeof c.saveField !== 'object' || c.saveField === null) {
         errors.push({ field: `${prefix}.saveField`, message: 'saveField is required for executable save_field controls' });
@@ -200,6 +220,13 @@ export function validateGameProfile(profile: unknown): ProfileValidationError[] 
         const sf = c.saveField as Record<string, unknown>;
         if (typeof sf.filePath !== 'string' || !sf.filePath) {
           errors.push({ field: `${prefix}.saveField.filePath`, message: 'filePath must be a non-empty string' });
+        } else {
+          if (containsTraversal(sf.filePath)) {
+            errors.push({ field: `${prefix}.saveField.filePath`, message: 'filePath must not contain path traversal' });
+          }
+          if (isRawDeveloperAbsolutePath(sf.filePath)) {
+            errors.push({ field: `${prefix}.saveField.filePath`, message: 'filePath must use an approved runtime binding token, not a raw absolute path' });
+          }
         }
         if (typeof sf.fieldPath !== 'string' || !sf.fieldPath) {
           errors.push({ field: `${prefix}.saveField.fieldPath`, message: 'fieldPath must be a non-empty string' });
