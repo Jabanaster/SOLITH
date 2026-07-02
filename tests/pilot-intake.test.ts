@@ -24,7 +24,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { intakePilotSave } from '../src/core/pilot/intake.js';
-import { RealWorldPilotManifestSchema, assessPilotReadiness } from '../src/core/pilot/manifest.js';
+import { RealWorldPilotManifestSchema, assessPilotReadiness, createCompatibilityPilotReport } from '../src/core/pilot/manifest.js';
 
 const FIXTURE_JSON  = JSON.stringify({ player: { hp: 100, gold: 150, level: 5 } });
 const FIXTURE_INI   = '[player]\nhp = 100\ngold = 150\n';
@@ -370,6 +370,144 @@ test('intake-12 — pilot readiness accepts copied local text formats and reject
   const readiness = assessPilotReadiness(rejected);
   assert.equal(readiness.ready, false);
   assert.ok(readiness.reasons.includes('save_format_not_ready_for_pilot'));
+
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.rmSync(wrkDir, { recursive: true, force: true });
+});
+
+test('pilot-report-01 — safe offline pilot report is ready and read-only', async () => {
+  const srcDir = makeWorkspace('src-report-ready');
+  const wrkDir = makeWorkspace('wrk-report-ready');
+  const src = makeFixture(srcDir, 'save.json', FIXTURE_JSON);
+
+  const result = await intakePilotSave({
+    gameName: 'Report Quest',
+    gameVersion: '1.0',
+    gameStore: 'steam',
+    sourceSavePath: src,
+    workspaceRootDir: wrkDir,
+    cloudSyncRisk: 'none',
+    confirmations: BASE_CONFIRMATIONS,
+  });
+
+  assert.equal(result.success, true);
+  if (!result.success) return;
+
+  const report = createCompatibilityPilotReport({
+    manifest: result.manifest,
+    gameClassification: 'offline_single_player',
+    fixtureEvidenceConfirmed: true,
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.gameName, 'Report Quest');
+  assert.equal(report.format, 'json');
+  assert.equal(report.sampleFileEvidence.fileName, 'save.json');
+  assert.equal(report.sampleFileEvidence.sha256.length, 64);
+  assert.ok(report.supportedOperations.includes('read_save_fields'));
+  assert.ok(report.blockedOperations.includes('write_execution'));
+  assert.equal(report.executableControlsEnabled, false);
+
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.rmSync(wrkDir, { recursive: true, force: true });
+});
+
+test('pilot-report-02 — unsupported pilot format is rejected in report', async () => {
+  const srcDir = makeWorkspace('src-report-bin');
+  const wrkDir = makeWorkspace('wrk-report-bin');
+  const src = path.join(srcDir, 'save.bin');
+  fs.writeFileSync(src, Buffer.from([0x00, 0x01, 0x02]));
+
+  const result = await intakePilotSave({
+    gameName: 'Binary Quest',
+    gameVersion: '1.0',
+    gameStore: 'steam',
+    sourceSavePath: src,
+    workspaceRootDir: wrkDir,
+    cloudSyncRisk: 'none',
+    confirmations: BASE_CONFIRMATIONS,
+  });
+
+  assert.equal(result.success, true);
+  if (!result.success) return;
+
+  const report = createCompatibilityPilotReport({
+    manifest: result.manifest,
+    gameClassification: 'offline_single_player',
+    fixtureEvidenceConfirmed: true,
+  });
+
+  assert.equal(report.ready, false);
+  assert.equal(report.format, 'binary');
+  assert.deepEqual(report.supportedOperations, []);
+  assert.ok(report.errors.includes('save_format_not_ready_for_pilot'));
+  assert.equal(report.executableControlsEnabled, false);
+
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.rmSync(wrkDir, { recursive: true, force: true });
+});
+
+test('pilot-report-03 — online and multiplayer classifications are rejected', async () => {
+  const srcDir = makeWorkspace('src-report-online');
+  const wrkDir = makeWorkspace('wrk-report-online');
+  const src = makeFixture(srcDir, 'save.json', FIXTURE_JSON);
+
+  const result = await intakePilotSave({
+    gameName: 'Classification Quest',
+    gameVersion: '1.0',
+    gameStore: 'steam',
+    sourceSavePath: src,
+    workspaceRootDir: wrkDir,
+    cloudSyncRisk: 'none',
+    confirmations: BASE_CONFIRMATIONS,
+  });
+
+  assert.equal(result.success, true);
+  if (!result.success) return;
+
+  for (const classification of ['online', 'multiplayer'] as const) {
+    const report = createCompatibilityPilotReport({
+      manifest: result.manifest,
+      gameClassification: classification,
+      fixtureEvidenceConfirmed: true,
+    });
+    assert.equal(report.ready, false);
+    assert.ok(report.errors.includes('pilot_requires_offline_single_player_classification'));
+    assert.ok(report.blockedOperations.includes('online_or_multiplayer_pilot'));
+  }
+
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.rmSync(wrkDir, { recursive: true, force: true });
+});
+
+test('pilot-report-04 — cloud-sync risk and missing sample evidence block readiness', async () => {
+  const srcDir = makeWorkspace('src-report-cloud');
+  const wrkDir = makeWorkspace('wrk-report-cloud');
+  const src = makeFixture(srcDir, 'save.json', FIXTURE_JSON);
+
+  const result = await intakePilotSave({
+    gameName: 'Cloud Quest',
+    gameVersion: '1.0',
+    gameStore: 'steam',
+    sourceSavePath: src,
+    workspaceRootDir: wrkDir,
+    cloudSyncRisk: 'high',
+    confirmations: { ...BASE_CONFIRMATIONS, cloudSyncDisabled: true },
+  });
+
+  assert.equal(result.success, true);
+  if (!result.success) return;
+
+  const report = createCompatibilityPilotReport({
+    manifest: result.manifest,
+    gameClassification: 'offline_single_player',
+    fixtureEvidenceConfirmed: false,
+  });
+
+  assert.equal(report.ready, false);
+  assert.ok(report.blockedOperations.includes('cloud_sync_risk_high'));
+  assert.ok(report.errors.includes('fixture_or_safe_sample_evidence_required'));
+  assert.equal(report.executableControlsEnabled, false);
 
   fs.rmSync(srcDir, { recursive: true, force: true });
   fs.rmSync(wrkDir, { recursive: true, force: true });
