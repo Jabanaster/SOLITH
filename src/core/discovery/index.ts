@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import fs from 'fs';
+import path from 'path';
 import { ParsedSave, DiscoveryResult, ParsedNode, ParserDiagnostic } from '../../shared/types';
 import { SAFE_KEYWORDS, RISKY_KEYWORDS, BLOCKED_KEYWORDS } from '../../shared/constants';
 import { getAdapterForFile } from '../adapters/index';
@@ -7,6 +9,26 @@ import { generateId } from '../../shared/ids';
 import { buildParsedDocument, buildParsedNode } from '../saves/normalization';
 
 const MAX_DISCOVERY_COMPARE_BYTES = 8 * 1024 * 1024;
+
+export interface DiscoveryReportFileEvidence {
+  label: 'before' | 'after';
+  fileName: string;
+  sha256: string | null;
+  sizeBytes: number | null;
+}
+
+export interface DiscoveryReportChange {
+  path: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface DiscoveryReport {
+  comparedAt: string;
+  files: DiscoveryReportFileEvidence[];
+  changedPaths: DiscoveryReportChange[];
+  unsupportedSections: string[];
+}
 
 const NOISE_KEYS = [
   'timestamp', 'time', 'date', 'modified', 'created', 'updated', 'saved_at', 'utc',
@@ -82,6 +104,65 @@ function isExistingLargeFile(filePath: string): boolean {
   } catch {
     return true;
   }
+}
+
+function createFileEvidence(label: 'before' | 'after', filePath: string): DiscoveryReportFileEvidence {
+  const fileName = path.basename(filePath);
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { label, fileName, sha256: null, sizeBytes: null };
+    }
+
+    const stats = fs.statSync(filePath);
+    if (!stats.isFile() || stats.size > MAX_DISCOVERY_COMPARE_BYTES) {
+      return { label, fileName, sha256: null, sizeBytes: stats.size };
+    }
+
+    const sha256 = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+    return { label, fileName, sha256, sizeBytes: stats.size };
+  } catch {
+    return { label, fileName, sha256: null, sizeBytes: null };
+  }
+}
+
+function getDiscoveryReason(result: DiscoveryResult): string {
+  return result.explanation || result.evidence || result.description || 'Changed value discovered.';
+}
+
+export function createDiscoveryReport(
+  saveA: ParsedSave,
+  saveB: ParsedSave,
+  results: DiscoveryResult[],
+  comparedAt: string = new Date().toISOString()
+): DiscoveryReport {
+  const unsupportedSections = [...new Set(results
+    .filter(result => calculateScore(result) === 0 || result.risk === 'blocked')
+    .map(result => result.path))]
+    .sort((a, b) => a.localeCompare(b));
+
+  const changedPaths = results
+    .filter(result => result.risk !== 'blocked' && calculateScore(result) > 0)
+    .map(result => ({
+      path: result.path,
+      confidence: calculateScore(result),
+      reason: getDiscoveryReason(result)
+    }))
+    .sort((a, b) => {
+      const byPath = a.path.localeCompare(b.path);
+      if (byPath !== 0) return byPath;
+      return a.reason.localeCompare(b.reason);
+    });
+
+  return {
+    comparedAt,
+    files: [
+      createFileEvidence('before', saveA.path),
+      createFileEvidence('after', saveB.path)
+    ],
+    changedPaths,
+    unsupportedSections
+  };
 }
 
 export function compareSaves(

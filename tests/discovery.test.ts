@@ -18,7 +18,7 @@ import {
   addUserSelectedLocation,
   isPathApproved
 } from '../src/core/saves/locations.ts';
-import { compareSaves, calculateScore, rankDiscoveries } from '../src/core/discovery/index.ts';
+import { compareSaves, calculateScore, createDiscoveryReport, rankDiscoveries } from '../src/core/discovery/index.ts';
 import { createRecipe } from '../src/core/recipes/index.ts';
 import { createProposalForEdit, dryRunProposal, applyProposal } from '../src/core/saves/editor.ts';
 import { getBackupsForGame, restoreBackupById } from '../src/core/backups/index.ts';
@@ -211,6 +211,69 @@ describe('ResourceForge Save Discovery, Locations, and Discovery Engine Tests', 
     };
 
     assert.deepStrictEqual(compareSaves(docA, docB), []);
+  });
+
+  test('4e. Discovery report captures hash evidence without leaking full paths', () => {
+    const beforePath = path.join(TEMP_ROOT, 'game', 'report-before.json');
+    const afterPath = path.join(TEMP_ROOT, 'game', 'report-after.json');
+    fs.writeFileSync(beforePath, JSON.stringify({ player: { gold: 50 }, session: { checksum: 'abc' } }));
+    fs.writeFileSync(afterPath, JSON.stringify({ player: { gold: 200 }, session: { checksum: 'def' } }));
+
+    const docA = {
+      format: 'json',
+      path: beforePath,
+      data: { player: { gold: 50 }, session: { checksum: 'abc' } }
+    };
+    const docB = {
+      format: 'json',
+      path: afterPath,
+      data: { player: { gold: 200 }, session: { checksum: 'def' } }
+    };
+
+    const results = [
+      ...compareSaves(docA, docB),
+      {
+        path: 'session.checksum',
+        oldValue: 'abc',
+        newValue: 'def',
+        confidence: 0,
+        description: 'Integrity metadata changed',
+        risk: 'blocked'
+      }
+    ];
+    const report = createDiscoveryReport(docA, docB, results, '2026-07-02T12:00:00.000Z');
+
+    assert.strictEqual(report.comparedAt, '2026-07-02T12:00:00.000Z');
+    assert.deepStrictEqual(report.files.map(file => file.fileName), ['report-before.json', 'report-after.json']);
+    assert.ok(report.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256 || '')), 'Report should include SHA-256 hashes');
+    assert.ok(report.files.every(file => typeof file.sizeBytes === 'number'), 'Report should include file sizes');
+    assert.ok(!JSON.stringify(report).includes(TEMP_ROOT), 'Report must not leak full local paths');
+    assert.deepStrictEqual(report.changedPaths.map(change => change.path), ['player.gold']);
+    assert.deepStrictEqual(report.unsupportedSections, ['session.checksum']);
+  });
+
+  test('4f. Discovery report serialization is deterministic for stable inputs', () => {
+    const docA = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'deterministic-before.json'),
+      data: { player: { level: 2, gold: 50 } }
+    };
+    const docB = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'deterministic-after.json'),
+      data: { player: { level: 3, gold: 200 } }
+    };
+
+    const results = [
+      { path: 'player.level', oldValue: 2, newValue: 3, confidence: 50, description: 'level changed' },
+      { path: 'player.gold', oldValue: 50, newValue: 200, confidence: 50, description: 'gold changed' }
+    ];
+
+    const reportA = createDiscoveryReport(docA, docB, results, '2026-07-02T12:00:00.000Z');
+    const reportB = createDiscoveryReport(docA, docB, [...results].reverse(), '2026-07-02T12:00:00.000Z');
+
+    assert.strictEqual(JSON.stringify(reportA), JSON.stringify(reportB));
+    assert.deepStrictEqual(reportA.changedPaths.map(change => change.path), ['player.gold', 'player.level']);
   });
 
   test('5. End-to-End Save Edit & Restore Workflow', async () => {
