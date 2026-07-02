@@ -16,6 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
 import { validateJsonSaveFieldProposal } from '../saves/json-save-field';
+import { validateIniSaveFieldProposal } from '../saves/ini-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -65,6 +66,15 @@ export async function proposeWriteField(params: unknown): Promise<ProposeWriteRe
   const format = detectSaveFormatFromPath(filePath);
   if (format === 'json') {
     const proposal = validateJsonSaveFieldProposal(filePath, field, currentValue, String((params as Record<string, string>).newValue));
+    return {
+      valid: true,
+      currentValue: proposal.currentValue,
+      proposedValue: proposal.proposedValue,
+      preview: proposal.preview,
+    };
+  }
+  if (format === 'ini') {
+    const proposal = validateIniSaveFieldProposal(filePath, field, currentValue, String((params as Record<string, string>).newValue));
     return {
       valid: true,
       currentValue: proposal.currentValue,

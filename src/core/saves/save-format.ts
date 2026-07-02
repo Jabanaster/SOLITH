@@ -43,8 +43,8 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     label: 'INI/config',
     recognized: true,
     canInspect: true,
-    canReadSaveField: false,
-    canProposeSaveField: false,
+    canReadSaveField: true,
+    canProposeSaveField: true,
     canWriteSaveField: false,
   },
   unknown: {

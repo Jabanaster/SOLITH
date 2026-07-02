@@ -166,6 +166,26 @@ describe('proposeWriteField', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  test('allows INI proposal preview without enabling write execution', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-propose-'));
+    const iniPath = path.join(tmpDir, 'settings.ini');
+    fs.writeFileSync(iniPath, '[player]\nmoney=5000\n', 'utf-8');
+    try {
+      const result = await proposeWriteField({
+        filePath: iniPath,
+        field: 'player.money',
+        currentValue: KNOWN_VALUE,
+        newValue: NEW_VALUE,
+      });
+      assert.equal(result.valid, true);
+      assert.equal(result.currentValue, KNOWN_VALUE);
+      assert.equal(result.proposedValue, NEW_VALUE);
+      assert.match(result.preview ?? '', /INI write execution is not supported/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── executeWriteField ─────────────────────────────────────────────────────────
@@ -233,6 +253,26 @@ describe('executeWriteField', () => {
     try {
       await assert.rejects(
         () => executeWriteField({ filePath: jsonPath, field: 'player.money', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(error.name, 'UnsupportedSaveFormatError');
+          assert.match(error.message, /unsupported_save_format/);
+          assert.equal(error.message.includes(tmpDir), false);
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects INI write execution with unsupported-format error', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-execute-'));
+    const iniPath = path.join(tmpDir, 'settings.ini');
+    fs.writeFileSync(iniPath, '[player]\nmoney=5000\n', 'utf-8');
+    try {
+      await assert.rejects(
+        () => executeWriteField({ filePath: iniPath, field: 'player.money', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
         (error: unknown) => {
           assert.ok(error instanceof Error);
           assert.equal(error.name, 'UnsupportedSaveFormatError');

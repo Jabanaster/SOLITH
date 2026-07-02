@@ -158,4 +158,49 @@ describe('readSaveField', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  test('reads simple section.key values from INI saves', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-read-'));
+    const tmpPath = path.join(tmpDir, 'settings.ini');
+    fs.writeFileSync(tmpPath, '[player]\nmoney=5000\nlevel = 7\n', 'utf-8');
+    try {
+      const result = await readSaveField({ filePath: tmpPath, field: 'player.money' });
+      assert.equal(result.found, true);
+      assert.equal(result.value, '5000');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('returns found=false for missing INI fields', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-missing-'));
+    const tmpPath = path.join(tmpDir, 'settings.ini');
+    fs.writeFileSync(tmpPath, '[player]\nmoney=5000\n', 'utf-8');
+    try {
+      const result = await readSaveField({ filePath: tmpPath, field: 'player.stamina' });
+      assert.equal(result.found, false);
+      assert.equal(result.value, null);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('throws a safe malformed INI error without full path leakage', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-malformed-'));
+    const tmpPath = path.join(tmpDir, 'private-settings.ini');
+    fs.writeFileSync(tmpPath, '[player]\nnot-a-key-value\n', 'utf-8');
+    try {
+      await assert.rejects(
+        () => readSaveField({ filePath: tmpPath, field: 'player.money' }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /ini_parse_error/);
+          assert.equal(error.message.includes(tmpDir), false);
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

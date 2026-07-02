@@ -43,6 +43,8 @@ describe('save format capabilities', () => {
     assert.equal(json.canProposeSaveField, true);
     assert.equal(json.canWriteSaveField, false);
     assert.equal(ini.recognized, true);
+    assert.equal(ini.canReadSaveField, true);
+    assert.equal(ini.canProposeSaveField, true);
     assert.equal(ini.canWriteSaveField, false);
   });
 
@@ -74,6 +76,15 @@ describe('save format capabilities', () => {
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_propose'));
     assert.throws(
       () => assertPathSaveFormatSupportsOperation('player.json', 'save_field_write'),
+      /unsupported_save_format/,
+    );
+  });
+
+  test('allows INI read/propose but rejects write execution', () => {
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_read'));
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_propose'));
+    assert.throws(
+      () => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_write'),
       /unsupported_save_format/,
     );
   });

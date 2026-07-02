@@ -13,6 +13,7 @@
 
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
 import { readJsonSaveField } from '../saves/json-save-field';
+import { readIniSaveField } from '../saves/ini-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 import fs from 'fs';
 
@@ -40,8 +41,16 @@ export async function readSaveField(params: unknown): Promise<ReadSaveFieldResul
   }
   assertPathSaveFormatSupportsOperation(filePath, 'save_field_read');
 
-  if (detectSaveFormatFromPath(filePath) === 'json') {
+  const format = detectSaveFormatFromPath(filePath);
+  if (format === 'json') {
     const result = readJsonSaveField(filePath, field);
+    if (!result.found) {
+      return { value: null, found: false };
+    }
+    return { value: String(result.value), found: true };
+  }
+  if (format === 'ini') {
+    const result = readIniSaveField(filePath, field);
     if (!result.found) {
       return { value: null, found: false };
     }
