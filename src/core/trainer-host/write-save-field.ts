@@ -15,6 +15,7 @@
 import fs from 'fs';
 import path from 'path';
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
+import { assertPathSaveFormatSupportsOperation } from '../saves/save-format';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export async function proposeWriteField(params: unknown): Promise<ProposeWriteRe
   const { filePath, field, currentValue } = params as Record<string, string>;
 
   if (!fs.existsSync(filePath)) throw new Error('file_not_found');
+  assertPathSaveFormatSupportsOperation(filePath, 'save_field_write');
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
@@ -97,6 +99,7 @@ export async function executeWriteField(params: unknown): Promise<ExecuteWriteRe
   const { filePath, field, currentValue, newValue } = params as Record<string, string>;
 
   if (!fs.existsSync(filePath)) throw new Error('file_not_found');
+  assertPathSaveFormatSupportsOperation(filePath, 'save_field_write');
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
@@ -162,6 +165,7 @@ export async function rollbackWriteField(params: unknown): Promise<RollbackResul
   }
 
   if (!fs.existsSync(backupPath)) throw new Error('backup_not_found');
+  assertPathSaveFormatSupportsOperation(filePath, 'save_field_rollback');
 
   const tmpPath = path.join(path.dirname(filePath), path.basename(filePath) + '.trainer-restore-tmp');
   fs.copyFileSync(backupPath, tmpPath);

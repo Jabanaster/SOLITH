@@ -1,5 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readSaveField } from '../../src/core/trainer-host/read-save-field.js';
@@ -61,7 +63,6 @@ describe('readSaveField', () => {
 
   test('throws xml_safety error on DOCTYPE with SYSTEM reference', async () => {
     const tmpPath = path.resolve(__dirname, '../../demo-game/save/doctype-fixture.xml');
-    const fs = await import('fs');
     fs.writeFileSync(tmpPath, '<?xml version="1.0"?><!DOCTYPE foo SYSTEM "http://evil.com/evil.dtd"><foo/>');
     try {
       await assert.rejects(
@@ -70,6 +71,27 @@ describe('readSaveField', () => {
       );
     } finally {
       fs.unlinkSync(tmpPath);
+    }
+  });
+
+  test('throws a user-safe unsupported-format error for non-XML save-field reads', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-private-read-'));
+    const tmpPath = path.join(tmpDir, 'private-player.json');
+    fs.writeFileSync(tmpPath, '{"SaveGame":{"player":[{"money":5000}]}}', 'utf-8');
+    try {
+      await assert.rejects(
+        () => readSaveField({ filePath: tmpPath, field: 'SaveGame.player.0.money' }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(error.name, 'UnsupportedSaveFormatError');
+          assert.match(error.message, /unsupported/i);
+          assert.match(error.message, /private-player\.json/);
+          assert.equal(error.message.includes(tmpDir), false);
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

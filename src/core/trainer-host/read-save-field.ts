@@ -12,6 +12,7 @@
  */
 
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
+import { assertPathSaveFormatSupportsOperation } from '../saves/save-format';
 import fs from 'fs';
 
 export interface ReadSaveFieldParams {
@@ -36,6 +37,7 @@ export async function readSaveField(params: unknown): Promise<ReadSaveFieldResul
   if (!fs.existsSync(filePath)) {
     return { value: null, found: false };
   }
+  assertPathSaveFormatSupportsOperation(filePath, 'save_field_read');
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);

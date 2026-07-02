@@ -83,6 +83,27 @@ describe('proposeWriteField', () => {
       fs.unlinkSync(evil);
     }
   });
+
+  test('throws a user-safe unsupported-format error for non-XML proposals', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-private-propose-'));
+    const jsonPath = path.join(tmpDir, 'private-player.json');
+    fs.writeFileSync(jsonPath, '{"SaveGame":{"player":[{"money":5000}]}}', 'utf-8');
+    try {
+      await assert.rejects(
+        () => proposeWriteField({ filePath: jsonPath, field: FIELD, currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(error.name, 'UnsupportedSaveFormatError');
+          assert.match(error.message, /unsupported/i);
+          assert.match(error.message, /private-player\.json/);
+          assert.equal(error.message.includes(tmpDir), false);
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── executeWriteField ─────────────────────────────────────────────────────────
