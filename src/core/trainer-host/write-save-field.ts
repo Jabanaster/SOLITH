@@ -15,7 +15,8 @@
 import fs from 'fs';
 import path from 'path';
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
-import { assertPathSaveFormatSupportsOperation } from '../saves/save-format';
+import { readJsonSaveField } from '../saves/json-save-field';
+import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -40,6 +41,9 @@ function assertValidParams(p: unknown, required: string[]): asserts p is Record<
 
 export interface ProposeWriteResult {
   valid: true;
+  currentValue?: string;
+  proposedValue?: string;
+  preview?: string;
 }
 
 /**
@@ -56,7 +60,20 @@ export async function proposeWriteField(params: unknown): Promise<ProposeWriteRe
   const { filePath, field, currentValue } = params as Record<string, string>;
 
   if (!fs.existsSync(filePath)) throw new Error('file_not_found');
-  assertPathSaveFormatSupportsOperation(filePath, 'save_field_write');
+  assertPathSaveFormatSupportsOperation(filePath, 'save_field_propose');
+
+  if (detectSaveFormatFromPath(filePath) === 'json') {
+    const readResult = readJsonSaveField(filePath, field);
+    if (!readResult.found) throw new Error('field_not_found');
+    const live = String(readResult.value);
+    if (live !== String(currentValue)) throw new Error(`value_mismatch: current=${live} expected=${currentValue}`);
+    return {
+      valid: true,
+      currentValue: live,
+      proposedValue: String((params as Record<string, string>).newValue),
+      preview: `Change ${field} from ${live} to ${String((params as Record<string, string>).newValue)}`,
+    };
+  }
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);

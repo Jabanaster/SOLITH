@@ -39,6 +39,8 @@ describe('save format capabilities', () => {
     assert.equal(xml.canReadSaveField, true);
     assert.equal(xml.canWriteSaveField, true);
     assert.equal(json.recognized, true);
+    assert.equal(json.canReadSaveField, true);
+    assert.equal(json.canProposeSaveField, true);
     assert.equal(json.canWriteSaveField, false);
     assert.equal(ini.recognized, true);
     assert.equal(ini.canWriteSaveField, false);
@@ -62,7 +64,17 @@ describe('save format capabilities', () => {
 
   test('allows XML save-field operations', () => {
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('farm.xml', 'save_field_read'));
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('farm.xml', 'save_field_propose'));
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('farm.xml', 'save_field_write'));
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('farm.xml', 'save_field_rollback'));
+  });
+
+  test('allows JSON read/propose but rejects write execution', () => {
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_read'));
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_propose'));
+    assert.throws(
+      () => assertPathSaveFormatSupportsOperation('player.json', 'save_field_write'),
+      /unsupported_save_format/,
+    );
   });
 });

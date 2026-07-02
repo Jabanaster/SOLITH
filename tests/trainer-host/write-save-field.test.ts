@@ -86,19 +86,53 @@ describe('proposeWriteField', () => {
 
   test('throws a user-safe unsupported-format error for non-XML proposals', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-private-propose-'));
-    const jsonPath = path.join(tmpDir, 'private-player.json');
-    fs.writeFileSync(jsonPath, '{"SaveGame":{"player":[{"money":5000}]}}', 'utf-8');
+    const jsonPath = path.join(tmpDir, 'private-player.bin');
+    fs.writeFileSync(jsonPath, '{"SaveGame":{"player":{"money":5000}}}', 'utf-8');
     try {
       await assert.rejects(
-        () => proposeWriteField({ filePath: jsonPath, field: FIELD, currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
+        () => proposeWriteField({ filePath: jsonPath, field: 'SaveGame.player.money', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
         (error: unknown) => {
           assert.ok(error instanceof Error);
           assert.equal(error.name, 'UnsupportedSaveFormatError');
           assert.match(error.message, /unsupported/i);
-          assert.match(error.message, /private-player\.json/);
+          assert.match(error.message, /private-player\.bin/);
           assert.equal(error.message.includes(tmpDir), false);
           return true;
         },
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('allows JSON read-only proposal validation with preview', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-'));
+    const jsonPath = path.join(tmpDir, 'player.json');
+    fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
+    try {
+      const result = await proposeWriteField({
+        filePath: jsonPath,
+        field: 'player.money',
+        currentValue: KNOWN_VALUE,
+        newValue: NEW_VALUE,
+      });
+      assert.equal(result.valid, true);
+      assert.equal(result.currentValue, KNOWN_VALUE);
+      assert.equal(result.proposedValue, NEW_VALUE);
+      assert.match(result.preview ?? '', /player\.money/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects missing JSON proposal fields', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-missing-'));
+    const jsonPath = path.join(tmpDir, 'player.json');
+    fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
+    try {
+      await assert.rejects(
+        () => proposeWriteField({ filePath: jsonPath, field: 'player.stamina', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
+        /field_not_found/,
       );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -162,6 +196,26 @@ describe('executeWriteField', () => {
       () => executeWriteField({ filePath: tmp, field: FIELD, currentValue: NEW_VALUE }),
       /invalid_params/,
     );
+  });
+
+  test('rejects JSON write execution with unsupported-format error', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-execute-'));
+    const jsonPath = path.join(tmpDir, 'player.json');
+    fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
+    try {
+      await assert.rejects(
+        () => executeWriteField({ filePath: jsonPath, field: 'player.money', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(error.name, 'UnsupportedSaveFormatError');
+          assert.match(error.message, /unsupported_save_format/);
+          assert.equal(error.message.includes(tmpDir), false);
+          return true;
+        },
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

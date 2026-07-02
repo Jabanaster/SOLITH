@@ -4,6 +4,7 @@ export type SaveFormatId = 'xml' | 'json' | 'ini' | 'unknown' | 'unsupported';
 
 export type SaveFormatOperation =
   | 'save_field_read'
+  | 'save_field_propose'
   | 'save_field_write'
   | 'save_field_rollback'
   | 'inspect';
@@ -14,6 +15,7 @@ export interface SaveFormatCapability {
   recognized: boolean;
   canInspect: boolean;
   canReadSaveField: boolean;
+  canProposeSaveField: boolean;
   canWriteSaveField: boolean;
 }
 
@@ -24,6 +26,7 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     recognized: true,
     canInspect: true,
     canReadSaveField: true,
+    canProposeSaveField: true,
     canWriteSaveField: true,
   },
   json: {
@@ -31,7 +34,8 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     label: 'JSON',
     recognized: true,
     canInspect: true,
-    canReadSaveField: false,
+    canReadSaveField: true,
+    canProposeSaveField: true,
     canWriteSaveField: false,
   },
   ini: {
@@ -40,6 +44,7 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     recognized: true,
     canInspect: true,
     canReadSaveField: false,
+    canProposeSaveField: false,
     canWriteSaveField: false,
   },
   unknown: {
@@ -48,6 +53,7 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     recognized: false,
     canInspect: false,
     canReadSaveField: false,
+    canProposeSaveField: false,
     canWriteSaveField: false,
   },
   unsupported: {
@@ -56,6 +62,7 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     recognized: false,
     canInspect: false,
     canReadSaveField: false,
+    canProposeSaveField: false,
     canWriteSaveField: false,
   },
 };
@@ -122,6 +129,8 @@ export function assertSaveFormatSupportsOperation(
       ? capability.canInspect
       : operation === 'save_field_read'
         ? capability.canReadSaveField
+        : operation === 'save_field_propose'
+          ? capability.canProposeSaveField
         : capability.canWriteSaveField;
 
   if (!supported) {

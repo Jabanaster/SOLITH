@@ -12,7 +12,8 @@
  */
 
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
-import { assertPathSaveFormatSupportsOperation } from '../saves/save-format';
+import { readJsonSaveField } from '../saves/json-save-field';
+import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 import fs from 'fs';
 
 export interface ReadSaveFieldParams {
@@ -38,6 +39,14 @@ export async function readSaveField(params: unknown): Promise<ReadSaveFieldResul
     return { value: null, found: false };
   }
   assertPathSaveFormatSupportsOperation(filePath, 'save_field_read');
+
+  if (detectSaveFormatFromPath(filePath) === 'json') {
+    const result = readJsonSaveField(filePath, field);
+    if (!result.found) {
+      return { value: null, found: false };
+    }
+    return { value: String(result.value), found: true };
+  }
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
