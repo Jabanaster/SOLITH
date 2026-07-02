@@ -11,6 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   validateGameProfile,
+  validateProfileAuthoringWorkflow,
   loadGameProfile,
   loadStardewProfile,
   loadTrainerControls,
@@ -21,6 +22,8 @@ import { isControlExecutable, requiresApproval } from '../src/core/trainer-host/
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STARDEW_PROFILE_PATH = path.resolve(__dirname, '../src/core/game-profiles/profiles/stardew-valley.json');
 const SHIPPED_PROFILES_DIR = path.resolve(__dirname, '../src/core/game-profiles/profiles');
+const STARDEW_FIXTURE_PATH = path.resolve(__dirname, '../demo-game/save/stardew-fixture.xml');
+const JSON_FIXTURE_PATH = path.resolve(__dirname, './fixtures/discovery-test/game/player_save.json');
 
 function loadShippedProfileFiles(): Array<{ filePath: string; raw: string; profile: GameProfile }> {
   return fs.readdirSync(SHIPPED_PROFILES_DIR)
@@ -34,6 +37,32 @@ function loadShippedProfileFiles(): Array<{ filePath: string; raw: string; profi
 
 function shippedControlText(control: GameProfile['controls'][0]): string {
   return JSON.stringify(control).toLowerCase();
+}
+
+function authoringProfile(overrides: Partial<GameProfile> = {}): GameProfile {
+  return {
+    profileVersion: '1.0.0',
+    gameId: 'authoring-test-game',
+    displayName: 'Authoring Test Game',
+    saveFormat: 'xml',
+    controls: [
+      {
+        id: 'test-money',
+        label: 'Money',
+        description: 'Fixture-backed save field write with approval.',
+        category: 'CURRENCY',
+        controlType: 'number_input',
+        backend: 'save_field',
+        safetyStatus: 'requires_approval',
+        saveField: {
+          filePath: '{TEST_SAVE_FILE}',
+          fieldPath: 'SaveGame.player.0.money',
+          gameId: 'authoring-test-game',
+        },
+      },
+    ],
+    ...overrides,
+  };
 }
 
 // â”€â”€ Profile validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -236,6 +265,125 @@ describe('validateGameProfile â€” structure validation', () => {
     const errors = validateGameProfile(invalid);
     assert.ok(errors.some(e => e.message.includes('raw absolute path')));
     assert.ok(errors.some(e => e.message.includes('path traversal')));
+  });
+});
+
+describe('validateProfileAuthoringWorkflow â€” fixture-backed reports', () => {
+  it('generates a valid XML profile authoring report', () => {
+    const report = validateProfileAuthoringWorkflow({
+      profile: authoringProfile(),
+      fixturePath: STARDEW_FIXTURE_PATH,
+      approvedRuntimeBindings: ['TEST_SAVE_FILE'],
+    });
+
+    assert.equal(report.valid, true);
+    assert.equal(report.fixture?.fileName, 'stardew-fixture.xml');
+    assert.equal(report.fixture?.formatMatchesProfile, true);
+    assert.deepStrictEqual(report.executableControlIds, ['test-money']);
+    assert.ok(report.supportedOperations.includes('save_field_write'));
+  });
+
+  it('generates a valid JSON read-only profile report', () => {
+    const report = validateProfileAuthoringWorkflow({
+      profile: authoringProfile({ saveFormat: 'json', controls: [] }),
+      fixturePath: JSON_FIXTURE_PATH,
+    });
+
+    assert.equal(report.valid, true);
+    assert.equal(report.fixture?.fileName, 'player_save.json');
+    assert.ok(report.supportedOperations.includes('save_field_read'));
+    assert.ok(report.supportedOperations.includes('save_field_propose'));
+    assert.ok(report.blockedOperations.includes('save_field_write'));
+    assert.deepStrictEqual(report.executableControlIds, []);
+  });
+
+  it('rejects invalid memory backends and future controls', () => {
+    const report = validateProfileAuthoringWorkflow({
+      profile: authoringProfile({
+        controls: [
+          {
+            id: 'memory-money',
+            label: 'Memory Money',
+            description: 'Unsafe',
+            category: 'TEST',
+            controlType: 'number_input',
+            backend: 'memory_write',
+            safetyStatus: 'requires_approval',
+          },
+          {
+            id: 'future-money',
+            label: 'Future Money',
+            description: 'Not shipped',
+            category: 'TEST',
+            controlType: 'number_input',
+            backend: 'save_field',
+            safetyStatus: 'future_feature',
+          },
+        ],
+      }),
+      fixturePath: STARDEW_FIXTURE_PATH,
+      approvedRuntimeBindings: ['TEST_SAVE_FILE'],
+    });
+
+    assert.equal(report.valid, false);
+    assert.ok(report.errors.some(error => error.message.includes('memory')));
+    assert.ok(report.errors.some(error => error.message.includes('future controls')));
+  });
+
+  it('rejects invalid save-field paths and unknown runtime bindings', () => {
+    const report = validateProfileAuthoringWorkflow({
+      profile: authoringProfile({
+        controls: [
+          {
+            id: 'bad-path',
+            label: 'Bad Path',
+            description: 'Unsafe',
+            category: 'TEST',
+            controlType: 'number_input',
+            backend: 'save_field',
+            safetyStatus: 'requires_approval',
+            saveField: {
+              filePath: 'C:\\Users\\tester\\save.json',
+              fieldPath: 'player.money',
+              gameId: 'authoring-test-game',
+            },
+          },
+          {
+            id: 'unknown-binding',
+            label: 'Unknown Binding',
+            description: 'Unsafe',
+            category: 'TEST',
+            controlType: 'number_input',
+            backend: 'save_field',
+            safetyStatus: 'requires_approval',
+            saveField: {
+              filePath: '{UNKNOWN_SAVE_FILE}',
+              fieldPath: 'player.money',
+              gameId: 'authoring-test-game',
+            },
+          },
+        ],
+      }),
+      fixturePath: STARDEW_FIXTURE_PATH,
+      approvedRuntimeBindings: ['TEST_SAVE_FILE'],
+    });
+
+    assert.equal(report.valid, false);
+    assert.ok(report.errors.some(error => error.message.includes('raw absolute path')));
+    assert.ok(report.errors.some(error => error.message.includes('runtime binding is not approved')));
+  });
+
+  it('rejects missing fixture evidence without leaking full paths', () => {
+    const missingFixturePath = path.join(__dirname, 'fixtures', 'missing-authoring-save.json');
+    const report = validateProfileAuthoringWorkflow({
+      profile: authoringProfile({ saveFormat: 'json', controls: [] }),
+      fixturePath: missingFixturePath,
+    });
+
+    assert.equal(report.valid, false);
+    assert.equal(report.fixture?.fileName, 'missing-authoring-save.json');
+    assert.ok(report.errors.some(error => error.message.includes('fixture file is missing')));
+    assert.equal(JSON.stringify(report).includes(path.dirname(missingFixturePath)), false);
   });
 });
 

@@ -16,3 +16,9 @@ export {
   loadGameProfile,
   loadStardewProfile,
 } from './loader.js';
+export {
+  validateProfileAuthoringWorkflow,
+  type ProfileAuthoringFixtureEvidence,
+  type ProfileAuthoringValidationInput,
+  type ProfileAuthoringValidationReport,
+} from './authoring.js';
