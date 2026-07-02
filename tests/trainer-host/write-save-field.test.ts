@@ -119,7 +119,35 @@ describe('proposeWriteField', () => {
       assert.equal(result.valid, true);
       assert.equal(result.currentValue, KNOWN_VALUE);
       assert.equal(result.proposedValue, NEW_VALUE);
-      assert.match(result.preview ?? '', /player\.money/);
+      assert.match(result.preview ?? '', /JSON write execution is not supported/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects JSON proposal type changes for numeric fields', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-type-'));
+    const jsonPath = path.join(tmpDir, 'player.json');
+    fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
+    try {
+      await assert.rejects(
+        () => proposeWriteField({ filePath: jsonPath, field: 'player.money', currentValue: KNOWN_VALUE, newValue: 'a lot' }),
+        /json_proposal_type_mismatch/,
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects JSON proposal paths that traverse arrays', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-array-'));
+    const jsonPath = path.join(tmpDir, 'player.json');
+    fs.writeFileSync(jsonPath, '{"inventory":[{"count":2}]}', 'utf-8');
+    try {
+      await assert.rejects(
+        () => proposeWriteField({ filePath: jsonPath, field: 'inventory.0.count', currentValue: '2', newValue: '3' }),
+        /json_field_path_unsupported|field_not_found/,
+      );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
