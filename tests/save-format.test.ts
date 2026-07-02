@@ -9,6 +9,7 @@ import {
   getDetectedSaveFormatCapability,
   normalizeDeclaredSaveFormat,
 } from '../src/core/saves/save-format.ts';
+import { validateRuntimeSaveLocationBinding } from '../src/core/saves/runtime-binding.ts';
 
 describe('save format capabilities', () => {
   test('recognizes supported declared formats', () => {
@@ -86,6 +87,30 @@ describe('save format capabilities', () => {
     assert.throws(
       () => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_write'),
       /unsupported_save_format/,
+    );
+  });
+
+  test('runtime save-location binding requires approved roots', () => {
+    const root = path.resolve('safe-root');
+    const target = path.join(root, 'save.json');
+    const result = validateRuntimeSaveLocationBinding({
+      filePath: target,
+      approvedRoots: [root],
+      allowFileNames: ['save.json'],
+    });
+    assert.equal(result.approved, true);
+    assert.equal(result.resolvedPath, path.resolve(target));
+  });
+
+  test('runtime save-location binding rejects traversal and unregistered files', () => {
+    const root = path.resolve('safe-root');
+    assert.throws(
+      () => validateRuntimeSaveLocationBinding({ filePath: path.join(root, '..', 'escape.json'), approvedRoots: [root] }),
+      /path traversal|outside approved/,
+    );
+    assert.throws(
+      () => validateRuntimeSaveLocationBinding({ filePath: path.join(root, 'other.json'), approvedRoots: [root], allowFileNames: ['save.json'] }),
+      /file name is not registered/,
     );
   });
 });
