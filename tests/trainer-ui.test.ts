@@ -282,6 +282,8 @@ describe('Save edit risk messaging', () => {
     assert.match(copy, /approval/);
     assert.match(copy, /backup/);
     assert.match(copy, /rollback/);
+    assert.match(copy, /before writing/);
+    assert.match(copy, /after a supported write/);
   });
 
   test('37. blocked copy covers unsupported formats and unsafe paths', () => {
@@ -301,5 +303,22 @@ describe('Save edit risk messaging', () => {
     assert.ok(!allCopy.includes('anti-cheat'));
     assert.ok(!allCopy.includes('process injection'));
     assert.ok(!allCopy.includes('memory editing'));
+  });
+
+  test('39. preview-only JSON and INI copy does not claim backup or rollback execution', () => {
+    const copy = SAVE_EDIT_RISK_COPY.preview_only.detail.toLowerCase();
+    assert.match(copy, /write execution/);
+    assert.match(copy, /backup creation/);
+    assert.match(copy, /rollback execution/);
+    assert.match(copy, /blocked/);
+    assert.ok(!copy.includes('rollback available'));
+  });
+
+  test('40. blocked copy does not claim rollback availability', () => {
+    const copy = SAVE_EDIT_RISK_COPY.blocked.detail.toLowerCase();
+    assert.match(copy, /backup/);
+    assert.match(copy, /rollback/);
+    assert.match(copy, /unavailable/);
+    assert.ok(!copy.includes('rollback available'));
   });
 });

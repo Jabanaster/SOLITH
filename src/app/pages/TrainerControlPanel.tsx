@@ -175,12 +175,15 @@ const ControlRow: React.FC<ControlRowProps> = ({
       {/* Awaiting approval: show diff + approve/cancel */}
       {state.phase === 'awaiting_approval' && (
         <div className="tcr-proposal-box" data-testid={`proposal-${control.id}`}>
-          <p className="tcr-proposal-label">Executable XML save-field write — review proposal, approve explicitly, then write with backup:</p>
+          <p className="tcr-proposal-label">Executable XML save-field write — review proposal, approve explicitly, then write with a verified backup:</p>
           <div className="tcr-diff">
             <span className="diff-old">{state.currentValue ?? '?'}</span>
             <span className="diff-arrow">→</span>
             <span className="diff-new">{state.proposedNewValue}</span>
           </div>
+          <p className="tcr-message tcr-info" data-testid={`backup-before-write-${control.id}`}>
+            Backup is created before write; rollback becomes available only after this supported write succeeds.
+          </p>
           <div className="tcr-proposal-actions">
             <button
               className="tcr-btn tcr-btn-approve"
@@ -203,6 +206,9 @@ const ControlRow: React.FC<ControlRowProps> = ({
       {/* Rollback available after successful write */}
       {state.phase === 'applied' && state.backupPath && (
         <div className="tcr-rollback-row" data-testid={`rollback-area-${control.id}`}>
+          <p className="tcr-message tcr-info" data-testid={`rollback-message-${control.id}`}>
+            Rollback available from the verified backup created before this write.
+          </p>
           <button
             className="tcr-btn tcr-btn-rollback"
             onClick={onRollback}

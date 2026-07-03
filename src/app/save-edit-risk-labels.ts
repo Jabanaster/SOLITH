@@ -15,17 +15,17 @@ export const SAVE_EDIT_RISK_COPY: Record<SaveEditRiskState, SaveEditRiskCopy> = 
   preview_only: {
     label: 'Preview-only',
     summary: 'Validate and preview only',
-    detail: 'ResourceForge can validate the proposed value and show a preview, but write execution is blocked.',
+    detail: 'ResourceForge can validate the proposed value and show a preview, but write execution, backup creation, and rollback execution are blocked.',
   },
   executable: {
     label: 'Executable',
-    summary: 'Requires approval and backup',
-    detail: 'Supported XML save-field writes require a proposal, explicit approval, verified backup, and rollback path.',
+    summary: 'Approval, backup, rollback',
+    detail: 'Supported XML save-field writes require a proposal and explicit approval; ResourceForge creates a verified backup before writing and offers rollback after a supported write.',
   },
   blocked: {
     label: 'Blocked',
     summary: 'Operation unavailable',
-    detail: 'Unsupported formats, unsafe paths, unsupported controls, and rejected operations cannot be executed.',
+    detail: 'Unsupported formats, unsafe paths, unsupported controls, and rejected operations cannot be executed, so backup and rollback actions are unavailable.',
   },
 };
 
@@ -42,4 +42,3 @@ export function saveEditRiskStateForFormat(format: string): SaveEditRiskState {
 export function saveEditRiskLabelForFormat(format: string): string {
   return SAVE_EDIT_RISK_COPY[saveEditRiskStateForFormat(format)].label;
 }
-
