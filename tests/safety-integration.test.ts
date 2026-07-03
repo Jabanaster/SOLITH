@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import os from 'os';
-import db, { initDatabase } from '../src/core/database/index.ts';
+import db, { resetForTesting } from '../src/core/database/index.ts';
 import { addGame } from '../src/core/games/index.ts';
 import { applyProposal } from '../src/core/saves/editor.ts';
 import { recoverInterruptedOperations } from '../src/core/safety/operations.ts';
@@ -15,11 +15,13 @@ import { Proposal } from '../src/shared/types/index.ts';
 import { acquireFileLock, releaseFileLock } from '../src/core/safety/file-lock.ts';
 
 describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
-  const testGameDir = path.join(os.tmpdir(), 'resourceforge-test-game');
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const testRoot = path.join(os.tmpdir(), `resourceforge-safety-${runId}`);
+  const testGameDir = path.join(testRoot, 'game');
   let gameId = '';
 
   before(async () => {
-    await initDatabase();
+    await resetForTesting();
     
     // Ensure test game directory exists
     if (!fs.existsSync(testGameDir)) {
@@ -37,11 +39,11 @@ describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
 
   after(() => {
     // Clean up test game directory
-    if (fs.existsSync(testGameDir)) {
+    if (fs.existsSync(testRoot)) {
       try {
-        fs.rmSync(testGameDir, { recursive: true, force: true });
+        fs.rmSync(testRoot, { recursive: true, force: true });
       } catch (e) {
-        console.error('Failed to clean up testGameDir:', e);
+        console.error('Failed to clean up safety test root:', e);
       }
     }
   });
@@ -98,16 +100,17 @@ describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
       createdAt: new Date().toISOString()
     };
 
-    const res = await applyProposal(proposal);
-    assert.strictEqual(res.success, false);
-    assert.ok(res.error?.includes('locked'));
+    try {
+      const res = await applyProposal(proposal);
+      assert.strictEqual(res.success, false);
+      assert.ok(res.error?.includes('locked'));
 
-    // Original content remains unchanged
-    const currentContent = JSON.parse(fs.readFileSync(targetFile, 'utf-8'));
-    assert.strictEqual(currentContent.gold, 100);
-
-    // Release lock
-    releaseFileLock(canonicalPath);
+      // Original content remains unchanged
+      const currentContent = JSON.parse(fs.readFileSync(targetFile, 'utf-8'));
+      assert.strictEqual(currentContent.gold, 100);
+    } finally {
+      releaseFileLock(canonicalPath);
+    }
   });
 
   test('3. Stale Value Verification (Concurrent Mod Protection)', async () => {
