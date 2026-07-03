@@ -8,6 +8,7 @@ import {
 } from '../src/app/save-edit-risk-labels.js';
 import {
   LOCAL_TRAINER_SERVICE_UNAVAILABLE_MESSAGE,
+  LOCAL_ONLY_SAFETY_MESSAGE,
   OPERATION_FAILED_BEFORE_WRITE_MESSAGE,
   PREVIEW_ONLY_FORMAT_MESSAGE,
   UNSUPPORTED_FORMAT_BLOCKED_MESSAGE,
@@ -366,5 +367,18 @@ describe('Save edit risk messaging', () => {
     assert.equal(safe.includes('C:\\Users\\private'), false);
     assert.equal(safe.includes('/tmp/private'), false);
     assert.match(safe, /\[path\]/);
+  });
+
+  test('43. local-only safety copy is short, scoped, and does not imply prohibited support', () => {
+    const copy = LOCAL_ONLY_SAFETY_MESSAGE.toLowerCase();
+    assert.match(copy, /local single-player files only/);
+    assert.match(copy, /approved supported action/);
+    assert.equal(copy.includes('online'), false);
+    assert.equal(copy.includes('multiplayer'), false);
+    assert.equal(copy.includes('anti-cheat'), false);
+    assert.equal(copy.includes('memory'), false);
+    assert.equal(copy.includes('process'), false);
+    assert.equal(copy.includes('debugger'), false);
+    assert.equal(copy.includes('cloud'), false);
   });
 });

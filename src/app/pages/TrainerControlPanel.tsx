@@ -32,6 +32,7 @@ import { loadTrainerControls } from '../../core/game-profiles/transform.js';
 import stardewProfileData from '../../core/game-profiles/profiles/stardew-valley.json';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 import {
+  LOCAL_ONLY_SAFETY_MESSAGE,
   localTrainerServiceFailureMessage,
   operationFailedBeforeWriteMessage,
   userSafeErrorDetail,
@@ -475,6 +476,9 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
   return (
     <div className="trainer-control-panel" data-testid="trainer-control-panel">
       <div className="tcp-host-bar">
+        <span className="tcp-local-only-copy" data-testid="trainer-local-only-copy">
+          {LOCAL_ONLY_SAFETY_MESSAGE}
+        </span>
         <span className={`tcp-host-status ${hostRunning ? 'host-running' : 'host-stopped'}`}
               data-testid="host-status">
           TrainerHost: {hostRunning ? 'Running' : 'Stopped'}

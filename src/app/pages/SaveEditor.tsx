@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 import {
+  LOCAL_ONLY_SAFETY_MESSAGE,
   operationFailedBeforeWriteMessage,
   userSafeErrorDetail,
 } from '../reliability-messages.js';
@@ -187,6 +188,9 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
           {mode === 'save' 
             ? 'Inspect local save values and review supported save-field edits before any write.' 
             : 'Review local data-file suggestions before any supported write path is used.'}
+        </p>
+        <p className="description" data-testid="local-only-safety-copy">
+          {LOCAL_ONLY_SAFETY_MESSAGE} Unsupported and preview-only formats remain blocked from write execution.
         </p>
       </div>
 
