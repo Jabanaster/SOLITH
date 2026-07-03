@@ -31,6 +31,11 @@ import { loadTrainerControls } from '../../core/game-profiles/transform.js';
 // the fs-backed loader here, or Node built-ins get pulled into the browser bundle.
 import stardewProfileData from '../../core/game-profiles/profiles/stardew-valley.json';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
+import {
+  localTrainerServiceFailureMessage,
+  operationFailedBeforeWriteMessage,
+  userSafeErrorDetail,
+} from '../reliability-messages.js';
 
 // ── Profile-driven control loading ───────────────────────────────────────────
 
@@ -289,6 +294,7 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
   const [inputValues, setInputValues] = useState<Record<string, string>>(
     () => Object.fromEntries(controls.map(c => [c.id, '']))
   );
+  const [hostMessage, setHostMessage] = useState('');
 
   const electronAPI = api();
 
@@ -301,8 +307,15 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
     if (!autoStart || !electronAPI) return;
     setHostBusy(true);
     electronAPI.trainerHostStart()
-      .then((res: any) => setHostRunning(res?.success !== false))
-      .catch(() => {})
+      .then((res: any) => {
+        const running = res?.success !== false;
+        setHostRunning(running);
+        setHostMessage(running ? '' : localTrainerServiceFailureMessage());
+      })
+      .catch(() => {
+        setHostRunning(false);
+        setHostMessage(localTrainerServiceFailureMessage());
+      })
       .finally(() => setHostBusy(false));
   }, [autoStart, electronAPI]);
 
@@ -311,7 +324,12 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
     setHostBusy(true);
     try {
       const res = await electronAPI.trainerHostStart();
-      setHostRunning(res?.success !== false);
+      const running = res?.success !== false;
+      setHostRunning(running);
+      setHostMessage(running ? '' : localTrainerServiceFailureMessage());
+    } catch {
+      setHostRunning(false);
+      setHostMessage(localTrainerServiceFailureMessage());
     } finally {
       setHostBusy(false);
     }
@@ -323,6 +341,7 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
     try {
       await electronAPI.trainerHostStop();
       setHostRunning(false);
+      setHostMessage('');
     } finally {
       setHostBusy(false);
     }
@@ -340,10 +359,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
       if (res?.success !== false && res?.value !== undefined) {
         setControlState(control.id, { phase: 'idle', currentValue: String(res.value) });
       } else {
-        setControlState(control.id, { phase: 'error', message: res?.error ?? 'Read failed' });
+        setControlState(control.id, { phase: 'error', message: localTrainerServiceFailureMessage() });
       }
     } catch (e) {
-      setControlState(control.id, { phase: 'error', message: String(e) });
+      console.error('[TrainerControlPanel] read failed:', userSafeErrorDetail(e));
+      setControlState(control.id, { phase: 'error', message: localTrainerServiceFailureMessage() });
     }
   }, [electronAPI, setControlState]);
 
@@ -371,10 +391,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
           message: undefined,
         });
       } else {
-        setControlState(control.id, { phase: 'error', message: res?.error ?? 'Proposal failed' });
+        setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
       }
     } catch (e) {
-      setControlState(control.id, { phase: 'error', message: String(e) });
+      console.error('[TrainerControlPanel] propose failed:', userSafeErrorDetail(e));
+      setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
     }
   }, [electronAPI, controlStates, setControlState]);
 
@@ -395,10 +416,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
           message: `Written at ${ts}. Backup created.`,
         });
       } else {
-        setControlState(control.id, { phase: 'error', message: res?.error ?? 'Write failed' });
+        setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
       }
     } catch (e) {
-      setControlState(control.id, { phase: 'error', message: String(e) });
+      console.error('[TrainerControlPanel] write failed:', userSafeErrorDetail(e));
+      setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
     }
   }, [electronAPI, controlStates, setControlState]);
 
@@ -431,10 +453,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
           message: `Rolled back at ${ts}. Original value restored.`,
         });
       } else {
-        setControlState(control.id, { phase: 'error', message: res?.error ?? 'Rollback failed' });
+        setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
       }
     } catch (e) {
-      setControlState(control.id, { phase: 'error', message: String(e) });
+      console.error('[TrainerControlPanel] rollback failed:', userSafeErrorDetail(e));
+      setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
     }
   }, [electronAPI, controlStates, setControlState]);
 
@@ -466,6 +489,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
                   data-testid="stop-host-btn">
             {hostBusy ? 'Stopping…' : 'Stop Host'}
           </button>
+        )}
+        {hostMessage && (
+          <span className="tcp-host-message" data-testid="host-message">
+            {hostMessage}
+          </span>
         )}
       </div>
 

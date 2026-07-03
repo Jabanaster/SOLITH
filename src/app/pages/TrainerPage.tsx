@@ -3,6 +3,11 @@ import type { TrainerItem } from '../../shared/types/index.js';
 import { TrainerCard, type TrainerCardState } from '../components/TrainerCard.js';
 import { ApplyDialog } from '../components/ApplyDialog.js';
 import { ContextPanel } from '../components/ContextPanel.js';
+import {
+  localTrainerServiceFailureMessage,
+  operationFailedBeforeWriteMessage,
+  userSafeErrorDetail,
+} from '../reliability-messages.js';
 
 interface TrainerPageProps {
   gameId: string;
@@ -147,7 +152,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
 
       if (!proposal) {
         setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
-        setLastOpMessages(prev => ({ ...prev, [item.id]: 'Proposal creation failed' }));
+        setLastOpMessages(prev => ({ ...prev, [item.id]: operationFailedBeforeWriteMessage() }));
         return;
       }
 
@@ -167,13 +172,13 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
       } else {
         setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
         setLastOpMessages(prev => ({
-          ...prev, [item.id]: `Failed: ${res?.error ?? 'unknown error'}`
+          ...prev, [item.id]: operationFailedBeforeWriteMessage()
         }));
       }
     } catch (e) {
-      console.error('[TrainerPage] apply error:', e);
+      console.error('[TrainerPage] apply error:', userSafeErrorDetail(e));
       setTransientStates(prev => ({ ...prev, [item.id]: 'FAILED' }));
-      setLastOpMessages(prev => ({ ...prev, [item.id]: `Error: ${String(e).slice(0, 80)}` }));
+      setLastOpMessages(prev => ({ ...prev, [item.id]: operationFailedBeforeWriteMessage() }));
     } finally {
       setApplyBusy(false);
       setApplyPending(null);
@@ -194,7 +199,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
       } else {
         setTransientStates(prev => ({ ...prev, [sid]: 'FAILED' }));
         setLastOpMessages(prev => ({
-          ...prev, [sid]: `Restore failed: ${res?.error ?? 'unknown error'}`
+          ...prev, [sid]: operationFailedBeforeWriteMessage()
         }));
       }
     } catch (e) {
@@ -214,8 +219,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
         <div className="no-api-box glass">
           <h3>Read-Only Preview</h3>
           <p>
-            ResourceForge must run inside Electron to apply trainer changes.
-            Privileged IPC operations (apply, backup, restore) are disabled in browser preview.
+            {localTrainerServiceFailureMessage()} ResourceForge must run inside Electron to apply trainer changes.
           </p>
         </div>
       </div>

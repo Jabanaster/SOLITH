@@ -1,3 +1,8 @@
+import {
+  PREVIEW_ONLY_FORMAT_MESSAGE,
+  UNSUPPORTED_FORMAT_BLOCKED_MESSAGE,
+} from './reliability-messages.js';
+
 export type SaveEditRiskState = 'read_only' | 'preview_only' | 'executable' | 'blocked';
 
 export interface SaveEditRiskCopy {
@@ -14,8 +19,8 @@ export const SAVE_EDIT_RISK_COPY: Record<SaveEditRiskState, SaveEditRiskCopy> = 
   },
   preview_only: {
     label: 'Preview-only',
-    summary: 'Validate and preview only',
-    detail: 'ResourceForge can validate the proposed value and show a preview, but write execution, backup creation, and rollback execution are blocked.',
+    summary: 'Write execution blocked',
+    detail: `${PREVIEW_ONLY_FORMAT_MESSAGE} ResourceForge can validate the proposed value and show a preview, but backup creation and rollback execution are blocked.`,
   },
   executable: {
     label: 'Executable',
@@ -24,8 +29,8 @@ export const SAVE_EDIT_RISK_COPY: Record<SaveEditRiskState, SaveEditRiskCopy> = 
   },
   blocked: {
     label: 'Blocked',
-    summary: 'Operation unavailable',
-    detail: 'Unsupported formats, unsafe paths, unsupported controls, and rejected operations cannot be executed, so backup and rollback actions are unavailable.',
+    summary: 'Format or operation unavailable',
+    detail: `${UNSUPPORTED_FORMAT_BLOCKED_MESSAGE} Unsupported formats, unsafe paths, unsupported controls, and rejected operations cannot be executed, so backup and rollback actions are unavailable.`,
   },
 };
 

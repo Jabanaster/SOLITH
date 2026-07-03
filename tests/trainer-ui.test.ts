@@ -6,6 +6,13 @@ import {
   SAVE_EDIT_RISK_COPY,
   saveEditRiskLabelForFormat,
 } from '../src/app/save-edit-risk-labels.js';
+import {
+  LOCAL_TRAINER_SERVICE_UNAVAILABLE_MESSAGE,
+  OPERATION_FAILED_BEFORE_WRITE_MESSAGE,
+  PREVIEW_ONLY_FORMAT_MESSAGE,
+  UNSUPPORTED_FORMAT_BLOCKED_MESSAGE,
+  stripFilesystemPaths,
+} from '../src/app/reliability-messages.js';
 
 // ── Replicated from TrainerPage.tsx for unit testing ──────────────────────────
 
@@ -145,11 +152,11 @@ describe('STATE_CONFIG — all active states defined', () => {
     GAME_RUNNING: { label: 'Game Running', color: 'caution', explanation: 'Close the game before modifying this save.' },
     NEEDS_RESCAN: { label: 'Needs Rescan', color: 'caution', explanation: 'The save structure changed after a game update.' },
     BROKEN:       { label: 'Broken',       color: 'risky',   explanation: 'Target file not found or inaccessible.' },
-    BLOCKED:      { label: 'Blocked',      color: 'blocked', explanation: 'This target is protected and cannot be edited safely.' },
+    BLOCKED:      { label: 'Blocked',      color: 'blocked', explanation: UNSUPPORTED_FORMAT_BLOCKED_MESSAGE },
     APPLYING:     { label: 'Applying…',    color: 'info',    explanation: 'Writing change atomically. Do not close.' },
     APPLIED:      { label: 'Applied ✓',    color: 'safe',    explanation: 'Change applied. Backup created.' },
     RESTORED:     { label: 'Restored ✓',   color: 'safe',    explanation: 'Original value restored from backup.' },
-    FAILED:       { label: 'Failed',       color: 'risky',   explanation: 'Apply failed. Original file is unchanged.' },
+    FAILED:       { label: 'Failed',       color: 'risky',   explanation: OPERATION_FAILED_BEFORE_WRITE_MESSAGE },
   };
 
   test('19. All active TrainerCardState values are in STATE_CONFIG', () => {
@@ -288,6 +295,7 @@ describe('Save edit risk messaging', () => {
 
   test('37. blocked copy covers unsupported formats and unsafe paths', () => {
     const copy = SAVE_EDIT_RISK_COPY.blocked.detail.toLowerCase();
+    assert.match(copy, /blocked - this format is not executable yet/);
     assert.match(copy, /unsupported formats/);
     assert.match(copy, /unsafe paths/);
     assert.match(copy, /rejected operations/);
@@ -303,10 +311,12 @@ describe('Save edit risk messaging', () => {
     assert.ok(!allCopy.includes('anti-cheat'));
     assert.ok(!allCopy.includes('process injection'));
     assert.ok(!allCopy.includes('memory editing'));
+    assert.ok(!allCopy.includes('debugger attachment'));
   });
 
   test('39. preview-only JSON and INI copy does not claim backup or rollback execution', () => {
     const copy = SAVE_EDIT_RISK_COPY.preview_only.detail.toLowerCase();
+    assert.ok(copy.includes(PREVIEW_ONLY_FORMAT_MESSAGE.toLowerCase()));
     assert.match(copy, /write execution/);
     assert.match(copy, /backup creation/);
     assert.match(copy, /rollback execution/);
@@ -320,5 +330,41 @@ describe('Save edit risk messaging', () => {
     assert.match(copy, /rollback/);
     assert.match(copy, /unavailable/);
     assert.ok(!copy.includes('rollback available'));
+  });
+
+  test('41. reliability messages are user-safe and do not claim file changes after blocked writes', () => {
+    assert.strictEqual(
+      LOCAL_TRAINER_SERVICE_UNAVAILABLE_MESSAGE,
+      'Local trainer service unavailable. No game files were changed.'
+    );
+    assert.strictEqual(
+      OPERATION_FAILED_BEFORE_WRITE_MESSAGE,
+      'Operation failed before write completion. Check backup/rollback status before retrying.'
+    );
+
+    const copy = [
+      LOCAL_TRAINER_SERVICE_UNAVAILABLE_MESSAGE,
+      OPERATION_FAILED_BEFORE_WRITE_MESSAGE,
+      UNSUPPORTED_FORMAT_BLOCKED_MESSAGE,
+      PREVIEW_ONLY_FORMAT_MESSAGE,
+    ].join(' ').toLowerCase();
+
+    assert.match(copy, /no game files were changed/);
+    assert.match(copy, /before write completion/);
+    assert.ok(!copy.includes('safe edit'));
+    assert.ok(!copy.includes('online'));
+    assert.ok(!copy.includes('multiplayer'));
+    assert.ok(!copy.includes('memory editing'));
+    assert.ok(!copy.includes('process injection'));
+    assert.ok(!copy.includes('debugger attachment'));
+    assert.ok(!copy.includes('anti-cheat'));
+  });
+
+  test('42. displayed error detail strips full filesystem paths', () => {
+    const source = 'ENOENT C:\\Users\\private\\AppData\\Roaming\\ResourceForge\\backups\\manifest.json /tmp/private/save.json';
+    const safe = stripFilesystemPaths(source);
+    assert.equal(safe.includes('C:\\Users\\private'), false);
+    assert.equal(safe.includes('/tmp/private'), false);
+    assert.match(safe, /\[path\]/);
   });
 });

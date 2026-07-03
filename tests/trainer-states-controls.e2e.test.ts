@@ -354,7 +354,7 @@ const rendererStates = [
   { state: 'NEEDS_RESCAN', label: 'Needs Rescan', explanation: 'The save structure changed after a game update.', control: 'enabled' },
   { state: 'BROKEN', label: 'Broken', explanation: 'Target file not found or inaccessible.', control: 'absent' },
   { state: 'APPLYING', label: 'Applying…', explanation: 'Writing change atomically. Do not close.', control: 'disabled' },
-  { state: 'FAILED', label: 'Failed', explanation: 'Apply failed. Original file is unchanged.', control: 'enabled' },
+  { state: 'FAILED', label: 'Failed', explanation: 'Operation failed before write completion. Check backup/rollback status before retrying.', control: 'enabled' },
 ] as const;
 
 for (const spec of rendererStates) {

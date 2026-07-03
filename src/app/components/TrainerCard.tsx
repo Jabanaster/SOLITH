@@ -1,4 +1,8 @@
 import React from 'react';
+import {
+  OPERATION_FAILED_BEFORE_WRITE_MESSAGE,
+  UNSUPPORTED_FORMAT_BLOCKED_MESSAGE,
+} from '../reliability-messages.js';
 import type { TrainerItem } from '../../shared/types/index.js';
 
 export type TrainerCardState =
@@ -17,11 +21,11 @@ export const STATE_CONFIG: Record<TrainerCardState, { label: string; color: stri
   GAME_RUNNING: { label: 'Game Running', color: 'caution', explanation: 'Close the game before modifying this save.' },
   NEEDS_RESCAN: { label: 'Needs Rescan', color: 'caution', explanation: 'The save structure changed after a game update.' },
   BROKEN:       { label: 'Broken',       color: 'risky',   explanation: 'Target file not found or inaccessible.' },
-  BLOCKED:      { label: 'Blocked',      color: 'blocked', explanation: 'This target is protected and cannot be edited safely.' },
+  BLOCKED:      { label: 'Blocked',      color: 'blocked', explanation: UNSUPPORTED_FORMAT_BLOCKED_MESSAGE },
   APPLYING:     { label: 'Applying…',    color: 'info',    explanation: 'Writing change atomically. Do not close.' },
   APPLIED:      { label: 'Applied ✓',    color: 'safe',    explanation: 'Change applied. Backup created.' },
   RESTORED:     { label: 'Restored ✓',   color: 'safe',    explanation: 'Original value restored from backup.' },
-  FAILED:       { label: 'Failed',       color: 'risky',   explanation: 'Apply failed. Original file is unchanged.' },
+  FAILED:       { label: 'Failed',       color: 'risky',   explanation: OPERATION_FAILED_BEFORE_WRITE_MESSAGE },
 };
 
 interface TrainerCardProps {

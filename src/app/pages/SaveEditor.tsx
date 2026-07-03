@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
+import {
+  operationFailedBeforeWriteMessage,
+  userSafeErrorDetail,
+} from '../reliability-messages.js';
 
 interface SaveEditorProps {
   gameId: string | null;
@@ -159,10 +163,11 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
         // Reload file contents
         handleFileChange({ target: { value: selectedFile } } as any);
       } else {
-        alert(`Failed to apply modification: ${res.error}`);
+        alert(operationFailedBeforeWriteMessage());
       }
     } catch (err) {
-      console.error('Failed to apply edit:', err);
+      console.error('Failed to apply edit:', userSafeErrorDetail(err));
+      alert(operationFailedBeforeWriteMessage());
     } finally {
       setApplying(false);
     }
