@@ -59,11 +59,26 @@ function loadManifest(backupDir: string): BackupManifest {
  * Saves backup manifest atomically (temp file + rename).
  */
 function saveManifest(backupDir: string, manifest: BackupManifest): void {
+  fs.mkdirSync(backupDir, { recursive: true });
+
   const manifestPath = path.join(backupDir, 'manifest.json');
-  const tempPath = `${manifestPath}.tmp`;
-  
-  fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2), 'utf-8');
-  fs.renameSync(tempPath, manifestPath);
+  const tempPath = path.join(
+    backupDir,
+    `manifest.${process.pid}.${Date.now()}.${crypto.randomUUID()}.json.tmp`
+  );
+
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    fs.renameSync(tempPath, manifestPath);
+  } finally {
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Preserve the original write/rename failure for callers.
+      }
+    }
+  }
 }
 
 /**
