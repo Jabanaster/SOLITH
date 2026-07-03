@@ -2,6 +2,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import type { TrainerItem } from '../src/shared/types/index.js';
+import {
+  SAVE_EDIT_RISK_COPY,
+  saveEditRiskLabelForFormat,
+} from '../src/app/save-edit-risk-labels.js';
 
 // ── Replicated from TrainerPage.tsx for unit testing ──────────────────────────
 
@@ -254,5 +258,48 @@ describe('Compatibility profile level taxonomy', () => {
 
   test('33. BLOCKED_PENDING_USER_DATA is not a valid profile level (is a dashboard note)', () => {
     assert.ok(!VALID_LEVELS.includes('BLOCKED_PENDING_USER_DATA' as any));
+  });
+});
+
+describe('Save edit risk messaging', () => {
+  test('34. labels exist for read-only, preview-only, executable, and blocked states', () => {
+    assert.strictEqual(SAVE_EDIT_RISK_COPY.read_only.label, 'Read-only');
+    assert.strictEqual(SAVE_EDIT_RISK_COPY.preview_only.label, 'Preview-only');
+    assert.strictEqual(SAVE_EDIT_RISK_COPY.executable.label, 'Executable');
+    assert.strictEqual(SAVE_EDIT_RISK_COPY.blocked.label, 'Blocked');
+  });
+
+  test('35. JSON and INI are preview-only, not executable', () => {
+    assert.strictEqual(saveEditRiskLabelForFormat('json'), 'Preview-only');
+    assert.strictEqual(saveEditRiskLabelForFormat('ini'), 'Preview-only');
+    assert.notStrictEqual(saveEditRiskLabelForFormat('json'), 'Executable');
+    assert.notStrictEqual(saveEditRiskLabelForFormat('ini'), 'Executable');
+  });
+
+  test('36. XML executable copy keeps approval, backup, and rollback language', () => {
+    const copy = SAVE_EDIT_RISK_COPY.executable.detail.toLowerCase();
+    assert.match(copy, /xml/);
+    assert.match(copy, /approval/);
+    assert.match(copy, /backup/);
+    assert.match(copy, /rollback/);
+  });
+
+  test('37. blocked copy covers unsupported formats and unsafe paths', () => {
+    const copy = SAVE_EDIT_RISK_COPY.blocked.detail.toLowerCase();
+    assert.match(copy, /unsupported formats/);
+    assert.match(copy, /unsafe paths/);
+    assert.match(copy, /rejected operations/);
+  });
+
+  test('38. risk messaging does not reintroduce misleading safe edit wording or unsafe domains', () => {
+    const allCopy = Object.values(SAVE_EDIT_RISK_COPY)
+      .map(copy => `${copy.label} ${copy.summary} ${copy.detail}`)
+      .join(' ')
+      .toLowerCase();
+    assert.ok(!allCopy.includes('safe edit'));
+    assert.ok(!allCopy.includes('multiplayer'));
+    assert.ok(!allCopy.includes('anti-cheat'));
+    assert.ok(!allCopy.includes('process injection'));
+    assert.ok(!allCopy.includes('memory editing'));
   });
 });

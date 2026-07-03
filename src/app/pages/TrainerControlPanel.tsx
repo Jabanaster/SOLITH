@@ -30,6 +30,7 @@ import { loadTrainerControls } from '../../core/game-profiles/transform.js';
 // Renderer-safe: import the profile as data (bundled by Vite). We must NOT import
 // the fs-backed loader here, or Node built-ins get pulled into the browser bundle.
 import stardewProfileData from '../../core/game-profiles/profiles/stardew-valley.json';
+import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 
 // ── Profile-driven control loading ───────────────────────────────────────────
 
@@ -114,6 +115,7 @@ const ControlRow: React.FC<ControlRowProps> = ({
 }) => {
   const executable = isControlExecutable(control);
   const needsApproval = requiresApproval(control);
+  const riskCopy = executable ? SAVE_EDIT_RISK_COPY.executable : SAVE_EDIT_RISK_COPY.blocked;
   const backendLabel = BACKEND_LABELS[control.backend];
   const statusLabel = SAFETY_STATUS_LABELS[
     state.phase === 'applied' && state.backupPath ? 'rollback_available' : control.safetyStatus
@@ -138,6 +140,10 @@ const ControlRow: React.FC<ControlRowProps> = ({
                 data-testid={`status-${control.id}`}>
             {statusLabel}
           </span>
+          <span className={`tcr-status-badge status-${executable ? 'caution' : 'muted'}`}
+                data-testid={`edit-state-${control.id}`}>
+            {riskCopy.label}
+          </span>
           <span className="tcr-backend" data-testid={`backend-${control.id}`}>
             {backendLabel}
           </span>
@@ -153,6 +159,10 @@ const ControlRow: React.FC<ControlRowProps> = ({
         </p>
       )}
 
+      <p className="tcr-message tcr-info" data-testid={`edit-state-message-${control.id}`}>
+        {riskCopy.label}: {riskCopy.detail}
+      </p>
+
       {state.currentValue !== undefined && (
         <div className="tcr-current-row">
           <span className="tcr-field-label">Current</span>
@@ -165,7 +175,7 @@ const ControlRow: React.FC<ControlRowProps> = ({
       {/* Awaiting approval: show diff + approve/cancel */}
       {state.phase === 'awaiting_approval' && (
         <div className="tcr-proposal-box" data-testid={`proposal-${control.id}`}>
-          <p className="tcr-proposal-label">Proposed change — approve to write:</p>
+          <p className="tcr-proposal-label">Executable XML save-field write — review proposal, approve explicitly, then write with backup:</p>
           <div className="tcr-diff">
             <span className="diff-old">{state.currentValue ?? '?'}</span>
             <span className="diff-arrow">→</span>
@@ -249,7 +259,7 @@ const ControlRow: React.FC<ControlRowProps> = ({
         <div className="tcr-disabled-note" data-testid={`disabled-note-${control.id}`}>
           {control.safetyStatus === 'future_feature'
             ? 'Not yet implemented — planned for a future milestone.'
-            : 'This control is currently disabled.'}
+            : 'Blocked: this control is currently disabled and cannot execute writes.'}
         </div>
       )}
     </div>

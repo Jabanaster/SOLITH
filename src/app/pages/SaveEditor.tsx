@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 
 interface SaveEditorProps {
   gameId: string | null;
@@ -47,6 +48,8 @@ function isElevatedRisk(risk: string): boolean {
   const normalized = risk.toLowerCase();
   return normalized === 'caution' || normalized === 'risky';
 }
+
+const SAVE_EDIT_RISK_ORDER = ['read_only', 'preview_only', 'executable', 'blocked'] as const;
 
 const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   const [saveFiles, setSaveFiles] = useState<string[]>([]);
@@ -177,9 +180,24 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
         <h2>{mode === 'save' ? 'Save Editor' : 'Data Editor'}</h2>
         <p className="description">
           {mode === 'save' 
-            ? 'Inspect and edit gameplay parameters inside local save files.' 
-            : 'Suggest and inject configuration edits (damage values, shop prices, unlockables).'}
+            ? 'Inspect local save values and review supported save-field edits before any write.' 
+            : 'Review local data-file suggestions before any supported write path is used.'}
         </p>
+      </div>
+
+      <div className="file-selector-panel glass" data-testid="save-edit-risk-legend">
+        <label>Save edit states:</label>
+        <div className="risk-state-legend">
+          {SAVE_EDIT_RISK_ORDER.map(state => {
+            const copy = SAVE_EDIT_RISK_COPY[state];
+            return (
+              <div key={state} className={`badge risk-state-${state.replace(/_/g, '-')}`}>
+                <strong>{copy.label}</strong>
+                <span>{copy.summary}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="file-selector-panel glass">
@@ -290,7 +308,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
           <div className="modal-content glass">
             <h3>Modify Parameter</h3>
             <p className="modal-description">
-              This will modify a local save/data file. Confirm you have a backup or rollback point before continuing.
+              This local save/data edit must be reviewed before any write. JSON and INI proposals remain preview-only unless a supported write path is separately accepted.
             </p>
             <p className={`modal-description ${isDemoGame ? 'risk-caution' : 'risk-safe'}`}>
               {isDemoGame ? 'Demo fixture edit' : 'Registered game edit'}
@@ -300,6 +318,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
               <div><strong>Path:</strong> <code>{editingField.path}</code></div>
               <div><strong>Current Value:</strong> {String('value' in editingField ? editingField.value : editingField.currentValue)}</div>
               <div><strong>Risk assessment:</strong> <span className={`badge risk-${riskClassName(editingField.risk)}`}>{riskDisplayLabel(editingField.risk)}</span></div>
+              <div><strong>Blocked means:</strong> unsupported formats, unsafe paths, unsupported controls, and rejected operations cannot be executed.</div>
             </div>
 
             {isElevatedRisk(editingField.risk) && (
