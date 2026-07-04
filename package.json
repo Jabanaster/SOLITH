@@ -1,6 +1,6 @@
 {
   "name": "resourceforge",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Local AI Game Trainer + Save Editor + Discovery Lab",
   "main": "dist-electron/main.js",
   "author": "ResourceForge",
@@ -23,7 +23,7 @@
     "test:trainer-host": "tsx --test tests/trainer-host/protocol.test.ts tests/trainer-host/read-save-field.test.ts tests/trainer-host/host-runtime.test.ts tests/trainer-host/host-supervisor.test.ts tests/trainer-host/write-save-field.test.ts tests/trainer-host/e2e.test.ts",
     "test:trainer-schema": "tsx --test tests/trainer-control-schema.test.ts",
     "test:game-profile": "tsx --test tests/game-profile.test.ts",
-    "test": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/save-format.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-binding.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/v2-lifecycle.test.ts tests/command-runner.test.ts tests/v2-lifecycle-wiring.test.ts tests/trainer-host/protocol.test.ts tests/trainer-host/read-save-field.test.ts tests/trainer-host/host-runtime.test.ts tests/trainer-host/host-supervisor.test.ts tests/trainer-host/write-save-field.test.ts tests/trainer-host/e2e.test.ts tests/trainer-control-schema.test.ts tests/game-profile.test.ts",
+    "test": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/save-format.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-binding.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/v2-lifecycle.test.ts tests/command-runner.test.ts tests/v2-lifecycle-wiring.test.ts tests/release-artifacts.test.ts tests/trainer-host/protocol.test.ts tests/trainer-host/read-save-field.test.ts tests/trainer-host/host-runtime.test.ts tests/trainer-host/host-supervisor.test.ts tests/trainer-host/write-save-field.test.ts tests/trainer-host/e2e.test.ts tests/trainer-control-schema.test.ts tests/game-profile.test.ts",
     "test:drill-core": "tsx --test tests/drill-core-settings.test.ts",
     "test:electron-smoke": "playwright test tests/electron.smoke.test.ts",
     "test:electron-e2e": "playwright test tests/electron.e2e.test.ts --config playwright.e2e.config.ts",
@@ -41,6 +41,8 @@
     "test:performance": "playwright test tests/performance.e2e.test.ts --config playwright.e2e.config.ts",
     "test:pilot-intake": "tsx --test tests/pilot-intake.test.ts",
     "verify:electron-output": "node scripts/verify-electron-output.mjs",
+    "verify:release-artifacts": "node scripts/verify-release-artifacts.mjs",
+    "checksums:release": "node scripts/generate-release-checksums.mjs",
     "dist": "electron-builder",
     "dist:dir": "electron-builder --dir",
     "postinstall": "electron-builder install-app-deps",
@@ -57,6 +59,7 @@
     "directories": {
       "output": "dist"
     },
+    "artifactName": "${productName} Setup ${version}.${ext}",
     "files": [
       "dist-electron/**/*",
       "!dist-electron/**/*.map"
@@ -71,7 +74,18 @@
         "from": "demo-game",
         "to": "demo-game"
       }
-    ]
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "executableName": "ResourceForge"
+    },
+    "nsis": {
+      "artifactName": "ResourceForge Setup ${version}.${ext}",
+      "shortcutName": "ResourceForge",
+      "uninstallDisplayName": "ResourceForge"
+    }
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",
