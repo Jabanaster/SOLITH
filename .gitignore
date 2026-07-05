@@ -93,6 +93,9 @@ Docs/pilot/wand-captures/
 # The demo-game directory is tracked as fixture data; exclude any accidentally
 # generated runtime copies:
 demo-game/**/*.bak
+demo-game/data/*
+!demo-game/data/items.json
+!demo-game/data/player_stats.ini
 
 # ── Compat test database (only used by the legacy compat runner) ──────────────
 electron/test-compat.db
