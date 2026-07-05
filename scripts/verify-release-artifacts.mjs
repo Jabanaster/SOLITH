@@ -36,7 +36,7 @@ console.log('\nResourceForge release artifact verifier\n');
 console.log(`Root: ${root}`);
 console.log(`Version: ${pkg.version}`);
 
-check('package version is 1.5.0', pkg.version === '1.5.0', pkg.version);
+check('package version is non-empty', typeof pkg.version === 'string' && pkg.version.length > 0, String(pkg.version));
 check('productName is ResourceForge', pkg.build?.productName === 'ResourceForge', pkg.build?.productName);
 check('appId is stable', pkg.build?.appId === 'com.resourceforge.app', pkg.build?.appId);
 check('publish config is absent', pkg.build?.publish === undefined);
@@ -58,7 +58,7 @@ const artifactNames = setupArtifacts.join(', ');
 check('no ResourceForge installer artifact name includes 1.4.0', !artifactNames.includes('1.4.0'), artifactNames);
 
 const installerName = path.basename(paths.installer);
-check('installer name includes 1.5.0', installerName.includes('1.5.0'), installerName);
+check('installer name includes current package version', installerName.includes(pkg.version), installerName);
 check('installer name does not include 1.4.0', !installerName.includes('1.4.0'), installerName);
 check('installer name does not include old internal project names', !/trainer|drill|pilot/i.test(installerName), installerName);
 

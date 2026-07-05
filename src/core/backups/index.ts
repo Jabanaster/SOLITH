@@ -15,6 +15,11 @@ interface BackupManifest {
   version: string;
 }
 
+function isManifestLockContention(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY' || code === 'ENOTEMPTY';
+}
+
 /**
  * Validates that a file path is safe (no traversal, absolute path).
  */
@@ -147,10 +152,20 @@ export function createBackup(
     ...(recipeId && { recipeId })
   };
   
-  // Update manifest (JSON file for redundancy)
-  const manifest = loadManifest(backupDir);
-  manifest.backups.push(backup);
-  saveManifest(backupDir, manifest);
+  // Update manifest (JSON file for redundancy). DB remains the primary source.
+  try {
+    const manifest = loadManifest(backupDir);
+    manifest.backups.push(backup);
+    saveManifest(backupDir, manifest);
+  } catch (error) {
+    if (!isManifestLockContention(error)) {
+      throw error;
+    }
+    console.warn(
+      'Backup manifest update skipped due to lock contention:',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
   
   // Persist to database (primary storage for crash recovery)
   const metadata = JSON.stringify({
