@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import {
+  buildBackupDashboardSummary,
+  type BackupDashboardItem,
+} from './backups-dashboard.js';
 
 interface BackupsProps {
   gameId: string | null;
 }
 
-interface BackupItem {
-  id: string;
-  timestamp: string;
-  filePath: string;
-  originalHash: string;
-  backupPath: string;
-  recipeId?: string;
-}
+type BackupItem = BackupDashboardItem;
 
 const Backups: React.FC<BackupsProps> = ({ gameId }) => {
   const [backups, setBackups] = useState<BackupItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const summary = buildBackupDashboardSummary(backups);
 
   useEffect(() => {
     if (gameId) {
@@ -74,6 +72,41 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
         </p>
       </div>
 
+      {!loading && (
+        <div className="glass" data-testid="rollback-dashboard-summary" style={{ marginBottom: '20px', padding: '16px' }}>
+          <div className="section-header" style={{ marginBottom: '12px' }}>
+            <h3>Rollback Dashboard</h3>
+            <p className="description">
+              Local-only backup visibility for rollback readiness. Restore actions always target the recorded file path.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <div className="glass" style={{ padding: '12px' }}>
+              <div style={{ fontSize: '12px', color: '#8892b0' }}>Snapshots</div>
+              <div data-testid="rollback-dashboard-total" style={{ fontSize: '24px', fontWeight: 700 }}>{summary.totalBackups}</div>
+            </div>
+            <div className="glass" style={{ padding: '12px' }}>
+              <div style={{ fontSize: '12px', color: '#8892b0' }}>Target files</div>
+              <div data-testid="rollback-dashboard-files" style={{ fontSize: '24px', fontWeight: 700 }}>{summary.uniqueFiles}</div>
+            </div>
+            <div className="glass" style={{ padding: '12px' }}>
+              <div style={{ fontSize: '12px', color: '#8892b0' }}>Recipe-linked</div>
+              <div data-testid="rollback-dashboard-recipe-linked" style={{ fontSize: '24px', fontWeight: 700 }}>{summary.recipeLinkedBackups}</div>
+            </div>
+            <div className="glass" style={{ padding: '12px' }}>
+              <div style={{ fontSize: '12px', color: '#8892b0' }}>Latest snapshot</div>
+              <div data-testid="rollback-dashboard-latest" style={{ fontSize: '14px', fontWeight: 700 }}>
+                {summary.latestTimestamp ? new Date(summary.latestTimestamp).toLocaleString() : 'None yet'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '4px', wordBreak: 'break-all' }}>
+                {summary.latestFilePath ?? 'No rollback snapshots recorded yet.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="empty-state glass">
           <p>Loading backup snapshots...</p>
@@ -90,6 +123,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
               <tr style={{ background: 'rgba(22, 33, 62, 0.95)', borderBottom: '1px solid #2d3a5c', color: '#64ffda', fontSize: '13px' }}>
                 <th style={{ padding: '12px 16px' }}>Date & Time</th>
                 <th style={{ padding: '12px 16px' }}>Target File Path</th>
+                <th style={{ padding: '12px 16px' }}>Source</th>
                 <th style={{ padding: '12px 16px' }}>Original Hash</th>
                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Rollback Action</th>
               </tr>
@@ -105,6 +139,12 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ color: '#00d4ff', fontWeight: 600 }}>{fileName}</div>
                       <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px', wordBreak: 'break-all' }}>{backup.filePath}</div>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ color: '#e0e0e0', fontWeight: 600 }}>{backup.recipeId ?? 'Manual snapshot'}</div>
+                      <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>
+                        {backup.recipeId ? 'Recipe-linked restore point' : 'Editor or trainer rollback point'}
+                      </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <code style={{ fontSize: '11px', color: '#a0a0c0' }}>{backup.originalHash.substring(0, 16)}...</code>
