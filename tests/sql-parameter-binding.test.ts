@@ -14,7 +14,11 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
-import { initDatabase } from '../src/core/database/index.ts';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { resetForTesting } from '../src/core/database/index.ts';
+import db from '../src/core/database/index.ts';
 import {
   createProfile,
   getProfile,
@@ -26,13 +30,36 @@ import {
 
 describe('SQL Parameter Binding — Hostile Value Tests', () => {
   const baseGameId = randomUUID();
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const tempRoot = path.join(os.tmpdir(), `resourceforge-sql-binding-${runId}`);
+  const tempDb = path.join(tempRoot, 'test.db');
+
+  function seedGame(gameId: string, gameName: string): void {
+    db.prepare(`
+      INSERT OR REPLACE INTO games (id, name, path, engine)
+      VALUES (?, ?, ?, ?)
+    `).run(gameId, gameName, tempRoot, 'Test');
+  }
 
   before(async () => {
-    await initDatabase();
+    fs.mkdirSync(tempRoot, { recursive: true });
+    await resetForTesting(tempDb);
+    seedGame(baseGameId, 'Base SQL Binding Game');
+  });
+
+  after(() => {
+    try {
+      if (fs.existsSync(tempRoot)) {
+        fs.rmSync(tempRoot, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore cleanup failures in test teardown
+    }
   });
 
   test('1. Parameter binding with single quotes in gameName', () => {
     const gameNameWithQuotes = "O'Brien's Game (It's Great!)";
+    seedGame(baseGameId, gameNameWithQuotes);
     const profile = createProfile(baseGameId, gameNameWithQuotes, {});
 
     assert.strictEqual(profile.gameName, gameNameWithQuotes);
@@ -45,7 +72,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
 
   test('2. Parameter binding with SQL-like injection strings in gameName', () => {
     const injectionString = "Game'; DROP TABLE test; --";
-    const profile = createProfile(randomUUID(), injectionString, {});
+    const gameId = randomUUID();
+    seedGame(gameId, injectionString);
+    const profile = createProfile(gameId, injectionString, {});
 
     // If SQL injection worked, table would be gone - it's not, so binding works
     assert.strictEqual(profile.gameName, injectionString);
@@ -58,7 +87,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
 
   test('3. Parameter binding with double quotes and special chars', () => {
     const specialString = 'Text with "double quotes" and \\backslash\\';
-    const profile = createProfile(randomUUID(), specialString, {
+    const gameId = randomUUID();
+    seedGame(gameId, specialString);
+    const profile = createProfile(gameId, specialString, {
       publisherHints: [
         'Hint with "quotes"',
         "Hint with 'apostrophe'",
@@ -86,7 +117,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
       '🎮 Emoji 🎯'
     ];
 
-    const profile = createProfile(randomUUID(), 'Game with Unicode 日本語', {
+    const gameId = randomUUID();
+    seedGame(gameId, 'Game with Unicode 日本語');
+    const profile = createProfile(gameId, 'Game with Unicode 日本語', {
       developerHints: unicodeHints
     });
 
@@ -105,7 +138,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
       'Carriage\r\nreturn'
     ];
 
-    const profile = createProfile(randomUUID(), 'Game with Whitespace', {
+    const gameId = randomUUID();
+    seedGame(gameId, 'Game with Whitespace');
+    const profile = createProfile(gameId, 'Game with Whitespace', {
       limitations
     });
 
@@ -118,7 +153,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
   });
 
   test('6. Update with parameter binding and hostile values', () => {
-    const profile = createProfile(randomUUID(), 'Original Name', {});
+    const gameId = randomUUID();
+    seedGame(gameId, 'Original Name');
+    const profile = createProfile(gameId, 'Original Name', {});
     const newName = "Updated'; DROP DATABASE; -- 日本語";
     const newLimitations = ["'; DELETE FROM test; --"];
 
@@ -139,7 +176,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
 
   test('7. Delete with parameter binding', () => {
     const hostileGameName = "'; DELETE FROM compatibility_profiles; --";
-    const profile = createProfile(randomUUID(), hostileGameName, {});
+    const gameId = randomUUID();
+    seedGame(gameId, hostileGameName);
+    const profile = createProfile(gameId, hostileGameName, {});
     const profileId = profile.id;
 
     // Verify it exists
@@ -152,7 +191,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
     assert.strictEqual(getProfile(profileId), null);
 
     // But other profiles still exist (injection didn't work)
-    const otherProfile = createProfile(randomUUID(), 'Other Game', {});
+    const otherGameId = randomUUID();
+    seedGame(otherGameId, 'Other Game');
+    const otherProfile = createProfile(otherGameId, 'Other Game', {});
     assert.ok(getProfile(otherProfile.id));
 
     console.log('✓ Delete with parameter binding and injection string works');
@@ -161,6 +202,8 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
   test('8. Query with parameter binding (getProfilesForGame)', () => {
     const gameId1 = randomUUID();
     const gameId2 = randomUUID();
+    seedGame(gameId1, "Game'; DROP TABLE test; --");
+    seedGame(gameId2, 'Normal Game Name');
     const profile1 = createProfile(gameId1, "Game'; DROP TABLE test; --", {});
     const profile2 = createProfile(gameId2, 'Normal Game Name', {});
 
@@ -179,7 +222,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
   });
 
   test('9. Validation with parameter binding', () => {
-    const profile = createProfile(randomUUID(), "Game'; DROP TABLE fingerprints; --", {});
+    const gameId = randomUUID();
+    seedGame(gameId, "Game'; DROP TABLE fingerprints; --");
+    const profile = createProfile(gameId, "Game'; DROP TABLE fingerprints; --", {});
 
     const fingerprint = {
       fileCount: 10,
@@ -211,7 +256,9 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
     };
 
     // Create
-    const created = createProfile(randomUUID(), hostile.gameName, {
+    const gameId = randomUUID();
+    seedGame(gameId, hostile.gameName);
+    const created = createProfile(gameId, hostile.gameName, {
       publisherHints: hostile.publisherHints,
       limitations: hostile.limitations
     });

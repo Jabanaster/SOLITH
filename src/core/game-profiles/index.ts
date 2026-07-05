@@ -22,3 +22,23 @@ export {
   type ProfileAuthoringValidationInput,
   type ProfileAuthoringValidationReport,
 } from './authoring.js';
+export {
+  BUNDLED_GAME_PROFILE_CATALOG,
+  getBundledGameProfileCatalog,
+  getBundledGameProfileCatalogEntry,
+  validateBundledGameProfileCatalog,
+  validateGameProfileCatalogEntry,
+  type GameProfileCatalogEntry,
+  type GameProfileCatalogValidationError,
+  type ProfileEvidenceLevel,
+  type ProfileParserStatus,
+  type ProfileSupportStatus,
+  type ProfileUnsupportedReason,
+  type ProfileWriteSupportStatus,
+} from './catalog.js';
+export {
+  reviewGameProfileExchange,
+  type GameProfileExchangeReview,
+  type ProfileExchangeDirection,
+  type ProfileExchangeStatus,
+} from './review.js';
