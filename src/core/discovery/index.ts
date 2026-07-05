@@ -30,6 +30,11 @@ export interface DiscoveryReport {
   unsupportedSections: string[];
 }
 
+export interface DiscoveryAdvisoryComparison {
+  results: DiscoveryResult[];
+  report: DiscoveryReport;
+}
+
 const NOISE_KEYS = [
   'timestamp', 'time', 'date', 'modified', 'created', 'updated', 'saved_at', 'utc',
   'save_count', 'savecount', 'autosave', 'checkpoint_count', 'session', 'session_id', 'sessionid',
@@ -165,7 +170,21 @@ export function createDiscoveryReport(
   };
 }
 
-export function compareSaves(
+export function compareSavesWithReport(
+  saveA: ParsedSave,
+  saveB: ParsedSave,
+  gameId?: string,
+  knownOldValue?: any,
+  knownNewValue?: any
+): DiscoveryAdvisoryComparison {
+  const rawResults = compareSavesInternal(saveA, saveB, gameId, knownOldValue, knownNewValue);
+  return {
+    results: rankDiscoveries(rawResults),
+    report: createDiscoveryReport(saveA, saveB, rawResults),
+  };
+}
+
+function compareSavesInternal(
   saveA: ParsedSave,
   saveB: ParsedSave,
   gameId?: string,
@@ -386,7 +405,17 @@ export function compareSaves(
     }
   }
 
-  return rankDiscoveries(results);
+  return results;
+}
+
+export function compareSaves(
+  saveA: ParsedSave,
+  saveB: ParsedSave,
+  gameId?: string,
+  knownOldValue?: any,
+  knownNewValue?: any
+): DiscoveryResult[] {
+  return rankDiscoveries(compareSavesInternal(saveA, saveB, gameId, knownOldValue, knownNewValue));
 }
 
 export function rankDiscoveries(results: DiscoveryResult[]): DiscoveryResult[] {

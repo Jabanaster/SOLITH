@@ -133,6 +133,8 @@ export const CompareSavesSchema = z.object({
   knownNewValue: z.any().optional()
 });
 
+export const CompareSavesWithReportSchema = CompareSavesSchema;
+
 export const CreateProposalSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
   filePath: z.string().min(1),

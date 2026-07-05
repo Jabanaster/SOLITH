@@ -27,6 +27,7 @@ interface Window {
     detectSaveFiles: (gameId: string) => Promise<any[]>;
     parseSave: (gameId: string, filePath: string) => Promise<any>;
     compareSaves: (a: string, b: string, gameId: string, old?: any, nw?: any) => Promise<any[] | { error: string }>;
+    compareSavesReport: (a: string, b: string, gameId: string, old?: any, nw?: any) => Promise<{ results: any[]; report: any } | { error: string }>;
     createProposalForEdit: (gameId: string, filePath: string, path: string, oldValue: any, newValue: any, recipeId?: string) => Promise<any>;
     applyProposal: (proposal: any) => Promise<any>;
     suggestDataEdits: (gameId: string, filePath: string) => Promise<any[] | { error: string }>;

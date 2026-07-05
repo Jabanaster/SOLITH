@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   parseSave: (gameId: string, filePath: string) => ipcRenderer.invoke('parse-save', gameId, filePath),
   compareSaves: (savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => 
     ipcRenderer.invoke('compare-saves', savePathA, savePathB, gameId, knownOldValue, knownNewValue),
+  compareSavesReport: (savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) =>
+    ipcRenderer.invoke('compare-saves-report', savePathA, savePathB, gameId, knownOldValue, knownNewValue),
   createProposalForEdit: (gameId: string, filePath: string, path: string, oldValue: any, newValue: any, recipeId?: string) => 
     ipcRenderer.invoke('create-proposal-for-edit', gameId, filePath, path, oldValue, newValue, recipeId),
   applyProposal: (proposal: any) => ipcRenderer.invoke('apply-proposal', proposal),

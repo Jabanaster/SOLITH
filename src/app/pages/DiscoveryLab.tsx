@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { DiscoveryResult } from '../../shared/types';
+import type { DiscoveryAdvisoryComparison, DiscoveryReport } from '../../core/discovery/index.js';
+import type { DiscoveryResult } from '../../shared/types';
 
 interface DiscoveryLabProps {
   gameId: string | null;
@@ -13,6 +14,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   const [knownValueB, setKnownValueB] = useState('');
   
   const [candidates, setCandidates] = useState<DiscoveryResult[]>([]);
+  const [advisoryReport, setAdvisoryReport] = useState<DiscoveryReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [creatingRecipe, setCreatingRecipe] = useState<string | null>(null);
@@ -75,8 +77,18 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
       const valA = knownValueA.trim() !== '' ? (isNaN(Number(knownValueA)) ? knownValueA : Number(knownValueA)) : undefined;
       const valB = knownValueB.trim() !== '' ? (isNaN(Number(knownValueB)) ? knownValueB : Number(knownValueB)) : undefined;
 
-      const results = await window.electronAPI.compareSaves(saveA, saveB, gameId, valA, valB);
-      setCandidates(Array.isArray(results) ? results : []);
+      const response = await window.electronAPI.compareSavesReport(saveA, saveB, gameId, valA, valB) as DiscoveryAdvisoryComparison | { error: string };
+      if (response && 'error' in response) {
+        alert(response.error);
+        return;
+      }
+      if (response && 'results' in response) {
+        setCandidates(response.results || []);
+        setAdvisoryReport(response.report || null);
+      } else {
+        setCandidates([]);
+        setAdvisoryReport(null);
+      }
       setActiveStep(3); // Go to step 3 on comparison success
     } catch (err) {
       console.error('Compare failed:', err);
@@ -340,6 +352,36 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
 
       {activeStep === 3 && (
         <div className="results-container">
+          {advisoryReport && (
+            <div className="glass" style={{ padding: '16px', marginBottom: '24px', border: '1px solid #2d3a5c', borderRadius: '8px' }}>
+              <h3 style={{ marginTop: 0, color: '#64ffda' }}>Advisory Diff Summary</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                <span className="badge risk-safe">Advisory candidates: {advisoryReport.changedPaths.length}</span>
+                <span className="badge risk-caution">Unsupported sections: {advisoryReport.unsupportedSections.length}</span>
+                <span className="badge risk-safe">Compared: {new Date(advisoryReport.comparedAt).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {advisoryReport.files.map(file => (
+                  <div key={`${file.label}-${file.fileName}`} style={{ fontSize: '13px', color: '#e0e0e0' }}>
+                    <strong style={{ color: '#00d4ff' }}>{file.label.toUpperCase()}:</strong> {file.fileName}
+                    <span style={{ color: '#8892b0' }}>
+                      {' '}
+                      {file.sizeBytes !== null ? `(${file.sizeBytes} bytes)` : '(unavailable)'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {advisoryReport.unsupportedSections.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <strong style={{ color: '#ffb300' }}>Blocked or unsupported sections:</strong>
+                  <div style={{ fontSize: '12px', color: '#8892b0', marginTop: '6px', wordBreak: 'break-word' }}>
+                    {advisoryReport.unsupportedSections.join(', ')}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Filters Bar */}
           <div className="glass" style={{ padding: '16px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', border: '1px solid #2d3a5c', borderRadius: '8px' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>

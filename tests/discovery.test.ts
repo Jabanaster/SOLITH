@@ -18,7 +18,7 @@ import {
   addUserSelectedLocation,
   isPathApproved
 } from '../src/core/saves/locations.ts';
-import { compareSaves, calculateScore, createDiscoveryReport, rankDiscoveries } from '../src/core/discovery/index.ts';
+import { compareSaves, compareSavesWithReport, calculateScore, createDiscoveryReport, rankDiscoveries } from '../src/core/discovery/index.ts';
 import { createRecipe } from '../src/core/recipes/index.ts';
 import { createProposalForEdit, dryRunProposal, applyProposal } from '../src/core/saves/editor.ts';
 import { getBackupsForGame, restoreBackupById } from '../src/core/backups/index.ts';
@@ -274,6 +274,26 @@ describe('ResourceForge Save Discovery, Locations, and Discovery Engine Tests', 
 
     assert.strictEqual(JSON.stringify(reportA), JSON.stringify(reportB));
     assert.deepStrictEqual(reportA.changedPaths.map(change => change.path), ['player.gold', 'player.level']);
+  });
+
+  test('4g. Advisory comparison returns report metadata for save diff tooling', () => {
+    const docA = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'advisory-before.json'),
+      data: { player: { gold: 50 }, session: { checksum: 'abc' } }
+    };
+    const docB = {
+      format: 'json',
+      path: path.join(TEMP_ROOT, 'game', 'advisory-after.json'),
+      data: { player: { gold: 200 }, session: { checksum: 'def' } }
+    };
+
+    const advisory = compareSavesWithReport(docA, docB, MOCK_GAME_ID, 50, 200);
+
+    assert.ok(advisory.results.length > 0);
+    assert.strictEqual(advisory.report.files.length, 2);
+    assert.ok(advisory.report.changedPaths.some(change => change.path === 'player.gold'));
+    assert.ok(advisory.report.unsupportedSections.includes('session.checksum'));
   });
 
   test('5. End-to-End Save Edit & Restore Workflow', async () => {

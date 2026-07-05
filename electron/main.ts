@@ -18,6 +18,7 @@ import {
   DetectSaveFilesSchema,
   ParseSaveSchema,
   CompareSavesSchema,
+  CompareSavesWithReportSchema,
   CreateProposalSchema,
   ApplyProposalSchema,
   SuggestDataEditsSchema,
@@ -477,6 +478,34 @@ ipcMain.handle('compare-saves', async (event, savePathA: string, savePathB: stri
   } catch (error) {
     console.error('compare-saves error:', error);
     return [];
+  }
+});
+
+ipcMain.handle('compare-saves-report', async (event, savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => {
+  try {
+    const parsed = CompareSavesWithReportSchema.parse({ savePathA, savePathB, gameId, knownOldValue, knownNewValue });
+
+    const safetyA = validateSaveDataFileAccess(parsed.gameId, parsed.savePathA);
+    const safetyB = validateSaveDataFileAccess(parsed.gameId, parsed.savePathB);
+    if (!safetyA.safe || !safetyB.safe) {
+      console.error('compare-saves-report blocked: one or more files are not approved for this game.');
+      return { error: 'One or more files are not approved for this game.' };
+    }
+
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+
+    const savesModule = await import('../src/core/saves/index.js');
+    const saveA = savesModule.parseSaveFile(parsed.savePathA);
+    const saveB = savesModule.parseSaveFile(parsed.savePathB);
+    if (!saveA || !saveB) return { results: [], report: null };
+
+    const discoveryModule = await import('../src/core/discovery/index.js');
+    const analysis = discoveryModule.compareSavesWithReport(saveA, saveB, parsed.gameId, parsed.knownOldValue, parsed.knownNewValue);
+    return analysis;
+  } catch (error) {
+    console.error('compare-saves-report error:', error);
+    return { results: [], report: null };
   }
 });
 
