@@ -10,6 +10,11 @@ interface BackupsProps {
 
 type BackupItem = BackupDashboardItem;
 
+function formatBackupFileLabel(filePath: string | null | undefined): string {
+  if (!filePath) return 'Unknown file';
+  return filePath.replace(/\\/g, '/').split('/').pop() || 'Unknown file';
+}
+
 const Backups: React.FC<BackupsProps> = ({ gameId }) => {
   const [backups, setBackups] = useState<BackupItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +73,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
       <div className="section-header" style={{ marginBottom: '24px' }}>
         <h2>Backup & Rollback</h2>
         <p className="description">
-          ResourceForge takes an automatic snapshot of files before applying any trainer edits or custom tweaks. You can safely rollback to any historical point below.
+          ResourceForge takes an automatic snapshot of files before applying any trainer edits or custom tweaks. Rollback actions are explicit and require your confirmation.
         </p>
       </div>
 
@@ -77,7 +82,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
           <div className="section-header" style={{ marginBottom: '12px' }}>
             <h3>Rollback Dashboard</h3>
             <p className="description">
-              Local-only backup visibility for rollback readiness. Restore actions always target the recorded file path.
+              Local-only backup visibility for rollback readiness. This dashboard does not perform silent restore.
             </p>
           </div>
 
@@ -99,8 +104,8 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
               <div data-testid="rollback-dashboard-latest" style={{ fontSize: '14px', fontWeight: 700 }}>
                 {summary.latestTimestamp ? new Date(summary.latestTimestamp).toLocaleString() : 'None yet'}
               </div>
-              <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '4px', wordBreak: 'break-all' }}>
-                {summary.latestFilePath ?? 'No rollback snapshots recorded yet.'}
+              <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '4px' }}>
+                {summary.latestFilePath ? formatBackupFileLabel(summary.latestFilePath) : 'No rollback snapshots recorded yet.'}
               </div>
             </div>
           </div>
@@ -138,7 +143,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
                     <td style={{ padding: '12px 16px', fontWeight: 600, color: '#e0e0e0' }}>{formattedTime}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ color: '#00d4ff', fontWeight: 600 }}>{fileName}</div>
-                      <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px', wordBreak: 'break-all' }}>{backup.filePath}</div>
+                      <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>Recorded local target file</div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ color: '#e0e0e0', fontWeight: 600 }}>{backup.recipeId ?? 'Manual snapshot'}</div>

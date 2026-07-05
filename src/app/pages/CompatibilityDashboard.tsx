@@ -57,7 +57,13 @@ const CompatibilityDashboard: React.FC = () => {
       <div className="compat-header">
         <h2>Compatibility Dashboard</h2>
         <p className="compat-subtitle">
-          Profile coverage, evidence tiers, and version drift status for all evaluated games.
+          Profile coverage, evidence tiers, and version drift status for all evaluated games. Support matrix output is local and evidence-based.
+        </p>
+      </div>
+
+      <div className="glass" style={{ padding: '12px', marginBottom: '16px' }}>
+        <p style={{ margin: 0, fontSize: '13px', color: '#8892b0' }}>
+          Imported profiles require review before support claims. Discovery and parser coverage do not automatically create executable write support.
         </p>
       </div>
 

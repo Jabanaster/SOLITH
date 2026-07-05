@@ -30,6 +30,34 @@ To prevent accidental data loss, anti-cheat flags, or system instability, Resour
 
 ---
 
+## 🧾 V2 Safe Support Workflow (UI + Report Model)
+
+ResourceForge V2 surfaces support state as **reviewable evidence**, not implicit execution capability:
+
+- **Profile catalog is local/offline** and bundled for deterministic review.
+- **Imported profiles are review-required** before any supported claim.
+- **Save diff is advisory** and does not grant executable write support.
+- **Support matrix reports are evidence-based** (fixture coverage, blocked reasons, rollback readiness).
+- **Rollback dashboard is visibility/verification only** and does not perform silent restore.
+- **Unsupported writes remain blocked** even when discovery finds candidate paths.
+
+Execution scope remains narrow:
+
+- JSON/INI remain read-only or preview-only unless already proven in accepted behavior.
+- Discovery findings remain advisory unless mapped to existing supported write paths.
+- Executable writes remain limited to accepted supported XML controls with approval + backup/rollback safeguards.
+
+Generate the support matrix report locally:
+
+```bash
+node scripts/generate-support-matrix.mjs --format markdown
+node scripts/generate-support-matrix.mjs --format json --output reports/support-matrix.json
+```
+
+No remote calls are used for this workflow.
+
+---
+
 ## 📂 Supported File Types & Parsers
 
 ResourceForge scans directories and automatically parses the following formats to extract values, categories, and safety ratings:

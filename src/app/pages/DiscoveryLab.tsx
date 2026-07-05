@@ -193,7 +193,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
       <div className="section-header" style={{ marginBottom: '24px' }}>
         <h2>Discovery Lab</h2>
         <p className="description">
-          Find offsets by comparing save state transitions. Ideal for discovering variables like gold, stats, or items.
+          Find offsets by comparing save state transitions. Discovery remains advisory and does not by itself grant executable write support.
         </p>
       </div>
 
@@ -355,6 +355,9 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
           {advisoryReport && (
             <div className="glass" style={{ padding: '16px', marginBottom: '24px', border: '1px solid #2d3a5c', borderRadius: '8px' }}>
               <h3 style={{ marginTop: 0, color: '#64ffda' }}>Advisory Diff Summary</h3>
+              <p style={{ color: '#8892b0', fontSize: '13px', marginBottom: '12px' }}>
+                Advisory evidence only. Unsupported sections stay blocked until mapped to existing accepted supported controls.
+              </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
                 <span className="badge risk-safe">Advisory candidates: {advisoryReport.changedPaths.length}</span>
                 <span className="badge risk-caution">Unsupported sections: {advisoryReport.unsupportedSections.length}</span>
