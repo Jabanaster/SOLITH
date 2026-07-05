@@ -1,6 +1,6 @@
 {
   "name": "resourceforge",
-  "version": "1.5.1",
+  "version": "2.0.0",
   "description": "Local AI Game Trainer + Save Editor + Discovery Lab",
   "main": "dist-electron/main.js",
   "author": "ResourceForge",
