@@ -42,3 +42,14 @@ export {
   type ProfileExchangeDirection,
   type ProfileExchangeStatus,
 } from './review.js';
+export {
+  createSupportMatrixReport,
+  renderSupportMatrix,
+  renderSupportMatrixJson,
+  renderSupportMatrixMarkdown,
+  type BackupRollbackReadiness,
+  type SupportMatrixFixtureCoverage,
+  type SupportMatrixFormat,
+  type SupportMatrixReport,
+  type SupportMatrixRow,
+} from './support-matrix.js';
