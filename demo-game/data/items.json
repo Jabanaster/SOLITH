@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "item_001",
+      "name": "Health Potion",
+      "type": "consumable",
+      "price": 10,
+      "maxStack": 99,
+      "effects": {
+        "heal": 50
+      }
+    },
+    {
+      "id": "item_002",
+      "name": "Sword",
+      "type": "weapon",
+      "price": 100,
+      "maxStack": 1,
+      "effects": {
+        "damage": 25
+      }
+    },
+    {
+      "id": "item_003",
+      "name": "Shield",
+      "type": "armor",
+      "price": 75,
+      "maxStack": 1,
+      "effects": {
+        "defense": 10
+      }
+    }
+  ]
+}
