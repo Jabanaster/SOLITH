@@ -1,5 +1,7 @@
 # Next Actions
 
+**Updated:** 2026-07-07 — Trainer accessibility polish: `aria-disabled`/`aria-describedby` completed on all `TrainerCard.tsx` controls; confirmed `prefers-reduced-motion` already covers all animation code paths (CSS-only, no JS rAF loops exist)
+
 **Updated:** 2026-07-06 — Live Memory Trainer: pointer-path discovery + one real, restart-verified control (Atomfall ammo) landed
 
 ## Live Memory Trainer — next bite
@@ -40,10 +42,10 @@ loading and restoration are authorized and verified.
 - [ ] Add `@axe-core/playwright` to the Trainer E2E suite to automate accessibility audits
 - [x] Add focus trap to `ApplyDialog.tsx` (Escape key + focus loop past last button)
 - [x] Return focus to the card that triggered the dialog on close
-- [ ] Add `aria-describedby` linking state badges to card descriptions
+- [x] Add `aria-describedby` linking state badges to card descriptions
 - [x] Add `<label>` element to slider control in `TrainerCard.tsx`
-- [ ] Add `aria-disabled` and `aria-describedby` to disabled controls
-- [ ] Add `prefers-reduced-motion` detection to animation code paths
+- [x] Add `aria-disabled` and `aria-describedby` to disabled controls (`TrainerCard.tsx` — toggle, slider, dropdown, number input, apply button)
+- [x] Add `prefers-reduced-motion` detection to animation code paths (already covered globally by the blanket `@media (prefers-reduced-motion: reduce)` rule in `index.css`; no JS-driven `requestAnimationFrame` animation exists to gate separately)
 - [ ] Add large-list benchmark fixtures (100/500/1000/5000) before deciding pagination or virtualization
 - [ ] Add onboarding wizard / first-run experience
 - [x] Delete `fix-esm-imports.mjs` and `fix-esm-imports.ps1` (dead code — KI-003)

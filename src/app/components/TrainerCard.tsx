@@ -58,6 +58,8 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
               type="checkbox"
               checked={!!value}
               disabled={isDisabled}
+              aria-disabled={isDisabled}
+              aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
               onChange={e => onValueChange(e.target.checked)}
             />
             <span className="toggle-track" />
@@ -78,6 +80,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
               step={item.step ?? 1}
               value={value ?? item.min ?? 0}
               disabled={isDisabled}
+              aria-disabled={isDisabled}
               onChange={e => onValueChange(Number(e.target.value))}
               className="trainer-slider"
               aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
@@ -96,6 +99,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
               id={`trainer-dropdown-${item.id}`}
               value={String(value ?? '')}
               disabled={isDisabled}
+              aria-disabled={isDisabled}
               onChange={e => onValueChange(e.target.value)}
               className="trainer-select"
               onClick={e => e.stopPropagation()}
@@ -120,6 +124,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
             max={item.max}
             placeholder="New value…"
             disabled={isDisabled}
+            aria-disabled={isDisabled}
             onChange={e => onValueChange(Number(e.target.value))}
             onClick={e => e.stopPropagation()}
             aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
@@ -162,6 +167,7 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
           <button
             className="tc-apply-btn"
             disabled={isDisabled || value === '' || value === undefined || value === null}
+            aria-disabled={isDisabled || value === '' || value === undefined || value === null}
             onClick={onApply}
             aria-label={`Apply ${item.name}`}
             aria-describedby={stateInfo.explanation ? stateDescriptionId : undefined}
