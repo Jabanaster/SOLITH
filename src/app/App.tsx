@@ -10,11 +10,12 @@ import SaveLocations from './pages/SaveLocations';
 import CompatibilityDashboard from './pages/CompatibilityDashboard';
 import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
+import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls';
+  | 'session-monitor' | 'controls' | 'live-memory';
 
 type AppMode = 'trainer' | 'workshop';
 
@@ -54,6 +55,7 @@ const WORKSHOP_PAGES: { id: View; label: string }[] = [
   { id: 'journal',       label: 'Journal' },
   { id: 'compatibility', label: 'Compatibility' },
   { id: 'session-monitor', label: 'Session Monitor (V2)' },
+  { id: 'live-memory', label: 'Live Memory Trainer (V2)' },
 ];
 
 const App: React.FC = () => {
@@ -135,6 +137,8 @@ const App: React.FC = () => {
         return <CompatibilityDashboard />;
       case 'session-monitor':
         return <SessionMonitorPage />;
+      case 'live-memory':
+        return <LiveMemoryTrainerPage />;
       case 'controls':
         return <TrainerControlPanel />;
       default:
@@ -270,7 +274,8 @@ const App: React.FC = () => {
       </div>
 
       <div className="v2-notice" role="status">
-        V1: File-backed edits only — No memory injection, no anti-cheat interaction
+        V1 default: file-backed edits only. V2 Live Memory Trainer (Workshop Mode, off by default):
+        single-player/offline only — no injection, no anti-cheat interaction.
       </div>
     </div>
   );

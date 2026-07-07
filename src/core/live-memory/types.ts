@@ -1,0 +1,188 @@
+/**
+ * Live Memory Trainer — Domain Types
+ *
+ * Scope (see PROJECT_SPEC.md Section 42 / Section 3):
+ * - Local/offline single-player sessions only.
+ * - Standard ReadProcessMemory/WriteProcessMemory only — no DLL injection,
+ *   no code injection, no kernel drivers, no anti-cheat interaction.
+ * - Every write requires: an attached target, a passed online-session guard
+ *   check (rechecked immediately before the write, not just at attach time),
+ *   and an explicit user-confirmed proposal — mirroring the file-based
+ *   proposal → dry-run → apply → rollback flow used elsewhere in the app.
+ */
+
+export type LiveValueType = 'int32' | 'uint32' | 'float' | 'double' | 'int64' | 'byte';
+
+/** Identifies the OS process ResourceForge is attached to. */
+export interface LiveProcessTarget {
+  pid: number;
+  executableName: string;
+  /** ISO 8601. Combined with pid to detect PID reuse across polls. */
+  startTime?: string;
+}
+
+/** A single resolved memory location inside the attached process. */
+export interface LiveMemoryAddress {
+  /** Absolute address, or a module-relative offset resolved against `moduleName`. */
+  address: bigint;
+  moduleName?: string;
+  dataType: LiveValueType;
+}
+
+// ── Online-session guard ─────────────────────────────────────────────────────
+
+export interface RemoteConnectionEvidence {
+  availability: 'available' | 'unavailable' | 'permission_denied' | 'error';
+  /** Established connections owned by the target PID with a non-loopback remote address. */
+  remoteConnectionCount: number;
+  error?: string;
+  observedAt: string;
+}
+
+export interface OnlineGuardInput {
+  /** The user must explicitly confirm offline/single-player play for this attach session. */
+  userConfirmedOffline: boolean;
+  remoteConnections: RemoteConnectionEvidence;
+  /**
+   * Declared "known platform overhead" connection count for this specific game (e.g. Steamworks
+   * cloud saves/presence), evidence-based and manually reviewed — NOT a generic relaxation.
+   * Defaults to 0 (today's strict "any remote connection blocks" behavior) for any game without
+   * a reviewed entry. A count at or under this baseline is treated as background noise; a count
+   * above it still blocks, since that means something new appeared beyond the reviewed baseline.
+   * See PerGameConnectionBaseline / Docs/KNOWN_ISSUES.md KI-017.
+   */
+  acceptedConnectionBaseline?: number;
+}
+
+/**
+ * A single reviewed baseline entry: "this game was observed to hold up to N non-loopback
+ * ESTABLISHED connections during genuine single-player/offline play, on this date, via this
+ * evidence." Each entry must be backed by a real observation, not a guess — see the Stardew
+ * Valley entry in game-connection-baselines.ts for the format this is meant to follow.
+ */
+export interface PerGameConnectionBaseline {
+  executableName: string;
+  acceptedConnectionBaseline: number;
+  reviewedAt: string;
+  evidence: string;
+}
+
+export interface OnlineGuardResult {
+  allowed: boolean;
+  reason: string;
+}
+
+// ── Memory driver (native boundary) ──────────────────────────────────────────
+
+/**
+ * Narrow seam over the native memory backend (e.g. `memoryjs`). Production code
+ * uses NativeMemoryDriver; tests inject a FakeMemoryDriver so orchestration
+ * logic (guard checks, proposal/rollback flow) is fully testable without a
+ * real OS process or a compiled native addon.
+ */
+export interface MemoryDriver {
+  openProcess(pid: number): LiveProcessHandle;
+  readMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType): number;
+  writeMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType, value: number): void;
+  closeProcess(handle: LiveProcessHandle): void;
+  /** Enumerate committed memory regions for scanning. Bounded/filtered by the caller, not here. */
+  getRegions(handle: LiveProcessHandle): MemoryRegion[];
+  /** Bulk-read raw bytes for scanning. Throws if the read fails (e.g. region unmapped mid-scan). */
+  readBuffer(handle: LiveProcessHandle, address: bigint, size: number): Buffer;
+  /** Enumerate loaded modules (exe/dlls) — used to build restart-stable, module-relative pointer paths. */
+  getModules(handle: LiveProcessHandle): MemoryModule[];
+  /**
+   * Reads a 64-bit pointer value, returned as `bigint` (not `number` —
+   * `readMemory`'s declared `number` return type does not actually hold for
+   * memoryjs's native int64/uint64 handling, which returns a JS `bigint`;
+   * this method exists so pointer-chain code never has to rely on that
+   * mismatch). Use this, not readMemory('int64'/'uint64', ...), whenever the
+   * value being read is itself a memory address.
+   */
+  readPointer(handle: LiveProcessHandle, address: bigint): bigint;
+}
+
+/** A loaded module (the main executable or a DLL) inside the attached process. */
+export interface MemoryModule {
+  name: string;
+  baseAddress: bigint;
+  size: number;
+}
+
+/** A single committed virtual-memory region inside the attached process. */
+export interface MemoryRegion {
+  baseAddress: bigint;
+  size: number;
+  /** True if the region is writable (required for anything the scanner should treat as a write candidate). */
+  writable: boolean;
+}
+
+export interface LiveProcessHandle {
+  readonly pid: number;
+  readonly opaque: unknown;
+}
+
+// ── Proposal / rollback (mirrors the file-based proposal engine) ────────────
+
+export interface LiveWriteProposal {
+  proposalId: string;
+  target: LiveMemoryAddress;
+  currentValue: number;
+  requestedValue: number;
+  createdAt: string;
+}
+
+export interface LiveWriteManifest {
+  proposalId: string;
+  target: LiveMemoryAddress;
+  valueBefore: number;
+  valueAfter: number;
+  appliedAt: string;
+}
+
+// ── Memory scanning (Cheat-Engine-style first-scan / next-scan) ─────────────
+
+/** A single scanned candidate: an address and the value observed there at scan time. */
+export interface ScanMatch {
+  address: bigint;
+  value: number;
+}
+
+/**
+ * Next-scan comparison mode, applied against a prior candidate set:
+ * - exact: value now equals `value`.
+ * - changed / unchanged: value differs from / matches its own previous scan value.
+ * - increased / decreased: value moved in that direction versus its own previous scan value.
+ */
+export type ScanComparison =
+  | { kind: 'exact'; value: number }
+  | { kind: 'changed' }
+  | { kind: 'unchanged' }
+  | { kind: 'increased' }
+  | { kind: 'decreased' };
+
+export interface ScanBounds {
+  /** Skip any single region larger than this (bytes). Default 64 MiB. */
+  maxRegionBytes?: number;
+  /** Stop scanning once this many total bytes have been read across all regions. Default 512 MiB. */
+  maxTotalBytes?: number;
+  /** Cap on returned matches for a first scan, to keep the result set usable. Default 10000. */
+  maxMatches?: number;
+}
+
+// ── Freeze (continuous re-write, mirrors WeMod/Wand "Infinite X" toggles) ──
+
+export interface FreezeTarget {
+  address: LiveMemoryAddress;
+  value: number;
+}
+
+export type FreezeStopReason = 'user_stopped' | 'guard_blocked' | 'write_failed' | 'detached';
+
+export interface FreezeStatus {
+  active: boolean;
+  target: FreezeTarget | null;
+  lastGuard: OnlineGuardResult | null;
+  stopReason?: FreezeStopReason;
+  tickCount: number;
+}

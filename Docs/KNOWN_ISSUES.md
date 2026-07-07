@@ -4,6 +4,101 @@ This document records the current known bugs, design limitations, and trade-offs
 
 ## Open Issues
 
+### KI-018: Generic reverse pointer scanner cannot find a static root for managed-runtime (.NET/Mono) games like Stardew Valley
+
+Verified live (read-only) against the real, running Stardew Valley process:
+using the exact on-screen gold value (99999999), `scanFirst` reliably finds
+the single real address holding it (`0x21489f62ce0`, reproduced across two
+separate runs minutes apart — the object hadn't moved). Running
+`scanForPointerPath` against that address, with generous bounds (4 GiB
+value-scan budget, 2 GiB pointer-scan-per-level budget, offset window up to
+64 KiB, depth up to 4), found **zero** candidate static pointers anywhere in
+the process's committed memory.
+
+This is not a bug in the scanner — `pointer-scanner.ts`/`pointer-resolver.ts`
+are proven correct against fake multi-level pointer chains (7/7 tests,
+including a chain that resolves correctly after simulating an ASLR-style
+module base change). It's a real mismatch between the technique and the
+target: Stardew Valley runs on MonoGame over .NET/Mono, where the GC-managed
+heap's static roots live inside the runtime's own internal structures (GC
+handle tables, thread-stack roots at safepoints, etc.), not as plain
+pointers sitting at a fixed offset inside the game's PE module image the way
+they do in native C/C++ games (which is what this generic "any module +
+offset" scan technique is built for, and is exactly how real Cheat Engine
+pointer tables work for most Unreal/native-engine titles).
+
+Practical takeaway: this pointer-scanning approach should work well against
+native-engine games (Unreal Engine and similar C++-compiled titles are the
+common case), but reaching a genuinely stable root in a managed-runtime game
+needs a different, runtime-aware technique (e.g. locating the CLR's own GC
+handle/root tables, or a Mono-specific approach) that has not been built.
+Do not represent pointer-path discovery as working for managed-runtime
+games until that gap is actually closed.
+
+**Update 2026-07-06 (confirmed on a native-engine game):** the same
+technique was then run against Atomfall (Rebellion's native C++ "Asura"
+engine) and found 20 candidate static pointers at depth 1 on the first
+attempt (after correctly sizing `maxRegionBytes`/`maxBytesPerScan` to the
+game's real ~9 GiB committed footprint — the original bounds, sized for
+Stardew Valley's ~1 GiB, silently found nothing for a much larger game
+too). Restart-testing (fully closing and relaunching Atomfall, giving it a
+new PID, new ASLR base, and new heap layout) confirmed exactly 1 of the 20
+candidates still resolved correctly; the other 19 resolved to near-null
+pointers, a repeated poison value, or plain zero, confirming they were
+session-local numeric coincidences rather than real pointers. This is now
+a real, restart-verified control (`live-control-catalog.ts`:
+`atomfall-current-weapon-ammo`) — the technique works as designed for
+native-engine games; the managed-runtime gap above remains open.
+
+### KI-017: Online-session guard blocks virtually all Steam-integrated single-player games (real-machine finding, policy not yet decided)
+
+Verified live against a real, running commercial game (Stardew Valley 1.6,
+solo/offline farm, pid found via `listLiveMemoryProcesses()`): even with no
+multiplayer session active, the game process held 5 ESTABLISHED non-loopback
+TCP connections (`2a04:4e42:5::497` — Fastly CDN range — and
+`91.222.185.230`), almost certainly Steamworks background activity (cloud
+saves, friends/presence, telemetry) bundled into the game's own process
+rather than actual multiplayer traffic. `evaluateOnlineGuard()` correctly
+blocked the attach per its documented "any remote connection blocks,
+evidence overrides confirmation" design (`src/core/live-memory/online-guard.ts`).
+
+This is working as designed and is the safe default, but it means the
+current guard will likely block live writes for most/all Steam (and
+probably Epic/Xbox app) single-player games at all times, not just during
+genuine online sessions — the platform's own background networking looks
+identical to in-game network activity from a `netstat`/`Get-NetTCPConnection`
+vantage point. Options if this needs to be more usable in practice, none
+implemented yet:
+
+1. Keep the strict policy (safest; live writes stay rare/inert for
+   platform-integrated games).
+2. Per-game profile declares a "known background connection" baseline
+   (matching this project's existing evidence-based, manually-reviewed
+   per-game profile model) so the guard only blocks connections above it.
+3. Maintain an allowlist of known platform-infrastructure IP/ASN ranges to
+   exclude from the count — higher risk of getting wrong (an actual game
+   server could plausibly sit in a CDN range too).
+
+No default has been changed; this is documented for a deliberate decision,
+not silently patched around.
+
+### KI-016: Gate 13 electron-e2e "Full Demo Workflow" fails in this build environment (pre-existing, not caused by Live Memory Trainer work)
+
+`npm run test:electron-e2e` fails deterministically (2 runs, same result) at
+`parseSave returned null before apply` for the demo workspace fixture, in
+both "run 1" and "run 2" of the full UI→preload→IPC→DB→backup→apply→restore→
+journal workflow, cascading into the cross-run hash-comparison test.
+
+Isolated the cause: reproduced with the Live Memory Trainer IPC registration
+(`registerLiveMemoryIpc()` in `electron/main.ts`) temporarily disabled and the
+bundle rebuilt — the failure persisted identically, proving it is
+environmental to this build machine/sandbox, not caused by this feature. Not
+investigated further since it predates and is unrelated to this work; flag
+for separate investigation before next release-gate sign-off. `test:electron-smoke`
+(6/6) passes cleanly in the same environment, so basic Electron/IPC/renderer
+wiring is sound — this is specific to the heavier backup/apply/restore
+workflow test.
+
 ### KI-014: Accessibility E2E worker can transiently crash on Windows
 On some runs the Electron worker for `test:accessibility` has crashed
 (`code=3221226505`, a Windows access-violation in the GPU/worker process) before
@@ -31,6 +126,56 @@ CSS `prefers-reduced-motion` is respected in `index.css` global transitions, but
 
 ### KI-011: No pagination on trainer cards
 The trainer cards list in `TrainerPage.tsx` renders all recipes without pagination or virtual scrolling. This is acceptable for small recipe sets (< 50 items) but will degrade for games with 100+ recipes.
+
+### KI-015 (RESOLVED 2026-07-05): Live-memory native driver — build + verification
+
+`memoryjs@3.5.1`'s own install script and its native source both had bugs
+that block a clean install on this toolchain (Node v24.15.0 / MSVC v143):
+
+1. `scripts/install.js` calls `spawn('npm.cmd', ...)` without `shell: true`,
+   which throws `spawn EINVAL` on current Node (Windows now requires
+   `shell: true` to spawn `.cmd`/`.bat` files directly).
+2. `lib/memoryjs.cc` assigns C string literals to non-`const char*` in several
+   places, which current MSVC rejects by default (`/Zc:strictStrings`).
+
+Both are fixed via `patches/memoryjs+3.5.1.patch` (applied automatically by
+`patch-package` in `postinstall`): `install.js` gets `shell: true` (and now
+propagates a non-zero exit code instead of silently swallowing build
+failures), and `binding.gyp` gets `/Zc:strictStrings-` added to
+`AdditionalOptions`. After patching, `npm install` builds the native addon
+cleanly with Visual Studio Build Tools ("Desktop development with C++") +
+Python installed.
+
+Verified with real evidence, not just unit tests: `scripts/live-memory-verify.mts`
+spawns a genuine separate Node process holding a known value in a dedicated
+Buffer, uses `nativeMemoryDriver` (the actual product wrapper, not a mock) to
+locate it via a byte-pattern scan, and performs a real
+`ReadProcessMemory` → `WriteProcessMemory` → `ReadProcessMemory` round trip
+against that live process — confirmed passing twice, including after a full
+`npm install`/rebuild cycle. Orchestration logic remains additionally
+unit-tested against a fake driver (14/14, `tests/fixtures/fake-memory-driver.ts`)
+for fast, deterministic CI coverage.
+
+Update 2026-07-06: also verified against a real, running commercial game
+(Stardew Valley.exe) — `listLiveMemoryProcesses()` found the real process,
+and `nativeMemoryDriver.openProcess()`/`closeProcess()` succeeded cleanly
+against it (no anti-tamper blocking the handle). No memory was read or
+written against the real game; only attach/detach mechanics were confirmed.
+See KI-017 for what this real-game test surfaced about the online-session
+guard, plus a real bug it caught: the original `netstat -ano`-based
+`observeRemoteConnections()` parsed the full system-wide connection table
+client-side and exceeded the shared 32KB command-output cap on this real
+machine, making the guard fail closed on `output_size_exceeded` regardless
+of the target's actual state. Fixed by switching to a
+`Get-NetTCPConnection -OwningProcess <pid> -State Established` query scoped
+server-side to one PID (`src/core/live-memory/remote-connection-observer.ts`),
+which keeps output bounded no matter how busy the rest of the machine is.
+Covered by `tests/live-memory/remote-connection-observer.test.ts` (10 tests).
+
+Remaining gap: no per-game memory offsets exist yet (this milestone is attach
+mechanics + safety guard only, not a working trainer control for any
+specific game). Non-Windows remote-connection observation is still
+unimplemented (online-session guard fails closed on non-Windows regardless).
 
 ### KI-014: Atomfall Xbox save format is read-only
 

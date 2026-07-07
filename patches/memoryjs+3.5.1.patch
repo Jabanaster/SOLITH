@@ -1,0 +1,39 @@
+diff --git a/node_modules/memoryjs/binding.gyp b/node_modules/memoryjs/binding.gyp
+index 5f0e8ad..28c28a0 100644
+--- a/node_modules/memoryjs/binding.gyp
++++ b/node_modules/memoryjs/binding.gyp
+@@ -14,7 +14,12 @@
+         "lib/functions.cc",
+         "lib/debugger.cc"
+       ],
+-      'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ]
++      'defines': [ 'NAPI_DISABLE_CPP_EXCEPTIONS' ],
++      "msvs_settings": {
++        "VCCLCompilerTool": {
++          "AdditionalOptions": [ "/Zc:strictStrings-" ]
++        }
++      }
+     }
+   ]
+ }
+diff --git a/node_modules/memoryjs/scripts/install.js b/node_modules/memoryjs/scripts/install.js
+index cf65fb5..8c34eab 100644
+--- a/node_modules/memoryjs/scripts/install.js
++++ b/node_modules/memoryjs/scripts/install.js
+@@ -15,9 +15,14 @@ function run(script) {
+   const args = script.split(' ').slice(1);
+ 
+   // inherit stdio to print colour (helpful for warnings/errors readability)
+-  const child = spawn(program, args, { stdio: 'inherit' });
++  // shell: true is required on Windows to spawn a .cmd file (e.g. npm.cmd) —
++  // without it, modern Node throws `spawn EINVAL` instead of running it.
++  const child = spawn(program, args, { stdio: 'inherit', shell: true });
+ 
+-  child.on('close', code => console.log(`Script "${script}" exited with ${code}`));
++  child.on('close', (code) => {
++    console.log(`Script "${script}" exited with ${code}`);
++    if (code !== 0) process.exitCode = code;
++  });
+ }
+ 
+ const buildScripts = {

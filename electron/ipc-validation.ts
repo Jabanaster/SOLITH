@@ -248,6 +248,100 @@ export const TrainerHostRollbackSchema = z.object({
   field: z.string().min(1).max(200),
 });
 
+// ── Live Memory Trainer IPC Schemas (V2, feature-flagged, see PROJECT_SPEC.md Section 3.1) ──
+
+const LIVE_VALUE_TYPE = z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']);
+// Decimal or 0x-prefixed hex string — parsed with BigInt() in the main process.
+const LIVE_ADDRESS_STRING = z.string().min(1).max(20).regex(/^(0x[0-9a-fA-F]+|\d+)$/, 'Address must be decimal or 0x-hex');
+
+export const LiveMemoryListProcessesSchema = z.object({});
+
+export const LiveMemoryAttachSchema = z.object({
+  pid: z.number().int().positive(),
+  executableName: z.string().min(1).max(260),
+  // Must be explicitly true — cannot default or be inferred (see PROJECT_SPEC.md Section 3.1).
+  userConfirmedOffline: z.literal(true),
+});
+
+export const LiveMemoryDetachSchema = z.object({});
+
+export const LiveMemoryReadSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  dataType: LIVE_VALUE_TYPE,
+});
+
+export const LiveMemoryProposeWriteSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  dataType: LIVE_VALUE_TYPE,
+  requestedValue: z.number().finite(),
+});
+
+export const LiveMemoryConfirmWriteSchema = z.object({
+  proposalId: z.string().min(1).max(128),
+});
+
+export const LiveMemoryRollbackSchema = z.object({
+  manifest: z.object({
+    proposalId: z.string().min(1).max(128),
+    target: z.object({
+      address: LIVE_ADDRESS_STRING,
+      moduleName: z.string().max(260).optional(),
+      dataType: LIVE_VALUE_TYPE,
+    }),
+    valueBefore: z.number().finite(),
+    valueAfter: z.number().finite(),
+    appliedAt: z.string(),
+  }),
+});
+
+// Bounds are client-overridable but capped tightly server-side — a renderer
+// (even a trusted-by-default one) should not be able to request a scan large
+// enough to hang the main process.
+export const LiveMemoryScanFirstSchema = z.object({
+  dataType: LIVE_VALUE_TYPE,
+  targetValue: z.number().finite(),
+  maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
+  // 4 GiB ceiling — real-machine testing showed the 2 GiB production default is itself
+  // sometimes insufficient (Stardew Valley alone used ~957 MiB), so the client-overridable
+  // ceiling needs headroom above the default, not just enough to reach it.
+  maxTotalBytes: z.number().int().positive().max(4 * 1024 * 1024 * 1024).optional(),
+  maxMatches: z.number().int().positive().max(5000).optional(),
+});
+
+const SCAN_COMPARISON_SCHEMA = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('exact'), value: z.number().finite() }),
+  z.object({ kind: z.literal('changed') }),
+  z.object({ kind: z.literal('unchanged') }),
+  z.object({ kind: z.literal('increased') }),
+  z.object({ kind: z.literal('decreased') }),
+]);
+
+export const LiveMemoryScanNextSchema = z.object({
+  dataType: LIVE_VALUE_TYPE,
+  comparison: SCAN_COMPARISON_SCHEMA,
+  previous: z
+    .array(z.object({ address: LIVE_ADDRESS_STRING, value: z.number().finite() }))
+    .max(10_000),
+});
+
+export const LiveMemoryFreezeStartSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  dataType: LIVE_VALUE_TYPE,
+  value: z.number().finite(),
+  // Floor prevents a runaway tight loop from hammering the target process/CPU.
+  intervalMs: z.number().int().min(50).max(5000).optional(),
+});
+
+export const LiveMemoryFreezeStopSchema = z.object({});
+
+export const LiveMemoryFreezeStatusSchema = z.object({});
+
+export const LiveMemoryListControlsSchema = z.object({});
+
+export const LiveMemoryResolveControlSchema = z.object({
+  controlId: z.string().min(1).max(128),
+});
+
 /**
  * Validates a file path against a gameId's registered root directory.
  * Prevents path traversal and link-escapes inside IPC boundaries.

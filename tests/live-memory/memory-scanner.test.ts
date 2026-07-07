@@ -1,0 +1,210 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { FakeMemoryDriver } from '../fixtures/fake-memory-driver.js';
+import { scanFirst, scanNext } from '../../src/core/live-memory/memory-scanner.js';
+
+const HANDLE = { pid: 1234, opaque: { fake: true } };
+
+function filledBuffer(size: number, fill = 0xaa): Buffer {
+  return Buffer.alloc(size, fill);
+}
+
+test('scanFirst finds a value at an aligned offset within a single writable region', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(64);
+  region.writeInt32LE(500, 8);
+  driver.addRegion(0x1000n, region, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 500);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x1008n);
+  assert.equal(result.matches[0].value, 500);
+  assert.equal(result.truncated, false);
+  assert.equal(result.regionsScanned, 1);
+});
+
+test('scanFirst finds matches across multiple regions', () => {
+  const driver = new FakeMemoryDriver();
+  const regionA = filledBuffer(32);
+  regionA.writeInt32LE(9999, 0);
+  const regionB = filledBuffer(32);
+  regionB.writeInt32LE(9999, 16);
+  driver.addRegion(0x2000n, regionA, true);
+  driver.addRegion(0x3000n, regionB, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 9999);
+
+  const addresses = result.matches.map((m) => m.address).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  assert.deepEqual(addresses, [0x2000n, 0x3010n]);
+  assert.equal(result.regionsScanned, 2);
+});
+
+test('scanFirst excludes non-writable regions entirely', () => {
+  const driver = new FakeMemoryDriver();
+  const readOnly = filledBuffer(32);
+  readOnly.writeInt32LE(777, 4);
+  driver.addRegion(0x4000n, readOnly, false);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 777);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.regionsScanned, 0);
+});
+
+test('scanFirst only counts occurrences aligned to the value size, not raw byte matches', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(64);
+  region.writeInt32LE(500, 8); // aligned: offset 8 % 4 === 0
+  region.writeInt32LE(500, 21); // unaligned: offset 21 % 4 !== 0, non-overlapping with the aligned write above
+  driver.addRegion(0x5000n, region, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 500);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x5008n);
+});
+
+test('scanFirst skips a region larger than maxRegionBytes', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(128);
+  region.writeInt32LE(42, 0);
+  driver.addRegion(0x6000n, region, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 42, { maxRegionBytes: 64 });
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.regionsScanned, 0);
+});
+
+test('scanFirst stops and reports truncated when maxTotalBytes is exceeded', () => {
+  const driver = new FakeMemoryDriver();
+  const regionA = filledBuffer(64);
+  regionA.writeInt32LE(1, 0);
+  const regionB = filledBuffer(64);
+  regionB.writeInt32LE(1, 0);
+  driver.addRegion(0x7000n, regionA, true);
+  driver.addRegion(0x8000n, regionB, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 1, { maxTotalBytes: 64 });
+
+  assert.equal(result.truncated, true);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.matches.length, 1);
+});
+
+test('scanFirst stops and reports truncated when maxMatches is reached', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(64);
+  for (let offset = 0; offset < 64; offset += 4) {
+    region.writeInt32LE(7, offset);
+  }
+  driver.addRegion(0x9000n, region, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 7, { maxMatches: 3 });
+
+  assert.equal(result.matches.length, 3);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirst skips a region that becomes unreadable without aborting the whole scan', () => {
+  const driver = new FakeMemoryDriver();
+  const good = filledBuffer(32);
+  good.writeInt32LE(55, 0);
+  driver.addRegion(0xa000n, good, true);
+  // Appears in getRegions() but readBuffer() throws for it — simulates a region freed
+  // or reprotected between enumeration and read.
+  driver.addUnreadableRegion(0xb000n, 32, true);
+
+  const result = scanFirst(driver, HANDLE, 'int32', 55);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0xa000n);
+  // The unreadable region was skipped, not counted as scanned, and did not abort the scan.
+  assert.equal(result.regionsScanned, 1);
+});
+
+test('scanNext (exact): keeps only addresses whose current value matches the target', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 500);
+  driver.setValue(0x200n, 999);
+
+  const previous = [
+    { address: 0x100n, value: 500 },
+    { address: 0x200n, value: 500 },
+  ];
+
+  const result = scanNext(driver, HANDLE, 'int32', { kind: 'exact', value: 500 }, previous);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].address, 0x100n);
+  assert.equal(result[0].value, 500);
+});
+
+test('scanNext (changed): keeps addresses whose value differs from the prior scan', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 500); // unchanged from prior
+  driver.setValue(0x200n, 600); // changed from prior (was 500)
+
+  const previous = [
+    { address: 0x100n, value: 500 },
+    { address: 0x200n, value: 500 },
+  ];
+
+  const result = scanNext(driver, HANDLE, 'int32', { kind: 'changed' }, previous);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].address, 0x200n);
+  assert.equal(result[0].value, 600);
+});
+
+test('scanNext (unchanged): keeps addresses whose value matches the prior scan', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 500);
+  driver.setValue(0x200n, 600);
+
+  const previous = [
+    { address: 0x100n, value: 500 },
+    { address: 0x200n, value: 500 },
+  ];
+
+  const result = scanNext(driver, HANDLE, 'int32', { kind: 'unchanged' }, previous);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].address, 0x100n);
+});
+
+test('scanNext (increased / decreased): direction-based narrowing, e.g. health went down', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 80); // was 100 -> decreased
+  driver.setValue(0x200n, 120); // was 100 -> increased
+
+  const previous = [
+    { address: 0x100n, value: 100 },
+    { address: 0x200n, value: 100 },
+  ];
+
+  const decreased = scanNext(driver, HANDLE, 'int32', { kind: 'decreased' }, previous);
+  assert.equal(decreased.length, 1);
+  assert.equal(decreased[0].address, 0x100n);
+
+  const increased = scanNext(driver, HANDLE, 'int32', { kind: 'increased' }, previous);
+  assert.equal(increased.length, 1);
+  assert.equal(increased[0].address, 0x200n);
+});
+
+test('scanNext drops addresses that fail to read instead of throwing', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 500); // readable
+  // 0x999n is never seeded — readMemory will throw for it.
+
+  const previous = [
+    { address: 0x100n, value: 500 },
+    { address: 0x999n, value: 500 },
+  ];
+
+  const result = scanNext(driver, HANDLE, 'int32', { kind: 'exact', value: 500 }, previous);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].address, 0x100n);
+});

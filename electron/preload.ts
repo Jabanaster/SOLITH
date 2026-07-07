@@ -68,4 +68,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-host-approve-and-write', payload),
   trainerHostRollback: (payload: { gameId: string; filePath: string; backupPath: string; field: string }) =>
     ipcRenderer.invoke('trainer-host-rollback', payload),
+
+  // Live Memory Trainer (V2, feature-flagged off by default, single-player/
+  // offline only — see PROJECT_SPEC.md Section 3.1). Standard
+  // ReadProcessMemory/WriteProcessMemory only; no injection.
+  liveMemoryListProcesses: () => ipcRenderer.invoke('live-memory-list-processes'),
+  liveMemoryAttach: (payload: { pid: number; executableName: string; userConfirmedOffline: true }) =>
+    ipcRenderer.invoke('live-memory-attach', payload),
+  liveMemoryDetach: () => ipcRenderer.invoke('live-memory-detach'),
+  liveMemoryRead: (payload: { address: string; dataType: string }) =>
+    ipcRenderer.invoke('live-memory-read', payload),
+  liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) =>
+    ipcRenderer.invoke('live-memory-propose-write', payload),
+  liveMemoryConfirmWrite: (payload: { proposalId: string }) =>
+    ipcRenderer.invoke('live-memory-confirm-write', payload),
+  liveMemoryRollback: (payload: { manifest: unknown }) =>
+    ipcRenderer.invoke('live-memory-rollback', payload),
+  liveMemoryScanFirst: (payload: {
+    dataType: string;
+    targetValue: number;
+    maxRegionBytes?: number;
+    maxTotalBytes?: number;
+    maxMatches?: number;
+  }) => ipcRenderer.invoke('live-memory-scan-first', payload),
+  liveMemoryScanNext: (payload: {
+    dataType: string;
+    comparison: { kind: string; value?: number };
+    previous: { address: string; value: number }[];
+  }) => ipcRenderer.invoke('live-memory-scan-next', payload),
+  liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
+    ipcRenderer.invoke('live-memory-freeze-start', payload),
+  liveMemoryFreezeStop: () => ipcRenderer.invoke('live-memory-freeze-stop'),
+  liveMemoryFreezeStatus: () => ipcRenderer.invoke('live-memory-freeze-status'),
+  liveMemoryListControls: () => ipcRenderer.invoke('live-memory-list-controls'),
+  liveMemoryResolveControl: (payload: { controlId: string }) =>
+    ipcRenderer.invoke('live-memory-resolve-control', payload),
 });

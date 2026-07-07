@@ -1,5 +1,28 @@
 # Next Actions
 
+**Updated:** 2026-07-06 — Live Memory Trainer: pointer-path discovery + one real, restart-verified control (Atomfall ammo) landed
+
+## Live Memory Trainer — next bite
+
+- [x] Install and build `memoryjs`'s native addon (patched via `patch-package`, see KI-015).
+- [x] Verify a real ReadProcessMemory/WriteProcessMemory round trip against a controllable test-target process (`scripts/live-memory-verify.mts`).
+- [x] Verify attach mechanics (`openProcess`/`closeProcess`) against real running commercial games (Stardew Valley.exe, Atomfall_dx12.exe) — no memory read/written against either real game.
+- [x] Add IPC channels + preload exposure + Trainer-mode UI (process picker, offline confirmation, manual read/write, saved controls, scan workflow, freeze toggle).
+- [x] Fix the remote-connection observer's real-world output-size bug (KI-017) — rewritten to a PID-scoped `Get-NetTCPConnection` query.
+- [x] Add Cheat-Engine-style memory scanning (first scan + next scan) — verified read-only against 2 real games (Stardew Valley gold, Atomfall ammo), including a real narrowing sequence (5000 candidates → 1).
+- [x] Add WeMod/Wand-style freeze-value loop (guard-rechecked every tick) — unit-tested only; not yet exercised against a real game with a real write.
+- [x] Decide the KI-017 policy question for two specific, reviewed games (not the general default): added `acceptedConnectionBaseline` — Stardew Valley (5) and Atomfall (2), both measured live. Any other game still gets the strict default (0).
+- [x] Add module enumeration, a reverse pointer scanner, and a pointer-path resolver — needed because a raw scanned address is only valid for the current process instance.
+- [x] Build one real per-game trainer control end-to-end: Atomfall "Set Current Weapon Ammo", discovered via real gameplay (scan → narrow → pointer scan) and proven restart-stable (verified across a full game close/relaunch — 1 of 20 candidates survived; the other 19 were session-local coincidences).
+- [ ] Palworld (the originally-requested game) still has no live-memory control — not investigated this round.
+- [ ] Verify the freeze-value loop and confirmWrite/rollback against a real game with a real write — every real-game verification so far has been deliberately read-only (scan, resolve, read), since writing to a live save risks corrupting real player progress; this needs explicit authorization before attempting.
+- [ ] The managed-runtime pointer-scanning gap (KI-018) remains open — the technique does not work against .NET/Mono games like Stardew Valley; would need a CLR/Mono-specific approach.
+- [ ] Do not remove or weaken the online-session guard
+      (`src/core/live-memory/online-guard.ts`) — it is fail-closed by design
+      and evidence overrides user confirmation. Baselines are per-game,
+      evidence-based exceptions, not a general relaxation. See
+      PROJECT_SPEC.md Section 3.1.
+
 **Updated:** 2026-06-25 — Drill Core `master_volume` writable sandbox pilot passed
 
 ## Waiting for User — in-game validation authorization
