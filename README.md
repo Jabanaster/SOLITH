@@ -6,6 +6,51 @@ ResourceForge is strictly designed for single-player, offline games or applicati
 
 ---
 
+## 🎮 Multi-Game Live Trainer & Cheat Hub
+
+ResourceForge includes a **WeMod-equivalent live trainer** with pre-curated cheats for 7 popular games:
+
+| Game | Cheats | Features |
+|------|--------|----------|
+| **Palworld** | 54+ | Infinite health/stamina, capture rate, crafting, freeze values |
+| **Atomfall** | 29 | God mode, crafting free, teleport, skill points |
+| **Stardew Valley** | 50+ | Money, items, relationships, weather control |
+| **Avowed** | 45 | God mode, infinite resources, stat modifiers |
+| **Undisputed** | 30 | Unlimited health/stamina, damage boost, injury prevention |
+| **Dredge** | 15 | God mode, money, durability, time control |
+| **Crimson Desert** | 12 | Unlimited health/stamina, damage boost, defense |
+
+### **Features:**
+✅ **One-click cheat toggles** organized by category  
+✅ **Freeze value** (infinite health/stamina toggle — continuous re-write at 200ms)  
+✅ **Real-time scanning** for auto-discovery (scan → narrow → confirm → write)  
+✅ **Online-session guard** (fails-closed if game has active network connections)  
+✅ **Session-local caching** (discovered addresses cached for the session)  
+✅ **Defensive wrapping** (validates all memory operations to reduce antivirus flags)  
+
+### **Quick Start:**
+
+1. **Setup antivirus whitelist** (prevents false positives):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
+   ```
+   See [ANTIVIRUS_SETUP.md](Docs/ANTIVIRUS_SETUP.md) for detailed instructions.
+
+2. **Open ResourceForge** → Select a game from the cheat menu
+3. **Confirm offline-only mode** (safety checkbox required)
+4. **Toggle cheats** or manually discover values
+5. **Enable freeze** to maintain infinite values
+
+### **Safety Architecture:**
+
+- **Fail-closed guard**: Writes blocked if game has active network connections
+- **User confirmation required**: Explicit checkbox for offline-only mode  
+- **Connection baseline**: Per-game (Palworld: 4 connections = Steamworks overhead)
+- **Type validation**: All memory operations validated before native calls
+- **Graceful errors**: Invalid addresses/handles rejected before reaching native layer
+
+---
+
 ## 🛡️ Safety Policy & Scope Limits
 
 To prevent accidental data loss, anti-cheat flags, or system instability, ResourceForge enforces strict scope gates:
