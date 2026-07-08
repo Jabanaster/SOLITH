@@ -1,0 +1,201 @@
+.selector-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.selector-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.selector-header h2 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: #666;
+  margin: 0;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* Game Card */
+.game-card {
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-card:hover {
+  border-color: #007bff;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.game-card.running {
+  border-color: #28a745;
+  background: #f0f9f5;
+}
+
+.game-card.selected {
+  border-color: #007bff;
+  background: #e8f4ff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.game-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Game Name */
+.game-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.75rem;
+}
+
+/* Running Badge */
+.running-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #28a745;
+  color: white;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Game Info */
+.game-info {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.cheat-count {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.platform-badge {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* Discovery Type */
+.discovery-type {
+  display: inline-block;
+  background: #fff3e0;
+  color: #e65100;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+/* Selected Game Info */
+.selected-game-info {
+  background: #f5f5f5;
+  border-left: 4px solid #007bff;
+  border-radius: 4px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.selected-game-info h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.selected-game-info p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.game-stats {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.game-stats span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* No Games Message */
+.no-games-message {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px dashed #ccc;
+  color: #666;
+}
+
+.no-games-message p {
+  margin: 0.5rem 0;
+}
+
+.helper-text {
+  font-size: 0.9rem;
+  color: #999;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .games-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .selector-container {
+    padding: 1rem;
+  }
+
+  .selector-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .game-stats {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
