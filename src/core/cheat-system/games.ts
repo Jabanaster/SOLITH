@@ -1149,7 +1149,9 @@ export const UNDISPUTED_CONFIG: GameConfig = {
   gameId: 'undisputed',
   name: 'Undisputed',
   executable: 'Undisputed.exe',
-  platform: 'steam',
+  // Confirmed live: process path is under WindowsApps\DeepSilver.Undisputed_* — Microsoft
+  // Store/Xbox packaging, not Steam.
+  platform: 'xbox-game-pass',
   cheatsSupported: true,
   cheatDiscoveryType: 'memory-scan',
   dataType: 'int32',
@@ -1159,10 +1161,10 @@ export const UNDISPUTED_CONFIG: GameConfig = {
     { id: 'stats', name: 'Stats' },
   ],
   cheats: undisputedCheats,
-  connectionBaseline: 0,
+  connectionBaseline: 7, // Measured 2026-07-08 during offline tutorial — see game-connection-baselines.ts
   description: 'Boxing simulation with stat and career mode cheats',
   lastUpdated: new Date('2026-07-08'),
-  images: steamImages(1148810),
+  images: steamImages(1148810), // Steam art used for header/icon even for the Game Pass build — cosmetic only
   pinnedCheatIds: ['unlimited-health', 'infinite-stamina-boxing'],
 };
 

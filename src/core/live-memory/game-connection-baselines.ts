@@ -49,6 +49,19 @@ const BASELINES: PerGameConnectionBaseline[] = [
       '4 ESTABLISHED non-loopback TCP connections observed (Steamworks cloud saves, friends/presence, telemetry). ' +
       'Based on single measurement; may need re-review if observed count varies across sessions/versions.',
   },
+  {
+    executableName: 'Undisputed.exe',
+    acceptedConnectionBaseline: 7,
+    reviewedAt: '2026-07-08',
+    evidence:
+      'Measured live against a real, running Undisputed process (Microsoft Store/Xbox build, ' +
+      'DeepSilver.Undisputed package) during the offline tutorial: 7 ESTABLISHED non-loopback TCP ' +
+      'connections observed — 4x to 2603:1061:14:191::1 (Azure/Xbox Live-owned range) plus ' +
+      '184.28.150.23 and 20.109.157.180 (also Azure-owned), consistent with Xbox Live ' +
+      'presence/telemetry rather than in-match multiplayer traffic. Based on a single measurement ' +
+      'during the tutorial only (not verified during career mode or online matchmaking); re-review ' +
+      'if the observed count varies in those states.',
+  },
 ];
 
 const BASELINE_BY_EXECUTABLE = new Map<string, number>(
