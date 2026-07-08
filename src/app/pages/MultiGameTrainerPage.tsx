@@ -32,38 +32,6 @@ export default function MultiGameTrainerPage() {
     setUserConfirmedOffline(false);
   }, []);
 
-  const handleCheatToggle = useCallback(
-    (cheatId: string, enabled: boolean, value: number | string) => {
-      // eslint-disable-next-line no-console
-      console.log(`[${selectedGame?.name}] toggle ${cheatId} -> ${enabled} (${value})`);
-    },
-    [selectedGame],
-  );
-
-  const handleCheatFreeze = useCallback(
-    (cheatId: string, enabled: boolean) => {
-      // eslint-disable-next-line no-console
-      console.log(`[${selectedGame?.name}] freeze ${cheatId} -> ${enabled}`);
-    },
-    [selectedGame],
-  );
-
-  const handleCheatDiscover = useCallback(
-    (cheatId: string) => {
-      // eslint-disable-next-line no-console
-      console.log(`[${selectedGame?.name}] discover ${cheatId}`);
-    },
-    [selectedGame],
-  );
-
-  const handleValueApply = useCallback(
-    (cheatId: string, value: number | string) => {
-      // eslint-disable-next-line no-console
-      console.log(`[${selectedGame?.name}] apply ${cheatId} = ${value}`);
-    },
-    [selectedGame],
-  );
-
   return (
     <div className={styles['page-container']}>
       <header className={styles['page-header']}>
@@ -75,9 +43,7 @@ export default function MultiGameTrainerPage() {
       </header>
 
       <main className={styles['page-content']}>
-        {!selectedGame && (
-          <GameCheatSelector onGameSelect={handleGameSelect} autoSelectRunning={true} />
-        )}
+        {!selectedGame && <GameCheatSelector onGameSelect={handleGameSelect} autoSelectRunning={true} />}
 
         {selectedGame && (
           <>
@@ -92,19 +58,17 @@ export default function MultiGameTrainerPage() {
                   checked={userConfirmedOffline}
                   onChange={(e) => setUserConfirmedOffline(e.target.checked)}
                 />
-                <span>
-                  I confirm this {selectedGame.name} session is single-player/offline only
-                </span>
+                <span>I confirm this {selectedGame.name} session is single-player/offline only</span>
               </label>
             </div>
 
+            {/* key={gameId} forces a full remount (fresh session hook, fresh
+                process handle) on game switch — state from one game's cheats
+                must never bleed into another's. */}
             <GameSpecificCheatMenu
+              key={selectedGame.gameId}
               game={selectedGame}
               userConfirmedOffline={userConfirmedOffline}
-              onCheatToggle={handleCheatToggle}
-              onCheatFreeze={handleCheatFreeze}
-              onCheatDiscover={handleCheatDiscover}
-              onValueApply={handleValueApply}
             />
           </>
         )}

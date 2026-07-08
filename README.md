@@ -8,22 +8,22 @@ ResourceForge is strictly designed for single-player, offline games or applicati
 
 ## 🎮 Multi-Game Live Trainer & Cheat Hub
 
-ResourceForge includes a **WeMod-equivalent live trainer** with pre-curated cheats for 7 popular games:
+ResourceForge includes a **WeMod-style live trainer** with pre-curated cheats for 7 popular games. Toggling a cheat drives a real scan → narrow → confirm → write workflow against live process memory (no stubs) for the six memory-scan titles; Stardew Valley's console-command cheats are catalogued but not yet executed automatically.
 
-| Game | Cheats | Features |
-|------|--------|----------|
-| **Palworld** | 54+ | Infinite health/stamina, capture rate, crafting, freeze values |
-| **Atomfall** | 29 | God mode, crafting free, teleport, skill points |
-| **Stardew Valley** | 50+ | Money, items, relationships, weather control |
-| **Avowed** | 45 | God mode, infinite resources, stat modifiers |
-| **Undisputed** | 30 | Unlimited health/stamina, damage boost, injury prevention |
-| **Dredge** | 15 | God mode, money, durability, time control |
-| **Crimson Desert** | 12 | Unlimited health/stamina, damage boost, defense |
+| Game | Cheats defined | Discovery | Wired to real memory I/O |
+|------|-----------------|-----------|---------------------------|
+| **Palworld** | 26 | Memory scan | ✅ |
+| **Undisputed** | 11 | Memory scan | ✅ |
+| **Atomfall** | 10 | Memory scan | ✅ |
+| **Avowed** | 10 | Memory scan | ✅ |
+| **Dredge** | 10 | Memory scan | ✅ |
+| **Stardew Valley** | 9 | Console command | ⏳ Cataloged only — command executor not yet built |
+| **Crimson Desert** | 8 | Memory scan | ✅ |
 
 ### **Features:**
-✅ **One-click cheat toggles** organized by category  
+✅ **One-click cheat toggles** organized by category, with per-game Steam artwork  
+✅ **Real, per-cheat memory discovery** — no shared/global scan state; each cheat scans and narrows independently  
 ✅ **Freeze value** (infinite health/stamina toggle — continuous re-write at 200ms)  
-✅ **Real-time scanning** for auto-discovery (scan → narrow → confirm → write)  
 ✅ **Online-session guard** (fails-closed if game has active network connections)  
 ✅ **Session-local caching** (discovered addresses cached for the session)  
 ✅ **Defensive wrapping** (validates all memory operations to reduce antivirus flags)  

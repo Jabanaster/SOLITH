@@ -173,17 +173,79 @@
    Cheat Row
    ============================================================ */
 
+.cheat-row-wrap {
+  border-bottom: 1px solid #202028;
+}
+
+.cheat-row-wrap:last-child {
+  border-bottom: none;
+}
+
 .cheat-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 0.25rem;
-  border-bottom: 1px solid #202028;
   gap: 1rem;
 }
 
-.cheat-row:last-child {
-  border-bottom: none;
+/* Inline discovery panel (scan/narrow), shown under a row while status = discovering/error */
+.discovery-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.25rem 0.75rem 1.6rem;
+  flex-wrap: wrap;
+}
+
+.discovery-hint {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+}
+
+.discovery-input {
+  background: #202028;
+  border: 1px solid #34343e;
+  border-radius: 4px;
+  color: #e4e4e7;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  width: 100px;
+}
+
+.discovery-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.discovery-btn {
+  background: #1e3a8a;
+  border: 1px solid #2563eb;
+  color: #dbeafe;
+  border-radius: 4px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discovery-btn:hover {
+  background: #1d4ed8;
+}
+
+.discovery-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.discovery-error {
+  font-size: 0.8rem;
+  color: #fca5a5;
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
 }
 
 .cheat-row-main {
