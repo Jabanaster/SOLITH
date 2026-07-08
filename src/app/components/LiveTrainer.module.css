@@ -1,0 +1,203 @@
+.live-trainer-panel {
+  background: var(--color-surface, #f5f5f5);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  max-width: 600px;
+}
+
+.live-trainer-panel h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text, #333);
+}
+
+.trainer-status {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-idle {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+.status-scanning {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-narrowing {
+  background-color: #cfe2ff;
+  color: #084298;
+}
+
+.status-confirmed {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+
+.status-error {
+  background-color: #f8d7da;
+  color: #842029;
+}
+
+.candidate-count,
+.confirmed-addr {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  background-color: #e7e7e7;
+  color: #333;
+}
+
+.confirmed-addr {
+  font-family: monospace;
+  font-size: 0.8rem;
+  background-color: #d1e7dd;
+}
+
+.error-message {
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background-color: #f8d7da;
+  border: 1px solid #f5c2c7;
+  border-radius: 4px;
+  color: #842029;
+  font-size: 0.9rem;
+}
+
+.scan-section,
+.narrow-section,
+.write-section {
+  margin: 1.5rem 0;
+}
+
+.scan-section h3,
+.narrow-section h3,
+.write-section h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text, #333);
+}
+
+.scan-section p,
+.narrow-section p,
+.write-section p {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.input-group input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.input-group button {
+  padding: 0.5rem 1rem;
+  background-color: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.input-group button:hover:not(:disabled) {
+  background-color: #0052a3;
+}
+
+.input-group button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.candidate-info {
+  padding: 0.75rem;
+  background-color: #f0f0f0;
+  border-left: 3px solid #0066cc;
+  border-radius: 2px;
+  margin: 0.75rem 0 !important;
+  font-size: 0.9rem;
+}
+
+.current-value {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.current-value strong {
+  font-size: 1.1rem;
+  color: #0066cc;
+}
+
+.refresh-btn {
+  padding: 0.375rem 0.625rem;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.refresh-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.write-result {
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.write-result.success {
+  background-color: #d1e7dd;
+  border: 1px solid #badbcc;
+  color: #0f5132;
+}
+
+.write-result.error {
+  background-color: #f8d7da;
+  border: 1px solid #f5c2c7;
+  color: #842029;
+}

@@ -40,6 +40,15 @@ const BASELINES: PerGameConnectionBaseline[] = [
       'Live presence/achievements/telemetry background activity rather than in-game multiplayer ' +
       'traffic (Atomfall has no online multiplayer mode).',
   },
+  {
+    executableName: 'Palworld-Win64-Shipping.exe',
+    acceptedConnectionBaseline: 4,
+    reviewedAt: '2026-07-08',
+    evidence:
+      'Measured live against a real, running Palworld process during solo single-player mode: ' +
+      '4 ESTABLISHED non-loopback TCP connections observed (Steamworks cloud saves, friends/presence, telemetry). ' +
+      'Based on single measurement; may need re-review if observed count varies across sessions/versions.',
+  },
 ];
 
 const BASELINE_BY_EXECUTABLE = new Map<string, number>(
