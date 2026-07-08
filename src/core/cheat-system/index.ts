@@ -7,7 +7,14 @@
 export type { GameId, CheatDefinition, GameConfig, CheatToggleState, GameSession } from './types.js';
 
 // Registry
-export { gameRegistry, registerGame, getGameConfig, listAvailableGames, findGameByExecutable, getInstalledGames } from './game-registry.js';
+export {
+  gameRegistry,
+  registerGame,
+  getGameConfig,
+  listAvailableGames,
+  findGameByExecutable,
+} from './game-registry.js';
+export { getInstalledGames as getRegistryInstalledGames } from './game-registry.js';
 
 // Game configurations
 export {
@@ -31,16 +38,15 @@ export {
   getSortedGameList,
 } from './game-detector.js';
 
+import { ALL_GAMES } from './games.js';
+import { registerGame } from './game-registry.js';
+
 /**
- * Initialize the cheat system with all games
- * Call this once at app startup
+ * Initialize the cheat system with all games.
+ * Call this once at app startup (idempotent — safe to call more than once).
  */
 export function initializeCheatSystem(): void {
-  const { ALL_GAMES, registerGame } = require('./games.js');
-
   for (const gameConfig of ALL_GAMES) {
     registerGame(gameConfig);
   }
-
-  console.log(`✅ Cheat system initialized with ${ALL_GAMES.length} games`);
 }

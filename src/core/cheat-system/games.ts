@@ -3,7 +3,24 @@
  * Auto-generated from WeMod, FearLess, SMAPI and official sources
  */
 
-import type { GameConfig, CheatDefinition, CheatSource } from './types.js';
+import type { GameConfig, CheatDefinition, CheatSource, GameImageUrls } from './types.js';
+
+/**
+ * Builds Steam CDN image URLs from a known AppID.
+ * Steam's CDN is publicly hotlinkable (used by countless launchers/overlays).
+ * If the AppID is wrong/unavailable, the UI falls back to a generated gradient
+ * placeholder (see GameSpecificCheatMenu's onError handling) — this is a
+ * best-effort enhancement, not a hard dependency.
+ */
+function steamImages(appId: number): GameImageUrls {
+  const base = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}`;
+  return {
+    steamAppId: appId,
+    headerUrl: `${base}/header.jpg`,
+    coverUrl: `${base}/library_600x900_2x.jpg`,
+    iconUrl: `${base}/capsule_231x87.jpg`,
+  };
+}
 
 const COMMON_SOURCES = {
   wemod: (url?: string): CheatSource => ({
@@ -504,6 +521,8 @@ export const PALWORLD_CONFIG: GameConfig = {
   description: 'Monster taming and crafting game with online multiplayer (cheat support: solo mode only)',
   releaseDate: '2024-01-19',
   lastUpdated: new Date('2026-07-08'),
+  images: steamImages(1623730),
+  pinnedCheatIds: ['infinite-player-health', 'infinite-stamina', 'instant-capture'],
 };
 
 export const ATOMFALL_CONFIG: GameConfig = {
@@ -525,6 +544,8 @@ export const ATOMFALL_CONFIG: GameConfig = {
   connectionBaseline: 2,
   description: 'Post-apocalyptic action-adventure with Xbox Live integration',
   lastUpdated: new Date('2026-07-08'),
+  images: steamImages(2075450),
+  pinnedCheatIds: ['infinite-health', 'infinite-stamina', 'free-crafting'],
 };
 
 export const STARDEW_VALLEY_CONFIG: GameConfig = {
@@ -547,6 +568,8 @@ export const STARDEW_VALLEY_CONFIG: GameConfig = {
   connectionBaseline: 5,
   description: 'Farming simulation with built-in console commands (1.6.0+)',
   lastUpdated: new Date('2026-07-08'),
+  images: steamImages(413150),
+  pinnedCheatIds: ['set-money', 'teleport'],
 };
 
 export const AVOWED_CONFIG: GameConfig = {
@@ -567,6 +590,8 @@ export const AVOWED_CONFIG: GameConfig = {
   connectionBaseline: 0,
   description: 'Obsidian RPG with full cheat support via memory scanning',
   lastUpdated: new Date('2026-07-08'),
+  images: steamImages(2457220),
+  pinnedCheatIds: ['god-mode', 'infinite-essence'],
 };
 
 export const UNDISPUTED_CONFIG: GameConfig = {
@@ -586,6 +611,8 @@ export const UNDISPUTED_CONFIG: GameConfig = {
   connectionBaseline: 0,
   description: 'Boxing simulation with stat and career mode cheats',
   lastUpdated: new Date('2026-07-08'),
+  images: steamImages(1148810),
+  pinnedCheatIds: ['unlimited-health', 'infinite-stamina-boxing'],
 };
 
 export const DREDGE_CONFIG: GameConfig = {
@@ -605,6 +632,8 @@ export const DREDGE_CONFIG: GameConfig = {
   connectionBaseline: 0,
   description: 'Indie horror fishing game with progression cheats',
   lastUpdated: new Date('2026-07-08'),
+  images: steamImages(1562430),
+  pinnedCheatIds: ['god-mode-dredge', 'unlimited-money-dredge'],
 };
 
 export const CRIMSON_DESERT_CONFIG: GameConfig = {
@@ -624,6 +653,8 @@ export const CRIMSON_DESERT_CONFIG: GameConfig = {
   connectionBaseline: 0,
   description: 'Pearl Abyss action-adventure with stat modification support',
   lastUpdated: new Date('2026-07-08'),
+  // No confirmed Steam AppID yet (pre-release at last verification) — UI falls back to a gradient placeholder.
+  pinnedCheatIds: ['unlimited-health-cd', 'unlimited-stamina-cd'],
 };
 
 // ============================================================================

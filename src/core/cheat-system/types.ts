@@ -37,6 +37,17 @@ export interface CheatSource {
   lastChecked: Date;
 }
 
+export interface GameImageUrls {
+  /** Wide header/banner image (Steam CDN 'header.jpg' style, ~460x215 or similar) */
+  headerUrl?: string;
+  /** Tall cover/library art (Steam CDN 'library_600x900.jpg' style) */
+  coverUrl?: string;
+  /** Small square icon (Steam CDN 'icon.jpg' or capsule) */
+  iconUrl?: string;
+  /** Steam AppID, when known — used to construct CDN fallback URLs */
+  steamAppId?: number;
+}
+
 export interface GameConfig {
   gameId: GameId;
   name: string;
@@ -52,6 +63,8 @@ export interface GameConfig {
   description: string;
   releaseDate?: string;
   lastUpdated: Date;
+  images?: GameImageUrls;
+  pinnedCheatIds?: string[]; // Cheats shown in the "Pinned" section at top (WeMod-style)
 }
 
 export interface GameRegistry {

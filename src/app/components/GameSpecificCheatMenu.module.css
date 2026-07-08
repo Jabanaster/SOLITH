@@ -1,0 +1,449 @@
+.menu-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: #16171b;
+  color: #e4e4e7;
+  border-radius: 10px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ============================================================
+   Header (WeMod-style banner + icon)
+   ============================================================ */
+
+.game-header {
+  position: relative;
+  min-height: 180px;
+}
+
+.header-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.header-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.55);
+}
+
+.header-fallback {
+  width: 100%;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2b2f45, #1a1c28);
+}
+
+.header-fallback span {
+  font-size: 4rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.15);
+}
+
+.header-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, #16171b 95%);
+}
+
+.header-content {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  min-height: 180px;
+}
+
+.header-icon-wrap {
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.icon-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.icon-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4b5bdc, #2c3570);
+}
+
+.icon-fallback span {
+  font-size: 2rem;
+  font-weight: 800;
+  color: white;
+}
+
+.header-text h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.header-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.platform-tag,
+.cheat-count-tag,
+.discovery-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.platform-tag {
+  background: rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+}
+
+.cheat-count-tag {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.discovery-tag {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+}
+
+/* ============================================================
+   Offline warning
+   ============================================================ */
+
+.offline-warning {
+  margin: 1rem 1.5rem 0 1.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.12);
+  border-left: 3px solid #ef4444;
+  border-radius: 4px;
+  color: #fca5a5;
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   Sections
+   ============================================================ */
+
+.cheat-section {
+  padding: 1rem 1.5rem;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 0.5rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #27272e;
+}
+
+.cheat-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================
+   Cheat Row
+   ============================================================ */
+
+.cheat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.25rem;
+  border-bottom: 1px solid #202028;
+  gap: 1rem;
+}
+
+.cheat-row:last-child {
+  border-bottom: none;
+}
+
+.cheat-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.bolt-icon {
+  color: #6b7280;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.cheat-row-name {
+  font-size: 0.9rem;
+  color: #e4e4e7;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.info-icon {
+  color: #52525b;
+  font-size: 0.8rem;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.cheat-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Status pills */
+.status-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.status-discovering {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.status-frozen {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Off/On toggle (WeMod pill style) */
+.off-on-toggle {
+  display: flex;
+  align-items: center;
+  background: #26262e;
+  border: 1px solid #34343e;
+  border-radius: 16px;
+  padding: 0.15rem;
+  cursor: pointer;
+  width: 76px;
+  position: relative;
+}
+
+.off-on-toggle span {
+  flex: 1;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0;
+  border-radius: 12px;
+  color: #71717a;
+  z-index: 1;
+}
+
+.off-on-toggle .toggle-off-label {
+  color: #d4d4d8;
+}
+
+.off-on-toggle.is-on {
+  background: #1e3a8a;
+  border-color: #2563eb;
+}
+
+.off-on-toggle.is-on .toggle-off-label {
+  color: #71717a;
+}
+
+.off-on-toggle.is-on .toggle-on-label {
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.off-on-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Freeze icon button */
+.freeze-icon-btn {
+  background: transparent;
+  border: 1px solid #34343e;
+  color: #71717a;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.freeze-icon-btn:hover {
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+.freeze-icon-btn.active {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #93c5fd;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.freeze-icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Pin icon */
+.pin-icon-btn {
+  background: transparent;
+  border: none;
+  color: #52525b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.25rem;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.pin-icon-btn:hover {
+  opacity: 1;
+}
+
+/* Stepper (numeric value rows) */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #202028;
+  border: 1px solid #2c2c36;
+  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+}
+
+.stepper button {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  font-size: 1rem;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper button:hover {
+  background: #2c2c36;
+  color: #fff;
+}
+
+.stepper button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  min-width: 32px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #e4e4e7;
+  font-variant-numeric: tabular-nums;
+}
+
+.apply-check-btn {
+  width: 28px;
+  height: 28px;
+  background: #14532d;
+  border: 1px solid #16a34a;
+  color: #86efac;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.apply-check-btn:hover {
+  background: #166534;
+}
+
+.apply-check-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cheat-row {
+    flex-wrap: wrap;
+  }
+
+  .cheat-row-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ============================================================
+   Light theme override (menu is intentionally dark-only, like WeMod,
+   but respect a light host page background around it)
+   ============================================================ */
+
+@media (prefers-color-scheme: light) {
+  .menu-container {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  }
+}

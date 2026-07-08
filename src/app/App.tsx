@@ -11,11 +11,12 @@ import CompatibilityDashboard from './pages/CompatibilityDashboard';
 import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
+import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
 
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls' | 'live-memory';
+  | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer';
 
 type AppMode = 'trainer' | 'workshop';
 
@@ -56,6 +57,7 @@ const WORKSHOP_PAGES: { id: View; label: string }[] = [
   { id: 'compatibility', label: 'Compatibility' },
   { id: 'session-monitor', label: 'Session Monitor (V2)' },
   { id: 'live-memory', label: 'Live Memory Trainer (V2)' },
+  { id: 'multi-game-trainer', label: 'Multi-Game Cheats (V2)' },
 ];
 
 const App: React.FC = () => {
@@ -139,6 +141,8 @@ const App: React.FC = () => {
         return <SessionMonitorPage />;
       case 'live-memory':
         return <LiveMemoryTrainerPage />;
+      case 'multi-game-trainer':
+        return <MultiGameTrainerPage />;
       case 'controls':
         return <TrainerControlPanel />;
       default:
