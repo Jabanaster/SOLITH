@@ -1,5 +1,15 @@
 # ResourceForge Multi-Game Live Trainer - Complete Summary
 
+> **Partially superseded (checkpoint `806ba56`, 2026-07-09).** `useLiveTrainerWorkflow.ts`,
+> `useFreezeValue.ts`, `PalworldCheatMenu.tsx`, and `LiveTrainer.tsx` referenced below were
+> intentionally removed as obsolete. Cheat toggle persistence now runs through
+> `useGameCheatSession` → preload → `electron/cheat-toggle-ipc.ts` →
+> `src/core/cheat-system/cheat-toggle-store.ts` → the `cheat_toggle_state` database table,
+> and manual address discovery is handled by `LiveWatchPanel.tsx` instead of `LiveTrainer.tsx`.
+> The underlying per-game cheat catalog (`src/core/cheat-system/games.ts`) and memory
+> scan/narrow/write pipeline described here are unaffected. See `README.md` → "Trainer UI
+> Migration" for the current wiring; treat file/component names below as historical.
+
 ## 🚀 What Was Delivered
 
 A **production-ready, extensible multi-game cheat system** with support for 7 games and 245+ pre-curated cheats, all integrated into a single, unified application.

@@ -51,6 +51,67 @@ ResourceForge includes a **WeMod-style live trainer** with pre-curated cheats fo
 
 ---
 
+## 🔁 Trainer UI Migration (Checkpoint `806ba56`)
+
+The Palworld-specific trainer UI was replaced with a generic, per-game architecture.
+This does not add capability beyond what the memory scan/narrow/write pipeline above
+already covers — it changes which components implement it.
+
+**Removed as obsolete** (intentional deletion, not a regression):
+- `src/app/components/LiveTrainer.tsx`, `LiveTrainer.module.css`, `LiveTrainer.test.tsx`
+- `src/app/components/PalworldCheatMenu.tsx`, `PalworldCheatMenu.module.css`, `PalworldCheatMenu.test.tsx`
+- `src/app/pages/PalworldTrainerPage.tsx`, `PalworldTrainerPage.module.css`
+- `src/app/hooks/useFreezeValue.ts`, `useLiveTrainerWorkflow.ts`
+
+**Active replacements:**
+- [`LiveWatchPanel`](src/app/components/LiveWatchPanel.tsx) is now the active live-watch UI —
+  it replaces `LiveTrainer.tsx`'s manual address-discovery view with a live-polling candidate
+  table (see the component's own scoring/confidence notes for what it does and does not infer).
+- `GameSpecificCheatMenu` (generic, driven by `src/core/cheat-system/games.ts`) replaces the
+  Palworld-only `PalworldCheatMenu`/`PalworldTrainerPage` pair.
+
+**Cheat toggle persistence** now flows through a dedicated chain instead of ad hoc component
+state:
+
+```
+UI → useGameCheatSession (src/app/hooks/useGameCheatSession.ts)
+   → preload (electron/preload.ts)
+   → electron/cheat-toggle-ipc.ts
+   → src/core/cheat-system/cheat-toggle-store.ts
+   → cheat_toggle_state table (src/core/database/index.ts)
+```
+
+Toggle state (enabled/disabled, last confirmed address, data type) survives a ResourceForge
+restart. It does **not** assume the target game process itself is still running with the same
+address layout — the caller re-verifies before reuse (see `cheat-toggle-store.ts` doc comment).
+
+**Verification for this checkpoint** (commit `806ba568c9ea9c11d1484e879849983074e76afd`):
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | Pass |
+| `npm run test:trainer-schema` | Pass, 35/35 |
+| `npm run test:live-memory` | Pass, 72/72 |
+| `npm run test:trainer-host` | Pass, 80/80 |
+| `npm test` (standard suite) | Pass, 508/508 |
+
+No remaining source file imports `LiveTrainer`, `PalworldCheatMenu`, `PalworldTrainerPage`,
+`useFreezeValue`, or `useLiveTrainerWorkflow`.
+
+**Known testing gap:** there are no dedicated tests yet for `electron/cheat-toggle-ipc.ts`,
+`src/core/cheat-system/cheat-toggle-store.ts`, or `LiveWatchPanel.tsx`. Existing coverage
+(`test:trainer-schema`, `test:live-memory`, `test:trainer-host`, standard suite) exercises the
+surrounding modified files but not these three directly. This is an open gap, not a claim of
+coverage that doesn't exist.
+
+**Scope reminder:** this migration changes UI wiring only. It does not enable any control that
+was previously blocked, and it does not add new process/memory capability. Unsupported controls
+remain blocked unless explicitly verified and allowed by project safety scope. Support claims in
+this document describe local, single-player, offline use of games/saves the user owns — not
+broad commercial-game live-trainer support, not multiplayer, and not anti-cheat bypass.
+
+---
+
 ## 🛡️ Safety Policy & Scope Limits
 
 To prevent accidental data loss, anti-cheat flags, or system instability, ResourceForge enforces strict scope gates:

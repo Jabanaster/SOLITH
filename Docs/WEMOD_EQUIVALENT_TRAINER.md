@@ -1,5 +1,13 @@
 # WeMod-Equivalent Live Trainer for Palworld
 
+> **Superseded (checkpoint `806ba56`, 2026-07-09).** `PalworldCheatMenu.tsx`,
+> `PalworldCheatMenu.test.tsx`, and `useFreezeValue.ts` referenced below were intentionally
+> removed as obsolete. Palworld cheats are now served through the generic
+> `GameSpecificCheatMenu.tsx` (shared across all catalogued games, not Palworld-specific),
+> with manual discovery handled by `LiveWatchPanel.tsx`. See `README.md` → "Trainer UI
+> Migration" for the current architecture. This document is kept for historical reference
+> only.
+
 ## Overview
 
 ResourceForge now includes a complete WeMod-equivalent live trainer for Palworld with all requested features:

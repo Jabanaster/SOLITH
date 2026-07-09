@@ -18,6 +18,42 @@ Older release tags remain unchanged:
 
 ## Current Development State
 
+### Trainer Toggle Persistence & Live-Watch Migration (2026-07-09)
+
+Status: **Accepted locally, not pushed, not tagged.**
+
+Commit: `806ba568c9ea9c11d1484e879849983074e76afd`
+
+This is a UI-wiring migration, not a scope expansion. It removed obsolete trainer components
+and replaced ad hoc cheat-toggle component state with a persisted store.
+
+Removed as obsolete: `LiveTrainer.tsx`/`.module.css`/`.test.tsx`, `PalworldCheatMenu.tsx`/
+`.module.css`/`.test.tsx`, `PalworldTrainerPage.tsx`/`.module.css`, `useFreezeValue.ts`,
+`useLiveTrainerWorkflow.ts`.
+
+Added: `LiveWatchPanel.tsx`/`.module.css` (active live-watch UI), `electron/cheat-toggle-ipc.ts`,
+`src/core/cheat-system/cheat-toggle-store.ts` (persists cheat toggle state to a new
+`cheat_toggle_state` database table).
+
+Verification passed:
+
+* `npx tsc --noEmit`: PASS
+* `npm run test:trainer-schema`: PASS, 35/35
+* `npm run test:live-memory`: PASS, 72/72
+* `npm run test:trainer-host`: PASS, 80/80
+* `npm test`: PASS, 508/508
+
+Scope boundaries preserved:
+
+* No new process/memory capability beyond what already existed.
+* No previously-blocked control was enabled.
+* No deleted files were restored.
+* Existing per-game cheat catalog (`src/core/cheat-system/games.ts`) unchanged.
+
+Known gap: `cheat-toggle-ipc.ts`, `cheat-toggle-store.ts`, and `LiveWatchPanel.tsx` have no
+dedicated tests yet. Existing suites (trainer-schema, live-memory, trainer-host, standard)
+cover the surrounding modified files but not these three directly — open item, not hidden.
+
 V1.1 development has started from the locked `v1.0.2` baseline.
 
 Current local development state:
