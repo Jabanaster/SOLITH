@@ -314,6 +314,11 @@ const SCAN_COMPARISON_SCHEMA = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unchanged') }),
   z.object({ kind: z.literal('increased') }),
   z.object({ kind: z.literal('decreased') }),
+  z.object({ kind: z.literal('increasedBy'), value: z.number().finite() }),
+  z.object({ kind: z.literal('decreasedBy'), value: z.number().finite() }),
+  z.object({ kind: z.literal('greaterThan'), value: z.number().finite() }),
+  z.object({ kind: z.literal('lessThan'), value: z.number().finite() }),
+  z.object({ kind: z.literal('between'), min: z.number().finite(), max: z.number().finite() }),
 ]);
 
 export const LiveMemoryScanNextSchema = z.object({
@@ -322,6 +327,42 @@ export const LiveMemoryScanNextSchema = z.object({
   previous: z
     .array(z.object({ address: LIVE_ADDRESS_STRING, value: z.number().finite() }))
     .max(10_000),
+});
+
+// "Unknown initial value" scan pair — for a stat with no visible number.
+// scanFirstUnknown takes no target value at all (it snapshots raw bytes);
+// scanNextFromUnknown reuses the same bounded comparison kinds as scan-next,
+// applied against that snapshot instead of a prior match list.
+// key scopes the baseline snapshot to one caller-chosen slot (the renderer passes the cheat
+// id) so scanning two stats' unknown values concurrently doesn't clobber each other's baseline.
+const UNKNOWN_SCAN_KEY = z.string().min(1).max(128);
+
+export const LiveMemoryScanFirstUnknownSchema = z.object({
+  key: UNKNOWN_SCAN_KEY,
+  maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
+  // Lower ceiling than scan-first's 4 GiB — this holds raw region bytes resident as the
+  // baseline snapshot (not just filtered match addresses), so the memory cost is much higher
+  // per byte scanned. 1 GiB gives headroom above the 512 MiB production default without
+  // inviting a multi-GB resident snapshot from the renderer.
+  maxTotalBytes: z.number().int().positive().max(1024 * 1024 * 1024).optional(),
+});
+
+export const LiveMemoryScanNextFromUnknownSchema = z.object({
+  key: UNKNOWN_SCAN_KEY,
+  // Array, not a single type — tries every listed interpretation at each offset (Cheat
+  // Engine's "All" scan type equivalent) instead of committing to one guess upfront.
+  dataTypes: z.array(LIVE_VALUE_TYPE).min(1).max(6),
+  comparison: SCAN_COMPARISON_SCHEMA,
+  maxMatches: z.number().int().positive().max(5000).optional(),
+});
+
+// Watch Live Values panel — bulk-reads a candidate list on a poll interval so the renderer can
+// show which one visibly correlates with a real in-game change, instead of guessing blind.
+export const LiveMemoryReadManySchema = z.object({
+  addresses: z
+    .array(z.object({ address: LIVE_ADDRESS_STRING, dataType: LIVE_VALUE_TYPE }))
+    .min(1)
+    .max(500),
 });
 
 export const LiveMemoryFreezeStartSchema = z.object({
@@ -340,6 +381,28 @@ export const LiveMemoryListControlsSchema = z.object({});
 
 export const LiveMemoryResolveControlSchema = z.object({
   controlId: z.string().min(1).max(128),
+});
+
+// Persisted cheat toggle state (Multi-Game Live Trainer) — gameId here is a fixed slug
+// (e.g. 'undisputed'), not a UUID like the games-library gameId schemas above.
+const CHEAT_GAME_ID = z.string().min(1).max(64);
+const CHEAT_ID = z.string().min(1).max(128);
+
+export const CheatToggleGetAllSchema = z.object({
+  gameId: CHEAT_GAME_ID,
+});
+
+export const CheatToggleSetSchema = z.object({
+  gameId: CHEAT_GAME_ID,
+  cheatId: CHEAT_ID,
+  enabled: z.boolean(),
+  confirmedAddress: LIVE_ADDRESS_STRING.nullable().optional(),
+  dataType: LIVE_VALUE_TYPE.nullable().optional(),
+});
+
+export const CheatToggleClearSchema = z.object({
+  gameId: CHEAT_GAME_ID,
+  cheatId: CHEAT_ID,
 });
 
 /**

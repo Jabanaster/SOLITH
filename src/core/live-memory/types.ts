@@ -149,17 +149,38 @@ export interface ScanMatch {
 }
 
 /**
+ * A scanned candidate from a multi-datatype unknown-value scan — the same raw
+ * bytes can be validly interpreted as int32, float, etc., and a "no visible
+ * number" stat (a bar with no digits) could be stored as any of them. Tags
+ * each match with which interpretation produced it, since a candidate list
+ * mixing types needs to know how to re-read/write each address correctly.
+ */
+export interface TypedScanMatch extends ScanMatch {
+  dataType: LiveValueType;
+}
+
+/**
  * Next-scan comparison mode, applied against a prior candidate set:
  * - exact: value now equals `value`.
  * - changed / unchanged: value differs from / matches its own previous scan value.
  * - increased / decreased: value moved in that direction versus its own previous scan value.
+ * - increasedBy / decreasedBy: value moved in that direction by exactly `value` (e.g. "took
+ *   exactly 12 damage") — tighter than plain increased/decreased when the exact delta is known.
+ * - greaterThan / lessThan: value's *current* reading compares against `value`, independent of
+ *   its previous value (e.g. "still above half health").
+ * - between: value's current reading falls within [min, max] inclusive.
  */
 export type ScanComparison =
   | { kind: 'exact'; value: number }
   | { kind: 'changed' }
   | { kind: 'unchanged' }
   | { kind: 'increased' }
-  | { kind: 'decreased' };
+  | { kind: 'decreased' }
+  | { kind: 'increasedBy'; value: number }
+  | { kind: 'decreasedBy'; value: number }
+  | { kind: 'greaterThan'; value: number }
+  | { kind: 'lessThan'; value: number }
+  | { kind: 'between'; min: number; max: number };
 
 export interface ScanBounds {
   /** Skip any single region larger than this (bytes). Default 64 MiB. */

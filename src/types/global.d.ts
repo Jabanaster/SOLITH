@@ -63,9 +63,34 @@ interface Window {
     }>;
     liveMemoryScanNext: (payload: {
       dataType: string;
-      comparison: { kind: string; value?: number };
+      comparison: { kind: string; value?: number; min?: number; max?: number };
       previous: { address: string; value: number }[];
     }) => Promise<{ success: boolean; matches?: { address: string; value: number }[]; error?: string }>;
+    liveMemoryScanFirstUnknown: (payload: {
+      key: string;
+      maxRegionBytes?: number;
+      maxTotalBytes?: number;
+    }) => Promise<{ success: boolean; regionsScanned?: number; bytesScanned?: number; truncated?: boolean; error?: string }>;
+    liveMemoryScanNextFromUnknown: (payload: {
+      key: string;
+      dataTypes: string[];
+      comparison: { kind: string; value?: number; min?: number; max?: number };
+      maxMatches?: number;
+    }) => Promise<{
+      success: boolean;
+      result?: {
+        matches: { address: string; value: number; dataType: string }[];
+        regionsScanned: number;
+        bytesScanned: number;
+        truncated: boolean;
+      };
+      error?: string;
+    }>;
+    liveMemoryReadMany: (payload: { addresses: { address: string; dataType: string }[] }) => Promise<{
+      success: boolean;
+      values?: { address: string; value: number; dataType: string }[];
+      error?: string;
+    }>;
     liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryFreezeStop: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryFreezeStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
@@ -80,5 +105,18 @@ interface Window {
       currentValue?: number;
       error?: string;
     }>;
+    cheatToggleGetAll: (payload: { gameId: string }) => Promise<{
+      success: boolean;
+      states?: { gameId: string; cheatId: string; enabled: boolean; confirmedAddress: string | null; dataType: string | null }[];
+      error?: string;
+    }>;
+    cheatToggleSet: (payload: {
+      gameId: string;
+      cheatId: string;
+      enabled: boolean;
+      confirmedAddress?: string | null;
+      dataType?: string | null;
+    }) => Promise<{ success: boolean; error?: string }>;
+    cheatToggleClear: (payload: { gameId: string; cheatId: string }) => Promise<{ success: boolean; error?: string }>;
   };
 }

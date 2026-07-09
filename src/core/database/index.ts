@@ -641,6 +641,21 @@ function applySchema(): void {
     )
   `);
 
+  // Persisted cheat toggle state (Multi-Game Live Trainer) — remembers which cheats were
+  // enabled and their confirmed address so a ResourceForge restart (not a game restart) can
+  // re-arm them automatically instead of forcing the user to redo discovery from scratch.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS cheat_toggle_state (
+      gameId TEXT NOT NULL,
+      cheatId TEXT NOT NULL,
+      enabled INTEGER DEFAULT 0,
+      confirmedAddress TEXT,
+      dataType TEXT,
+      updatedAt TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (gameId, cheatId)
+    )
+  `);
+
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS pilot_runs (
       id TEXT PRIMARY KEY,

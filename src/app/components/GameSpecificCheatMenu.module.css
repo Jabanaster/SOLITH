@@ -248,6 +248,42 @@
   color: #fca5a5;
 }
 
+.discovery-btn-secondary {
+  background: transparent;
+  border: 1px solid #34343e;
+  color: #a1a1aa;
+  border-radius: 4px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.discovery-btn-secondary:hover {
+  color: #e4e4e7;
+  border-color: #52525b;
+}
+
+.advanced-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #27272e;
+  border-radius: 6px;
+}
+
+.advanced-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .cheat-row-main {
   display: flex;
   align-items: center;

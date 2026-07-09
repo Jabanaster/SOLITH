@@ -42,12 +42,14 @@ import {
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc } from './live-memory-ipc.js';
+import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
 // Registered once at module level, same as the other IPC handlers below, so
 // it is never duplicated on window recreation.
 registerLiveMemoryIpc();
+registerCheatToggleIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);

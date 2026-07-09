@@ -9,19 +9,17 @@ import {
   LiveMemoryRollbackSchema,
   LiveMemoryScanFirstSchema,
   LiveMemoryScanNextSchema,
+  LiveMemoryScanFirstUnknownSchema,
+  LiveMemoryScanNextFromUnknownSchema,
+  LiveMemoryReadManySchema,
   LiveMemoryFreezeStartSchema,
   LiveMemoryFreezeStopSchema,
   LiveMemoryFreezeStatusSchema,
   LiveMemoryListControlsSchema,
   LiveMemoryResolveControlSchema,
 } from './ipc-validation.js';
-import { LiveMemorySession, nativeMemoryDriver, listLiveMemoryProcesses, listControlsForGame, getControl } from '../src/core/live-memory/index.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
-
-// Importing LiveMemorySession/nativeMemoryDriver here does NOT load the
-// memoryjs native addon — nativeMemoryDriver lazily requires it only inside
-// openProcess/readMemory/writeMemory/closeProcess, the first time one is
-// actually called.
+import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
 
 /**
  * Live Memory Trainer IPC — feature-flagged (`v2LiveModeEnabled`, off by
@@ -36,6 +34,16 @@ import type { ScanMatch } from '../src/core/live-memory/types.js';
  * passes (rechecked before every write, not just at attach — see
  * LiveMemorySession). Nothing here bypasses that guard.
  */
+
+let liveMemoryModule: any = null;
+
+async function getLiveMemoryModule() {
+  if (!liveMemoryModule) {
+    liveMemoryModule = await import('../src/core/live-memory/index.js');
+  }
+  return liveMemoryModule;
+}
+
 export function registerLiveMemoryIpc(): void {
   ipcMain.handle('live-memory-list-processes', async (event) => {
     try {
@@ -43,7 +51,8 @@ export function registerLiveMemoryIpc(): void {
       LiveMemoryListProcessesSchema.parse({});
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
-      return { success: true, processes: listLiveMemoryProcesses() };
+      const mod = await getLiveMemoryModule();
+      return { success: true, processes: mod.listLiveMemoryProcesses() };
     } catch (error) {
       return { success: false, error: sanitize(error, 'list_processes_failed') };
     }
@@ -56,8 +65,9 @@ export function registerLiveMemoryIpc(): void {
 
       const parsed = LiveMemoryAttachSchema.parse(payload);
 
+      const mod = await getLiveMemoryModule();
       disposeSession(event.sender.id);
-      const session = new LiveMemorySession(nativeMemoryDriver);
+      const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
       const result = await session.attach(
         { pid: parsed.pid, executableName: parsed.executableName },
         parsed.userConfirmedOffline,
@@ -162,6 +172,65 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  // "Unknown initial value" first scan — for a stat with no visible number (a bar, a
+  // percentage with no digits). Read-only, same as scan-first: nothing is written.
+  ipcMain.handle('live-memory-scan-first-unknown', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanFirstUnknownSchema.parse(payload);
+      const result = session.scanFirstUnknown(parsed.key, {
+        maxRegionBytes: parsed.maxRegionBytes,
+        maxTotalBytes: parsed.maxTotalBytes,
+      });
+      return { success: true, ...result };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_first_unknown_failed') };
+    }
+  });
+
+  // Consumes the snapshot from scan-first-unknown; filters by comparison against the baseline,
+  // trying every dataType in parsed.dataTypes at each offset (Cheat Engine's "All" scan type).
+  // Survivors are typically still numerous enough that the renderer should route them into the
+  // Watch Live Values panel next, not assume a single address — this endpoint's job is only to
+  // turn "every writable byte" into a workable candidate list, one real filter.
+  ipcMain.handle('live-memory-scan-next-from-unknown', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanNextFromUnknownSchema.parse(payload);
+      const result = session.scanNextFromUnknown(parsed.key, parsed.dataTypes, parsed.comparison, {
+        maxMatches: parsed.maxMatches,
+      });
+      return {
+        success: true,
+        result: {
+          matches: result.matches.map((m) => ({ address: m.address.toString(), value: m.value, dataType: m.dataType })),
+          regionsScanned: result.regionsScanned,
+          bytesScanned: result.bytesScanned,
+          truncated: result.truncated,
+        },
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_next_from_unknown_failed') };
+    }
+  });
+
+  // Watch Live Values panel — bulk-reads a candidate list on a poll interval so the user can
+  // visually spot which address correlates with a real in-game change instead of guessing blind
+  // via repeated increased/decreased narrow rounds.
+  ipcMain.handle('live-memory-read-many', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryReadManySchema.parse(payload);
+      const results = session.readMany(parsed.addresses.map((a) => ({ address: BigInt(a.address), dataType: a.dataType })));
+      return {
+        success: true,
+        values: results.map((r) => ({ address: r.address.toString(), value: r.value, dataType: r.dataType })),
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'read_many_failed') };
+    }
+  });
+
   ipcMain.handle('live-memory-freeze-start', async (event, payload: unknown) => {
     try {
       const session = requireSession(event);
@@ -205,7 +274,8 @@ export function registerLiveMemoryIpc(): void {
       LiveMemoryListControlsSchema.parse({});
       const executableName = session.getAttachedExecutableName();
       if (!executableName) return { success: true, controls: [] };
-      const controls = listControlsForGame(executableName);
+      const mod = await getLiveMemoryModule();
+      const controls = mod.listControlsForGame(executableName);
       return { success: true, controls: controls.map(serializeControlSummary) };
     } catch (error) {
       return { success: false, error: sanitize(error, 'list_controls_failed') };
@@ -219,7 +289,8 @@ export function registerLiveMemoryIpc(): void {
     try {
       const session = requireSession(event);
       const parsed = LiveMemoryResolveControlSchema.parse(payload);
-      const control = getControl(parsed.controlId);
+      const mod = await getLiveMemoryModule();
+      const control = mod.getControl(parsed.controlId);
       if (!control) return { success: false, error: 'unknown_control' };
 
       const address = session.resolveControl(control);
@@ -319,5 +390,10 @@ function sanitize(error: unknown, fallback: string): string {
   if (error instanceof Error && (error.message === 'not_attached' || error.message === 'sender_invalid')) {
     return error.message;
   }
+  // The real message never reaches the renderer (deliberately — avoids leaking internal
+  // details like file paths or native error text into UI-facing strings) but gets lost
+  // entirely without this, making every failure here indistinguishable from every other.
+  // eslint-disable-next-line no-console
+  console.error(`[live-memory-ipc] ${fallback}:`, error);
   return fallback;
 }

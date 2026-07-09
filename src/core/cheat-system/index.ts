@@ -28,15 +28,10 @@ export {
   CRIMSON_DESERT_CONFIG,
 } from './games.js';
 
-// Game detection
-export {
-  isGameRunning,
-  getRunningGames,
-  getInstalledGames,
-  getGameFromRunningProcess,
-  formatGameList,
-  getSortedGameList,
-} from './game-detector.js';
+// Game detection — pure functions, take a running-process-name list as input
+// (see game-detector.ts for why: no Node/native imports allowed here, this
+// module is reachable from renderer code).
+export { isGameRunning, getRunningGames, formatGameList, getSortedGameList } from './game-detector.js';
 
 import { ALL_GAMES } from './games.js';
 import { registerGame } from './game-registry.js';

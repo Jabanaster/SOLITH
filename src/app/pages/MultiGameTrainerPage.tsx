@@ -11,11 +11,30 @@ let cheatSystemInitialized = false;
 export default function MultiGameTrainerPage() {
   const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
   const [userConfirmedOffline, setUserConfirmedOffline] = useState(false);
+  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
     if (!cheatSystemInitialized) {
       initializeCheatSystem();
       cheatSystemInitialized = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    window.electronAPI
+      .getSettings()
+      .then((s: any) => setFeatureEnabled(!!s?.v2LiveModeEnabled))
+      .catch(() => setFeatureEnabled(false));
+  }, []);
+
+  const handleEnableFeature = useCallback(async () => {
+    setEnabling(true);
+    try {
+      await window.electronAPI.setSetting('v2LiveModeEnabled', true);
+      setFeatureEnabled(true);
+    } finally {
+      setEnabling(false);
     }
   }, []);
 
@@ -41,6 +60,18 @@ export default function MultiGameTrainerPage() {
           Dredge, and Crimson Desert
         </p>
       </header>
+
+      {featureEnabled === false && (
+        <div className={styles['feature-gate-banner']}>
+          <p>
+            Live memory access is disabled by default (single-player/offline only, no injection). Enable it to scan
+            and write cheats for a running game.
+          </p>
+          <button className={styles['enable-btn']} onClick={handleEnableFeature} disabled={enabling}>
+            {enabling ? 'Enabling…' : 'Enable Live Memory Access'}
+          </button>
+        </div>
+      )}
 
       <main className={styles['page-content']}>
         {!selectedGame && <GameCheatSelector onGameSelect={handleGameSelect} autoSelectRunning={true} />}

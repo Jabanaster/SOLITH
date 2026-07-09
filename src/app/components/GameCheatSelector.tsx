@@ -18,19 +18,41 @@ export const GameCheatSelector: React.FC<GameCheatSelectorProps> = ({
   const [runningGames, setRunningGames] = useState<Set<GameId>>(new Set());
 
   useEffect(() => {
-    // Load all registered games
-    const allGames = getSortedGameList();
-    setGames(allGames);
+    let cancelled = false;
 
-    // Track which games are running
-    const running = getRunningGames();
-    setRunningGames(new Set(running.map((g) => g.gameId)));
+    async function loadGamesAndRunningState() {
+      // Process detection crosses into the main process over IPC — this
+      // component must never import the native driver or game-detector's
+      // process-enumeration path directly (renderer is sandboxed; see
+      // useGameCheatSession.ts for the full explanation of why that crashes).
+      let runningProcessNames: string[] = [];
+      try {
+        const result = await window.electronAPI.liveMemoryListProcesses();
+        if (result.success && result.processes) {
+          runningProcessNames = result.processes.map((p) => p.name);
+        }
+      } catch {
+        // Feature flag off or IPC unavailable — fall back to "nothing detected running",
+        // games still list normally, just without running-state badges.
+      }
+      if (cancelled) return;
 
-    // Auto-select running game if only one is running
-    if (autoSelectRunning && running.length === 1) {
-      setSelectedGameId(running[0].gameId);
-      onGameSelect(running[0]);
+      const allGames = getSortedGameList(runningProcessNames);
+      setGames(allGames);
+
+      const running = getRunningGames(runningProcessNames);
+      setRunningGames(new Set(running.map((g) => g.gameId)));
+
+      if (autoSelectRunning && running.length === 1) {
+        setSelectedGameId(running[0].gameId);
+        onGameSelect(running[0]);
+      }
     }
+
+    void loadGamesAndRunningState();
+    return () => {
+      cancelled = true;
+    };
   }, [autoSelectRunning, onGameSelect]);
 
   const handleSelectGame = (gameId: GameId) => {

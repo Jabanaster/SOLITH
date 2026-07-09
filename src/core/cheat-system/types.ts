@@ -68,7 +68,6 @@ export interface GameConfig {
 }
 
 export interface GameRegistry {
-  games: Map<GameId, GameConfig>;
   add(config: GameConfig): void;
   get(gameId: GameId): GameConfig | undefined;
   getByExecutable(executable: string): GameConfig | undefined;

@@ -1,57 +1,80 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { nativeMemoryDriver, listLiveMemoryProcesses } from '../../core/live-memory/native-memory-driver.js';
-import { scanFirst } from '../../core/live-memory/memory-scanner.js';
-import { observeRemoteConnections } from '../../core/live-memory/remote-connection-observer.js';
-import { evaluateOnlineGuard } from '../../core/live-memory/online-guard.js';
-import { getConnectionBaseline } from '../../core/live-memory/game-connection-baselines.js';
-import { trainerSessionCache } from '../stores/trainerSessionCache.js';
-import type { LiveProcessHandle, LiveValueType } from '../../core/live-memory/types.js';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
 
 export type CheatStatus = 'idle' | 'discovering' | 'confirmed' | 'frozen' | 'error';
 
+export interface ScanCandidate {
+  address: string;
+  value: number;
+  /** Present on candidates from a multi-type unknown-value scan; absent from exact-value scans (single fixed type). */
+  dataType?: string;
+}
+
 export interface CheatSessionState {
   enabled: boolean;
   status: CheatStatus;
-  candidates: { address: string; value: number }[];
+  candidates: ScanCandidate[];
   confirmedAddress: string | null;
+  /** The data type the confirmed address was actually found under — may differ from the cheat definition's presumed type (see the multi-type unknown scan). Falls back to resolveMemoryDataType(cheat) when null. */
+  confirmedDataType: string | null;
   liveValue: number | null;
   isFrozen: boolean;
   error: string | null;
+  /** True once scanFirstUnknown has captured a baseline snapshot, waiting on narrowUnknown(). */
+  unknownScanActive: boolean;
 }
 
-const FREEZE_INTERVAL_MS = 200;
 const IDLE_STATE: CheatSessionState = {
   enabled: false,
   status: 'idle',
   candidates: [],
   confirmedAddress: null,
+  confirmedDataType: null,
   liveValue: null,
   isFrozen: false,
   error: null,
+  unknownScanActive: false,
 };
+
+/** Types tried at once for an unknown-value scan — Cheat Engine's "All" equivalent, scoped to the types that actually show up as game stats (byte/int64 are rare for a bar/meter and would mostly add noise). */
+const UNKNOWN_SCAN_DATA_TYPES = ['float', 'int32', 'double'];
 
 /**
  * 'bool' cheats are represented as int32 flags in real game memory (0/1);
  * 'string' cheats (Stardew-style console commands) have no memory address
  * at all and are handled by a separate command executor, not this hook.
  */
-function resolveMemoryDataType(cheat: CheatDefinition): LiveValueType | null {
+function resolveMemoryDataType(cheat: CheatDefinition): string | null {
   if (cheat.valueType === 'bool') return 'int32';
   if (cheat.valueType === 'string') return null;
   return cheat.valueType;
 }
 
 /**
- * Manages live memory discovery/write/freeze for every cheat of one game at
- * once. One process handle is shared across all of the game's cheats (opened
- * lazily on first discovery, closed on unmount) since scanning/writing 30+
- * addresses through 30+ separate handles would be wasteful and racy.
+ * Manages live memory discovery/write/freeze for every cheat of one game,
+ * entirely through the electronAPI IPC bridge (window.electronAPI.liveMemory*)
+ * exposed by electron/preload.ts.
+ *
+ * This MUST NOT import anything from src/core/live-memory directly — those
+ * modules use Node built-ins (createRequire, native addons) that only exist
+ * in the Electron main process. This hook runs in the sandboxed renderer
+ * (contextIsolation: true, nodeIntegration: false, sandbox: true — see
+ * electron/main.ts), where those imports crash at module-load time with
+ * "createRequire is not a function". All actual memory access happens in
+ * main via electron/live-memory-ipc.ts; this hook only ever calls
+ * ipcRenderer.invoke through the preload bridge.
+ *
+ * One LiveMemorySession (main-process side) is shared per attached game and
+ * supports exactly one active freeze at a time — see startFreeze in
+ * live-memory-session.ts ("A freeze is already active on this session. Stop
+ * it first."). This hook enforces that by tracking which cheat currently
+ * owns the freeze and stopping it before starting a new one.
  */
 export function useGameCheatSession(game: GameConfig, userConfirmedOffline: boolean) {
   const [states, setStates] = useState<Record<string, CheatSessionState>>({});
-  const handleRef = useRef<LiveProcessHandle | null>(null);
-  const freezeIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const attachedRef = useRef(false);
+  const frozenCheatIdRef = useRef<string | null>(null);
+  const reappliedRef = useRef(false);
 
   const getState = useCallback((cheatId: string): CheatSessionState => states[cheatId] ?? IDLE_STATE, [states]);
 
@@ -59,10 +82,36 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     setStates((prev) => ({ ...prev, [cheatId]: { ...(prev[cheatId] ?? IDLE_STATE), ...patch } }));
   }, []);
 
-  const ensureHandle = useCallback((): LiveProcessHandle => {
-    if (handleRef.current) return handleRef.current;
-    const processes = listLiveMemoryProcesses();
-    const match = processes.find(
+  /** Fire-and-forget write-through to the persisted cheat_toggle_state table (see cheat-toggle-store.ts). */
+  const persist = useCallback(
+    (cheat: CheatDefinition, enabled: boolean, confirmedAddress: string | null, confirmedDataType: string | null) => {
+      void window.electronAPI.cheatToggleSet({
+        gameId: game.gameId,
+        cheatId: cheat.id,
+        enabled,
+        confirmedAddress,
+        dataType: confirmedDataType ?? resolveMemoryDataType(cheat),
+      });
+    },
+    [game.gameId],
+  );
+
+  const clearPersisted = useCallback(
+    (cheatId: string) => {
+      void window.electronAPI.cheatToggleClear({ gameId: game.gameId, cheatId });
+    },
+    [game.gameId],
+  );
+
+  const ensureAttached = useCallback(async (): Promise<void> => {
+    if (attachedRef.current) return;
+
+    const listResult = await window.electronAPI.liveMemoryListProcesses();
+    if (!listResult.success || !listResult.processes) {
+      throw new Error(listResult.error ?? 'Could not list running processes');
+    }
+
+    const match = listResult.processes.find(
       (p) =>
         p.name.toLowerCase() === game.executable.toLowerCase() ||
         (game.aliases ?? []).some((a) => a.toLowerCase() === p.name.toLowerCase()),
@@ -70,17 +119,22 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     if (!match) {
       throw new Error(`${game.name} is not running (looked for ${game.executable})`);
     }
-    const handle = nativeMemoryDriver.openProcess(match.pid);
-    handleRef.current = handle;
-    return handle;
+
+    const attachResult = await window.electronAPI.liveMemoryAttach({
+      pid: match.pid,
+      executableName: match.name,
+      userConfirmedOffline: true,
+    });
+    if (!attachResult.success) {
+      throw new Error(attachResult.guard?.reason ?? attachResult.error ?? 'Failed to attach to process');
+    }
+    attachedRef.current = true;
   }, [game]);
 
-  const stopFreeze = useCallback((cheatId: string) => {
-    const interval = freezeIntervalsRef.current[cheatId];
-    if (interval) {
-      clearInterval(interval);
-      delete freezeIntervalsRef.current[cheatId];
-    }
+  const stopFreeze = useCallback(async (cheatId: string) => {
+    if (frozenCheatIdRef.current !== cheatId) return;
+    await window.electronAPI.liveMemoryFreezeStop();
+    frozenCheatIdRef.current = null;
     setStates((prev) => {
       const existing = prev[cheatId];
       if (!existing) return prev;
@@ -93,29 +147,39 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
 
   const writeValue = useCallback(
     async (cheat: CheatDefinition, value: number): Promise<{ allowed: boolean; reason: string }> => {
-      const dataType = resolveMemoryDataType(cheat);
       const current = getState(cheat.id);
-      const handle = handleRef.current;
+      const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
 
       if (!dataType) return { allowed: false, reason: 'Console-command cheat — not memory-backed' };
-      if (!handle || !current.confirmedAddress) return { allowed: false, reason: 'No confirmed address yet' };
+      if (!current.confirmedAddress) return { allowed: false, reason: 'No confirmed address yet' };
 
       try {
-        const processes = listLiveMemoryProcesses();
-        const match = processes.find((p) => p.name.toLowerCase() === game.executable.toLowerCase());
-        if (!match) return { allowed: false, reason: `${game.name} is not running` };
+        // A cheat can reach here with a confirmedAddress restored from a persisted session
+        // (see the reapply effect below) without ever going through discover()/discoverUnknown()
+        // in THIS mount — those are the only other callers that attach. Every write needs an
+        // attached session regardless of how it got its address, so attach here too.
+        await ensureAttached();
 
-        const evidence = await observeRemoteConnections(match.pid);
-        const baseline = getConnectionBaseline(game.executable) || game.connectionBaseline;
-        const guard = evaluateOnlineGuard({
-          userConfirmedOffline,
-          remoteConnections: evidence,
-          acceptedConnectionBaseline: baseline,
+        const proposeResult = await window.electronAPI.liveMemoryProposeWrite({
+          address: current.confirmedAddress,
+          dataType,
+          requestedValue: value,
         });
-        if (!guard.allowed) return { allowed: false, reason: guard.reason };
+        if (!proposeResult.success) {
+          const reason = proposeResult.error ?? 'Propose failed';
+          patchState(cheat.id, { status: 'error', error: reason });
+          return { allowed: false, reason };
+        }
 
-        const addr = BigInt(current.confirmedAddress);
-        nativeMemoryDriver.writeMemory(handle, addr, dataType, value);
+        const confirmResult = await window.electronAPI.liveMemoryConfirmWrite({
+          proposalId: proposeResult.proposal.proposalId,
+        });
+        if (!confirmResult.success) {
+          const reason = confirmResult.guard?.reason ?? confirmResult.error ?? 'Write blocked';
+          patchState(cheat.id, { status: 'error', error: reason });
+          return { allowed: false, reason };
+        }
+
         patchState(cheat.id, { liveValue: value });
         return { allowed: true, reason: `Wrote ${value}` };
       } catch (err) {
@@ -124,73 +188,269 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         return { allowed: false, reason };
       }
     },
-    [getState, game, userConfirmedOffline, patchState],
+    [getState, patchState, ensureAttached],
   );
 
   const discover = useCallback(
-    (cheat: CheatDefinition, currentValue: number) => {
+    async (cheat: CheatDefinition, currentValue: number) => {
       const dataType = resolveMemoryDataType(cheat);
       if (!dataType) {
         patchState(cheat.id, { status: 'error', error: 'This cheat requires console commands, not memory scanning' });
         return;
       }
       try {
-        const handle = ensureHandle();
-        const result = scanFirst(nativeMemoryDriver, handle, dataType, currentValue);
-        const candidates = result.matches.map((m) => ({ address: `0x${m.address.toString(16)}`, value: m.value }));
+        await ensureAttached();
+        const result = await window.electronAPI.liveMemoryScanFirst({ dataType, targetValue: currentValue });
+        if (!result.success || !result.result) {
+          patchState(cheat.id, { status: 'error', error: result.error ?? 'Scan failed' });
+          return;
+        }
         patchState(cheat.id, {
           status: 'discovering',
-          candidates,
-          error: result.truncated ? 'Scan truncated by memory budget — narrow to reduce it' : null,
+          candidates: result.result.matches,
+          confirmedDataType: dataType,
+          error: result.result.truncated ? 'Scan truncated by memory budget — narrow to reduce it' : null,
         });
       } catch (err) {
         patchState(cheat.id, { status: 'error', error: err instanceof Error ? err.message : String(err) });
       }
     },
-    [ensureHandle, patchState],
+    [ensureAttached, patchState],
+  );
+
+  /**
+   * Shared narrowing step: re-reads every current candidate and keeps the
+   * ones matching `comparison` against their own last-observed value. Used
+   * by both narrow() (exact new value) and narrowByComparison()
+   * (increased/decreased/changed) — the same underlying scanNext, just a
+   * different comparison kind, so either can be used repeatedly in any
+   * order against a shrinking candidate list without ever needing a fresh
+   * baseline snapshot. Requires a single-type candidate list (from discover(),
+   * not discoverUnknown()) since scanNext takes one dataType for the whole batch.
+   */
+  const narrowWithComparison = useCallback(
+    async (cheat: CheatDefinition, comparison: { kind: string; value?: number; min?: number; max?: number }) => {
+      const current = getState(cheat.id);
+      const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
+      if (!dataType || current.candidates.length === 0) return;
+
+      try {
+        const result = await window.electronAPI.liveMemoryScanNext({
+          dataType,
+          comparison,
+          previous: current.candidates.map((c) => ({ address: c.address, value: c.value })),
+        });
+        if (!result.success || !result.matches) {
+          patchState(cheat.id, { status: 'error', error: result.error ?? 'Narrow failed' });
+          return;
+        }
+
+        const narrowed = result.matches;
+        if (narrowed.length === 1) {
+          const [confirmed] = narrowed;
+          patchState(cheat.id, {
+            status: 'confirmed',
+            candidates: narrowed,
+            confirmedAddress: confirmed.address,
+            liveValue: confirmed.value,
+          });
+          persist(cheat, getState(cheat.id).enabled, confirmed.address, dataType);
+        } else if (narrowed.length > 1) {
+          patchState(cheat.id, { status: 'discovering', candidates: narrowed });
+        } else {
+          patchState(cheat.id, { status: 'error', error: 'No candidates matched — try scanning again', candidates: [] });
+        }
+      } catch (err) {
+        patchState(cheat.id, { status: 'error', error: err instanceof Error ? err.message : String(err) });
+      }
+    },
+    [getState, patchState, persist],
   );
 
   const narrow = useCallback(
-    (cheat: CheatDefinition, newValue: number) => {
+    (cheat: CheatDefinition, newValue: number) => narrowWithComparison(cheat, { kind: 'exact', value: newValue }),
+    [narrowWithComparison],
+  );
+
+  /** Keeps narrowing the existing candidate list by how the value moved — usable repeatedly, no re-baseline needed. */
+  const narrowByComparison = useCallback(
+    (cheat: CheatDefinition, comparisonKind: 'increased' | 'decreased' | 'changed' | 'unchanged') =>
+      narrowWithComparison(cheat, { kind: comparisonKind }),
+    [narrowWithComparison],
+  );
+
+  /** Narrows by an exact known delta — e.g. "took exactly 12 damage" — tighter than plain increased/decreased. */
+  const narrowByDelta = useCallback(
+    (cheat: CheatDefinition, direction: 'increasedBy' | 'decreasedBy', amount: number) =>
+      narrowWithComparison(cheat, { kind: direction, value: amount }),
+    [narrowWithComparison],
+  );
+
+  /** Narrows by the candidate's *current* reading against a fixed threshold, independent of its previous value. */
+  const narrowByThreshold = useCallback(
+    (cheat: CheatDefinition, direction: 'greaterThan' | 'lessThan', threshold: number) =>
+      narrowWithComparison(cheat, { kind: direction, value: threshold }),
+    [narrowWithComparison],
+  );
+
+  /** Narrows to candidates whose current reading falls within [min, max] inclusive. */
+  const narrowByRange = useCallback(
+    (cheat: CheatDefinition, min: number, max: number) => narrowWithComparison(cheat, { kind: 'between', min, max }),
+    [narrowWithComparison],
+  );
+
+  /**
+   * "Unknown initial value" first scan — the Cheat Engine / WeMod-researcher
+   * technique for a stat with no visible number (a bar, a percentage with no
+   * digits). Captures a baseline snapshot instead of searching for a target
+   * value; call narrowUnknown after provoking a real in-game change (taking
+   * damage, spending stamina) to turn the snapshot into real candidates.
+   */
+  const discoverUnknown = useCallback(
+    async (cheat: CheatDefinition) => {
       const dataType = resolveMemoryDataType(cheat);
-      const handle = handleRef.current;
-      const current = getState(cheat.id);
-      if (!dataType || !handle || current.candidates.length === 0) return;
-
-      const narrowed: { address: string; value: number }[] = [];
-      for (const candidate of current.candidates) {
-        try {
-          const addr = BigInt(candidate.address);
-          const value = nativeMemoryDriver.readMemory(handle, addr, dataType);
-          if (value === newValue) narrowed.push({ address: candidate.address, value });
-        } catch {
-          // Address became unreadable (page freed/moved) — drop it silently.
-        }
+      if (!dataType) {
+        patchState(cheat.id, { status: 'error', error: 'This cheat requires console commands, not memory scanning' });
+        return;
       }
-
-      if (narrowed.length === 1) {
-        const [confirmed] = narrowed;
+      try {
+        await ensureAttached();
+        const result = await window.electronAPI.liveMemoryScanFirstUnknown({ key: cheat.id });
+        if (!result.success) {
+          patchState(cheat.id, { status: 'error', error: result.error ?? 'Baseline scan failed' });
+          return;
+        }
         patchState(cheat.id, {
-          status: 'confirmed',
-          candidates: narrowed,
-          confirmedAddress: confirmed.address,
-          liveValue: confirmed.value,
+          status: 'discovering',
+          unknownScanActive: true,
+          candidates: [],
+          error: result.truncated ? 'Snapshot truncated by memory budget — results may be incomplete' : null,
         });
-        trainerSessionCache.store(game.executable, dataType, confirmed.address, confirmed.value);
-      } else if (narrowed.length > 1) {
-        patchState(cheat.id, { status: 'discovering', candidates: narrowed });
-      } else {
-        patchState(cheat.id, { status: 'error', error: 'No candidates matched — try scanning again', candidates: [] });
+      } catch (err) {
+        patchState(cheat.id, { status: 'error', error: err instanceof Error ? err.message : String(err) });
       }
     },
-    [getState, game.executable, patchState],
+    [ensureAttached, patchState],
+  );
+
+  /**
+   * Consumes the baseline snapshot from discoverUnknown, filtering by how the
+   * value moved — tries every type in UNKNOWN_SCAN_DATA_TYPES at once (Cheat
+   * Engine's "All" scan type), since a bar with no visible number could be
+   * stored as any of them and guessing wrong converges on a false positive
+   * (as this project's first Undisputed attempt did, assuming int32 for what
+   * turned out to be a float). Once down to one candidate, its own tagged
+   * dataType becomes the cheat's confirmedDataType — not a fixed guess.
+   */
+  const narrowUnknown = useCallback(
+    async (cheat: CheatDefinition, comparisonKind: 'increased' | 'decreased' | 'changed') => {
+      const dataType = resolveMemoryDataType(cheat);
+      if (!dataType) return;
+
+      try {
+        const result = await window.electronAPI.liveMemoryScanNextFromUnknown({
+          key: cheat.id,
+          dataTypes: UNKNOWN_SCAN_DATA_TYPES,
+          comparison: { kind: comparisonKind },
+        });
+        if (!result.success || !result.result) {
+          patchState(cheat.id, { status: 'error', error: result.error ?? 'Narrow failed', unknownScanActive: false });
+          return;
+        }
+
+        const narrowed = result.result.matches;
+        if (narrowed.length === 1) {
+          const [confirmed] = narrowed;
+          patchState(cheat.id, {
+            status: 'confirmed',
+            candidates: narrowed,
+            confirmedAddress: confirmed.address,
+            confirmedDataType: confirmed.dataType,
+            liveValue: confirmed.value,
+            unknownScanActive: false,
+          });
+          persist(cheat, getState(cheat.id).enabled, confirmed.address, confirmed.dataType);
+        } else if (narrowed.length > 1) {
+          patchState(cheat.id, { status: 'discovering', candidates: narrowed, unknownScanActive: false });
+        } else {
+          patchState(cheat.id, {
+            status: 'error',
+            error: 'No candidates matched — try again with a bigger change',
+            candidates: [],
+            unknownScanActive: false,
+          });
+        }
+      } catch (err) {
+        patchState(cheat.id, {
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          unknownScanActive: false,
+        });
+      }
+    },
+    [patchState, getState, persist],
+  );
+
+  /**
+   * Bulk-reads every current candidate's live value in one round trip — the
+   * backing call for the Watch Live Values panel, which polls this on an
+   * interval so the user can visually spot which address correlates with a
+   * real in-game change instead of guessing blind via repeated narrow rounds.
+   */
+  const readCandidatesLive = useCallback(
+    async (cheat: CheatDefinition): Promise<ScanCandidate[]> => {
+      const current = getState(cheat.id);
+      if (current.candidates.length === 0) return [];
+      const fallbackType = current.confirmedDataType ?? resolveMemoryDataType(cheat) ?? 'int32';
+      const result = await window.electronAPI.liveMemoryReadMany({
+        addresses: current.candidates.map((c) => ({ address: c.address, dataType: c.dataType ?? fallbackType })),
+      });
+      if (!result.success || !result.values) return current.candidates;
+      return result.values;
+    },
+    [getState],
+  );
+
+  /**
+   * Directly confirms a specific candidate as the cheat's address — the
+   * "Use this address" action in the Watch Live Values panel, once the user
+   * has visually identified which one moves in sync with a real change.
+   * Skips the exact/comparison narrow flow entirely.
+   */
+  const confirmCandidate = useCallback(
+    (cheat: CheatDefinition, candidate: ScanCandidate) => {
+      const dataType = candidate.dataType ?? resolveMemoryDataType(cheat);
+      patchState(cheat.id, {
+        status: 'confirmed',
+        confirmedAddress: candidate.address,
+        confirmedDataType: dataType ?? null,
+        liveValue: candidate.value,
+        unknownScanActive: false,
+      });
+      persist(cheat, getState(cheat.id).enabled, candidate.address, dataType ?? null);
+    },
+    [patchState, getState, persist],
   );
 
   const toggleCheat = useCallback(
     (cheat: CheatDefinition, enabled: boolean) => {
       if (!enabled) {
-        stopFreeze(cheat.id);
-        patchState(cheat.id, { enabled: false, status: getState(cheat.id).confirmedAddress ? 'confirmed' : 'idle' });
+        void stopFreeze(cheat.id);
+        // Toggling off is the explicit "forget this" action — clear the confirmed address too,
+        // not just the enabled flag. Otherwise the next toggle-on reuses a stale (possibly
+        // wrong) address instead of starting fresh discovery, which is silently useless if that
+        // address turns out to be a false positive.
+        patchState(cheat.id, {
+          enabled: false,
+          status: 'idle',
+          confirmedAddress: null,
+          confirmedDataType: null,
+          candidates: [],
+          liveValue: null,
+          error: null,
+          unknownScanActive: false,
+        });
+        clearPersisted(cheat.id);
         return;
       }
 
@@ -199,28 +459,56 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       if (current.confirmedAddress) {
         void writeValue(cheat, Number(cheat.infiniteValue ?? 1));
         patchState(cheat.id, { status: 'confirmed' });
+        persist(cheat, true, current.confirmedAddress, current.confirmedDataType);
       } else {
         patchState(cheat.id, { status: 'discovering' });
+        persist(cheat, true, null, null);
       }
     },
-    [getState, patchState, stopFreeze, writeValue],
+    [getState, patchState, stopFreeze, writeValue, persist, clearPersisted],
   );
 
   const startFreeze = useCallback(
-    (cheat: CheatDefinition) => {
-      if (freezeIntervalsRef.current[cheat.id]) return;
+    async (cheat: CheatDefinition) => {
+      const current = getState(cheat.id);
+      const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
+      if (!dataType || !current.confirmedAddress) return;
+
+      try {
+        // Same reasoning as writeValue — a restored confirmedAddress may never have gone
+        // through discover()/discoverUnknown() in this mount.
+        await ensureAttached();
+      } catch (err) {
+        patchState(cheat.id, { status: 'error', error: err instanceof Error ? err.message : String(err) });
+        return;
+      }
+
+      // Only one freeze can be active per session — stop whichever cheat currently owns it.
+      if (frozenCheatIdRef.current && frozenCheatIdRef.current !== cheat.id) {
+        await stopFreeze(frozenCheatIdRef.current);
+      }
+
       const value = Number(cheat.infiniteValue ?? 1);
-      void writeValue(cheat, value);
-      freezeIntervalsRef.current[cheat.id] = setInterval(() => void writeValue(cheat, value), FREEZE_INTERVAL_MS);
+      const result = await window.electronAPI.liveMemoryFreezeStart({
+        address: current.confirmedAddress,
+        dataType,
+        value,
+        intervalMs: 200,
+      });
+      if (!result.success) {
+        patchState(cheat.id, { status: 'error', error: result.error ?? 'Freeze failed to start' });
+        return;
+      }
+      frozenCheatIdRef.current = cheat.id;
       patchState(cheat.id, { isFrozen: true, status: 'frozen' });
     },
-    [writeValue, patchState],
+    [getState, patchState, stopFreeze, ensureAttached],
   );
 
   const toggleFreeze = useCallback(
     (cheat: CheatDefinition, enabled: boolean) => {
-      if (enabled) startFreeze(cheat);
-      else stopFreeze(cheat.id);
+      if (enabled) void startFreeze(cheat);
+      else void stopFreeze(cheat.id);
     },
     [startFreeze, stopFreeze],
   );
@@ -231,30 +519,97 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       if (current.confirmedAddress) {
         void writeValue(cheat, value);
       } else {
-        discover(cheat, value);
+        void discover(cheat, value);
       }
     },
     [getState, writeValue, discover],
   );
 
-  const resetError = useCallback((cheatId: string) => {
-    patchState(cheatId, { status: 'idle', error: null, candidates: [] });
-  }, [patchState]);
+  const resetError = useCallback(
+    (cheatId: string) => {
+      patchState(cheatId, { status: 'idle', error: null, candidates: [], unknownScanActive: false });
+    },
+    [patchState],
+  );
+
+  // Hydrate from the persisted cheat_toggle_state table on mount — restores which cheats
+  // were on and their confirmed address from before ResourceForge last closed. This is local
+  // UI state only; nothing is written to game memory here (that happens in the reapply effect
+  // below, gated on userConfirmedOffline).
+  useEffect(() => {
+    let cancelled = false;
+    window.electronAPI.cheatToggleGetAll({ gameId: game.gameId }).then((result) => {
+      if (cancelled || !result.success || !result.states) return;
+      setStates((prev) => {
+        const next = { ...prev };
+        for (const row of result.states!) {
+          if (!row.enabled) continue;
+          next[row.cheatId] = {
+            ...IDLE_STATE,
+            enabled: true,
+            confirmedAddress: row.confirmedAddress,
+            confirmedDataType: row.dataType,
+            status: row.confirmedAddress ? 'confirmed' : 'discovering',
+          };
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [game.gameId]);
+
+  // Once the user (re-)confirms offline play, silently re-arm every cheat that was persisted
+  // as enabled: a confirmed one gets its write reapplied immediately (valid only if Undisputed
+  // itself never restarted — a stale address just surfaces as a write error, same as any other
+  // failed write); one that was mid-discovery restarts its baseline scan automatically instead
+  // of leaving the user to notice and re-click "Don't know the value?" themselves. Runs once per
+  // mount — flipping the checkbox off and back on doesn't re-trigger it a second time.
+  useEffect(() => {
+    if (!userConfirmedOffline || reappliedRef.current) return;
+    reappliedRef.current = true;
+
+    for (const cheat of game.cheats) {
+      const state = getState(cheat.id);
+      if (!state.enabled) continue;
+
+      if (state.confirmedAddress) {
+        void writeValue(cheat, Number(cheat.infiniteValue ?? 1));
+      } else if (state.status === 'discovering') {
+        void discoverUnknown(cheat);
+      }
+    }
+    // Deliberately omits getState/writeValue/discoverUnknown/game.cheats from deps — this must
+    // run exactly once when offline is first confirmed (guarded by reappliedRef), not on every
+    // render those callbacks are recreated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userConfirmedOffline]);
 
   useEffect(() => {
     return () => {
-      Object.values(freezeIntervalsRef.current).forEach(clearInterval);
-      freezeIntervalsRef.current = {};
-      if (handleRef.current) {
-        try {
-          nativeMemoryDriver.closeProcess(handleRef.current);
-        } catch {
-          // Process may have already exited — nothing to clean up.
-        }
-        handleRef.current = null;
+      if (attachedRef.current) {
+        void window.electronAPI.liveMemoryDetach();
+        attachedRef.current = false;
       }
     };
   }, []);
 
-  return { getState, discover, narrow, toggleCheat, toggleFreeze, applyValue, resetError };
+  return {
+    getState,
+    discover,
+    narrow,
+    narrowByComparison,
+    narrowByDelta,
+    narrowByThreshold,
+    narrowByRange,
+    discoverUnknown,
+    narrowUnknown,
+    readCandidatesLive,
+    confirmCandidate,
+    toggleCheat,
+    toggleFreeze,
+    applyValue,
+    resetError,
+  };
 }

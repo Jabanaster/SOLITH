@@ -2,8 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { evaluateOnlineGuard } from './online-guard.js';
 import { observeRemoteConnections } from './remote-connection-observer.js';
 import { getConnectionBaseline } from './game-connection-baselines.js';
-import { scanFirst as scanFirstRegions, scanNext as scanNextMatches } from './memory-scanner.js';
-import type { ScanResult } from './memory-scanner.js';
+import {
+  scanFirst as scanFirstRegions,
+  scanNext as scanNextMatches,
+  scanFirstUnknown as scanFirstUnknownSnapshot,
+  scanNextFromSnapshotMultiType,
+} from './memory-scanner.js';
+import type { ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
 import type { LiveTrainerControl } from './live-control-catalog.js';
 import type {
@@ -98,6 +103,7 @@ export class LiveMemorySession {
   private freezeScheduler: FreezeScheduler = DEFAULT_FREEZE_SCHEDULER;
   private freeze: FreezeState | null = null;
   private freezeGeneration = 0;
+  private unknownSnapshots = new Map<string, UnknownScanSnapshot>();
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -160,6 +166,80 @@ export class LiveMemorySession {
   scanNext(dataType: LiveValueType, comparison: ScanComparison, previous: ScanMatch[]): ScanMatch[] {
     if (!this.handle) throw new Error('No process attached.');
     return scanNextMatches(this.driver, this.handle, dataType, comparison, previous);
+  }
+
+  /**
+   * "Unknown initial value" first scan — for a stat with no visible number
+   * (a bar, a percentage with no digits). Captures a raw-bytes baseline of
+   * every writable region instead of searching for one target value. Call
+   * scanNextFromUnknown after provoking a real in-game change to turn this
+   * into a concrete candidate list; from there the normal scanNext/exact
+   * flow narrows further. Read-only — nothing is written.
+   *
+   * `key` scopes the baseline to one caller-chosen slot (the renderer passes
+   * the cheat id) — a session is one attached process, but a user routinely
+   * runs unknown-value discovery on more than one stat at once (e.g. Health
+   * and Stamina together). A single unkeyed snapshot field would let a
+   * second scanFirstUnknown silently clobber the first one's baseline.
+   */
+  scanFirstUnknown(key: string, bounds?: ScanBounds): { regionsScanned: number; bytesScanned: number; truncated: boolean } {
+    if (!this.handle) throw new Error('No process attached.');
+    const snapshot = scanFirstUnknownSnapshot(this.driver, this.handle, bounds);
+    this.unknownSnapshots.set(key, snapshot);
+    return {
+      regionsScanned: snapshot.regionsScanned,
+      bytesScanned: snapshot.bytesScanned,
+      truncated: snapshot.truncated,
+    };
+  }
+
+  /**
+   * Consumes the snapshot from scanFirstUnknown for the same `key`: re-reads
+   * those regions now and keeps cells whose value satisfies `comparison`
+   * against the baseline (e.g. `{kind: 'decreased'}` after taking damage),
+   * trying every dataType in `dataTypes` at each offset rather than
+   * committing to one interpretation upfront (Cheat Engine's "All" scan
+   * type) — see scanNextFromSnapshotMultiType's doc comment for why this
+   * matters. Single-use per key — clears that slot once called, since its
+   * raw bytes are only valid as a baseline for the very next comparison.
+   */
+  scanNextFromUnknown(
+    key: string,
+    dataTypes: LiveValueType[],
+    comparison: ScanComparison,
+    bounds?: ScanBounds,
+  ): TypedScanResult {
+    if (!this.handle) throw new Error('No process attached.');
+    const snapshot = this.unknownSnapshots.get(key);
+    if (!snapshot) {
+      throw new Error('No unknown-value scan in progress for this cheat — call scanFirstUnknown first.');
+    }
+    const result = scanNextFromSnapshotMultiType(this.driver, this.handle, dataTypes, comparison, snapshot, bounds);
+    this.unknownSnapshots.delete(key);
+    return result;
+  }
+
+  /**
+   * Bulk-reads a list of (address, dataType) pairs in one call — the backing
+   * primitive for the Watch Live Values panel, which polls a whole candidate
+   * list on an interval and needs that to be one round trip, not N. Each
+   * candidate carries its own dataType since a multi-type unknown scan's
+   * survivors aren't all the same type. Unreadable addresses (freed/moved
+   * since the last poll) are silently dropped rather than throwing — same
+   * steady-state reasoning as scanNext.
+   */
+  readMany(addresses: { address: bigint; dataType: LiveValueType }[]): { address: bigint; value: number; dataType: LiveValueType }[] {
+    if (!this.handle) throw new Error('No process attached.');
+    const results: { address: bigint; value: number; dataType: LiveValueType }[] = [];
+    for (const target of addresses) {
+      try {
+        const value = this.driver.readMemory(this.handle, target.address, target.dataType);
+        results.push({ address: target.address, value, dataType: target.dataType });
+      } catch {
+        continue;
+      }
+    }
+    return results;
   }
 
   /**
@@ -356,5 +436,6 @@ export class LiveMemorySession {
     this.handle = null;
     this.target = null;
     this.pendingProposals.clear();
+    this.unknownSnapshots.clear();
   }
 }

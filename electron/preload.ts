@@ -93,9 +93,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('live-memory-scan-first', payload),
   liveMemoryScanNext: (payload: {
     dataType: string;
-    comparison: { kind: string; value?: number };
+    comparison: { kind: string; value?: number; min?: number; max?: number };
     previous: { address: string; value: number }[];
   }) => ipcRenderer.invoke('live-memory-scan-next', payload),
+  liveMemoryScanFirstUnknown: (payload: { key: string; maxRegionBytes?: number; maxTotalBytes?: number }) =>
+    ipcRenderer.invoke('live-memory-scan-first-unknown', payload),
+  liveMemoryScanNextFromUnknown: (payload: {
+    key: string;
+    dataTypes: string[];
+    comparison: { kind: string; value?: number; min?: number; max?: number };
+    maxMatches?: number;
+  }) => ipcRenderer.invoke('live-memory-scan-next-from-unknown', payload),
+  liveMemoryReadMany: (payload: { addresses: { address: string; dataType: string }[] }) =>
+    ipcRenderer.invoke('live-memory-read-many', payload),
   liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
     ipcRenderer.invoke('live-memory-freeze-start', payload),
   liveMemoryFreezeStop: () => ipcRenderer.invoke('live-memory-freeze-stop'),
@@ -103,4 +113,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryListControls: () => ipcRenderer.invoke('live-memory-list-controls'),
   liveMemoryResolveControl: (payload: { controlId: string }) =>
     ipcRenderer.invoke('live-memory-resolve-control', payload),
+
+  // Persisted cheat toggle state — survives a ResourceForge restart (see
+  // cheat-toggle-store.ts for why this is scoped to "app restart", not "game restart").
+  cheatToggleGetAll: (payload: { gameId: string }) => ipcRenderer.invoke('cheat-toggle-get-all', payload),
+  cheatToggleSet: (payload: {
+    gameId: string;
+    cheatId: string;
+    enabled: boolean;
+    confirmedAddress?: string | null;
+    dataType?: string | null;
+  }) => ipcRenderer.invoke('cheat-toggle-set', payload),
+  cheatToggleClear: (payload: { gameId: string; cheatId: string }) =>
+    ipcRenderer.invoke('cheat-toggle-clear', payload),
 });

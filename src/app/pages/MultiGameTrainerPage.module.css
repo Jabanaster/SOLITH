@@ -27,6 +27,53 @@
   gap: 1rem;
 }
 
+.feature-gate-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.25rem;
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+}
+
+.feature-gate-banner p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #92600a;
+  flex: 1;
+  min-width: 240px;
+}
+
+.enable-btn {
+  background: #f59e0b;
+  border: none;
+  color: #1a1200;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.enable-btn:hover {
+  background: #d97706;
+}
+
+.enable-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .feature-gate-banner p {
+    color: #fcd34d;
+  }
+}
+
 .back-bar {
   display: flex;
   align-items: center;
