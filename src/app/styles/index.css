@@ -18,40 +18,82 @@
  * Fallback stack ensures readable UI even on clean systems without those fonts.
  */
 
+/* ─── Vendored Fonts ────────────────────────────────────── */
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../assets/fonts/ibm-plex-sans/IBMPlexSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../assets/fonts/ibm-plex-sans/IBMPlexSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../assets/fonts/ibm-plex-sans/IBMPlexSans-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/jetbrains-mono/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ─── CSS Custom Properties ─────────────────────────────── */
 :root {
-  --bg-base:        #080b12;
-  --bg-surface:     #0d1117;
-  --bg-raised:      #111827;
-  --bg-hover:       #1a2235;
+  --bg-base:        #0b0f1e;
+  --bg-surface:     #0e1322;
+  --bg-raised:      #151b2e;
+  --bg-hover:       #1a2138;
+  --bg-topbar:      #0c1020;
+  --bg-hero:        linear-gradient(135deg, #1a2138, #121729);
+  --bg-log:         #0a0d1a;
 
-  --cyan:           #00e5ff;
-  --cyan-dim:       rgba(0, 229, 255, 0.12);
-  --cyan-glow:      rgba(0, 229, 255, 0.25);
-  --teal:           #64ffda;
-  --teal-dim:       rgba(100, 255, 218, 0.12);
-  --purple:         #a78bfa;
-  --purple-dim:     rgba(167, 139, 250, 0.12);
+  --cyan:           #4fb8d9;
+  --cyan-dim:       rgba(79, 184, 217, 0.12);
+  --cyan-dim-strong: rgba(79, 184, 217, 0.16);
+  --cyan-glow:      rgba(79, 184, 217, 0.25);
+  --teal:           #7fd6ee;
+  --teal-dim:       rgba(127, 214, 238, 0.12);
+  --purple:         #8b7cd8;
+  --purple-dim:     rgba(139, 124, 216, 0.12);
 
-  --safe:           #22c55e;
-  --safe-dim:       rgba(34, 197, 94, 0.12);
-  --caution:        #f59e0b;
-  --caution-dim:    rgba(245, 158, 11, 0.12);
-  --risky:          #ef4444;
-  --risky-dim:      rgba(239, 68, 68, 0.12);
+  --safe:           #5cb88a;
+  --safe-dim:       rgba(92, 184, 138, 0.12);
+  --caution:        #c99a4a;
+  --caution-dim:    rgba(201, 154, 74, 0.12);
+  --risky:          #c9636b;
+  --risky-dim:      rgba(201, 99, 107, 0.12);
+  --gold:           #c9a227;
 
-  --text-primary:   #f0f4ff;
-  --text-secondary: #8b96b0;
-  --text-muted:     #4a5568;
-  --text-accent:    #00e5ff;
+  --text-primary:   #eef1fa;
+  --text-secondary: #aab3cc;
+  --text-muted:     #78819c;
+  --text-accent:    #7fd6ee;
 
-  --border:         rgba(255, 255, 255, 0.06);
-  --border-accent:  rgba(0, 229, 255, 0.25);
+  --border:         rgba(255, 255, 255, 0.07);
+  --border-accent:  rgba(79, 184, 217, 0.35);
 
-  --glass-bg:       rgba(13, 17, 23, 0.75);
-  --glass-bg-light: rgba(26, 34, 53, 0.6);
+  --glass-bg:       rgba(11, 15, 30, 0.75);
+  --glass-bg-light: rgba(21, 27, 46, 0.6);
   --glass-blur:     blur(20px);
-  --glass-border:   rgba(255, 255, 255, 0.07);
+  --glass-border:   rgba(255, 255, 255, 0.08);
 
   --radius-sm:  6px;
   --radius:     10px;
@@ -61,10 +103,13 @@
   --shadow-sm:  0 2px 8px rgba(0,0,0,0.4);
   --shadow:     0 4px 20px rgba(0,0,0,0.5);
   --shadow-lg:  0 8px 40px rgba(0,0,0,0.6);
-  --shadow-cyan: 0 0 20px rgba(0, 229, 255, 0.15), 0 0 60px rgba(0, 229, 255, 0.05);
+  --shadow-cyan: inset 0 0 0 1px rgba(79, 184, 217, 0.3);
 
   --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, "SFMono-Regular", monospace;
 }
 
 /* ─── Reset & Base ──────────────────────────────────────── */
@@ -77,21 +122,19 @@
 html { font-size: 14px; }
 
 body {
-  font-family:
-    Inter,
-    "Segoe UI",
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg-base);
   color: var(--text-primary);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
+}
+
+/* Native form controls don't inherit font-family by default — this is the
+   guard against browser-default serif leaking into buttons/inputs/selects. */
+button, input, select, textarea {
+  font-family: inherit;
 }
 
 /* ─── Scrollbars ────────────────────────────────────────── */
@@ -202,7 +245,6 @@ body {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 13px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
@@ -268,7 +310,6 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   transition: all var(--transition);
 }
 
@@ -303,7 +344,6 @@ body {
   color: #000;
   font-weight: 700;
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   cursor: pointer;
   transition: all var(--transition);
   box-shadow: 0 2px 12px rgba(0, 229, 255, 0.3);
@@ -329,7 +369,6 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 500;
   transition: all var(--transition);
 }
@@ -351,7 +390,6 @@ body {
   color: #000;
   font-weight: 700;
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   cursor: pointer;
   transition: all var(--transition);
   box-shadow: 0 2px 12px rgba(0, 229, 255, 0.25);
@@ -590,7 +628,6 @@ body {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
@@ -719,7 +756,6 @@ body {
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 13px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   transition: all var(--transition);
   outline: none;
 }
@@ -837,7 +873,6 @@ body {
   color: var(--cyan);
   cursor: pointer;
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 600;
   transition: all var(--transition);
 }
@@ -936,7 +971,6 @@ body {
   border-radius: 4px;
   color: var(--text-muted);
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
@@ -1085,7 +1119,6 @@ code, .mono {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 12px;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
@@ -1439,7 +1472,6 @@ code, .mono {
   color: #000;
   font-size: 12px;
   font-weight: 700;
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   cursor: pointer;
   transition: all var(--transition);
   white-space: nowrap;
