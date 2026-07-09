@@ -110,7 +110,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "better-sqlite3": "^12.11.1",
-    "memoryjs": "^3.5.1",
+    "memoryjs": "file:vendor/memoryjs-3.5.1-patched",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "sql.js": "^1.14.1",

@@ -138,12 +138,26 @@ that block a clean install on this toolchain (Node v24.15.0 / MSVC v143):
 2. `lib/memoryjs.cc` assigns C string literals to non-`const char*` in several
    places, which current MSVC rejects by default (`/Zc:strictStrings`).
 
-Both are fixed via `patches/memoryjs+3.5.1.patch` (applied automatically by
-`patch-package` in `postinstall`): `install.js` gets `shell: true` (and now
-propagates a non-zero exit code instead of silently swallowing build
-failures), and `binding.gyp` gets `/Zc:strictStrings-` added to
-`AdditionalOptions`. After patching, `npm install` builds the native addon
-cleanly with Visual Studio Build Tools ("Desktop development with C++") +
+Both were originally fixed via `patches/memoryjs+3.5.1.patch` (applied by
+`patch-package` in `postinstall`). That worked for `npm install` on top of an
+*already-installed* `node_modules/memoryjs`, but a genuinely clean `npm ci`
+from an empty `node_modules` still failed: `memoryjs`'s own install-time build
+script runs as part of installing `memoryjs` itself, before the root
+project's `postinstall` (where `patch-package` runs) ever gets a chance to
+fix it. The patch was always applied one step too late to help a true fresh
+clone. Discovered and root-caused during fresh-clone release verification on
+2026-07-09 (three independent reproductions: tool-driven clone, second clean
+clone, and a manual PowerShell clone all failed identically).
+
+Fixed durably by vendoring a pre-patched copy of `memoryjs@3.5.1` at
+`vendor/memoryjs-3.5.1-patched/` (both fixes — `shell: true` in
+`scripts/install.js`, `/Zc:strictStrings-` in `binding.gyp` — baked directly
+into the vendored source; see `vendor/memoryjs-3.5.1-patched/NOTES.md`) and
+pointing the root `package.json` at it via `"memoryjs":
+"file:vendor/memoryjs-3.5.1-patched"`. `patches/memoryjs+3.5.1.patch` has been
+removed — the fix no longer depends on a postinstall patching step running in
+time. With this, `npm ci` builds the native addon cleanly on the very first
+install, given Visual Studio Build Tools ("Desktop development with C++") +
 Python installed.
 
 Verified with real evidence, not just unit tests: `scripts/live-memory-verify.mts`
