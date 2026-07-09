@@ -1,5 +1,8 @@
 # ── Node ─────────────────────────────────────────────────────────────────────
 node_modules/
+
+# ── Brainstorming companion (local scratch, not part of the app) ───────────────
+.superpowers/
 npm-debug.log*
 yarn-error.log*
 
