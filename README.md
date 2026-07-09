@@ -116,7 +116,7 @@ broad commercial-game live-trainer support, not multiplayer, and not anti-cheat 
 
 To prevent accidental data loss, anti-cheat flags, or system instability, ResourceForge enforces strict scope gates:
 
-### **Allowed Actions (Safe & File-Backed)**
+### **Allowed Actions (Safe & File-Backed — default path)**
 - Save file editing (JSON, XML, INI, CSV, TSV, key/value text, Lua tables).
 - Config file editing (.cfg, .conf, .ini).
 - JSON/XML/CSV data tweaking.
@@ -124,8 +124,15 @@ To prevent accidental data loss, anti-cheat flags, or system instability, Resour
 - Offline rule-based or local AI explanations.
 - Automatic backups and one-click rollback/restore.
 
+### **⚠️ Gated Actions (Live Memory — off by default, scoped, verified)**
+- Live memory read/scan/write, limited to the pre-declared per-game control catalog
+  (`src/core/cheat-system/games.ts`), behind the `v2LiveModeEnabled` setting, a per-session
+  offline-confirmation checkbox, and a fail-closed online guard. See
+  [`Docs/safety-architecture.md`](Docs/safety-architecture.md) → "Live-Memory Subsystem — Gated &
+  Scoped" for the full constraint list. This is not a general RAM-editing feature and does not
+  extend to unsupported games or controls outside the catalog.
+
 ### **🚫 STRICTLY BLOCKED Actions**
-- Live memory editing (ram scanning/freezing).
 - Process injection or DLL injection.
 - Kernel drivers.
 - Anti-cheat bypass or stealth behaviors.
@@ -133,6 +140,8 @@ To prevent accidental data loss, anti-cheat flags, or system instability, Resour
 - Executable patching (.exe, .dll, .sys, .drv modification).
 - Online/multiplayer game support.
 - Trainer overlays or live hotkey listening.
+- Live memory access outside the gated, catalogued subsystem above (no freeform address entry,
+  no unsupported-game targeting).
 
 ---
 

@@ -5,10 +5,53 @@ This document describes the core design and safety guarantees built into **Resou
 ---
 
 ## 1. Safety Boundaries (Strict Constraints)
-ResourceForge is built to be a safe, offline, and file-backed game trainer. It strictly enforces the following V1 security principles:
-* **No Live Memory Editing / Process Injection**: Avoids process memory tampering, bypasses, or anti-cheat triggers. All edits are file-backed.
-* **Offline Only**: Operates locally on files. It does not perform network writes or bypass online anti-cheat systems.
-* **No Executable Modification**: Modifies only save and configuration files. Executables (`.exe`), dynamic link libraries (`.dll`), system files (`.sys`), and device drivers (`.drv`) are completely blocked.
+ResourceForge's default and primary edit path is safe, offline, file-backed save/config editing. It strictly enforces the following security principles:
+* **File-Backed Editing Is the Safer, Default Path**: Save and configuration file editing (Sections 2–6 below) covers the large majority of ResourceForge's supported use cases and carries the lowest risk. Prefer it whenever a game's data is file-backed.
+* **Live Memory Access Is Gated, Not Blanket-Permitted**: ResourceForge also ships a scoped live-memory subsystem (see Section 1a). This is not a general RAM-editing capability — it operates only against the explicit, catalogued controls for supported games, behind an off-by-default feature flag, an online/offline confirmation gate, and a fail-closed connection guard. Unsupported games and unsupported controls remain blocked.
+* **Offline Only**: Operates locally on files and local process memory only. It does not perform network writes and does not bypass online anti-cheat systems. Live-memory writes fail closed if the game process shows active remote connections (see Section 1a).
+* **No Executable Modification**: Modifies only save/configuration files and, within the gated live-memory subsystem, in-memory values of a running game's own process — never the executable, libraries, or system files on disk. `.exe`, `.dll`, `.sys`, and `.drv` file modification is completely blocked.
+* **No Anti-Cheat Bypass, No Multiplayer/Commercial-Trainer Claim**: Neither the file-backed path nor the live-memory subsystem is designed to defeat, evade, or interact with anti-cheat systems, and neither is scoped for multiplayer or general commercial-game live-trainer use. Support is limited to catalogued, single-player, offline use of games/saves the user owns.
+
+---
+
+## 1a. Live-Memory Subsystem — Gated & Scoped
+
+ResourceForge's live-memory subsystem (`src/core/live-memory/`, `electron/live-memory-ipc.ts`,
+`electron/cheat-toggle-ipc.ts`) exists and is verified by test, but it is not an open RAM-editing
+feature. It is constrained on every axis below; removing any one of these constraints would be a
+scope change requiring separate, explicit safety-scope authorization — it is not implied by this
+document.
+
+* **Off by default**: Gated behind the `v2LiveModeEnabled` setting. The UI (`MultiGameTrainerPage`)
+  shows a feature-gate banner and requires an explicit opt-in before any scan/read/write is possible.
+* **Explicit per-session confirmation**: A "single-player/offline only" checkbox must be checked by
+  the user for the *current* game session before any control becomes usable. This confirmation does
+  not carry over between games — switching games resets it.
+* **Fail-closed online guard**: Writes are blocked if the target process shows active remote network
+  connections above its declared per-game baseline, or if connection evidence is unavailable. The
+  guard fails closed, not open, on missing or ambiguous evidence.
+* **Catalog-bound, not freeform**: Only pre-declared controls in the per-game catalog
+  (`src/core/cheat-system/games.ts`, `src/core/live-memory/live-control-catalog.ts`) are reachable.
+  There is no arbitrary address/offset entry path exposed to the renderer.
+* **Schema-validated IPC boundary**: Every live-memory and cheat-toggle IPC call is validated by Zod
+  schemas (`electron/ipc-validation.ts`) before it reaches process-memory or persistence code.
+* **Persistence does not grant execution authority**: Cheat toggle persistence
+  (`src/core/cheat-system/cheat-toggle-store.ts`, `cheat_toggle_state` table) remembers which toggles
+  were enabled and their last confirmed address so they can be re-armed after a ResourceForge
+  restart. It does not itself perform a write, and a remembered address is not trusted blindly — it
+  must be re-verified against the live process before reuse. The active UI for manual discovery is
+  `LiveWatchPanel` (`src/app/components/LiveWatchPanel.tsx`); the earlier `LiveTrainer` /
+  `PalworldCheatMenu` / `PalworldTrainerPage` / `useFreezeValue` / `useLiveTrainerWorkflow`
+  implementation was removed and must not be restored.
+* **Test-covered**: `test:live-memory` (72 tests), `test:trainer-host` (80 tests), and
+  `test:cheat-toggle` (27 tests) cover the online guard, pointer resolution, freeze lifecycle, and
+  toggle persistence/scoping. Current full-suite gate is 535/535.
+* **Still strictly blocked, unchanged by this subsystem's existence**: process injection, DLL
+  injection, kernel drivers, anti-cheat bypass or stealth behavior, DRM bypass, executable/library/
+  driver patching, online/multiplayer support, and any control outside the declared per-game catalog.
+  Broad commercial-game live-trainer support and Palworld-specific live-cheat support in particular
+  remain unauthorized claims — the catalog covering Palworld cheats does not itself constitute that
+  authorization; see `README.md` → "Trainer UI Migration" for the current scope statement.
 
 ---
 
