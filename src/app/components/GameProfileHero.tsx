@@ -37,7 +37,7 @@ export const GameProfileHero: React.FC<GameProfileHeroProps> = ({
             <div className={styles.title}>{gameName}</div>
             <div className={styles.sub}>{pathLabel}</div>
           </div>
-          <button className={styles.action} onClick={onAction}>{actionLabel}</button>
+          <button type="button" className={styles.action} onClick={onAction}>{actionLabel}</button>
         </div>
         <div className={styles.meta}>
           {chips.map((chip) => (
