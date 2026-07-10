@@ -12,7 +12,7 @@ import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
-import { Icon } from './components/icons/index.js';
+import { Icon, type IconName } from './components/icons/index.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -74,18 +74,18 @@ const TRAINER_CATEGORIES: { id: string; label: string }[] = [
   { id: 'discovery',     label: 'Discovered' },
 ];
 
-const WORKSHOP_PAGES: { id: View; label: string }[] = [
-  { id: 'saves',         label: 'Save Editor' },
-  { id: 'data',          label: 'Data Editor' },
-  { id: 'discovery',     label: 'Discovery Lab' },
-  { id: 'locations',     label: 'Save Locations' },
-  { id: 'recipes',       label: 'Recipes' },
-  { id: 'backups',       label: 'Backups' },
-  { id: 'journal',       label: 'Journal' },
-  { id: 'compatibility', label: 'Compatibility' },
-  { id: 'session-monitor', label: 'Session Monitor (V2)' },
-  { id: 'live-memory', label: 'Live Memory Trainer (V2)' },
-  { id: 'multi-game-trainer', label: 'Multi-Game Cheats (V2)' },
+const WORKSHOP_PAGES: { id: View; label: string; icon: IconName }[] = [
+  { id: 'saves',         label: 'Save Editor',   icon: 'save' },
+  { id: 'data',          label: 'Data Editor',   icon: 'database' },
+  { id: 'discovery',     label: 'Discovery Lab', icon: 'discovery' },
+  { id: 'locations',     label: 'Save Locations', icon: 'search' },
+  { id: 'recipes',       label: 'Recipes',       icon: 'apply' },
+  { id: 'backups',       label: 'Backups',       icon: 'backups' },
+  { id: 'journal',       label: 'Journal',       icon: 'log' },
+  { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
+  { id: 'session-monitor', label: 'Session Monitor (V2)', icon: 'activity' },
+  { id: 'live-memory', label: 'Live Memory Trainer (V2)', icon: 'trainer' },
+  { id: 'multi-game-trainer', label: 'Multi-Game Cheats (V2)', icon: 'game' },
 ];
 
 const App: React.FC = () => {
@@ -262,6 +262,7 @@ const App: React.FC = () => {
                 onClick={() => setCurrentView(page.id)}
                 className={currentView === page.id ? 'active' : ''}
               >
+                <Icon name={page.icon} />
                 {page.label}
               </button>
             ))}
