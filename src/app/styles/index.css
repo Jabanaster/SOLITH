@@ -338,22 +338,21 @@ button, input, select, textarea {
   align-items: center;
   gap: 6px;
   padding: 9px 18px;
-  background: linear-gradient(135deg, var(--cyan) 0%, #0099cc 100%);
-  border: none;
+  background: var(--cyan-dim-strong);
+  border: 1px solid var(--cyan);
   border-radius: var(--radius-sm);
-  color: #000;
-  font-weight: 700;
+  color: var(--teal);
+  font-weight: 600;
   font-size: 12px;
   cursor: pointer;
   transition: all var(--transition);
-  box-shadow: 0 2px 12px rgba(0, 229, 255, 0.3);
   letter-spacing: 0.2px;
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
-  filter: brightness(1.1);
+  background: var(--cyan-dim);
+  background: rgba(79, 184, 217, 0.22);
+  border-color: var(--teal);
 }
 
 .btn-primary:active { transform: translateY(0); }
@@ -384,22 +383,20 @@ button, input, select, textarea {
   align-items: center;
   gap: 6px;
   padding: 9px 18px;
-  background: linear-gradient(135deg, var(--cyan) 0%, #0099cc 100%);
-  border: none;
+  background: var(--cyan-dim-strong);
+  border: 1px solid var(--cyan);
   border-radius: var(--radius-sm);
-  color: #000;
-  font-weight: 700;
+  color: var(--teal);
+  font-weight: 600;
   font-size: 12px;
   cursor: pointer;
   transition: all var(--transition);
-  box-shadow: 0 2px 12px rgba(0, 229, 255, 0.25);
   white-space: nowrap;
 }
 
 .btn-add:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
-  filter: brightness(1.1);
+  background: rgba(79, 184, 217, 0.22);
+  border-color: var(--teal);
 }
 
 /* ─── Content Area ──────────────────────────────────────── */
