@@ -467,7 +467,7 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
       <div className="trainer-control-panel trainer-no-api">
         <div className="no-api-box glass">
           <h3>Read-Only Preview</h3>
-          <p>ResourceForge must run inside Electron to use trainer controls.</p>
+          <p>Solith must run inside Electron to use trainer controls.</p>
         </div>
       </div>
     );

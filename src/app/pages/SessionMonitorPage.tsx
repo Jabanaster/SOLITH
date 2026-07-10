@@ -34,7 +34,7 @@ const STATE_LABELS: Record<LifecycleState, string> = {
   game_running: 'Game Running',
   observing: 'Observing (Partial Evidence)',
   external_session_observed: 'External Session Detected',
-  resourceforge_session_connected: 'ResourceForge Session Connected',
+  resourceforge_session_connected: 'Solith Session Connected',
   session_ended_game_running: 'Session Ended — Game Still Running',
   game_exited: 'Game Exited',
   stale_evidence: 'Stale Evidence',
@@ -188,7 +188,7 @@ const SessionMonitorPage: React.FC = () => {
           <p><strong>This feature is disabled.</strong></p>
           <p>
             To enable it, set <code>v2SessionMonitorEnabled</code> to <code>true</code> in
-            ResourceForge settings. It is disabled by default.
+            Solith settings. It is disabled by default.
           </p>
           <p className="v2-safety-notice">
             When enabled, this panel observes publicly available system metadata (process list,
@@ -252,12 +252,12 @@ const SessionMonitorPage: React.FC = () => {
         <h3>External Session</h3>
         <p className={snap?.externalSessionActive ? 'v2-state-session' : 'v2-meta'}>
           {snap?.externalSessionActive
-            ? 'External trainer session detected (not ResourceForge-owned)'
+            ? 'External trainer session detected (not Solith-owned)'
             : 'No external session detected'}
         </p>
         <p className="v2-meta v2-external-note">
           Observed sessions belong to the external application that opened them.
-          ResourceForge does not own or control them.
+          Solith does not own or control them.
         </p>
       </section>
 
@@ -337,7 +337,7 @@ const SessionMonitorPage: React.FC = () => {
         <p className="v2-safety-notice">
           <strong>Safety:</strong> This panel observes publicly available system metadata only.
           It does not read process memory, inject code, send commands to the game or any external
-          application, or modify any file outside ResourceForge's own data directory.
+          application, or modify any file outside Solith's own data directory.
           No game modifications are performed.
         </p>
       </section>

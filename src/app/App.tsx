@@ -183,9 +183,9 @@ const App: React.FC = () => {
       {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="app-title">
-          <div className="app-brand-mark" aria-hidden="true">RF</div>
-          <h1>ResourceForge</h1>
-          <p className="subtitle">Local Trainer &amp; Discovery Lab</p>
+          <div className="app-brand-mark" aria-hidden="true">SO</div>
+          <h1>Solith</h1>
+          <p className="subtitle">Game control, saves, and recovery.</p>
         </div>
 
         {/* Mode toggle */}
@@ -298,7 +298,7 @@ const App: React.FC = () => {
             </>
           ) : (
             <div className="game-header-idle">
-              <h2>ResourceForge</h2>
+              <h2>Solith</h2>
               <span className="game-header-status">
                 {appMode === 'workshop' ? 'WORKSHOP MODE' : 'TRAINER MODE'} · STANDBY
               </span>
@@ -310,7 +310,7 @@ const App: React.FC = () => {
           {loading ? (
             <div className="loading-state">
               <div className="loading-spinner" aria-hidden="true" />
-              <span>Loading ResourceForge…</span>
+              <span>Loading Solith…</span>
             </div>
           ) : (
             <ContentErrorBoundary key={currentView}>{renderContent()}</ContentErrorBoundary>

@@ -73,7 +73,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
       <div className="section-header" style={{ marginBottom: '24px' }}>
         <h2>Backup & Rollback</h2>
         <p className="description">
-          ResourceForge takes an automatic snapshot of files before applying any trainer edits or custom tweaks. Rollback actions are explicit and require your confirmation.
+          Solith takes an automatic snapshot of files before applying any trainer edits or custom tweaks. Rollback actions are explicit and require your confirmation.
         </p>
       </div>
 

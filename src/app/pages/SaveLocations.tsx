@@ -82,7 +82,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
 
   const handleRevoke = async (id: string) => {
     if (!window.electronAPI) return;
-    if (!confirm('Are you sure you want to revoke access? ResourceForge will block all scans and edits to this location immediately.')) {
+    if (!confirm('Are you sure you want to revoke access? Solith will block all scans and edits to this location immediately.')) {
       return;
     }
     try {
@@ -141,7 +141,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
         <div>
           <h2>Save Locations</h2>
           <p className="description">
-            To security-harden ResourceForge, accessing or modifying folders outside the registered game directory requires explicit user approval.
+            To security-harden Solith, accessing or modifying folders outside the registered game directory requires explicit user approval.
           </p>
         </div>
         <button 

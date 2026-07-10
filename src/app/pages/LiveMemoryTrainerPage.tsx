@@ -342,7 +342,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
         <div className="v2-monitor-disabled">
           <p><strong>This feature is disabled.</strong></p>
           <p>
-            To enable it, set <code>v2LiveModeEnabled</code> to <code>true</code> in ResourceForge
+            To enable it, set <code>v2LiveModeEnabled</code> to <code>true</code> in Solith
             settings. It is disabled by default.
           </p>
           <p className="v2-safety-notice">

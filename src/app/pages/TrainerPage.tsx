@@ -219,7 +219,7 @@ const TrainerPage: React.FC<TrainerPageProps> = ({ gameId, category }) => {
         <div className="no-api-box glass">
           <h3>Read-Only Preview</h3>
           <p>
-            {localTrainerServiceFailureMessage()} ResourceForge must run inside Electron to apply trainer changes.
+            {localTrainerServiceFailureMessage()} Solith must run inside Electron to apply trainer changes.
           </p>
         </div>
       </div>

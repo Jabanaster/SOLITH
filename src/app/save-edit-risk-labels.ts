@@ -20,12 +20,12 @@ export const SAVE_EDIT_RISK_COPY: Record<SaveEditRiskState, SaveEditRiskCopy> = 
   preview_only: {
     label: 'Preview-only',
     summary: 'Write execution blocked',
-    detail: `${PREVIEW_ONLY_FORMAT_MESSAGE} ResourceForge can validate the proposed value and show a preview, but backup creation and rollback execution are blocked.`,
+    detail: `${PREVIEW_ONLY_FORMAT_MESSAGE} Solith can validate the proposed value and show a preview, but backup creation and rollback execution are blocked.`,
   },
   executable: {
     label: 'Executable',
     summary: 'Approval, backup, rollback',
-    detail: 'Supported XML save-field writes require a proposal and explicit approval; ResourceForge creates a verified backup before writing and offers rollback after a supported write.',
+    detail: 'Supported XML save-field writes require a proposal and explicit approval; Solith creates a verified backup before writing and offers rollback after a supported write.',
   },
   blocked: {
     label: 'Blocked',

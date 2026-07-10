@@ -160,7 +160,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
         <div className="modal-overlay">
           <div className="modal-content glass">
             <h3>Add Game Path</h3>
-            <p className="modal-description">Point ResourceForge to the local directory where the game is installed.</p>
+            <p className="modal-description">Point Solith to the local directory where the game is installed.</p>
             <div className="input-group">
               <label>Game Name</label>
               <input
