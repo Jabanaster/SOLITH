@@ -344,6 +344,28 @@ button, input, select, textarea {
   letter-spacing: -0.3px;
 }
 
+.game-header-idle {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.game-header-idle h2 {
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 14px;
+}
+
+.game-header-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--teal);
+  letter-spacing: 0.05em;
+  padding-left: 10px;
+  border-left: 1px solid var(--cyan-dim);
+}
+
 .header-actions {
   display: flex;
   gap: 8px;

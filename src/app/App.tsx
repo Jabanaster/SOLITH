@@ -297,7 +297,12 @@ const App: React.FC = () => {
               </div>
             </>
           ) : (
-            <h2>ResourceForge</h2>
+            <div className="game-header-idle">
+              <h2>ResourceForge</h2>
+              <span className="game-header-status">
+                {appMode === 'workshop' ? 'WORKSHOP MODE' : 'TRAINER MODE'} · STANDBY
+              </span>
+            </div>
           )}
         </header>
 
