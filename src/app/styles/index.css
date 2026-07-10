@@ -431,20 +431,14 @@ button, input, select, textarea {
   left: 0;
   right: 0;
   padding: 6px 16px;
-  background: rgba(239, 68, 68, 0.06);
-  border-top: 1px solid rgba(239, 68, 68, 0.15);
-  color: rgba(239, 68, 68, 0.7);
+  background: var(--bg-topbar);
+  border-top: 1px solid var(--risky-dim);
+  color: var(--risky);
   font-size: 10px;
   text-align: center;
   letter-spacing: 0.3px;
   z-index: 100;
-  font-family:
-    "JetBrains Mono",
-    "Cascadia Code",
-    "Cascadia Mono",
-    Consolas,
-    "Courier New",
-    monospace;
+  font-family: var(--font-mono);
 }
 
 /* ─── Glass Card ────────────────────────────────────────── */
