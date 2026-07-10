@@ -1,0 +1,84 @@
+.card {
+  position: relative;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  padding: 11px 12px 11px 14px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.safe::before    { background: var(--safe); }
+.caution::before { background: var(--caution); }
+.blocked::before { background: var(--risky); }
+.neutral::before { background: var(--cyan); }
+.special::before { background: var(--purple); }
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 7px;
+}
+
+.iconSlot {
+  width: 23px;
+  height: 23px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+}
+
+.safe    .iconSlot { color: var(--safe);    border-color: var(--safe-dim); }
+.caution .iconSlot { color: var(--caution); border-color: var(--caution-dim); }
+.blocked .iconSlot { color: var(--risky);   border-color: var(--risky-dim); }
+.neutral .iconSlot { color: var(--teal);    border-color: var(--cyan-dim); }
+.special .iconSlot { color: var(--purple);  border-color: var(--purple-dim); }
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.description {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.metadata {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin: 8px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.safe    .statusLabel { color: var(--safe); }
+.caution .statusLabel { color: var(--caution); }
+.blocked .statusLabel { color: var(--risky); }
+.neutral .statusLabel { color: var(--teal); }
+.special .statusLabel { color: var(--purple); }
+
+.footerRight { color: var(--text-muted); }
