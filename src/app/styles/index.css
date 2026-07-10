@@ -656,15 +656,26 @@ button, input, select, textarea {
 
 /* ─── Empty State ───────────────────────────────────────── */
 .empty-state {
+  position: relative;
   text-align: center;
-  padding: 60px 40px;
-  border-radius: var(--radius-xl);
+  padding: 48px 40px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-accent);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--cyan-dim);
 }
 
-.empty-state-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.6;
+.empty-state-icon-slot {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cyan-dim);
+  background: var(--cyan-dim);
+  color: var(--teal);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
 }
 
 .empty-state h3 {
@@ -681,6 +692,10 @@ button, input, select, textarea {
   max-width: 340px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.empty-state-cta {
+  margin-top: 4px;
 }
 
 /* ─── Modal ─────────────────────────────────────────────── */

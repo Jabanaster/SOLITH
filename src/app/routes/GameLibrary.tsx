@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Icon } from '../components/icons/index.js';
 
 interface Game {
   id: string;
@@ -97,10 +98,13 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       </div>
       
       {games.length === 0 ? (
-        <div className="empty-state glass">
+        <div className="empty-state">
+          <div className="empty-state-icon-slot">
+            <Icon name="game" size={22} />
+          </div>
           <h3>No games added yet</h3>
           <p>Add a local game directory to build custom file-backed trainers.</p>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary" style={{ marginTop: '1rem' }}>Add Game Now</button>
+          <button onClick={() => setShowAddModal(true)} className="btn-primary empty-state-cta">Add Game Now</button>
         </div>
       ) : (
         <div className="game-grid">
