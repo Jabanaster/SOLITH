@@ -22,6 +22,10 @@ export default function MultiGameTrainerPage() {
   }, []);
 
   useEffect(() => {
+    if (!window.electronAPI) {
+      setFeatureEnabled(false);
+      return;
+    }
     window.electronAPI
       .getSettings()
       .then((s: any) => setFeatureEnabled(!!s?.v2LiveModeEnabled))
@@ -29,6 +33,7 @@ export default function MultiGameTrainerPage() {
   }, []);
 
   const handleEnableFeature = useCallback(async () => {
+    if (!window.electronAPI) return;
     setEnabling(true);
     try {
       await window.electronAPI.setSetting('v2LiveModeEnabled', true);

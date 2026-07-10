@@ -13,6 +13,33 @@ import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
 
+class ContentErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    console.error('Page crashed:', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="content-error-fallback" role="alert">
+          <h2>This page failed to load.</h2>
+          <p>Pick another page from the sidebar to keep working.</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
@@ -273,7 +300,9 @@ const App: React.FC = () => {
               <div className="loading-spinner" aria-hidden="true" />
               <span>Loading ResourceForge…</span>
             </div>
-          ) : renderContent()}
+          ) : (
+            <ContentErrorBoundary key={currentView}>{renderContent()}</ContentErrorBoundary>
+          )}
         </main>
       </div>
 
