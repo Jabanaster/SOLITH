@@ -172,10 +172,8 @@ button, input, select, textarea {
 .sidebar {
   width: 240px;
   min-width: 240px;
-  background: var(--glass-bg);
-  border-right: 1px solid var(--glass-border);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -197,15 +195,34 @@ button, input, select, textarea {
 
 .app-title {
   padding: 20px 16px 16px;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-brand-mark {
+  width: 28px;
+  height: 28px;
+  background: var(--bg-raised);
+  border: 1px solid var(--cyan);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--teal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
 .app-title h1 {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--cyan) 0%, var(--teal) 100%);
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -236,12 +253,13 @@ button, input, select, textarea {
 .nav-section button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   padding: 9px 10px;
   margin-bottom: 2px;
   background: transparent;
   border: 1px solid transparent;
+  border-left: 3px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 13px;
@@ -252,6 +270,13 @@ button, input, select, textarea {
   position: relative;
 }
 
+.nav-section button svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
 .nav-section button:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -259,23 +284,15 @@ button, input, select, textarea {
 }
 
 .nav-section button.active {
-  background: var(--cyan-dim);
-  color: var(--cyan);
-  border-color: var(--border-accent);
+  background: linear-gradient(90deg, var(--cyan-dim), transparent);
+  color: var(--text-primary);
+  border-left-color: var(--cyan);
   font-weight: 600;
 }
 
-.nav-section button.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
-  background: var(--cyan);
-  border-radius: 0 2px 2px 0;
-  box-shadow: 0 0 8px var(--cyan);
+.nav-section button.active svg {
+  opacity: 1;
+  color: var(--teal);
 }
 
 /* ─── Main Content ──────────────────────────────────────── */

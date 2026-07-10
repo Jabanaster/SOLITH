@@ -12,6 +12,7 @@ import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
+import { Icon } from './components/icons/index.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -182,6 +183,7 @@ const App: React.FC = () => {
       {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="app-title">
+          <div className="app-brand-mark" aria-hidden="true">RF</div>
           <h1>ResourceForge</h1>
           <p className="subtitle">Local Trainer &amp; Discovery Lab</p>
         </div>
@@ -212,6 +214,7 @@ const App: React.FC = () => {
             onClick={() => setCurrentView('library')}
             className={currentView === 'library' ? 'active' : ''}
           >
+            <Icon name="game" />
             Game Library
           </button>
         </nav>
@@ -236,12 +239,15 @@ const App: React.FC = () => {
             <h3>Actions</h3>
             <button onClick={() => setCurrentView('controls')} className={currentView === 'controls' ? 'active' : ''}
                     data-testid="nav-controls">
+              <Icon name="trainer" />
               Trainer Controls
             </button>
             <button onClick={() => setCurrentView('backups')} className={currentView === 'backups' ? 'active' : ''}>
+              <Icon name="backups" />
               Backups
             </button>
             <button onClick={() => setCurrentView('journal')} className={currentView === 'journal' ? 'active' : ''}>
+              <Icon name="log" />
               Journal
             </button>
           </nav>
