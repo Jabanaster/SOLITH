@@ -1,20 +1,74 @@
-# ResourceForge Roadmap
+﻿# Solith / ResourceForge Roadmap
 
-## Current Baseline
+## Current Baseline (Solith 2.0)
 
-ResourceForge's current pushed release baseline is **v1.0.2**.
+Product UI: **Solith** Â· package `resourceforge@2.0.0`
 
-* Current pushed release: `v1.0.2`
+* Branch: `master`
+* Latest milestone work: **Mâ€“Q** (live trainer parity, schema.v1 definitions, catalog routing, hotkeys)
+* Head (local): see `git log -1` â€” push state may advance independently of this doc
+
+### Accepted capability stack
+
+```
+schema.v1.yml â†’ compile â†’ SQLite payloadJson
+         â†‘ export                    â†“ lazy load
+   Discovery Lab              Trainer Library
+                                    â”œâ”€ memoryFeatures â†’ LiveMemorySession
+                                    â””â”€ saveEditor.saveFields â†’ TrainerHost (catalog save controls)
+```
+
+### Milestone map (recent)
+
+| Milestone | Theme | Status |
+|-----------|--------|--------|
+| **M** | Live trainer parity â€” overlay, hotkeys, memory_write unlock | Accepted |
+| **N** | Trainer Library â€” 1000+ metadata seed, remote sync, Steam art | Accepted |
+| **O.1** | schema.v1 guard, fingerprint, AOB resolver | Accepted |
+| **O.2** | YAML export + Solith module branding | Accepted |
+| **O.3** | YAML compiler + catalog import | Accepted |
+| **O+** | Catalog â†’ live memory wiring | Accepted |
+| **P** | Save-field execution router from catalog | Accepted |
+| **Q** | F1â€“F12 cheat hotkeys, hybrid launch chooser, drift modal | In progress |
+
+### Bundled schema.v1 definitions
+
+Palworld (live memory) and Stardew Valley (save-field controls) ship as `schema.v1` payloads via `bundled-definition-seed.ts`, upserted on catalog bootstrap.
+
+### Connection baselines (KI-017)
+
+Reviewed baselines live in `src/core/live-memory/game-connection-baselines.ts`. New entries require a measured observation â€” catalog seed executable names alone do not loosen the online guard.
+
+Current reviewed executables: Stardew Valley, Atomfall, Palworld, Undisputed.
+
+### Next suggested work
+
+1. Hybrid definitions â€” launch chooser when both memory and save controls exist (wired in App)
+2. Expand bundled definitions for Atomfall / Undisputed / Dredge with verified pointer paths
+3. Measure and document connection baselines for Avowed, Dredge, Crimson Desert
+4. Release evidence gates on current `master`
+5. JSON save-field write verification per game profile
+
+---
+
+## Historical: v1.0.2 baseline
+
+ResourceForge v1.0.2 remains the prior save-editor / Stardew-controls release baseline.
+
+* Tag: `v1.0.2`
 * Commit: `d84b155a8f6729f8428b5c777f0784853c65d419`
-* Tag object: `9e618998e103e475daf7cff7ff667e515a9e5074`
-* Remote `master`: `d84b155a8f6729f8428b5c777f0784853c65d419`
-* Status: accepted, tagged locally, pushed, and remote-tag verified.
 
-Older release tags remain unchanged:
+Older milestone tags (`v1-milestone-f` through `v1-milestone-j`) are unchanged on the legacy branch history.
 
-* `v1.0.0`: left unchanged; superseded for fresh-clone reproducibility.
-* `v1.0.1`: left unchanged; accepted functionally, superseded by `v1.0.2` for line-ending hygiene.
-* `v1.0.2`: clean release baseline for V1.1 development.
+---
+
+## Historical: v1.1 development notes
+
+The sections below document earlier v1.1 bite work. They are retained for audit trail only.
+
+---
+
+# Historical Roadmap (archive)
 
 ## Current Development State
 
@@ -52,7 +106,7 @@ Scope boundaries preserved:
 
 Known gap: `cheat-toggle-ipc.ts`, `cheat-toggle-store.ts`, and `LiveWatchPanel.tsx` have no
 dedicated tests yet. Existing suites (trainer-schema, live-memory, trainer-host, standard)
-cover the surrounding modified files but not these three directly — open item, not hidden.
+cover the surrounding modified files but not these three directly ΓÇö open item, not hidden.
 
 V1.1 development has started from the locked `v1.0.2` baseline.
 

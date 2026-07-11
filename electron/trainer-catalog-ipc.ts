@@ -9,6 +9,7 @@ import {
   getRecentSyncLogs,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
+import { ensureBundledDefinitions } from '../src/core/trainer-catalog/bundled-definition-seed.js';
 import { syncAllTrainerSources } from '../src/core/trainer-catalog/sync/index.js';
 import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-loader.js';
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
@@ -83,6 +84,7 @@ export function registerTrainerCatalogIpc(): void {
     try {
       const seedPath = resolvePackagedSeedPath();
       const total = ensureCatalogSeeded(seedPath, 1000);
+      ensureBundledDefinitions();
       return { success: true, total };
     } catch (error) {
       return { success: false, error: sanitize(error) };
@@ -199,6 +201,7 @@ export async function bootstrapTrainerCatalog(): Promise<void> {
   const seedPath = resolvePackagedSeedPath();
   try {
     ensureCatalogSeeded(seedPath, 1000);
+    ensureBundledDefinitions();
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('[trainer-catalog] Seed bootstrap skipped:', error);

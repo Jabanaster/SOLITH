@@ -43,6 +43,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
     { label: 'Option 1', value: 'option-1' }
   ]);
   const [gameName, setGameName] = useState('Custom Game');
+  const [importingToLibrary, setImportingToLibrary] = useState(false);
 
   useEffect(() => {
     if (gameId) {
@@ -130,6 +131,43 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
     });
     downloadTextFile(bundle.filename, bundle.yaml);
     alert(`Exported ${bundle.filename}. Review the YAML before compiling or sharing.`);
+  };
+
+  const handleAddToLibrary = async (candidate: DiscoveryResult, labelOverride?: string) => {
+    if (!gameId || !saveB) {
+      alert('Select save files and run a comparison before adding to the library.');
+      return;
+    }
+    if (!window.electronAPI?.trainerCatalogImportYaml) {
+      alert('Trainer Library import is only available in the desktop app.');
+      return;
+    }
+
+    const exportCandidate = labelOverride
+      ? { ...candidate, suggestedName: labelOverride, suggestedCategory: recipeCategory }
+      : candidate;
+    const bundle = exportDiscoveryCandidateToYaml({
+      gameId,
+      gameName,
+      saveFilePath: saveB,
+      candidate: exportCandidate,
+    });
+
+    setImportingToLibrary(true);
+    try {
+      const result = await window.electronAPI.trainerCatalogImportYaml({ yamlText: bundle.yaml });
+      if (result.success) {
+        alert(
+          `Added "${result.title ?? recipeName}" to Trainer Library (${result.cheatCount ?? 0} features). Open Trainer Library to launch it.`,
+        );
+        setSelectedCandidate(null);
+      } else {
+        const detail = result.errors?.join('; ') ?? result.error ?? 'Import failed';
+        alert(detail);
+      }
+    } finally {
+      setImportingToLibrary(false);
+    }
   };
 
   const openRecipeModal = (candidate: DiscoveryResult) => {
@@ -740,6 +778,14 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
                 style={{ padding: '8px 16px' }}
               >
                 Export YAML
+              </button>
+              <button
+                onClick={() => selectedCandidate && void handleAddToLibrary(selectedCandidate, recipeName)}
+                disabled={!recipeName.trim() || importingToLibrary}
+                className="btn-secondary"
+                style={{ padding: '8px 16px' }}
+              >
+                {importingToLibrary ? 'Adding…' : 'Add to Library'}
               </button>
               <button 
                 onClick={handleCreateRecipe} 

@@ -307,6 +307,18 @@
   text-overflow: ellipsis;
 }
 
+.hotkey-tag {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #9ec5ff;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  background: rgba(30, 50, 80, 0.55);
+}
+
 .info-icon {
   color: #52525b;
   font-size: 0.8rem;

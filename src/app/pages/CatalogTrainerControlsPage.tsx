@@ -63,6 +63,12 @@ export default function CatalogTrainerControlsPage({
 
   return (
     <>
+      {capabilities?.saveFormat === 'json' && (
+        <p className="catalog-controls-format-note" role="note">
+          JSON save format: edits use the JSON save-field router. Approve a concrete save file path before writing;
+          binary or hex-only fields in this definition are not routed to TrainerHost.
+        </p>
+      )}
       {message && <p className="catalog-controls-message">{message}</p>}
       <TrainerControlPanel
         autoStart

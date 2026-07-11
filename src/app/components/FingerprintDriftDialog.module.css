@@ -1,0 +1,61 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 16, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 1rem;
+}
+
+.dialog {
+  width: min(520px, 100%);
+  background: #141c2b;
+  border: 1px solid rgba(255, 180, 80, 0.35);
+  border-radius: 12px;
+  padding: 1.2rem 1.3rem 1.3rem;
+}
+
+.dialog h2 {
+  margin: 0 0 0.65rem;
+  color: #ffd89a;
+  font-size: 1.15rem;
+}
+
+.dialog p {
+  margin: 0 0 0.65rem;
+  color: #d8e2f5;
+  line-height: 1.45;
+}
+
+.note {
+  color: #8fa3c7 !important;
+  font-size: 0.88rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.cancel,
+.proceed {
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+}
+
+.cancel {
+  border: 1px solid rgba(140, 150, 170, 0.3);
+  background: transparent;
+  color: #b8c4dc;
+}
+
+.proceed {
+  border: 1px solid rgba(255, 180, 80, 0.45);
+  background: rgba(90, 55, 10, 0.85);
+  color: #ffe8c8;
+}

@@ -1,0 +1,64 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 16, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.dialog {
+  width: min(480px, 100%);
+  background: #0f1624;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem 1.35rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.subtitle {
+  margin: 0 0 1rem;
+  color: #8fa3c7;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.primary,
+.secondary {
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid rgba(120, 180, 255, 0.4);
+  background: rgba(30, 55, 95, 0.95);
+  color: #e8f0ff;
+}
+
+.secondary {
+  border: 1px solid rgba(140, 150, 170, 0.25);
+  background: transparent;
+  color: #b8c4dc;
+}
+
+.hint {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: #8fa3c7;
+}

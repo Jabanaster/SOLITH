@@ -14,6 +14,7 @@ import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import TrainerLibraryPage from './pages/TrainerLibraryPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
 import CatalogTrainerControlsPage from './pages/CatalogTrainerControlsPage';
+import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode } from './components/LibraryLaunchDialog.js';
 import { Icon, type IconName } from './components/icons/index.js';
 import { solithBranding } from './assets/branding/index.js';
 import { BrandingArtwork } from './components/BrandingArtwork.js';
@@ -145,6 +146,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [libraryLaunchGameId, setLibraryLaunchGameId] = useState<string | null>(null);
   const [libraryLaunchDisplayName, setLibraryLaunchDisplayName] = useState<string>('');
+  const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
 
   const handleLibraryLaunch = (
     catalogGameId: string,
@@ -154,11 +156,21 @@ const App: React.FC = () => {
       saveControlCount?: number;
     },
   ) => {
-    setLibraryLaunchGameId(catalogGameId);
-    setLibraryLaunchDisplayName(displayName);
-
     const memoryCount = capabilities?.memoryCheatCount ?? 0;
     const saveCount = capabilities?.saveControlCount ?? 0;
+
+    if (memoryCount > 0 && saveCount > 0) {
+      setPendingLibraryLaunch({
+        catalogGameId,
+        displayName,
+        memoryCheatCount: memoryCount,
+        saveControlCount: saveCount,
+      });
+      return;
+    }
+
+    setLibraryLaunchGameId(catalogGameId);
+    setLibraryLaunchDisplayName(displayName);
 
     if (saveCount > 0 && memoryCount === 0) {
       setCurrentView('catalog-save-controls');
@@ -166,6 +178,14 @@ const App: React.FC = () => {
     }
 
     setCurrentView('multi-game-trainer');
+  };
+
+  const completeLibraryLaunch = (mode: LibraryLaunchMode) => {
+    if (!pendingLibraryLaunch) return;
+    setLibraryLaunchGameId(pendingLibraryLaunch.catalogGameId);
+    setLibraryLaunchDisplayName(pendingLibraryLaunch.displayName);
+    setCurrentView(mode === 'save-controls' ? 'catalog-save-controls' : 'multi-game-trainer');
+    setPendingLibraryLaunch(null);
   };
 
   useEffect(() => { loadGames(); }, []);
@@ -407,6 +427,14 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {pendingLibraryLaunch && (
+        <LibraryLaunchDialog
+          choice={pendingLibraryLaunch}
+          onSelect={completeLibraryLaunch}
+          onCancel={() => setPendingLibraryLaunch(null)}
+        />
+      )}
     </div>
   );
 };

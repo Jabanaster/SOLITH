@@ -1,7 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
+import { cheatsForHotkeySlots, parseCheatHotkeySlot } from '../../core/cheat-system/cheat-hotkey-slots.js';
 
 export type CheatStatus = 'idle' | 'discovering' | 'confirmed' | 'frozen' | 'error';
+
+export interface DriftPromptState {
+  warning: string;
+}
 
 export interface ScanCandidate {
   address: string;
@@ -72,6 +77,8 @@ function resolveMemoryDataType(cheat: CheatDefinition): string | null {
  */
 export function useGameCheatSession(game: GameConfig, userConfirmedOffline: boolean) {
   const [states, setStates] = useState<Record<string, CheatSessionState>>({});
+  const [driftPrompt, setDriftPrompt] = useState<DriftPromptState | null>(null);
+  const driftResolverRef = useRef<((proceed: boolean) => void) | null>(null);
   const attachedRef = useRef(false);
   const frozenCheatIdRef = useRef<string | null>(null);
   const reappliedRef = useRef(false);
@@ -103,6 +110,19 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     [game.gameId],
   );
 
+  const resolveDriftPrompt = useCallback((proceed: boolean) => {
+    driftResolverRef.current?.(proceed);
+    driftResolverRef.current = null;
+    setDriftPrompt(null);
+  }, []);
+
+  const waitForDriftAck = useCallback((warning: string) => {
+    return new Promise<boolean>((resolve) => {
+      driftResolverRef.current = resolve;
+      setDriftPrompt({ warning });
+    });
+  }, []);
+
   const ensureAttached = useCallback(async (): Promise<void> => {
     if (attachedRef.current) return;
 
@@ -132,7 +152,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       const warning =
         attachResult.fingerprintWarning ??
         'Executable hash does not match the loaded trainer definition (possible game patch).';
-      const proceed = window.confirm(`${warning}\n\nProceed anyway?`);
+      const proceed = await waitForDriftAck(warning);
       if (!proceed) {
         throw new Error(warning);
       }
@@ -146,7 +166,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       throw new Error(attachResult.guard?.reason ?? attachResult.error ?? 'Failed to attach to process');
     }
     attachedRef.current = true;
-  }, [game]);
+  }, [game, waitForDriftAck]);
 
   const stopFreeze = useCallback(async (cheatId: string) => {
     if (frozenCheatIdRef.current !== cheatId) return;
@@ -668,8 +688,25 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     };
   }, []);
 
+  useEffect(() => {
+    if (!userConfirmedOffline) return undefined;
+    const slots = cheatsForHotkeySlots(game);
+    const unsubscribe = window.electronAPI?.onTrainerHotkey?.((payload) => {
+      const slotIndex = parseCheatHotkeySlot(payload.action);
+      if (slotIndex == null) return;
+      const cheat = slots[slotIndex];
+      if (!cheat) return;
+      const enabled = getState(cheat.id).enabled;
+      toggleCheat(cheat, !enabled);
+    });
+    return () => unsubscribe?.();
+  }, [game, userConfirmedOffline, toggleCheat, getState]);
+
   return {
     getState,
+    driftPrompt,
+    resolveDriftPrompt,
+    hotkeyCheats: cheatsForHotkeySlots(game),
     discover,
     narrow,
     narrowByComparison,

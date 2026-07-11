@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import styles from './GameSpecificCheatMenu.module.css';
 import { useGameCheatSession } from '../hooks/useGameCheatSession.js';
 import { LiveWatchPanel } from './LiveWatchPanel.js';
+import { FingerprintDriftDialog } from './FingerprintDriftDialog.js';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
 
 interface GameSpecificCheatMenuProps {
@@ -106,6 +107,17 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
       .map((id) => game.cheats.find((c) => c.id === id))
       .filter((c): c is CheatDefinition => Boolean(c));
   }, [game]);
+
+  const hotkeySlotByCheatId = useMemo(() => {
+    const map = new Map<string, number>();
+    session.hotkeyCheats.forEach((cheat, index) => map.set(cheat.id, index + 1));
+    return map;
+  }, [session.hotkeyCheats]);
+
+  function hotkeyLabel(cheatId: string): string | null {
+    const slot = hotkeySlotByCheatId.get(cheatId);
+    return slot != null && slot <= 12 ? `F${slot}` : null;
+  }
 
   function renderDiscoveryPanel(cheat: CheatDefinition) {
     const state = session.getState(cheat.id);
@@ -331,6 +343,11 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           <div className={styles['cheat-row-main']}>
             <span className={styles['bolt-icon']}>⚡</span>
             <span className={styles['cheat-row-name']}>{cheat.name}</span>
+            {hotkeyLabel(cheat.id) && (
+              <span className={styles['hotkey-tag']} title="Global hotkey when offline is confirmed">
+                {hotkeyLabel(cheat.id)}
+              </span>
+            )}
             {(cheat.notes || isConsoleOnly(cheat)) && (
               <span className={styles['info-icon']} title={cheat.notes ?? 'Console-command cheat — not yet wired'}>
                 ⓘ
@@ -392,6 +409,11 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           <div className={styles['cheat-row-main']}>
             <span className={styles['bolt-icon']}>⚡</span>
             <span className={styles['cheat-row-name']}>{cheat.name}</span>
+            {hotkeyLabel(cheat.id) && (
+              <span className={styles['hotkey-tag']} title="Global hotkey when offline is confirmed">
+                {hotkeyLabel(cheat.id)}
+              </span>
+            )}
             {isConsoleOnly(cheat) && (
               <span className={styles['info-icon']} title="Console-command cheat — not yet wired">
                 ⓘ
@@ -439,6 +461,11 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           <div className={styles['cheat-row-main']}>
             <span className={styles['bolt-icon']}>⚡</span>
             <span className={styles['cheat-row-name']}>{cheat.name}</span>
+            {hotkeyLabel(cheat.id) && (
+              <span className={styles['hotkey-tag']} title="Global hotkey when offline is confirmed">
+                {hotkeyLabel(cheat.id)}
+              </span>
+            )}
           </div>
 
           <div className={styles['cheat-row-controls']}>
@@ -538,6 +565,14 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           onReadLive={handleReadLive}
           onConfirm={handleConfirmFromWatch}
           onClose={() => setWatchingCheatId(null)}
+        />
+      )}
+
+      {session.driftPrompt && (
+        <FingerprintDriftDialog
+          warning={session.driftPrompt.warning}
+          onProceed={() => session.resolveDriftPrompt(true)}
+          onCancel={() => session.resolveDriftPrompt(false)}
         />
       )}
     </div>

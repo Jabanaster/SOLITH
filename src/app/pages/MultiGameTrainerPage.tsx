@@ -61,13 +61,26 @@ export default function MultiGameTrainerPage({ initialGameId }: { initialGameId?
     }
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onTrainerHotkey?.((payload) => {
+      if (payload.action === 'hide_overlay') {
+        setOverlayVisible(false);
+        return;
+      }
+      if (payload.action === 'toggle_overlay') {
+        setOverlayVisible((visible) => !visible);
+      }
+    });
+    return () => unsubscribe?.();
+  }, []);
+
   return (
     <div className={styles['page-container']}>
       <PageModuleHeader
         artwork="trainerController"
         className={styles['page-header']}
         title="Live Trainer"
-        description="WeMod-class live memory trainer — auto-detect running games, toggle cheats in-session, use Ctrl+Shift+O for the overlay"
+        description="WeMod-class live memory trainer — auto-detect running games, toggle cheats in-session, F1–F12 hotkeys, Ctrl+Shift+O overlay"
         actions={
           <div className={styles['header-actions']}>
             <button type="button" className={styles['overlay-btn']} onClick={() => void handleToggleOverlay()}>

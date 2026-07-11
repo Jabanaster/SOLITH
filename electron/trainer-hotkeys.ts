@@ -4,12 +4,17 @@ import { toggleTrainerOverlay, hideTrainerOverlay } from './trainer-overlay.js';
 
 export type TrainerHotkeyAction =
   | 'toggle_overlay'
-  | 'hide_overlay';
+  | 'hide_overlay'
+  | `cheat_slot_${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
 
-const DEFAULT_HOTKEYS: Record<TrainerHotkeyAction, string> = {
+const DEFAULT_HOTKEYS: Record<string, string> = {
   toggle_overlay: 'Control+Shift+O',
   hide_overlay: 'Control+Shift+\\',
 };
+
+for (let i = 1; i <= 12; i += 1) {
+  DEFAULT_HOTKEYS[`cheat_slot_${i}`] = `F${i}`;
+}
 
 let registered = false;
 
@@ -39,7 +44,15 @@ export function registerTrainerHotkeys(): void {
     broadcastHotkey('hide_overlay');
   });
 
-  if (!toggleOk || !hideOk) {
+  let cheatSlotsOk = true;
+  for (let i = 1; i <= 12; i += 1) {
+    const action = `cheat_slot_${i}` as TrainerHotkeyAction;
+    const key = DEFAULT_HOTKEYS[action];
+    const ok = globalShortcut.register(key, () => broadcastHotkey(action));
+    if (!ok) cheatSlotsOk = false;
+  }
+
+  if (!toggleOk || !hideOk || !cheatSlotsOk) {
     // eslint-disable-next-line no-console
     console.warn('[trainer-hotkeys] Failed to register one or more global shortcuts');
   }
