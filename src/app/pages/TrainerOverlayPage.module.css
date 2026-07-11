@@ -1,0 +1,77 @@
+.overlay-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0a0e16;
+  color: #e8edf7;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  -webkit-app-region: drag;
+}
+
+.overlay-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(120, 180, 255, 0.18);
+  background: linear-gradient(180deg, rgba(18, 28, 48, 0.95), rgba(10, 14, 22, 0.98));
+}
+
+.overlay-header h1 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.overlay-header p {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: #8fa3c7;
+}
+
+.close-btn,
+.back-btn {
+  -webkit-app-region: no-drag;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: rgba(20, 32, 52, 0.9);
+  color: #d8e6ff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.close-btn {
+  width: 28px;
+  height: 28px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(120, 180, 255, 0.12);
+  -webkit-app-region: no-drag;
+}
+
+.back-btn {
+  align-self: flex-start;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.offline-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #b8c8e6;
+}
+
+.cheat-panel {
+  flex: 1;
+  overflow: auto;
+  -webkit-app-region: no-drag;
+}

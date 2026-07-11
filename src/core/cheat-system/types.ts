@@ -5,7 +5,7 @@
 
 import type { LiveValueType } from '../live-memory/types.js';
 
-export type GameId = 'palworld' | 'atomfall' | 'stardew-valley' | 'avowed' | 'undisputed' | 'dredge' | 'crimson-desert';
+export type GameId = string;
 
 export interface CheatCategory {
   id: string;
@@ -31,7 +31,7 @@ export interface CheatDefinition {
 }
 
 export interface CheatSource {
-  name: 'WeMod' | 'FearLess' | 'Nexus' | 'SMAPI' | 'Console' | 'Community' | 'Official';
+  name: 'WeMod' | 'FearLess' | 'Nexus' | 'SMAPI' | 'Console' | 'Community' | 'Official' | 'MrAntiFun' | 'FLiNG' | 'Plitch';
   url?: string;
   verified: boolean;
   lastChecked: Date;

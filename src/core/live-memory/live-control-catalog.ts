@@ -6,11 +6,10 @@ import type { LivePointerPath } from './pointer-resolver.js';
  * pointer path — the live-memory equivalent of a file-based ProfileControl
  * (src/core/game-profiles/types.ts), but deliberately kept as a SEPARATE
  * catalog rather than added to GameProfile.controls[]: that system's
- * validateGameProfile() explicitly rejects 'memory_write'/'memory_observation'
- * backends as executable ("memory backends cannot be executable in V1
- * profiles") — a deliberate V1 safety boundary this feature must not weaken
- * or route around. This catalog is consumed only by the separately
- * feature-flagged (`v2LiveModeEnabled`) Live Memory Trainer UI/IPC.
+ * validateGameProfile() rejects executable memory_observation (read-only).
+ * memory_write backends are executable when safetyStatus permits — routed
+ * through the feature-flagged (`v2LiveModeEnabled`, on by default) Live Memory
+ * Trainer UI/IPC.
  *
  * Every entry must be backed by real, restart-verified discovery — not a
  * guess. See the Atomfall entry below for the investigation that produced

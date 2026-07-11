@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '../components/icons/index.js';
+import { solithBranding } from '../assets/branding/index.js';
 
 interface Game {
   id: string;
@@ -100,7 +101,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       {games.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon-slot">
-            <Icon name="game" size={22} />
+            <img src={solithBranding.trainerController} alt="" className="empty-state-artwork" />
           </div>
           <h3>No games added yet</h3>
           <p>Add a local game directory to build custom file-backed trainers.</p>

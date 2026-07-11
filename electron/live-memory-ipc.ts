@@ -381,9 +381,8 @@ function serializeWriteResult(result: { success: boolean; manifest?: unknown; gu
 }
 
 async function isFeatureEnabled(): Promise<boolean> {
-  const settingsModule = await import('../src/core/settings/index.js');
-  const raw = settingsModule.getSetting('v2LiveModeEnabled');
-  return raw === true || raw === 1;
+  const mod = await import('../src/core/settings/unlock-trainer-capabilities.js');
+  return mod.isTrainerCapabilityEnabled('v2LiveModeEnabled');
 }
 
 function sanitize(error: unknown, fallback: string): string {

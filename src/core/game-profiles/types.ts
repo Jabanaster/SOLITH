@@ -205,8 +205,10 @@ export function validateGameProfile(profile: unknown): ProfileValidationError[] 
     }
 
     const executable = EXECUTABLE_SAFETY_STATUSES.has(c.safetyStatus as ControlSafetyStatus);
-    if (executable && (c.backend === 'memory_write' || c.backend === 'memory_observation')) {
-      errors.push({ field: `${prefix}.backend`, message: 'memory backends cannot be executable in V1 profiles' });
+
+    // memory_write controls route through the live-memory trainer IPC path.
+    if (executable && c.backend === 'memory_observation') {
+      errors.push({ field: `${prefix}.backend`, message: 'memory_observation is read-only and cannot be executable' });
     }
 
     // For save_field backend with executable status, saveField is required

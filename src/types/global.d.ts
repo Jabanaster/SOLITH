@@ -118,5 +118,32 @@ interface Window {
       dataType?: string | null;
     }) => Promise<{ success: boolean; error?: string }>;
     cheatToggleClear: (payload: { gameId: string; cheatId: string }) => Promise<{ success: boolean; error?: string }>;
+
+    trainerOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
+    trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
+    trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
+    onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
+
+    trainerCatalogSearch: (payload: { query?: string; limit?: number; offset?: number }) => Promise<{
+      success: boolean;
+      entries?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry[];
+      total?: number;
+      error?: string;
+    }>;
+    trainerCatalogStats: () => Promise<{ success: boolean; total?: number; error?: string }>;
+    trainerCatalogGet: (payload: { catalogGameId: string }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
+    trainerCatalogSeed: () => Promise<{ success: boolean; total?: number; error?: string }>;
+    trainerCatalogSyncRemote: () => Promise<{
+      success: boolean;
+      report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
+      error?: string;
+    }>;
+    trainerCatalogLoadGame: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      gameId?: string;
+      name?: string;
+      cheatCount?: number;
+      error?: string;
+    }>;
   };
 }

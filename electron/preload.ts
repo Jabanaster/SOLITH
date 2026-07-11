@@ -126,4 +126,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('cheat-toggle-set', payload),
   cheatToggleClear: (payload: { gameId: string; cheatId: string }) =>
     ipcRenderer.invoke('cheat-toggle-clear', payload),
+
+  trainerOverlayToggle: () => ipcRenderer.invoke('trainer-overlay-toggle'),
+  trainerOverlayHide: () => ipcRenderer.invoke('trainer-overlay-hide'),
+  trainerHotkeysGetDefaults: () => ipcRenderer.invoke('trainer-hotkeys-get-defaults'),
+  onTrainerHotkey: (callback: (payload: { action: string }) => void) => {
+    const listener = (_event: unknown, payload: { action: string }) => callback(payload);
+    ipcRenderer.on('trainer-hotkey', listener);
+    return () => ipcRenderer.removeListener('trainer-hotkey', listener);
+  },
+
+  trainerCatalogSearch: (payload: { query?: string; limit?: number; offset?: number }) =>
+    ipcRenderer.invoke('trainer-catalog-search', payload),
+  trainerCatalogStats: () => ipcRenderer.invoke('trainer-catalog-stats'),
+  trainerCatalogGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-catalog-get', payload),
+  trainerCatalogSeed: () => ipcRenderer.invoke('trainer-catalog-seed'),
+  trainerCatalogSyncRemote: () => ipcRenderer.invoke('trainer-catalog-sync-remote'),
+  trainerCatalogLoadGame: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-load-game', payload),
 });

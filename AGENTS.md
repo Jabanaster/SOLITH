@@ -417,6 +417,45 @@ NEXT_SAFE_ACTION=Stop and request user approval
 
 ---
 
+## Milestone M — Live Trainer Parity (USER AUTHORIZED)
+
+User authorized unlocking WeMod / Cheat Engine class capabilities where already implemented.
+
+**Enabled by default:**
+```
+v2LiveModeEnabled (live memory scan/read/write)
+v2HotkeysEnabled (global hotkeys: Ctrl+Shift+O overlay, Ctrl+Shift+\ hide)
+v2OverlayEnabled (always-on-top trainer overlay window)
+memory_write backend in trainer-control-schema
+```
+
+**Still forbidden (non-negotiable):**
+```
+DLL injection / code injection / kernel drivers
+anti-cheat bypass / stealth / debugger attachment for bypass
+packet capture
+online or multiplayer targeting (online guard remains fail-closed)
+scraping or auto-installing third-party trainer binaries (MrAntiFun, FLiNG, etc.)
+```
+
+**Milestone N (USER AUTHORIZED) adds:**
+```
+1000+ game metadata catalog (bundled seed + SQLite search)
+remote definition sync from MrAntiFun / FLiNG / Plitch (HTML listings → mod pack JSON, no .exe download)
+versioned mod pack schema with per-title cheats (community = scan-required, verified = pointer paths)
+Cheat Engine freeform mode (any process / address / scan — v2FreeformMemoryEnabled)
+```
+
+**Allowed Milestone M work:**
+```
+enable gated trainer capabilities
+overlay + hotkey infrastructure
+catalog expansion with verified controls
+preset/toggle persistence improvements
+```
+
+---
+
 ## Hard Safety Boundaries
 
 Do not add, modify, enable, or suggest executable support for:
@@ -427,15 +466,23 @@ packet capture
 DLL injection
 debugger attachment
 stealth behavior
+```
+
+The following are **permitted** under Milestone M live-trainer scope (ReadProcessMemory/WriteProcessMemory only, catalog-bound, offline guard):
+```
 runtime memory editing
 live process writes
-process injection
 memory scanning
-God Mode execution
+verified per-game health/stamina/inventory/currency controls in catalog
+```
+
+Do not add outside verified catalog without explicit per-control verification:
+```
+God Mode execution (unverified)
 Aim Assist execution
-teleporting
-inventory editing
-health editing
+teleporting (unverified)
+unverified inventory editing
+unverified health editing
 relationship editing
 quest editing
 world-state editing
@@ -488,9 +535,10 @@ NEXT_SAFE_COMMAND=git status --short
 
 ## Current Allowed Work Mode
 
-Unless the user explicitly authorizes a new milestone, your default mode is:
+User authorized Milestone M live trainer parity work.
+
 ```
-READ_ONLY_VERIFY_REPORT
+IMPLEMENT_TRAINER_PARITY
 ```
 
 **Allowed:**
@@ -499,22 +547,17 @@ read files
 run git status/log/tag commands
 run tests
 run builds
-inspect diffs
-propose an evidence plan
-report exact proposed files
+enable trainer capabilities (live memory, overlay, hotkeys)
+catalog and UX expansion within safety boundaries
 ```
 
 **Forbidden:**
 ```
-editing files
-creating files
-deleting files
-committing
-tagging
-pushing
-merging
-releasing
-starting feature work
+DLL injection / kernel / anti-cheat bypass
+remote trainer binary ingestion
+committing without COMMIT IT
+tagging without TAG IT
+pushing without PUSH IT
 ```
 
 ---

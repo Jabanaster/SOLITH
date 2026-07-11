@@ -203,8 +203,8 @@ describe('validateGameProfile â€” structure validation', () => {
     assert.deepStrictEqual(errors, []);
   });
 
-  it('rejects executable memory backends in V1 profiles', () => {
-    const invalid: GameProfile = {
+  it('allows executable memory_write backends in live trainer profiles', () => {
+    const valid: GameProfile = {
       profileVersion: '1.0.0',
       gameId: 'test',
       displayName: 'Test',
@@ -213,7 +213,7 @@ describe('validateGameProfile â€” structure validation', () => {
         {
           id: 'memory-money',
           label: 'Memory Money',
-          description: 'Unsafe',
+          description: 'Live memory control',
           category: 'TEST',
           controlType: 'number_input',
           backend: 'memory_write',
@@ -221,8 +221,8 @@ describe('validateGameProfile â€” structure validation', () => {
         },
       ],
     };
-    const errors = validateGameProfile(invalid);
-    assert.ok(errors.some(e => e.message.includes('memory backends cannot be executable')));
+    const errors = validateGameProfile(valid);
+    assert.deepStrictEqual(errors, []);
   });
 
   it('rejects executable save_field profile paths with traversal or raw absolute paths', () => {

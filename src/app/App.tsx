@@ -348,11 +348,6 @@ const App: React.FC = () => {
           )}
         </main>
       </div>
-
-      <div className="v2-notice" role="status">
-        Local-only save editing. Requires approval before writes.
-        Still blocked: injection, anti-cheat bypass, third-party .exe downloads.
-      </div>
     </div>
   );
 };

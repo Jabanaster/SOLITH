@@ -215,6 +215,10 @@ export interface Settings {
   v2LiveModeEnabled: boolean;
   v2HotkeysEnabled: boolean;
   v2OverlayEnabled: boolean;
+  trainerCapabilitiesUnlocked?: boolean;
+  v2FreeformMemoryEnabled: boolean;
+  v2RemoteCatalogSyncEnabled: boolean;
+  trainerRemoteSyncCompleted?: boolean;
   /** V2 read-only session lifecycle monitor. Default: false. */
   v2SessionMonitorEnabled: boolean;
 }

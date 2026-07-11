@@ -119,44 +119,30 @@ test('trainer-e2e 01–25 — full Trainer UX workflow', async () => {
     await win.waitForSelector('#root > *', { timeout: 20_000 });
     win.on('pageerror', err => rendererErrors.push(err.message));
 
-    // ── Test 01: Mode toggle buttons present ──────────────────────────────────
-    const trainerBtn  = win.locator('button.mode-btn', { hasText: 'Trainer' });
-    const workshopBtn = win.locator('button.mode-btn', { hasText: 'Workshop' });
-    await expect(trainerBtn).toBeVisible();
-    await expect(workshopBtn).toBeVisible();
+    // ── Test 01: Solith top banner present ──────────────────────────────────
+    await expect(win.locator('.solith-top-banner__image')).toBeVisible();
 
-    // ── Test 02: Trainer mode is active by default ────────────────────────────
-    const trainerPressed = await trainerBtn.getAttribute('aria-pressed');
-    expect(trainerPressed, 'Trainer should start active').toBe('true');
+    // ── Test 02: Unified sidebar navigation visible ─────────────────────────
+    await expect(win.locator('button', { hasText: 'Game Library' })).toBeVisible();
+    await expect(win.locator('button', { hasText: 'Save Editor' })).toBeVisible();
+    await expect(win.locator('button', { hasText: 'Compatibility' })).toBeVisible();
 
-    // ── Test 03: Switch to Workshop Mode ──────────────────────────────────────
-    await workshopBtn.click();
+    // ── Test 03: Sidebar collapse control present ───────────────────────────
+    await expect(win.locator('.sidebar-collapse-btn')).toBeVisible();
+
+    // ── Test 04: Navigate to Compatibility without mode toggle ──────────────
+    await win.locator('button', { hasText: 'Compatibility' }).click();
     await win.waitForTimeout(300);
-    const workshopPressed = await workshopBtn.getAttribute('aria-pressed');
-    expect(workshopPressed, 'Workshop should be active after click').toBe('true');
-    const trainerPressedAfter = await trainerBtn.getAttribute('aria-pressed');
-    expect(trainerPressedAfter, 'Trainer should be inactive after switching').toBe('false');
+    expect(await win.locator('button.active', { hasText: 'Compatibility' }).count()).toBeGreaterThanOrEqual(1);
 
-    // ── Test 04: Workshop sidebar shows Compatibility entry ───────────────────
-    const compatBtn = win.locator('button', { hasText: 'Compatibility' });
-    await expect(compatBtn).toBeVisible();
-
-    // ── Test 05: Switch back to Trainer Mode ──────────────────────────────────
-    await trainerBtn.click();
+    // ── Test 05: Navigate to Save Editor ────────────────────────────────────
+    await win.locator('button', { hasText: 'Save Editor' }).click();
     await win.waitForTimeout(300);
-    const backToTrainer = await trainerBtn.getAttribute('aria-pressed');
-    expect(backToTrainer, 'Trainer active after switching back').toBe('true');
+    expect(await win.locator('button.active', { hasText: 'Save Editor' }).count()).toBeGreaterThanOrEqual(1);
 
-    // ── Test 06: Mode persists in localStorage ────────────────────────────────
-    await workshopBtn.click();
+    // ── Test 06: Return to Game Library ─────────────────────────────────────
+    await win.locator('button', { hasText: 'Game Library' }).click();
     await win.waitForTimeout(200);
-    const storedMode = await win.evaluate(() => localStorage.getItem('rf-app-mode'));
-    expect(storedMode, 'localStorage persists workshop mode').toBe('workshop');
-
-    await trainerBtn.click();
-    await win.waitForTimeout(200);
-    const storedMode2 = await win.evaluate(() => localStorage.getItem('rf-app-mode'));
-    expect(storedMode2, 'localStorage persists trainer mode').toBe('trainer');
 
     // ── Test 07: window.electronAPI is exposed ────────────────────────────────
     const apiExists = await win.evaluate(() => typeof (window as any).electronAPI === 'object');
@@ -440,10 +426,10 @@ test('trainer-e2e 27 — get-all-profiles: returns array, no crash', async () =>
   }
 });
 
-test('trainer-e2e 28 — mode toggle: Workshop sidebar contains all 8 pages', async () => {
+test('trainer-e2e 28 — unified sidebar contains core workshop pages', async () => {
   if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
 
-  const runId      = `mode-${Date.now()}`;
+  const runId      = `nav-${Date.now()}`;
   const userDataDir = path.join(os.tmpdir(), runId, 'userData');
   const appDataDir  = path.join(os.tmpdir(), runId, 'appdata');
   fs.mkdirSync(userDataDir, { recursive: true });
@@ -458,52 +444,13 @@ test('trainer-e2e 28 — mode toggle: Workshop sidebar contains all 8 pages', as
     await win.waitForLoadState('domcontentloaded');
     await win.waitForSelector('#root > *', { timeout: 15_000 });
 
-    // Switch to Workshop
-    await win.locator('button.mode-btn', { hasText: 'Workshop' }).click();
-    await win.waitForTimeout(300);
-
-    // Add a game so Workshop sidebar pages appear
-    const gameDir = path.join(os.tmpdir(), runId, 'game');
-    fs.mkdirSync(gameDir, { recursive: true });
-    const addRes = await win.evaluate(
-      (dir: string) => (window as any).electronAPI.addGame({ name: 'Mode Test', path: dir }),
-      gameDir
-    );
-    expect(addRes?.success).toBe(true);
-    const gameId = addRes.game.id;
-
-    // Navigate to library, select game
-    await win.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button'));
-      const libBtn = btns.find(b => b.textContent?.trim() === 'Game Library');
-      libBtn?.click();
-    });
-    await win.waitForTimeout(200);
-
-    // The Workshop sidebar pages are shown when a game is selected in workshop mode
-    // At minimum, without a game selected, Compatibility nav should be in workshop
-    const expectedPages = ['Save Editor', 'Discovery Lab', 'Recipes', 'Backups', 'Journal', 'Save Locations', 'Compatibility'];
+    const expectedPages = [
+      'Save Editor', 'Discovery Lab', 'Recipes', 'Backups', 'Journal',
+      'Save Locations', 'Compatibility', 'Trainer Library', 'Live Memory Trainer',
+    ];
     for (const page of expectedPages) {
-      // Pages appear in the sidebar when game is selected; Compatibility appears always in workshop
-      // Just verify Compatibility is visible without a game
-      if (page === 'Compatibility') {
-        await expect(win.locator('button', { hasText: page })).toBeVisible();
-      }
+      await expect(win.locator('button', { hasText: page })).toBeVisible();
     }
-
-    // Verify localStorage has 'workshop'
-    const mode = await win.evaluate(() => localStorage.getItem('rf-app-mode'));
-    expect(mode, 'mode persisted').toBe('workshop');
-
-    // Switch back to Trainer — mode changes to trainer
-    await win.locator('button.mode-btn', { hasText: 'Trainer' }).click();
-    await win.waitForTimeout(300);
-    const modeBack = await win.evaluate(() => localStorage.getItem('rf-app-mode'));
-    expect(modeBack, 'trainer mode persisted').toBe('trainer');
-
-    // Trainer buttons: mode-btn Trainer is aria-pressed=true
-    const pressed = await win.locator('button.mode-btn', { hasText: 'Trainer' }).getAttribute('aria-pressed');
-    expect(pressed, 'Trainer button aria-pressed true').toBe('true');
 
   } finally {
     await app.close().catch(() => {});

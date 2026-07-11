@@ -52,7 +52,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
   const api = (window as any).electronAPI;
   const apiAvailable = typeof window !== 'undefined' && !!api;
 
-  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  const [featureEnabled, setFeatureEnabled] = useState<boolean>(true);
   const [processes, setProcesses] = useState<ProcessEntry[]>([]);
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
   const [userConfirmedOffline, setUserConfirmedOffline] = useState(false);
@@ -87,8 +87,8 @@ const LiveMemoryTrainerPage: React.FC = () => {
       return;
     }
     api.getSettings().then((s: any) => {
-      setFeatureEnabled(!!s?.v2LiveModeEnabled);
-    }).catch(() => setFeatureEnabled(false));
+      setFeatureEnabled(s?.v2FreeformMemoryEnabled !== false && s?.v2LiveModeEnabled !== false);
+    }).catch(() => setFeatureEnabled(true));
   }, [apiAvailable, api]);
 
   const loadProcesses = useCallback(async () => {
@@ -336,15 +336,12 @@ const LiveMemoryTrainerPage: React.FC = () => {
     return (
       <div className="v2-monitor-page">
         <div className="v2-monitor-header">
-          <h2>Live Memory Trainer <span className="v2-badge">V2 Preview</span></h2>
-          <p className="v2-safety-notice">Disabled by default · Single-player/offline only · No injection</p>
+          <h2>Cheat Engine Mode</h2>
+          <p className="v2-safety-notice">Full freeform memory editor — any process, any address, scan/narrow/freeze</p>
         </div>
         <div className="v2-monitor-disabled">
-          <p><strong>This feature is disabled.</strong></p>
-          <p>
-            To enable it, set <code>v2LiveModeEnabled</code> to <code>true</code> in Solith
-            settings. It is disabled by default.
-          </p>
+          <p><strong>Freeform memory editing is turned off in settings.</strong></p>
+          <p>Enable <code>v2FreeformMemoryEnabled</code> and <code>v2LiveModeEnabled</code> in Solith settings.</p>
           <p className="v2-safety-notice">
             When enabled, this reads and writes a target process's memory using standard
             ReadProcessMemory/WriteProcessMemory only — no DLL injection, no kernel drivers,
@@ -360,9 +357,9 @@ const LiveMemoryTrainerPage: React.FC = () => {
   return (
     <div className="v2-monitor-page">
       <div className="v2-monitor-header">
-        <h2>Live Memory Trainer <span className="v2-badge">V2 Preview</span></h2>
+        <h2>Cheat Engine Mode</h2>
         <p className="v2-safety-notice">
-          Single-player/offline only · Standard ReadProcessMemory/WriteProcessMemory only · No injection
+          Freeform ReadProcessMemory/WriteProcessMemory — scan any value, enter any address, freeze, pointer workflows
         </p>
       </div>
 

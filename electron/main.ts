@@ -134,6 +134,11 @@ function createWindow() {
     mainWindow.loadFile(path.join(moduleDirectory, 'dist/index.html'));
   }
 
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow?.setMenuBarVisibility(false);
+    mainWindow?.setMenu(null);
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

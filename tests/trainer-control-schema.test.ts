@@ -122,7 +122,15 @@ describe('isControlExecutable — execution eligibility', () => {
     assert.strictEqual(isControlExecutable(supported), true);
   });
 
-  it('returns false for memory_write backend (Health)', () => {
+  it('returns true for memory_write backend when requires_approval', () => {
+    const memory: TrainerControl = {
+      ...MEMORY_CONTROL,
+      safetyStatus: 'requires_approval',
+    };
+    assert.strictEqual(isControlExecutable(memory), true);
+  });
+
+  it('returns false for memory_write with future_feature status', () => {
     assert.strictEqual(isControlExecutable(MEMORY_CONTROL), false);
   });
 

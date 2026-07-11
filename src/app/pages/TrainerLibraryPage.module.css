@@ -1,0 +1,171 @@
+.page {
+  padding: 1rem 1.25rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.6rem;
+}
+
+.header p {
+  margin: 0;
+  color: #8fa3c7;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.syncBtn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(25, 45, 75, 0.9);
+  color: #e8f0ff;
+  cursor: pointer;
+}
+
+.searchRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.searchRow input {
+  flex: 1;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: rgba(10, 16, 28, 0.95);
+  color: #e8f0ff;
+}
+
+.searchRow button {
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(40, 90, 160, 0.85);
+  color: #fff;
+  cursor: pointer;
+}
+
+.filters {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filterBtn,
+.filterActive {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  background: transparent;
+  color: #b8c8e6;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.filterActive {
+  background: rgba(60, 120, 200, 0.35);
+  color: #fff;
+}
+
+.message,
+.loading {
+  color: #9eb6dc;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid rgba(120, 180, 255, 0.15);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(12, 18, 30, 0.95);
+}
+
+.coverWrap {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  background: #111827;
+}
+
+.coverWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coverFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  color: #6b8cc7;
+  background: linear-gradient(145deg, #1a2740, #0d1424);
+}
+
+.badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #cde0ff;
+}
+
+.cardBody {
+  padding: 0.65rem 0.75rem 0.8rem;
+}
+
+.cardBody h2 {
+  margin: 0 0 0.25rem;
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.cardBody p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #8fa3c7;
+}
+
+.meta {
+  margin-top: 0.35rem !important;
+}
+
+.launchBtn {
+  margin-top: 0.55rem;
+  width: 100%;
+  padding: 0.45rem;
+  border-radius: 6px;
+  border: 1px solid rgba(120, 180, 255, 0.3);
+  background: rgba(30, 55, 90, 0.9);
+  color: #e8f0ff;
+  cursor: pointer;
+  font-size: 0.8rem;
+}

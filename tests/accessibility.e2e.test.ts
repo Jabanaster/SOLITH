@@ -95,17 +95,15 @@ test('a11y-02 — all <button> elements have accessible names', async () => {
 });
 // ── a11y-03: mode toggle buttons have aria-pressed ────────────────────────────
 
-test('a11y-03 — Trainer/Workshop mode toggle buttons have aria-pressed attribute', async () => {
+test('a11y-03 — sidebar collapse button has aria-expanded attribute', async () => {
   if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
   const ctx = await launchFresh('aria-pressed');
   try {
-    const result = await ctx!.win.evaluate((): { count: number; withPressed: number } => {
-      const modeBtns = Array.from(document.querySelectorAll('button.mode-btn'));
-      const withPressed = modeBtns.filter(btn => btn.hasAttribute('aria-pressed')).length;
-      return { count: modeBtns.length, withPressed };
+    const hasExpanded = await ctx!.win.evaluate(() => {
+      const btn = document.querySelector('.sidebar-collapse-btn');
+      return btn?.hasAttribute('aria-expanded') ?? false;
     });
-    expect(result.count, 'at least 2 mode buttons exist').toBeGreaterThanOrEqual(2);
-    expect(result.withPressed, 'all mode buttons have aria-pressed').toBe(result.count);
+    expect(hasExpanded, 'collapse button exposes aria-expanded').toBe(true);
   } finally { await cleanup(ctx); }
 });
 

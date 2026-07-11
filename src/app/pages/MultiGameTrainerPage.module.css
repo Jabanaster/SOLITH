@@ -21,6 +21,20 @@
   margin: 0;
 }
 
+.header-actions {
+  margin-top: 0.75rem;
+}
+
+.overlay-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 160, 255, 0.35);
+  background: rgba(30, 50, 80, 0.85);
+  color: #e8f0ff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
 .page-content {
   display: flex;
   flex-direction: column;

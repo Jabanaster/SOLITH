@@ -29,6 +29,7 @@ build/
 # ── User data (MUST NOT be committed) ────────────────────────────────────────
 # Production database — lives in Electron's userData directory
 /data/
+!data/trainer-catalog-seed.json
 *.db
 *.db-shm
 *.db-wal
@@ -43,6 +44,8 @@ logs/
 
 # Temporary workspaces
 .tmp/
+.tmp-solith-assets/
+.tmp-solith-screenshot-profile/
 tmp/
 temp/
 

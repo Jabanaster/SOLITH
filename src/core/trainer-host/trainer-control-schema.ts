@@ -5,10 +5,10 @@
  * trainer panel. Controls are pure data; the panel component interprets them.
  *
  * Safety rules enforced here:
- *   - Controls backed by 'memory_write' or 'unsupported' cannot be executed
- *     regardless of their safetyStatus.
- *   - A control can only be executed if backend === 'save_field' AND
- *     safetyStatus === 'supported' or 'requires_approval'.
+ *   - Controls backed by 'unsupported' cannot be executed.
+ *   - memory_observation is read-only and never executable.
+ *   - save_field and memory_write controls execute when safetyStatus is
+ *     'supported' or 'requires_approval'.
  *   - 'requires_approval' controls must go through propose → explicit-approve → execute.
  *   - 'rollback_available' is a result status set after a successful write, not an
  *     initial configuration.
@@ -21,7 +21,7 @@ export type ControlBackend =
   | 'save_field'        // TrainerHost XML/JSON save read-write (supported)
   | 'runtime_file'      // Live config file patching (future)
   | 'memory_observation'// Read-only memory scan (future, read-only)
-  | 'memory_write'      // Memory injection (explicitly blocked for now)
+  | 'memory_write'      // Live process memory write (V2 live trainer)
   | 'unsupported';      // No backend — placeholder / future feature
 
 /** User-visible and logic-visible safety status of the control. */
@@ -90,16 +90,22 @@ export interface TrainerControl {
 
 /**
  * Returns true only if a control can be submitted for write execution.
- * This is the enforcement layer — UI should also hide/disable the button,
- * but this function is the authoritative gate in logic/tests.
  *
- * A control is executable if:
- *   1. backend is 'save_field' (the only write-capable backend in Milestone E)
- *   2. safetyStatus is 'supported' or 'requires_approval'
- *      ('requires_approval' is executable but must go through the approval flow first)
+ * Executable when safetyStatus is 'supported' or 'requires_approval' and
+ * backend is save_field, memory_write, or runtime_file.
+ * memory_observation and unsupported are never executable.
  */
 export function isControlExecutable(control: TrainerControl): boolean {
-  if (control.backend !== 'save_field') return false;
+  if (control.backend === 'unsupported' || control.backend === 'memory_observation') {
+    return false;
+  }
+  if (
+    control.backend !== 'save_field'
+    && control.backend !== 'memory_write'
+    && control.backend !== 'runtime_file'
+  ) {
+    return false;
+  }
   return control.safetyStatus === 'supported' || control.safetyStatus === 'requires_approval';
 }
 

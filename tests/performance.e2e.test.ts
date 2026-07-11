@@ -308,37 +308,26 @@ test('perf-08 — getRecipes with 3 items — Trainer list data (5 runs) < 150ms
 
 // ── perf-09: Mode switch Trainer→Workshop (5 runs) ───────────────────────────
 
-test('perf-09 — mode switch Trainer→Workshop (5 runs) < 500ms each', async () => {
+test('perf-09 — sidebar collapse toggle (5 runs) < 500ms each', async () => {
   test.setTimeout(60_000);
   if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
 
   const N = 5;
   const times: number[] = [];
-
-  // Ensure starting in Trainer mode
-  await win.locator('button.mode-btn', { hasText: 'Trainer' }).click();
-  await win.waitForTimeout(200);
+  const btn = win.locator('.sidebar-collapse-btn');
 
   for (let i = 0; i < N; i++) {
     const t0 = Date.now();
-    await win.locator('button.mode-btn', { hasText: 'Workshop' }).click();
-    await win.waitForFunction(
-      () => {
-        const btns = Array.from(document.querySelectorAll('button.mode-btn'));
-        const ws = btns.find((b: any) => b.textContent?.includes('Workshop'));
-        return ws?.getAttribute('aria-pressed') === 'true';
-      },
-      { timeout: 3000 }
-    );
+    await btn.click();
+    await win.waitForSelector('.sidebar--collapsed', { timeout: 3000 });
     times.push(Date.now() - t0);
-
-    // Reset to Trainer for next iteration
-    await win.locator('button.mode-btn', { hasText: 'Trainer' }).click();
+    await btn.click();
+    await win.waitForSelector('.sidebar:not(.sidebar--collapsed)', { timeout: 3000 });
     await win.waitForTimeout(100);
   }
   const med = median(times);
   const slowest = Math.max(...times);
-  console.log(`perf-09 mode_switch_ms = [${times.join(',')}], median=${med}, slowest=${slowest} (runs=${N})`);
+  console.log(`perf-09 sidebar_collapse_ms = [${times.join(',')}], median=${med}, slowest=${slowest} (runs=${N})`);
   expect(med, `median ${med}ms (target < ${MODE_SWITCH_TARGET_MS}ms)`).toBeLessThan(MODE_SWITCH_TARGET_MS);
 });
 

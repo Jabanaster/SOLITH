@@ -651,6 +651,52 @@ function applySchema(): void {
     )
   `);
 
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS trainer_catalog_games (
+      catalogGameId TEXT PRIMARY KEY,
+      displayName TEXT NOT NULL,
+      steamAppId INTEGER,
+      executablesJson TEXT NOT NULL,
+      categoriesJson TEXT NOT NULL,
+      headerUrl TEXT,
+      coverUrl TEXT,
+      iconUrl TEXT,
+      verificationStatus TEXT NOT NULL,
+      sourcesJson TEXT NOT NULL,
+      hasModPack INTEGER DEFAULT 0,
+      modPackId TEXT,
+      cheatCount INTEGER DEFAULT 0,
+      searchableText TEXT NOT NULL,
+      updatedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS trainer_mod_packs (
+      packId TEXT PRIMARY KEY,
+      catalogGameId TEXT NOT NULL,
+      payloadJson TEXT NOT NULL,
+      verificationStatus TEXT NOT NULL,
+      sourceProvider TEXT NOT NULL,
+      syncedAt TEXT NOT NULL,
+      updatedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS trainer_sync_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL,
+      status TEXT NOT NULL,
+      detail TEXT,
+      importedCount INTEGER DEFAULT 0,
+      syncedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_catalog_search ON trainer_catalog_games(searchableText)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_mod_packs_game ON trainer_mod_packs(catalogGameId)');
+
   // Persisted cheat toggle state (Multi-Game Live Trainer) — remembers which cheats were
   // enabled and their confirmed address so a ResourceForge restart (not a game restart) can
   // re-arm them automatically instead of forcing the user to redo discovery from scratch.
@@ -721,9 +767,13 @@ function applySchema(): void {
     { key: 'theme', value: 'dark' },
     { key: 'safetyAcknowledged', value: 'false' },
     { key: 'externalSaveScanEnabled', value: 'false' },
-    { key: 'v2LiveModeEnabled', value: 'false' },
-    { key: 'v2HotkeysEnabled', value: 'false' },
-    { key: 'v2OverlayEnabled', value: 'false' }
+    { key: 'v2LiveModeEnabled', value: 'true' },
+    { key: 'v2HotkeysEnabled', value: 'true' },
+    { key: 'v2OverlayEnabled', value: 'true' },
+    { key: 'v2FreeformMemoryEnabled', value: 'true' },
+    { key: 'v2RemoteCatalogSyncEnabled', value: 'true' },
+    { key: 'trainerRemoteSyncCompleted', value: 'false' },
+    { key: 'trainerCapabilitiesUnlocked', value: 'false' }
   ];
   defaultSettings.forEach(s => {
     rawDb!.run('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', [s.key, s.value]);

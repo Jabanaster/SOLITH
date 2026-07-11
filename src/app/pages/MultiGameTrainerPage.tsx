@@ -2,17 +2,22 @@ import React, { useEffect, useState, useCallback } from 'react';
 import styles from './MultiGameTrainerPage.module.css';
 import { GameCheatSelector } from '../components/GameCheatSelector.js';
 import { GameSpecificCheatMenu } from '../components/GameSpecificCheatMenu.js';
-import { initializeCheatSystem } from '../../core/cheat-system/index.js';
+import { initializeCheatSystem, getGameConfig } from '../../core/cheat-system/index.js';
 import { trainerSessionCache } from '../stores/trainerSessionCache.js';
 import type { GameConfig } from '../../core/cheat-system/types.js';
 
 let cheatSystemInitialized = false;
 
-export default function MultiGameTrainerPage() {
+export default function MultiGameTrainerPage({ initialGameId }: { initialGameId?: string | null }) {
   const [selectedGame, setSelectedGame] = useState<GameConfig | null>(null);
   const [userConfirmedOffline, setUserConfirmedOffline] = useState(false);
-  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
-  const [enabling, setEnabling] = useState(false);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+
+  useEffect(() => {
+    if (!initialGameId) return;
+    const game = getGameConfig(initialGameId);
+    if (game) setSelectedGame(game);
+  }, [initialGameId]);
 
   useEffect(() => {
     if (!cheatSystemInitialized) {
@@ -22,64 +27,40 @@ export default function MultiGameTrainerPage() {
   }, []);
 
   useEffect(() => {
-    if (!window.electronAPI) {
-      setFeatureEnabled(false);
-      return;
-    }
-    window.electronAPI
-      .getSettings()
-      .then((s: any) => setFeatureEnabled(!!s?.v2LiveModeEnabled))
-      .catch(() => setFeatureEnabled(false));
-  }, []);
-
-  const handleEnableFeature = useCallback(async () => {
-    if (!window.electronAPI) return;
-    setEnabling(true);
-    try {
-      await window.electronAPI.setSetting('v2LiveModeEnabled', true);
-      setFeatureEnabled(true);
-    } finally {
-      setEnabling(false);
-    }
-  }, []);
-
-  useEffect(() => {
     return () => {
       trainerSessionCache.clearAll();
     };
   }, []);
 
-  // Reset offline confirmation when switching games — a confirmation for one
-  // game's connection profile must not silently carry over to another.
   const handleGameSelect = useCallback((game: GameConfig) => {
     setSelectedGame(game);
     setUserConfirmedOffline(false);
   }, []);
 
+  const handleToggleOverlay = useCallback(async () => {
+    const result = await window.electronAPI?.trainerOverlayToggle?.();
+    if (result?.success) {
+      setOverlayVisible(!!result.visible);
+    }
+  }, []);
+
   return (
     <div className={styles['page-container']}>
       <header className={styles['page-header']}>
-        <h1>Multi-Game Live Trainer</h1>
+        <h1>Live Trainer</h1>
         <p className={styles['page-subtitle']}>
-          One-click cheats for 7 games — Palworld, Atomfall, Stardew Valley, Avowed, Undisputed,
-          Dredge, and Crimson Desert
+          WeMod-class live memory trainer — auto-detect running games, toggle cheats in-session,
+          use Ctrl+Shift+O for the overlay
         </p>
-      </header>
-
-      {featureEnabled === false && (
-        <div className={styles['feature-gate-banner']}>
-          <p>
-            Live memory access is disabled by default (single-player/offline only, no injection). Enable it to scan
-            and write cheats for a running game.
-          </p>
-          <button className={styles['enable-btn']} onClick={handleEnableFeature} disabled={enabling}>
-            {enabling ? 'Enabling…' : 'Enable Live Memory Access'}
+        <div className={styles['header-actions']}>
+          <button type="button" className={styles['overlay-btn']} onClick={() => void handleToggleOverlay()}>
+            {overlayVisible ? 'Hide Overlay' : 'Show Overlay'} (Ctrl+Shift+O)
           </button>
         </div>
-      )}
+      </header>
 
       <main className={styles['page-content']}>
-        {!selectedGame && <GameCheatSelector onGameSelect={handleGameSelect} autoSelectRunning={true} />}
+        {!selectedGame && <GameCheatSelector onGameSelect={handleGameSelect} autoSelectRunning />}
 
         {selectedGame && (
           <>
@@ -98,9 +79,6 @@ export default function MultiGameTrainerPage() {
               </label>
             </div>
 
-            {/* key={gameId} forces a full remount (fresh session hook, fresh
-                process handle) on game switch — state from one game's cheats
-                must never bleed into another's. */}
             <GameSpecificCheatMenu
               key={selectedGame.gameId}
               game={selectedGame}

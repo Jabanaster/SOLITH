@@ -243,27 +243,22 @@ test('point 15 — app exits cleanly (close() resolves without timeout)', async 
 
 // ── Points 16-20: Trainer UX survived packaging ───────────────────────────────
 
-test('point 16 — Trainer/Workshop mode toggle renders in packaged app', async () => {
-  const trainerBtn  = win.locator('button.mode-btn', { hasText: 'Trainer' });
-  const workshopBtn = win.locator('button.mode-btn', { hasText: 'Workshop' });
-  await expect(trainerBtn).toBeVisible();
-  await expect(workshopBtn).toBeVisible();
-  const pressed = await trainerBtn.getAttribute('aria-pressed');
-  expect(pressed, 'Trainer mode is default').toBe('true');
+test('point 16 — unified sidebar navigation renders in packaged app', async () => {
+  await expect(win.locator('.solith-top-banner__image')).toBeVisible();
+  await expect(win.locator('button', { hasText: 'Game Library' })).toBeVisible();
+  await expect(win.locator('button', { hasText: 'Save Editor' })).toBeVisible();
+  await expect(win.locator('button', { hasText: 'Compatibility' })).toBeVisible();
 });
 
-test('point 17 — Trainer mode can be toggled in packaged app', async () => {
-  // Switch to Workshop
-  await win.locator('button.mode-btn', { hasText: 'Workshop' }).click();
+test('point 17 — sidebar collapse toggles in packaged app', async () => {
+  const btn = win.locator('.sidebar-collapse-btn');
+  await expect(btn).toBeVisible();
+  await btn.click();
   await win.waitForTimeout(300);
-  const workshopPressed = await win.locator('button.mode-btn', { hasText: 'Workshop' }).getAttribute('aria-pressed');
-  expect(workshopPressed, 'Workshop active after click').toBe('true');
-
-  // Switch back
-  await win.locator('button.mode-btn', { hasText: 'Trainer' }).click();
+  expect(await win.locator('.sidebar--collapsed').count()).toBe(1);
+  await btn.click();
   await win.waitForTimeout(300);
-  const trainerPressed = await win.locator('button.mode-btn', { hasText: 'Trainer' }).getAttribute('aria-pressed');
-  expect(trainerPressed, 'Trainer active after switching back').toBe('true');
+  expect(await win.locator('.sidebar--collapsed').count()).toBe(0);
 });
 
 test('point 18 — new Trainer IPC methods exposed in packaged preload', async () => {
