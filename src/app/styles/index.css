@@ -215,7 +215,7 @@ button, input, select, textarea {
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 64px;
+  padding-bottom: 16px;
   transition: width var(--transition-slow), min-width var(--transition-slow);
 }
 
@@ -470,18 +470,19 @@ button, input, select, textarea {
 
 .solith-top-banner {
   flex-shrink: 0;
+  width: 100%;
+  height: clamp(140px, 22.5vh, 200px);
   border-bottom: 1px solid var(--border-accent);
-  background: rgba(8, 12, 22, 0.72);
+  background: linear-gradient(180deg, rgba(8, 12, 22, 0.96) 0%, rgba(8, 12, 22, 0.88) 100%);
   overflow: hidden;
 }
 
 .solith-top-banner__image {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 112px;
+  height: 100%;
   object-fit: cover;
-  object-position: center;
+  object-position: left center;
 }
 
 .game-context-bar {
@@ -642,25 +643,7 @@ button, input, select, textarea {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
-  padding-bottom: 64px;
-}
-
-/* ─── V2 Notice Bar ─────────────────────────────────────── */
-.v2-notice {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 10px 24px;
-  background: var(--bg-topbar);
-  border-top: 1px solid var(--risky-dim);
-  color: var(--risky);
-  font-size: 11px;
-  line-height: 1.5;
-  text-align: center;
-  letter-spacing: 0.3px;
-  z-index: 100;
-  font-family: var(--font-mono);
+  padding-bottom: 24px;
 }
 
 /* ─── Glass Card ────────────────────────────────────────── */
