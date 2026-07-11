@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
@@ -43,6 +43,9 @@ import {
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc } from './live-memory-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
+import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
+import { destroyTrainerOverlay } from './trainer-overlay.js';
+import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
@@ -50,6 +53,8 @@ import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 // it is never duplicated on window recreation.
 registerLiveMemoryIpc();
 registerCheatToggleIpc();
+registerTrainerHotkeyIpc();
+registerTrainerCatalogIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -97,7 +102,8 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'ResourceForge',
+    title: 'Solith',
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -110,6 +116,9 @@ function createWindow() {
     titleBarStyle: 'hiddenInset',
     frame: true
   });
+
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.setMenu(null);
 
   const isDev = process.argv.includes('--dev') || process.env.RESOURCEFORGE_DEV === '1';
   const isCompatTest = process.argv.includes('--compat-test');
@@ -139,6 +148,16 @@ app.whenReady().then(async () => {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
 
+    const { unlockTrainerCapabilities } = await import('../src/core/settings/unlock-trainer-capabilities.js');
+    unlockTrainerCapabilities();
+    registerTrainerHotkeys();
+
+    try {
+      await bootstrapTrainerCatalog();
+    } catch (error) {
+      console.error('Trainer catalog bootstrap failed:', error);
+    }
+
     const operationsModule = await import('../src/core/safety/operations.js');
     await operationsModule.recoverInterruptedOperations();
   } catch (error) {
@@ -156,6 +175,7 @@ app.whenReady().then(async () => {
     console.error('Failed to initialise V2 lifecycle wiring:', error);
   }
 
+  Menu.setApplicationMenu(null);
   createWindow();
 });
 
@@ -163,6 +183,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  unregisterTrainerHotkeys();
+  destroyTrainerOverlay();
 });
 
 // Remove the app-level 'before-quit' listener installed by lifecycle wiring.

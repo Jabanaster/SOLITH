@@ -11,8 +11,10 @@ import CompatibilityDashboard from './pages/CompatibilityDashboard';
 import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
+import TrainerLibraryPage from './pages/TrainerLibraryPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
 import { Icon, type IconName } from './components/icons/index.js';
+import { solithBranding } from './assets/branding/index.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -44,9 +46,20 @@ class ContentErrorBoundary extends React.Component<
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer';
+  | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer' | 'trainer-library';
 
-type AppMode = 'trainer' | 'workshop';
+type NavItem = {
+  id: View;
+  label: string;
+  icon: IconName;
+  testId?: string;
+};
+
+type NavSection = {
+  title: string;
+  secondary?: boolean;
+  items: NavItem[];
+};
 
 const TRAINER_CATEGORIES: { id: string; label: string }[] = [
   { id: 'all',           label: 'All Items' },
@@ -74,19 +87,43 @@ const TRAINER_CATEGORIES: { id: string; label: string }[] = [
   { id: 'discovery',     label: 'Discovered' },
 ];
 
-const WORKSHOP_PAGES: { id: View; label: string; icon: IconName }[] = [
-  { id: 'saves',         label: 'Save Editor',   icon: 'save' },
-  { id: 'data',          label: 'Data Editor',   icon: 'database' },
-  { id: 'discovery',     label: 'Discovery Lab', icon: 'discovery' },
-  { id: 'locations',     label: 'Save Locations', icon: 'search' },
-  { id: 'recipes',       label: 'Recipes',       icon: 'apply' },
-  { id: 'backups',       label: 'Backups',       icon: 'backups' },
-  { id: 'journal',       label: 'Journal',       icon: 'log' },
-  { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
-  { id: 'session-monitor', label: 'Session Monitor (V2)', icon: 'activity' },
-  { id: 'live-memory', label: 'Live Memory Trainer (V2)', icon: 'trainer' },
-  { id: 'multi-game-trainer', label: 'Multi-Game Cheats (V2)', icon: 'game' },
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Library',
+    items: [{ id: 'library', label: 'Game Library', icon: 'game' }],
+  },
+  {
+    title: 'Core Tools',
+    items: [
+      { id: 'saves', label: 'Save Editor', icon: 'save' },
+      { id: 'backups', label: 'Backups', icon: 'backups' },
+      { id: 'journal', label: 'Journal', icon: 'log' },
+      { id: 'locations', label: 'Save Locations', icon: 'search' },
+    ],
+  },
+  {
+    title: 'Utilities',
+    items: [
+      { id: 'discovery', label: 'Discovery Lab', icon: 'discovery' },
+      { id: 'data', label: 'Data Editor', icon: 'database' },
+      { id: 'recipes', label: 'Recipes', icon: 'apply' },
+      { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
+    ],
+  },
+  {
+    title: 'Advanced',
+    secondary: true,
+    items: [
+      { id: 'session-monitor', label: 'Session Monitor', icon: 'activity' },
+      { id: 'live-memory', label: 'Live Memory Trainer', icon: 'trainer' },
+      { id: 'multi-game-trainer', label: 'Multi-Game Cheats', icon: 'game', testId: 'nav-live-trainer' },
+      { id: 'trainer-library', label: 'Trainer Library', icon: 'search' },
+      { id: 'controls', label: 'Trainer Controls', icon: 'trainer', testId: 'nav-controls' },
+    ],
+  },
 ];
+
+const SIDEBAR_COLLAPSED_KEY = 'solith-sidebar-collapsed';
 
 const App: React.FC = () => {
   const e2eTrainerState = (window as any).electronAPI?.e2eTrainerState as string | null;
@@ -95,21 +132,32 @@ const App: React.FC = () => {
     e2eTrainerState ? { id: 'e2e-renderer-state-fixture', name: 'Renderer State Fixture' } : null
   );
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [appMode, setAppMode] = useState<AppMode>(() => {
-    try { return (localStorage.getItem('rf-app-mode') as AppMode) ?? 'trainer'; } catch { return 'trainer'; }
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
   });
   const [games, setGames] = useState<
     Array<{ id: string; name: string; path: string; dateAdded: string; lastScan: string; engine: string }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [libraryLaunchGameId, setLibraryLaunchGameId] = useState<string | null>(null);
+
+  const handleLibraryLaunch = (catalogGameId: string) => {
+    setLibraryLaunchGameId(catalogGameId);
+    setCurrentView('multi-game-trainer');
+  };
 
   useEffect(() => { loadGames(); }, []);
 
-  const switchMode = (mode: AppMode) => {
-    setAppMode(mode);
-    try { localStorage.setItem('rf-app-mode', mode); } catch { /* ignore */ }
-    if (mode === 'trainer' && selectedGame) setCurrentView('trainer');
-    if (mode === 'workshop') setCurrentView(selectedGame ? 'saves' : 'library');
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const navigateTo = (view: View) => {
+    setCurrentView(view);
   };
 
   const loadGames = async () => {
@@ -127,7 +175,7 @@ const App: React.FC = () => {
   const handleGameSelect = (gameId: string) => {
     const game = games.find(g => g.id === gameId);
     setSelectedGame({ id: gameId, name: game?.name ?? 'Unknown Game' });
-    setCurrentView(appMode === 'workshop' ? 'saves' : 'trainer');
+    setCurrentView('trainer');
   };
 
   const handleBackToLibrary = () => {
@@ -141,6 +189,8 @@ const App: React.FC = () => {
     if (result?.success) await loadGames();
   };
 
+  const isNavActive = (view: View) => currentView === view;
+
   const renderContent = () => {
     switch (currentView) {
       case 'library':
@@ -148,7 +198,9 @@ const App: React.FC = () => {
       case 'trainer':
         return selectedGame ? (
           <TrainerPage gameId={selectedGame.id} category={selectedCategory} onBack={handleBackToLibrary} />
-        ) : null;
+        ) : (
+          <GameLibrary games={games} onSelect={handleGameSelect} onAddGame={handleAddGame} />
+        );
       case 'saves':
         return <SaveEditor gameId={selectedGame?.id ?? null} />;
       case 'data':
@@ -167,10 +219,12 @@ const App: React.FC = () => {
         return <CompatibilityDashboard />;
       case 'session-monitor':
         return <SessionMonitorPage />;
+      case 'trainer-library':
+        return <TrainerLibraryPage onLaunchGame={handleLibraryLaunch} />;
       case 'live-memory':
         return <LiveMemoryTrainerPage />;
       case 'multi-game-trainer':
-        return <MultiGameTrainerPage />;
+        return <MultiGameTrainerPage initialGameId={libraryLaunchGameId} />;
       case 'controls':
         return <TrainerControlPanel />;
       default:
@@ -179,136 +233,113 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="app-container">
-      {/* ── Sidebar ── */}
-      <aside className="sidebar">
-        <div className="app-title">
-          <div className="app-brand-mark" aria-hidden="true">SO</div>
-          <h1>Solith</h1>
-          <p className="subtitle">Game control, saves, and recovery.</p>
-        </div>
-
-        {/* Mode toggle */}
-        <div className="mode-toggle-row">
+    <div className={`app-container${sidebarCollapsed ? ' app-container--sidebar-collapsed' : ''}`}>
+      <aside
+        className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}`}
+        aria-label="Main navigation"
+      >
+        <div className="sidebar-toolbar">
           <button
-            className={`mode-btn ${appMode === 'trainer' ? 'mode-active' : ''}`}
-            onClick={() => switchMode('trainer')}
-            aria-pressed={appMode === 'trainer'}
-            title="Trainer Mode — simple controls for common edits"
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={toggleSidebar}
+            aria-expanded={!sidebarCollapsed}
+            aria-controls="app-nav"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            Trainer
-          </button>
-          <button
-            className={`mode-btn ${appMode === 'workshop' ? 'mode-active' : ''}`}
-            onClick={() => switchMode('workshop')}
-            aria-pressed={appMode === 'workshop'}
-            title="Workshop Mode — advanced discovery, recipes, and diagnostics"
-          >
-            Workshop
+            <span className="sidebar-collapse-icon" aria-hidden="true">
+              {sidebarCollapsed ? '»' : '«'}
+            </span>
+            {!sidebarCollapsed && <span className="nav-label">Collapse</span>}
           </button>
         </div>
 
-        <nav className="nav-section" aria-label="Game library">
-          <h3>Library</h3>
-          <button
-            onClick={() => setCurrentView('library')}
-            className={currentView === 'library' ? 'active' : ''}
-          >
-            <Icon name="game" />
-            Game Library
-          </button>
-        </nav>
+        <div id="app-nav" className="sidebar-nav">
+          {NAV_SECTIONS.map((section) => (
+            <nav
+              key={section.title}
+              className={`nav-section${section.secondary ? ' nav-section--secondary' : ''}`}
+              aria-label={section.title}
+            >
+              <h3>{section.title}</h3>
+              {section.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => navigateTo(item.id)}
+                  className={isNavActive(item.id) ? 'active' : ''}
+                  title={item.label}
+                  data-testid={item.testId}
+                >
+                  <Icon name={item.icon} />
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              ))}
+            </nav>
+          ))}
 
-        {selectedGame && appMode === 'trainer' && (
-          <nav className="nav-section" aria-label="Trainer categories">
-            <h3>Trainer</h3>
-            {TRAINER_CATEGORIES.map(cat => (
+          {selectedGame && (
+            <nav className="nav-section nav-section--context" aria-label="Game trainer categories">
+              <h3>{sidebarCollapsed ? 'Game' : selectedGame.name}</h3>
               <button
-                key={cat.id}
-                onClick={() => { setSelectedCategory(cat.id); setCurrentView('trainer'); }}
-                className={currentView === 'trainer' && selectedCategory === cat.id ? 'active' : ''}
+                type="button"
+                onClick={() => navigateTo('trainer')}
+                className={currentView === 'trainer' && selectedCategory === 'all' ? 'active' : ''}
+                title="Game Trainer"
               >
-                {cat.label}
+                <Icon name="trainer" />
+                <span className="nav-label">Game Trainer</span>
               </button>
-            ))}
-          </nav>
-        )}
-
-        {selectedGame && appMode === 'trainer' && (
-          <nav className="nav-section" aria-label="Quick actions">
-            <h3>Actions</h3>
-            <button onClick={() => setCurrentView('controls')} className={currentView === 'controls' ? 'active' : ''}
-                    data-testid="nav-controls">
-              <Icon name="trainer" />
-              Trainer Controls
-            </button>
-            <button onClick={() => setCurrentView('backups')} className={currentView === 'backups' ? 'active' : ''}>
-              <Icon name="backups" />
-              Backups
-            </button>
-            <button onClick={() => setCurrentView('journal')} className={currentView === 'journal' ? 'active' : ''}>
-              <Icon name="log" />
-              Journal
-            </button>
-          </nav>
-        )}
-
-        {appMode === 'workshop' && (
-          <nav className="nav-section" aria-label="Workshop tools">
-            <h3>Workshop</h3>
-            {WORKSHOP_PAGES.map(page => (
-              <button
-                key={page.id}
-                onClick={() => setCurrentView(page.id)}
-                className={currentView === page.id ? 'active' : ''}
-              >
-                <Icon name={page.icon} />
-                {page.label}
-              </button>
-            ))}
-          </nav>
-        )}
+              {!sidebarCollapsed && TRAINER_CATEGORIES.filter((cat) => cat.id !== 'all').map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => { setSelectedCategory(cat.id); navigateTo('trainer'); }}
+                  className={currentView === 'trainer' && selectedCategory === cat.id ? 'active' : ''}
+                  title={cat.label}
+                >
+                  <span className="nav-category-dot" aria-hidden="true" />
+                  <span className="nav-label">{cat.label}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
       </aside>
 
-      {/* ── Main Content ── */}
       <div className="main-content">
-        <header className="game-header">
-          {selectedGame ? (
-            <>
-              <button onClick={handleBackToLibrary} className="back-btn">← Library</button>
-              <h2 id="game-title">{selectedGame.name}</h2>
-              <div className="header-actions">
-                <button
-                  className="btn-secondary"
-                  onClick={() => (window as any).electronAPI?.scanGame(selectedGame.id)}
-                >
-                  Rescan
-                </button>
-                {appMode === 'trainer' && (
-                  <button className="btn-secondary" onClick={() => switchMode('workshop')}>
-                    Workshop Mode
-                  </button>
-                )}
-                {appMode === 'workshop' && (
-                  <button className="btn-primary" onClick={() => { switchMode('trainer'); setCurrentView('trainer'); }}>
-                    Trainer Mode
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="game-header-idle">
-              <h2>Solith</h2>
-              <span className="game-header-status">
-                {appMode === 'workshop' ? 'WORKSHOP MODE' : 'TRAINER MODE'} · STANDBY
-              </span>
-            </div>
-          )}
+        <header className="solith-top-banner" aria-label="Solith">
+          <img
+            className="solith-top-banner__image"
+            src={solithBranding.topBanner}
+            alt="Solith — Your saves. Your rules. Your machine."
+          />
         </header>
+
+        {selectedGame && (
+          <div className="game-context-bar">
+            <button type="button" onClick={handleBackToLibrary} className="back-btn">
+              ← Library
+            </button>
+            <h2 id="game-title">{selectedGame.name}</h2>
+            <div className="header-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => (window as any).electronAPI?.scanGame(selectedGame.id)}
+              >
+                Rescan
+              </button>
+            </div>
+          </div>
+        )}
 
         <main className="content-area" id="main-content">
           {loading ? (
             <div className="loading-state">
+              <div className="loading-brand" aria-hidden="true">
+                <img src={solithBranding.trainerController} alt="" />
+              </div>
               <div className="loading-spinner" aria-hidden="true" />
               <span>Loading Solith…</span>
             </div>
@@ -319,8 +350,8 @@ const App: React.FC = () => {
       </div>
 
       <div className="v2-notice" role="status">
-        V1 default: file-backed edits only. V2 Live Memory Trainer (Workshop Mode, off by default):
-        single-player/offline only — no injection, no anti-cheat interaction.
+        Local-only save editing. Requires approval before writes.
+        Still blocked: injection, anti-cheat bypass, third-party .exe downloads.
       </div>
     </div>
   );

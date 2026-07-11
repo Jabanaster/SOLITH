@@ -11,7 +11,7 @@
   border: 0 !important;
 }
 /*
- * ResourceForge — Design System
+ * Solith — Design System
  * Fonts: Uses locally-installed fonts where available, with system fallbacks.
  * Inter and JetBrains Mono are referenced by name — if installed on the system
  * they will be picked up automatically. No CDN or network requests.
@@ -90,8 +90,8 @@
   --border:         rgba(255, 255, 255, 0.07);
   --border-accent:  rgba(79, 184, 217, 0.35);
 
-  --glass-bg:       rgba(11, 15, 30, 0.75);
-  --glass-bg-light: rgba(21, 27, 46, 0.6);
+  --glass-bg:       rgba(11, 15, 30, 0.94);
+  --glass-bg-light: rgba(21, 27, 46, 0.9);
   --glass-blur:     blur(20px);
   --glass-border:   rgba(255, 255, 255, 0.08);
 
@@ -110,6 +110,17 @@
 
   --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+
+  /* Solith shell background */
+  --solith-bg-image: url('../assets/branding/solith-landscape-background.png');
+  --solith-bg-overlay: rgba(7, 10, 18, 0.89);
+  --solith-bg-position: center 72%;
+
+  /* Panel surfaces — semi-opaque so landscape shows at ~8–12% effective strength */
+  --panel-surface: rgba(14, 19, 34, 0.92);
+  --panel-surface-raised: rgba(21, 27, 46, 0.9);
+  --sidebar-surface: rgba(11, 15, 30, 0.96);
+  --dialog-surface: rgba(10, 14, 24, 0.98);
 }
 
 /* ─── Reset & Base ──────────────────────────────────────── */
@@ -131,6 +142,29 @@ body {
   line-height: 1.5;
 }
 
+/* Fixed landscape shell — behind all app chrome */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--solith-bg-image);
+  background-size: cover;
+  background-position: var(--solith-bg-position);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--solith-bg-overlay);
+}
+
 /* Native form controls don't inherit font-family by default — this is the
    guard against browser-default serif leaking into buttons/inputs/selects. */
 button, input, select, textarea {
@@ -149,21 +183,19 @@ button, input, select, textarea {
   height: 100vh;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(0, 100, 255, 0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 90% 80%, rgba(100, 0, 255, 0.05) 0%, transparent 60%),
-    linear-gradient(180deg, #080b12 0%, #0a0e18 100%);
+  background: transparent;
+  z-index: 1;
 }
 
-/* Subtle grid overlay */
+/* Subtle HUD grid — very restrained */
 .app-container::before {
   content: '';
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0, 229, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(79, 184, 217, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79, 184, 217, 0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
   pointer-events: none;
   z-index: 0;
 }
@@ -172,15 +204,143 @@ button, input, select, textarea {
 .sidebar {
   width: 240px;
   min-width: 240px;
-  background: var(--bg-surface);
+  background: var(--sidebar-surface);
   border-right: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
   padding: 0;
   z-index: 10;
   position: relative;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: 64px;
+  transition: width var(--transition-slow), min-width var(--transition-slow);
+}
+
+.sidebar--collapsed {
+  width: 56px;
+  min-width: 56px;
+}
+
+.sidebar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 10px 8px 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--cyan);
+  border-color: var(--border-accent);
+  background: var(--cyan-dim);
+}
+
+.sidebar--collapsed .sidebar-collapse-btn {
+  width: 40px;
+  justify-content: center;
+  padding: 7px 0;
+}
+
+.sidebar-collapse-icon {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.sidebar-nav {
+  flex: 1;
+  min-height: 0;
+}
+
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar--collapsed .nav-label,
+.sidebar--collapsed .nav-section h3 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sidebar--collapsed .nav-section button {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.sidebar--collapsed .nav-section--context button .nav-category-dot {
+  display: none;
+}
+
+.nav-section--secondary {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.nav-section--secondary h3 {
+  color: rgba(120, 129, 156, 0.75);
+}
+
+.nav-section--secondary button {
+  color: rgba(170, 179, 204, 0.82);
+  font-size: 12px;
+}
+
+.nav-section--context {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-accent);
+}
+
+.nav-section--context h3 {
+  color: var(--teal);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-category-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 3px;
+}
+
+.nav-section button.active .nav-category-dot {
+  background: var(--cyan);
 }
 
 /* Sidebar top gradient accent */
@@ -205,29 +365,30 @@ button, input, select, textarea {
 }
 
 .app-brand-mark {
-  width: 28px;
-  height: 28px;
-  background: var(--bg-raised);
-  border: 1px solid var(--cyan);
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-accent);
+  border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--teal);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(79, 184, 217, 0.15);
+  background: rgba(8, 12, 22, 0.85);
+}
+
+.app-brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.92;
 }
 
 .app-title h1 {
   font-size: 18px;
   font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
@@ -307,9 +468,45 @@ button, input, select, textarea {
   z-index: 1;
 }
 
+.solith-top-banner {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-accent);
+  background: rgba(8, 12, 22, 0.72);
+  overflow: hidden;
+}
+
+.solith-top-banner__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 112px;
+  object-fit: cover;
+  object-position: center;
+}
+
+.game-context-bar {
+  padding: 10px 24px;
+  background: var(--panel-surface);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  flex-shrink: 0;
+}
+
+.game-context-bar h2 {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
 .game-header {
   padding: 14px 24px;
-  background: var(--glass-bg);
+  background: var(--panel-surface);
   border-bottom: 1px solid var(--glass-border);
   backdrop-filter: blur(10px);
   display: flex;
@@ -683,23 +880,46 @@ button, input, select, textarea {
   position: relative;
   text-align: center;
   padding: 48px 40px;
-  background: var(--bg-raised);
+  background: var(--panel-surface-raised);
   border: 1px solid var(--border-accent);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--cyan-dim);
 }
 
 .empty-state-icon-slot {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   margin: 0 auto 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cyan-dim);
-  background: var(--cyan-dim);
-  color: var(--teal);
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  border: 1px solid var(--border-accent);
+  background: rgba(8, 12, 22, 0.75);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(79, 184, 217, 0.12);
+}
+
+.empty-state-artwork {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.88;
+}
+
+.loading-brand {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-accent);
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(79, 184, 217, 0.12);
+}
+
+.loading-brand img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .empty-state h3 {
@@ -726,8 +946,8 @@ button, input, select, textarea {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(6px);
+  background: rgba(4, 6, 12, 0.72);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -741,7 +961,7 @@ button, input, select, textarea {
 }
 
 .modal-content {
-  background: #0e1420;
+  background: var(--dialog-surface);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
   padding: 28px;
@@ -1075,7 +1295,7 @@ button, input, select, textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   padding: 60px;
   color: var(--text-muted);
   font-size: 13px;
@@ -1661,8 +1881,8 @@ code, .mono {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(4, 6, 12, 0.78);
+  backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -1671,7 +1891,7 @@ code, .mono {
 }
 
 .dialog-box {
-  background: var(--bg-surface);
+  background: var(--dialog-surface);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-xl);
   width: 100%;
