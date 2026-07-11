@@ -471,16 +471,17 @@ button, input, select, textarea {
 .solith-top-banner {
   flex-shrink: 0;
   width: 100%;
-  height: clamp(140px, 22.5vh, 200px);
   border-bottom: 1px solid var(--border-accent);
-  background: linear-gradient(180deg, rgba(8, 12, 22, 0.96) 0%, rgba(8, 12, 22, 0.88) 100%);
-  overflow: hidden;
+  background: #080c16;
+  line-height: 0;
 }
 
+/* Asset: 1024×221 (~4.63:1). Width drives height — no forced box squash. */
 .solith-top-banner__image {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  aspect-ratio: 1024 / 221;
   object-fit: cover;
   object-position: left center;
 }
