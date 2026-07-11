@@ -76,6 +76,8 @@ export interface AttachFingerprintOptions {
   driftAcknowledged?: boolean;
   /** Override connection baseline from a loaded definition. */
   connectionBaseline?: number;
+  /** Catalog game id whose definition supplied fingerprint / feature resolution context. */
+  catalogGameId?: string;
 }
 
 export interface AttachResult {
@@ -125,6 +127,7 @@ export class LiveMemorySession {
   private unknownSnapshots = new Map<string, UnknownScanSnapshot>();
   private readonly addressCache = new SessionAddressCache();
   private lastFingerprint: FingerprintVerifyResult | null = null;
+  private catalogGameId: string | null = null;
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -145,6 +148,11 @@ export class LiveMemorySession {
   /** The executable name of the currently attached process, or null if not attached. */
   getAttachedExecutableName(): string | null {
     return this.target?.executableName ?? null;
+  }
+
+  /** Catalog game id from the most recent attach, if supplied. */
+  getCatalogGameId(): string | null {
+    return this.catalogGameId;
   }
 
   async attach(
@@ -198,6 +206,7 @@ export class LiveMemorySession {
     this.userConfirmedOffline = userConfirmedOffline;
     this.acceptedConnectionBaseline = acceptedConnectionBaseline;
     this.lastFingerprint = fingerprintResult ?? null;
+    this.catalogGameId = fingerprint?.catalogGameId ?? null;
     return {
       success: true,
       guard,
@@ -511,5 +520,6 @@ export class LiveMemorySession {
     this.unknownSnapshots.clear();
     this.addressCache.clear();
     this.lastFingerprint = null;
+    this.catalogGameId = null;
   }
 }

@@ -3,7 +3,7 @@ import styles from './MultiGameTrainerPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { GameCheatSelector } from '../components/GameCheatSelector.js';
 import { GameSpecificCheatMenu } from '../components/GameSpecificCheatMenu.js';
-import { initializeCheatSystem, getGameConfig } from '../../core/cheat-system/index.js';
+import { initializeCheatSystem, getGameConfig, registerGame } from '../../core/cheat-system/index.js';
 import { trainerSessionCache } from '../stores/trainerSessionCache.js';
 import type { GameConfig } from '../../core/cheat-system/types.js';
 
@@ -16,8 +16,24 @@ export default function MultiGameTrainerPage({ initialGameId }: { initialGameId?
 
   useEffect(() => {
     if (!initialGameId) return;
-    const game = getGameConfig(initialGameId);
-    if (game) setSelectedGame(game);
+
+    const local = getGameConfig(initialGameId);
+    if (local) {
+      setSelectedGame(local);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const result = await window.electronAPI?.trainerCatalogLoadGame?.({ catalogGameId: initialGameId });
+      if (cancelled || !result?.success || !result.config) return;
+      registerGame(result.config);
+      setSelectedGame(result.config);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [initialGameId]);
 
   useEffect(() => {

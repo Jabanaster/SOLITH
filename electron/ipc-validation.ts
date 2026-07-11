@@ -388,6 +388,11 @@ export const LiveMemoryResolveControlSchema = z.object({
   controlId: z.string().min(1).max(128),
 });
 
+export const LiveMemoryResolveDefinitionFeatureSchema = z.object({
+  catalogGameId: z.string().min(1).max(128),
+  featureId: z.string().min(1).max(128),
+});
+
 // Persisted cheat toggle state (Multi-Game Live Trainer) — gameId here is a fixed slug
 // (e.g. 'undisputed'), not a UUID like the games-library gameId schemas above.
 const CHEAT_GAME_ID = z.string().min(1).max(64);

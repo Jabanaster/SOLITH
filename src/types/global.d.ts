@@ -114,6 +114,12 @@ interface Window {
       currentValue?: number;
       error?: string;
     }>;
+    liveMemoryResolveDefinitionFeature: (payload: { catalogGameId: string; featureId: string }) => Promise<{
+      success: boolean;
+      address?: { address: string; dataType: string };
+      currentValue?: number;
+      error?: string;
+    }>;
     cheatToggleGetAll: (payload: { gameId: string }) => Promise<{
       success: boolean;
       states?: { gameId: string; cheatId: string; enabled: boolean; confirmedAddress: string | null; dataType: string | null }[];
@@ -152,6 +158,7 @@ interface Window {
       gameId?: string;
       name?: string;
       cheatCount?: number;
+      config?: import('../core/cheat-system/types.js').GameConfig;
       error?: string;
     }>;
     trainerCatalogImportYaml: (payload: { yamlText: string }) => Promise<{

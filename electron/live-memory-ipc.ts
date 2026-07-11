@@ -17,6 +17,7 @@ import {
   LiveMemoryFreezeStatusSchema,
   LiveMemoryListControlsSchema,
   LiveMemoryResolveControlSchema,
+  LiveMemoryResolveDefinitionFeatureSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
@@ -90,20 +91,26 @@ export function registerLiveMemoryIpc(): void {
           executableHashPrefixes: parsed.executableHashPrefixes,
           targetSHA256: parsed.targetSHA256,
           driftAcknowledged: parsed.driftAcknowledged,
+          catalogGameId: parsed.catalogGameId,
         };
       }
 
       if (parsed.catalogGameId) {
-        const { getModPackForGame } = await import('../src/core/trainer-catalog/store.js');
+        const { getModPackForGame, getDefinitionPayload } = await import('../src/core/trainer-catalog/store.js');
         const { modPackToSolithDefinition, definitionFingerprintFields } = await import(
           '../src/core/definitions/mod-pack-adapter.js'
         );
-        const pack = getModPackForGame(parsed.catalogGameId);
-        if (pack) {
-          const definition = modPackToSolithDefinition(pack);
+        const definition =
+          getDefinitionPayload(parsed.catalogGameId) ??
+          (() => {
+            const pack = getModPackForGame(parsed.catalogGameId!);
+            return pack ? modPackToSolithDefinition(pack) : null;
+          })();
+        if (definition) {
           const fields = definitionFingerprintFields(definition);
           fingerprint = {
             ...fingerprint,
+            catalogGameId: parsed.catalogGameId,
             executableHashPrefixes:
               fingerprint?.executableHashPrefixes && fingerprint.executableHashPrefixes.length > 0
                 ? fingerprint.executableHashPrefixes
@@ -351,6 +358,36 @@ export function registerLiveMemoryIpc(): void {
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'resolve_control_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-resolve-definition-feature', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryResolveDefinitionFeatureSchema.parse(payload);
+      const { getModPackForGame, getDefinitionPayload } = await import('../src/core/trainer-catalog/store.js');
+      const { modPackToSolithDefinition } = await import('../src/core/definitions/mod-pack-adapter.js');
+
+      const definition =
+        getDefinitionPayload(parsed.catalogGameId) ??
+        (() => {
+          const pack = getModPackForGame(parsed.catalogGameId);
+          return pack ? modPackToSolithDefinition(pack) : null;
+        })();
+      if (!definition) return { success: false, error: 'no_definition' };
+
+      const feature = definition.memoryFeatures?.find((f) => f.id === parsed.featureId);
+      if (!feature) return { success: false, error: 'unknown_feature' };
+
+      const address = session.resolveMemoryFeature(feature);
+      const currentValue = session.readValue(address);
+      return {
+        success: true,
+        address: { address: address.address.toString(), dataType: address.dataType },
+        currentValue,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'resolve_definition_feature_failed') };
     }
   });
 }

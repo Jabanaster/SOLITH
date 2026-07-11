@@ -113,6 +113,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryListControls: () => ipcRenderer.invoke('live-memory-list-controls'),
   liveMemoryResolveControl: (payload: { controlId: string }) =>
     ipcRenderer.invoke('live-memory-resolve-control', payload),
+  liveMemoryResolveDefinitionFeature: (payload: { catalogGameId: string; featureId: string }) =>
+    ipcRenderer.invoke('live-memory-resolve-definition-feature', payload),
 
   // Persisted cheat toggle state — survives a ResourceForge restart (see
   // cheat-toggle-store.ts for why this is scoped to "app restart", not "game restart").

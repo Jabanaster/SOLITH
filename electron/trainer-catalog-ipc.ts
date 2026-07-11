@@ -95,7 +95,13 @@ export function registerTrainerCatalogIpc(): void {
       const config = loadGameConfigFromCatalog(parsed.catalogGameId);
       if (!config) return { success: false, error: 'no_mod_pack' };
       registerGame(config);
-      return { success: true, gameId: config.gameId, name: config.name, cheatCount: config.cheats.length };
+      return {
+        success: true,
+        gameId: config.gameId,
+        name: config.name,
+        cheatCount: config.cheats.length,
+        config,
+      };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

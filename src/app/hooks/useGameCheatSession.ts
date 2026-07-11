@@ -120,11 +120,28 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       throw new Error(`${game.name} is not running (looked for ${game.executable})`);
     }
 
-    const attachResult = await window.electronAPI.liveMemoryAttach({
+    const attachPayload = {
       pid: match.pid,
       executableName: match.name,
-      userConfirmedOffline: true,
-    });
+      userConfirmedOffline: true as const,
+      catalogGameId: game.gameId,
+    };
+
+    let attachResult = await window.electronAPI.liveMemoryAttach(attachPayload);
+    if (!attachResult.success && attachResult.error === 'executable_fingerprint_mismatch') {
+      const warning =
+        attachResult.fingerprintWarning ??
+        'Executable hash does not match the loaded trainer definition (possible game patch).';
+      const proceed = window.confirm(`${warning}\n\nProceed anyway?`);
+      if (!proceed) {
+        throw new Error(warning);
+      }
+      attachResult = await window.electronAPI.liveMemoryAttach({
+        ...attachPayload,
+        driftAcknowledged: true,
+      });
+    }
+
     if (!attachResult.success) {
       throw new Error(attachResult.guard?.reason ?? attachResult.error ?? 'Failed to attach to process');
     }
@@ -432,6 +449,43 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     [patchState, getState, persist],
   );
 
+  const tryResolveStableCheat = useCallback(
+    async (cheat: CheatDefinition): Promise<boolean> => {
+      if (cheat.requiresDiscovery) return false;
+      patchState(cheat.id, { status: 'discovering', error: null });
+      try {
+        await ensureAttached();
+        const result = await window.electronAPI.liveMemoryResolveDefinitionFeature?.({
+          catalogGameId: game.gameId,
+          featureId: cheat.id,
+        });
+        if (!result?.success || !result.address) {
+          patchState(cheat.id, {
+            status: 'error',
+            error: result?.error ?? 'Could not resolve cheat address from catalog definition',
+          });
+          return false;
+        }
+
+        patchState(cheat.id, {
+          status: 'confirmed',
+          confirmedAddress: result.address.address,
+          confirmedDataType: result.address.dataType,
+          liveValue: result.currentValue ?? null,
+        });
+        persist(cheat, true, result.address.address, result.address.dataType);
+        return true;
+      } catch (err) {
+        patchState(cheat.id, {
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return false;
+      }
+    },
+    [ensureAttached, game.gameId, patchState, persist],
+  );
+
   const toggleCheat = useCallback(
     (cheat: CheatDefinition, enabled: boolean) => {
       if (!enabled) {
@@ -460,12 +514,20 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         void writeValue(cheat, Number(cheat.infiniteValue ?? 1));
         patchState(cheat.id, { status: 'confirmed' });
         persist(cheat, true, current.confirmedAddress, current.confirmedDataType);
+      } else if (!cheat.requiresDiscovery) {
+        void (async () => {
+          const resolved = await tryResolveStableCheat(cheat);
+          if (resolved) {
+            await writeValue(cheat, Number(cheat.infiniteValue ?? 1));
+            patchState(cheat.id, { status: 'confirmed' });
+          }
+        })();
       } else {
         patchState(cheat.id, { status: 'discovering' });
         persist(cheat, true, null, null);
       }
     },
-    [getState, patchState, stopFreeze, writeValue, persist, clearPersisted],
+    [getState, patchState, stopFreeze, writeValue, persist, clearPersisted, tryResolveStableCheat],
   );
 
   const startFreeze = useCallback(
@@ -507,10 +569,21 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
 
   const toggleFreeze = useCallback(
     (cheat: CheatDefinition, enabled: boolean) => {
-      if (enabled) void startFreeze(cheat);
-      else void stopFreeze(cheat.id);
+      if (enabled) {
+        const current = getState(cheat.id);
+        if (!current.confirmedAddress && !cheat.requiresDiscovery) {
+          void (async () => {
+            const resolved = await tryResolveStableCheat(cheat);
+            if (resolved) await startFreeze(cheat);
+          })();
+          return;
+        }
+        void startFreeze(cheat);
+      } else {
+        void stopFreeze(cheat.id);
+      }
     },
-    [startFreeze, stopFreeze],
+    [getState, startFreeze, stopFreeze, tryResolveStableCheat],
   );
 
   const applyValue = useCallback(
