@@ -3,6 +3,8 @@ import {
   buildBackupDashboardSummary,
   type BackupDashboardItem,
 } from './backups-dashboard.js';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { BrandingArtwork } from '../components/BrandingArtwork.js';
 
 interface BackupsProps {
   gameId: string | null;
@@ -70,12 +72,11 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
 
   return (
     <div className="backups-container">
-      <div className="section-header" style={{ marginBottom: '24px' }}>
-        <h2>Backup & Rollback</h2>
-        <p className="description">
-          Solith takes an automatic snapshot of files before applying any trainer edits or custom tweaks. Rollback actions are explicit and require your confirmation.
-        </p>
-      </div>
+      <PageModuleHeader
+        artwork="recoveryPhoenix"
+        title="Backup & Rollback"
+        description="Solith takes an automatic snapshot of files before applying any trainer edits or custom tweaks. Rollback actions are explicit and require your confirmation."
+      />
 
       {!loading && (
         <div className="glass" data-testid="rollback-dashboard-summary" style={{ marginBottom: '20px', padding: '16px' }}>
@@ -114,10 +115,16 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
 
       {loading ? (
         <div className="empty-state glass">
+          <div className="empty-state-icon-slot">
+            <BrandingArtwork artwork="recoveryPhoenix" size="empty" />
+          </div>
           <p>Loading backup snapshots...</p>
         </div>
       ) : backups.length === 0 ? (
         <div className="empty-state glass">
+          <div className="empty-state-icon-slot">
+            <BrandingArtwork artwork="recoveryPhoenix" size="empty" />
+          </div>
           <h3>No backups created yet</h3>
           <p>Backups are automatically generated when you apply modifications in the Save/Data Editor or Trainer pages.</p>
         </div>

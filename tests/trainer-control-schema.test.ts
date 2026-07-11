@@ -15,7 +15,7 @@ import {
   SAFETY_STATUS_LABELS,
   type TrainerControl,
 } from '../src/core/trainer-host/trainer-control-schema.js';
-import { buildControls } from '../src/app/pages/TrainerControlPanel.js';
+import { buildControls } from '../src/app/pages/trainer-control-panel-build.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

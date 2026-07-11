@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '../components/icons/index.js';
-import { solithBranding } from '../assets/branding/index.js';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { BrandingArtwork } from '../components/BrandingArtwork.js';
 
 interface Game {
   id: string;
@@ -75,13 +76,12 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
 
   return (
     <div className="game-library">
-      <div className="library-header">
-        <div>
-          <h2>Game Library</h2>
-          <p className="description">Manage local game folders, scan files, and edit saves</p>
-        </div>
-        <button onClick={() => setShowAddModal(true)} className="btn-add">+ Add Game</button>
-      </div>
+      <PageModuleHeader
+        artwork="hoodedProfile"
+        title="Game Library"
+        description="Manage local game folders, scan files, and edit saves"
+        actions={<button onClick={() => setShowAddModal(true)} className="btn-add">+ Add Game</button>}
+      />
 
       <div className="settings-panel glass">
         <label className="checkbox-container">
@@ -101,7 +101,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       {games.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon-slot">
-            <img src={solithBranding.trainerController} alt="" className="empty-state-artwork" />
+            <BrandingArtwork artwork="hoodedProfile" size="empty" />
           </div>
           <h3>No games added yet</h3>
           <p>Add a local game directory to build custom file-backed trainers.</p>

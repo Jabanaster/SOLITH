@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 
 type LifecycleState =
   | 'disabled' | 'idle' | 'game_not_running' | 'game_running' | 'observing'
@@ -206,12 +207,11 @@ const SessionMonitorPage: React.FC = () => {
 
   return (
     <div className="v2-monitor-page">
-      <div className="v2-monitor-header">
-        <h2>Session Lifecycle Monitor <span className="v2-badge">V2 Preview</span></h2>
-        <p className="v2-safety-notice">
-          Read-only session monitoring · No game modifications are performed
-        </p>
-      </div>
+      <PageModuleHeader
+        artwork="advancedDragon"
+        title={<>Session Lifecycle Monitor <span className="v2-badge">V2 Preview</span></>}
+        description="Read-only session monitoring · No game modifications are performed"
+      />
 
       {/* ── State ── */}
       <section className="v2-monitor-section" aria-label="Current lifecycle state">

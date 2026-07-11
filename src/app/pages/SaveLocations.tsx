@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 
 interface SaveLocationsProps {
   gameId: string | null;
@@ -137,22 +138,21 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
 
   return (
     <div className="save-locations-container">
-      <div className="section-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2>Save Locations</h2>
-          <p className="description">
-            To security-harden Solith, accessing or modifying folders outside the registered game directory requires explicit user approval.
-          </p>
-        </div>
-        <button 
-          onClick={handleScan} 
-          disabled={scanning}
-          className="btn-primary" 
-          style={{ background: '#64ffda', color: '#0d0d12' }}
-        >
-          {scanning ? '🔍 Scanning folders...' : '🔍 Scan for Saves'}
-        </button>
-      </div>
+      <PageModuleHeader
+        artwork="hoodedProfile"
+        title="Save Locations"
+        description="To security-harden Solith, accessing or modifying folders outside the registered game directory requires explicit user approval."
+        actions={
+          <button
+            onClick={handleScan}
+            disabled={scanning}
+            className="btn-primary"
+            style={{ background: '#64ffda', color: '#0d0d12' }}
+          >
+            {scanning ? '🔍 Scanning folders...' : '🔍 Scan for Saves'}
+          </button>
+        }
+      />
 
       <div className="glass" style={{ padding: '20px', marginBottom: '24px', border: '1px solid #2d3a5c', borderRadius: '8px' }}>
         <h3 style={{ marginTop: 0, marginBottom: '12px', color: '#64ffda' }}>Add Custom Location</h3>

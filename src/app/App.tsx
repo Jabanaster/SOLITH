@@ -15,6 +15,8 @@ import TrainerLibraryPage from './pages/TrainerLibraryPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
 import { Icon, type IconName } from './components/icons/index.js';
 import { solithBranding } from './assets/branding/index.js';
+import { BrandingArtwork } from './components/BrandingArtwork.js';
+import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -238,6 +240,18 @@ const App: React.FC = () => {
         className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}`}
         aria-label="Main navigation"
       >
+        <div className="sidebar-identity">
+          <div className="sidebar-identity__mark" aria-hidden="true">
+            <img src={solithBranding.trainerController} alt="" />
+          </div>
+          {!sidebarCollapsed && (
+            <div className="sidebar-identity__text">
+              <div className="sidebar-identity__title">Solith</div>
+              <div className="sidebar-identity__subtitle">Game control, saves, and recovery.</div>
+            </div>
+          )}
+        </div>
+
         <div className="sidebar-toolbar">
           <button
             type="button"
@@ -261,8 +275,15 @@ const App: React.FC = () => {
               className={`nav-section${section.secondary ? ' nav-section--secondary' : ''}`}
               aria-label={section.title}
             >
-              <h3>{section.title}</h3>
-              {section.items.map((item) => (
+              <h3>
+                {SECTION_ARTWORK[section.title] && !sidebarCollapsed ? (
+                  <BrandingArtwork artwork={SECTION_ARTWORK[section.title]!} size="section" />
+                ) : null}
+                <span>{section.title}</span>
+              </h3>
+              {section.items.map((item) => {
+                const artwork = NAV_MODULE_ARTWORK[item.id];
+                return (
                 <button
                   key={item.id}
                   type="button"
@@ -271,10 +292,17 @@ const App: React.FC = () => {
                   title={item.label}
                   data-testid={item.testId}
                 >
-                  <Icon name={item.icon} />
+                  <span className={`nav-icon-slot${artwork ? ' nav-icon-slot--artwork' : ''}`}>
+                    {artwork ? (
+                      <BrandingArtwork artwork={artwork} size="nav" />
+                    ) : (
+                      <Icon name={item.icon} />
+                    )}
+                  </span>
                   <span className="nav-label">{item.label}</span>
                 </button>
-              ))}
+              );
+              })}
             </nav>
           ))}
 
@@ -287,7 +315,9 @@ const App: React.FC = () => {
                 className={currentView === 'trainer' && selectedCategory === 'all' ? 'active' : ''}
                 title="Game Trainer"
               >
-                <Icon name="trainer" />
+                <span className="nav-icon-slot nav-icon-slot--artwork">
+                  <BrandingArtwork artwork="trainerController" size="nav" />
+                </span>
                 <span className="nav-label">Game Trainer</span>
               </button>
               {!sidebarCollapsed && TRAINER_CATEGORIES.filter((cat) => cat.id !== 'all').map((cat) => (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 
 interface JournalProps {
   gameId: string | null;
@@ -61,10 +62,11 @@ const Journal: React.FC<JournalProps> = ({ gameId }) => {
 
   return (
     <div className="journal-container">
-      <div className="section-header" style={{ marginBottom: '24px' }}>
-        <h2>Activity Journal</h2>
-        <p className="description">A detailed audit log of all automated scans, save comparisons, editor tweaks, backups, and restores performed locally.</p>
-      </div>
+      <PageModuleHeader
+        artwork="recoveryPhoenix"
+        title="Activity Journal"
+        description="A detailed audit log of all automated scans, save comparisons, editor tweaks, backups, and restores performed locally."
+      />
 
       {loading ? (
         <div className="empty-state glass">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 import {
   LOCAL_ONLY_SAFETY_MESSAGE,
@@ -182,17 +183,18 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
 
   return (
     <div className="save-editor-container">
-      <div className="section-header">
-        <h2>{mode === 'save' ? 'Save Editor' : 'Data Editor'}</h2>
-        <p className="description">
-          {mode === 'save' 
-            ? 'Inspect local save values and review supported save-field edits before any write.' 
-            : 'Review local data-file suggestions before any supported write path is used.'}
-        </p>
-        <p className="description" data-testid="local-only-safety-copy">
-          {LOCAL_ONLY_SAFETY_MESSAGE} Unsupported and preview-only formats remain blocked from write execution.
-        </p>
-      </div>
+      <PageModuleHeader
+        artwork={mode === 'save' ? 'trainerController' : 'advancedDragon'}
+        title={mode === 'save' ? 'Save Editor' : 'Data Editor'}
+        description={
+          mode === 'save'
+            ? 'Inspect local save values and review supported save-field edits before any write.'
+            : 'Review local data-file suggestions before any supported write path is used.'
+        }
+      />
+      <p className="description" style={{ marginTop: '-12px', marginBottom: '20px' }} data-testid="local-only-safety-copy">
+        {LOCAL_ONLY_SAFETY_MESSAGE} Unsupported and preview-only formats remain blocked from write execution.
+      </p>
 
       <div className="file-selector-panel glass" data-testid="save-edit-risk-legend">
         <label>Save edit states:</label>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import styles from './MultiGameTrainerPage.module.css';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { GameCheatSelector } from '../components/GameCheatSelector.js';
 import { GameSpecificCheatMenu } from '../components/GameSpecificCheatMenu.js';
 import { initializeCheatSystem, getGameConfig } from '../../core/cheat-system/index.js';
@@ -46,18 +47,19 @@ export default function MultiGameTrainerPage({ initialGameId }: { initialGameId?
 
   return (
     <div className={styles['page-container']}>
-      <header className={styles['page-header']}>
-        <h1>Live Trainer</h1>
-        <p className={styles['page-subtitle']}>
-          WeMod-class live memory trainer — auto-detect running games, toggle cheats in-session,
-          use Ctrl+Shift+O for the overlay
-        </p>
-        <div className={styles['header-actions']}>
-          <button type="button" className={styles['overlay-btn']} onClick={() => void handleToggleOverlay()}>
-            {overlayVisible ? 'Hide Overlay' : 'Show Overlay'} (Ctrl+Shift+O)
-          </button>
-        </div>
-      </header>
+      <PageModuleHeader
+        artwork="trainerController"
+        className={styles['page-header']}
+        title="Live Trainer"
+        description="WeMod-class live memory trainer — auto-detect running games, toggle cheats in-session, use Ctrl+Shift+O for the overlay"
+        actions={
+          <div className={styles['header-actions']}>
+            <button type="button" className={styles['overlay-btn']} onClick={() => void handleToggleOverlay()}>
+              {overlayVisible ? 'Hide Overlay' : 'Show Overlay'} (Ctrl+Shift+O)
+            </button>
+          </div>
+        }
+      />
 
       <main className={styles['page-content']}>
         {!selectedGame && <GameCheatSelector onGameSelect={handleGameSelect} autoSelectRunning />}

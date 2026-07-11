@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import styles from './TrainerLibraryPage.module.css';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 
 interface SearchResponse {
@@ -87,17 +88,17 @@ export default function TrainerLibraryPage({
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1>Trainer Library</h1>
-          <p>{total.toLocaleString()} games · searchable catalog with Steam artwork</p>
-        </div>
-        <div className={styles.actions}>
+      <PageModuleHeader
+        artwork="trainerController"
+        className={styles.header}
+        title="Trainer Library"
+        description={`${total.toLocaleString()} games · searchable catalog with Steam artwork`}
+        actions={
           <button type="button" className={styles.syncBtn} onClick={() => void handleSync()} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Sync MrAntiFun / FLiNG / Plitch'}
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <form className={styles.searchRow} onSubmit={handleSearch}>
         <input

@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { exportDiscoveryCandidateToYaml } from '../../core/definitions/export-definition.js';
+import { downloadTextFile } from '../utils/download-text-file.js';
 import type { DiscoveryAdvisoryComparison, DiscoveryReport } from '../../core/discovery/index.js';
 import type { DiscoveryResult } from '../../shared/types';
 
@@ -39,12 +42,25 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   const [dropdownOptions, setDropdownOptions] = useState<Array<{ label: string; value: string }>>([
     { label: 'Option 1', value: 'option-1' }
   ]);
+  const [gameName, setGameName] = useState('Custom Game');
 
   useEffect(() => {
     if (gameId) {
       loadSaveFiles();
+      void loadGameName();
     }
   }, [gameId]);
+
+  const loadGameName = async () => {
+    if (!gameId || !window.electronAPI?.getGames) return;
+    try {
+      const games = await window.electronAPI.getGames();
+      const match = Array.isArray(games) ? games.find((g: { id: string; name?: string }) => g.id === gameId) : null;
+      if (match?.name) setGameName(match.name);
+    } catch {
+      // keep default label
+    }
+  };
 
   const loadSaveFiles = async () => {
     if (!window.electronAPI) {
@@ -96,6 +112,24 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
     } finally {
       setComparing(false);
     }
+  };
+
+  const handleExportDefinition = (candidate: DiscoveryResult, labelOverride?: string) => {
+    if (!gameId || !saveB) {
+      alert('Select save files and run a comparison before exporting a definition.');
+      return;
+    }
+    const exportCandidate = labelOverride
+      ? { ...candidate, suggestedName: labelOverride, suggestedCategory: recipeCategory }
+      : candidate;
+    const bundle = exportDiscoveryCandidateToYaml({
+      gameId,
+      gameName,
+      saveFilePath: saveB,
+      candidate: exportCandidate,
+    });
+    downloadTextFile(bundle.filename, bundle.yaml);
+    alert(`Exported ${bundle.filename}. Review the YAML before compiling or sharing.`);
   };
 
   const openRecipeModal = (candidate: DiscoveryResult) => {
@@ -190,12 +224,11 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
 
   return (
     <div className="discovery-lab-container">
-      <div className="section-header" style={{ marginBottom: '24px' }}>
-        <h2>Discovery Lab</h2>
-        <p className="description">
-          Find offsets by comparing save state transitions. Discovery remains advisory and does not by itself grant executable write support.
-        </p>
-      </div>
+      <PageModuleHeader
+        artwork="advancedDragon"
+        title="Discovery Lab"
+        description="Find offsets by comparing save state transitions. Discovery remains advisory and does not by itself grant executable write support."
+      />
 
       {/* Guided Steps Header */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
@@ -517,6 +550,21 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
                           </span>
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleExportDefinition(cand)}
+                            disabled={cand.risk?.toLowerCase() === 'blocked'}
+                            className="btn-secondary"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              borderRadius: '4px',
+                              fontWeight: 600,
+                              cursor: cand.risk?.toLowerCase() === 'blocked' ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            Export Definition
+                          </button>
                           <button
                             onClick={() => openRecipeModal(cand)}
                             disabled={cand.risk?.toLowerCase() === 'blocked'}
@@ -531,8 +579,9 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
                               cursor: cand.risk?.toLowerCase() === 'blocked' ? 'not-allowed' : 'pointer'
                             }}
                           >
-                            ⚡ Create Recipe
+                            Create Recipe
                           </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -683,6 +732,14 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
                 style={{ padding: '8px 16px' }}
               >
                 Cancel
+              </button>
+              <button
+                onClick={() => selectedCandidate && handleExportDefinition(selectedCandidate, recipeName)}
+                disabled={!recipeName.trim()}
+                className="btn-secondary"
+                style={{ padding: '8px 16px' }}
+              >
+                Export YAML
               </button>
               <button 
                 onClick={handleCreateRecipe} 

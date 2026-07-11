@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { exportMemoryFeatureToYaml } from '../../core/definitions/export-definition.js';
+import { downloadTextFile } from '../utils/download-text-file.js';
 
 interface ProcessEntry {
   pid: number;
@@ -57,6 +60,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
   const [userConfirmedOffline, setUserConfirmedOffline] = useState(false);
   const [attached, setAttached] = useState(false);
+  const [attachedExecutable, setAttachedExecutable] = useState('');
   const [lastGuard, setLastGuard] = useState<GuardResult | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -123,6 +127,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
       setLastGuard(result.guard ?? null);
       if (result.success) {
         setAttached(true);
+        setAttachedExecutable(proc.name);
         setMessage(`Attached to ${proc.name} (PID ${selectedPid}).`);
       } else {
         setMessage(`Attach blocked: ${result.guard?.reason ?? result.error ?? 'unknown reason'}`);
@@ -137,6 +142,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
     try {
       await api.liveMemoryDetach();
       setAttached(false);
+      setAttachedExecutable('');
       setPendingProposal(null);
       setReadValue(null);
       setSavedControls([]);
@@ -304,6 +310,25 @@ const LiveMemoryTrainerPage: React.FC = () => {
     });
   }, [attached, controlsChecked, api]);
 
+  const handleExportMemoryDefinition = () => {
+    if (!attached || !address.trim() || !attachedExecutable) {
+      setMessage('Attach to a process and enter a resolved address before exporting.');
+      return;
+    }
+    const featureName = window.prompt('Feature name for this memory definition:', 'Discovered Stat')?.trim();
+    if (!featureName) return;
+    const bundle = exportMemoryFeatureToYaml({
+      gameName: attachedExecutable.replace(/\.exe$/i, ''),
+      executableName: attachedExecutable,
+      featureName,
+      dataType,
+      sessionAddress: address.trim(),
+      defaultValue: readValue ?? undefined,
+    });
+    downloadTextFile(bundle.filename, bundle.yaml);
+    setMessage(`Exported ${bundle.filename} — review pointer stability before distributing.`);
+  };
+
   const handleUseControl = async (control: SavedControl) => {
     setBusy(true);
     try {
@@ -356,12 +381,11 @@ const LiveMemoryTrainerPage: React.FC = () => {
 
   return (
     <div className="v2-monitor-page">
-      <div className="v2-monitor-header">
-        <h2>Cheat Engine Mode</h2>
-        <p className="v2-safety-notice">
-          Freeform ReadProcessMemory/WriteProcessMemory — scan any value, enter any address, freeze, pointer workflows
-        </p>
-      </div>
+      <PageModuleHeader
+        artwork="trainerController"
+        title={<>Cheat Engine Mode</>}
+        description="Freeform ReadProcessMemory/WriteProcessMemory — scan any value, enter any address, freeze, pointer workflows"
+      />
 
       <section className="v2-monitor-section" aria-label="Process selection">
         <h3>Target Process</h3>
@@ -453,6 +477,13 @@ const LiveMemoryTrainerPage: React.FC = () => {
 
           <div className="v2-controls-row">
             <button className="btn-secondary" onClick={handleRead} disabled={busy || !address.trim()}>Read</button>
+            <button
+              className="btn-secondary"
+              onClick={handleExportMemoryDefinition}
+              disabled={busy || !address.trim()}
+            >
+              Export Definition
+            </button>
           </div>
           {readValue !== null && <p className="v2-meta">Current value: {readValue}</p>}
 

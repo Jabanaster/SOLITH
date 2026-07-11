@@ -14,6 +14,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type {
   TrainerControl,
   ControlSafetyStatus,
@@ -24,12 +25,6 @@ import {
   BACKEND_LABELS,
   SAFETY_STATUS_LABELS,
 } from '../../core/trainer-host/trainer-control-schema.js';
-import type { GameProfile } from '../../core/game-profiles/types.js';
-import { validateGameProfile } from '../../core/game-profiles/types.js';
-import { loadTrainerControls } from '../../core/game-profiles/transform.js';
-// Renderer-safe: import the profile as data (bundled by Vite). We must NOT import
-// the fs-backed loader here, or Node built-ins get pulled into the browser bundle.
-import stardewProfileData from '../../core/game-profiles/profiles/stardew-valley.json';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 import {
   LOCAL_ONLY_SAFETY_MESSAGE,
@@ -40,22 +35,7 @@ import {
 
 // ── Profile-driven control loading ───────────────────────────────────────────
 
-/**
- * Loads trainer controls from the Stardew Valley game profile.
- * Replaces the hardcoded buildControls() from Milestone G.
- *
- * The profile is validated at build/runtime; an invalid profile yields no
- * controls rather than rendering an unsafe/partial panel.
- */
-export function buildControls(): TrainerControl[] {
-  const profile = stardewProfileData as GameProfile;
-  const errors = validateGameProfile(profile);
-  if (errors.length > 0) {
-    console.error('Stardew profile failed validation:', errors);
-    return [];
-  }
-  return loadTrainerControls(profile);
-}
+export { buildControls } from './trainer-control-panel-build.js';
 
 // Note: The rest of the panel implementation below remains unchanged.
 // Controls are now loaded from profile but the UI behavior is identical:
@@ -475,6 +455,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
 
   return (
     <div className="trainer-control-panel" data-testid="trainer-control-panel">
+      <PageModuleHeader
+        artwork="trainerController"
+        title="Trainer Controls"
+        description="Save-backed trainer controls loaded from verified game profiles. Propose, approve, and rollback with explicit confirmation."
+      />
       <div className="tcp-host-bar">
         <span className="tcp-local-only-copy" data-testid="trainer-local-only-copy">
           {LOCAL_ONLY_SAFETY_MESSAGE}

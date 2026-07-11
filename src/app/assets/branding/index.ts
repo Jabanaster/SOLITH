@@ -16,3 +16,5 @@ export const solithBranding = {
 } as const;
 
 export type SolithBrandingArtwork = keyof typeof solithBranding;
+
+export * from './module-artwork.js';

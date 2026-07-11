@@ -1,4 +1,6 @@
 import React from 'react';
+import type { SolithBrandingArtwork } from '../assets/branding/index.js';
+import { BrandingArtwork } from './BrandingArtwork.js';
 import { Icon, type IconName } from './icons/index.js';
 import styles from './ModuleCard.module.css';
 
@@ -14,6 +16,8 @@ const STATUS_LABEL: Record<ModuleCardStatus, string> = {
 
 interface ModuleCardProps {
   icon: IconName;
+  /** Optional Solith module artwork — replaces the vector icon when set. */
+  artwork?: SolithBrandingArtwork;
   title: string;
   description: string;
   metadata: string;
@@ -28,12 +32,20 @@ interface ModuleCardProps {
  * (reserved for live-memory/system-flagged modules per the design spec —
  * violet must not be used for `neutral`/general-purpose cards), neutral=cyan.
  */
-export const ModuleCard: React.FC<ModuleCardProps> = ({ icon, title, description, metadata, status, footerRight }) => {
+export const ModuleCard: React.FC<ModuleCardProps> = ({
+  icon,
+  artwork,
+  title,
+  description,
+  metadata,
+  status,
+  footerRight,
+}) => {
   return (
     <div className={`${styles.card} ${styles[status]}`}>
       <div className={styles.top}>
-        <div className={styles.iconSlot}>
-          <Icon name={icon} size={14} />
+        <div className={`${styles.iconSlot}${artwork ? ` ${styles.iconSlotArtwork}` : ''}`}>
+          {artwork ? <BrandingArtwork artwork={artwork} size="nav" /> : <Icon name={icon} size={14} />}
         </div>
         <div>
           <div className={styles.title}>{title}</div>

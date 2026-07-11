@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageModuleHeader } from '../components/PageModuleHeader.js';
 
 interface RecipesProps {
   gameId: string | null;
@@ -90,10 +91,11 @@ const Recipes: React.FC<RecipesProps> = ({ gameId }) => {
 
   return (
     <div className="recipes-container">
-      <div className="section-header" style={{ marginBottom: '24px' }}>
-        <h2>Trainer Recipes</h2>
-        <p className="description">Manage your saved trainer configurations. These recipes represent offsets and targets discovered in your game files.</p>
-      </div>
+      <PageModuleHeader
+        artwork="advancedDragon"
+        title="Trainer Recipes"
+        description="Manage your saved trainer configurations. These recipes represent offsets and targets discovered in your game files."
+      />
 
       <div className="categories-filter" style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>
         {CATEGORIES.map(cat => (
