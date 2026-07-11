@@ -22,7 +22,7 @@ import { spawn } from 'child_process';
 import { createConnection } from 'net';
 
 const VITE_PORT = 3000;
-const VITE_HOST = '127.0.0.1';
+const VITE_HOST = 'localhost';
 const POLL_INTERVAL_MS = 300;
 const VITE_READY_TIMEOUT_MS = 60_000;
 
