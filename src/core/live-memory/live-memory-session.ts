@@ -10,6 +10,13 @@ import {
 } from './memory-scanner.js';
 import type { ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
+import {
+  fingerprintBlocksAttach,
+  verifyDefinitionFingerprint,
+  type FingerprintVerifyResult,
+} from '../definitions/fingerprint-verify.js';
+import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
+import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
 import type { LiveTrainerControl } from './live-control-catalog.js';
 import type {
   FreezeStatus,
@@ -61,10 +68,22 @@ export interface StartFreezeResult {
   error?: string;
 }
 
+export interface AttachFingerprintOptions {
+  executableHashSHA256?: string;
+  executableHashPrefixes?: string[];
+  targetSHA256?: string;
+  /** User acknowledged executable drift after seeing fingerprintWarning. */
+  driftAcknowledged?: boolean;
+  /** Override connection baseline from a loaded definition. */
+  connectionBaseline?: number;
+}
+
 export interface AttachResult {
   success: boolean;
   guard: OnlineGuardResult;
   error?: string;
+  fingerprintWarning?: string;
+  fingerprint?: FingerprintVerifyResult;
 }
 
 export interface ConfirmWriteResult {
@@ -104,6 +123,8 @@ export class LiveMemorySession {
   private freeze: FreezeState | null = null;
   private freezeGeneration = 0;
   private unknownSnapshots = new Map<string, UnknownScanSnapshot>();
+  private readonly addressCache = new SessionAddressCache();
+  private lastFingerprint: FingerprintVerifyResult | null = null;
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -126,17 +147,45 @@ export class LiveMemorySession {
     return this.target?.executableName ?? null;
   }
 
-  async attach(target: LiveProcessTarget, userConfirmedOffline: boolean): Promise<AttachResult> {
+  async attach(
+    target: LiveProcessTarget,
+    userConfirmedOffline: boolean,
+    fingerprint?: AttachFingerprintOptions,
+  ): Promise<AttachResult> {
     if (this.isAttached()) {
       return { success: false, guard: { allowed: false, reason: 'Session already attached.' }, error: 'already_attached' };
     }
 
-    const acceptedConnectionBaseline = getConnectionBaseline(target.executableName);
+    const acceptedConnectionBaseline =
+      fingerprint?.connectionBaseline ?? getConnectionBaseline(target.executableName);
     const evidence = await this.remoteConnectionObserver(target.pid);
     const guard = evaluateOnlineGuard({ userConfirmedOffline, remoteConnections: evidence, acceptedConnectionBaseline });
 
     if (!guard.allowed) {
       return { success: false, guard };
+    }
+
+    let fingerprintResult: FingerprintVerifyResult | undefined;
+    if (
+      fingerprint &&
+      (fingerprint.targetSHA256 ||
+        (fingerprint.executableHashPrefixes && fingerprint.executableHashPrefixes.length > 0))
+    ) {
+      fingerprintResult = verifyDefinitionFingerprint({
+        executableHashSHA256: fingerprint.executableHashSHA256 ?? null,
+        executableHashPrefixes: fingerprint.executableHashPrefixes,
+        targetSHA256: fingerprint.targetSHA256,
+      });
+
+      if (fingerprintBlocksAttach(fingerprintResult, fingerprint.driftAcknowledged)) {
+        return {
+          success: false,
+          guard,
+          error: 'executable_fingerprint_mismatch',
+          fingerprintWarning: fingerprintResult.warning,
+          fingerprint: fingerprintResult,
+        };
+      }
     }
 
     try {
@@ -148,7 +197,21 @@ export class LiveMemorySession {
     this.target = target;
     this.userConfirmedOffline = userConfirmedOffline;
     this.acceptedConnectionBaseline = acceptedConnectionBaseline;
-    return { success: true, guard };
+    this.lastFingerprint = fingerprintResult ?? null;
+    return {
+      success: true,
+      guard,
+      fingerprint: fingerprintResult,
+      fingerprintWarning:
+        fingerprintResult?.status === 'mismatch' && fingerprint?.driftAcknowledged
+          ? fingerprintResult.warning
+          : undefined,
+    };
+  }
+
+  /** Fingerprint result from the most recent successful attach, if any. */
+  getAttachFingerprint(): FingerprintVerifyResult | null {
+    return this.lastFingerprint;
   }
 
   readValue(address: LiveMemoryAddress): number {
@@ -259,6 +322,15 @@ export class LiveMemorySession {
     if (!this.handle) throw new Error('No process attached.');
     const address = resolvePointerPath(this.driver, this.handle, control.pointerPath);
     return { address, dataType: control.dataType };
+  }
+
+  /**
+   * Resolves a schema.v1 memory feature to a concrete address. Uses the per-session
+   * AOB/pointer cache so freeze loops do not re-scan on every tick.
+   */
+  resolveMemoryFeature(feature: MemoryFeatureV1): LiveMemoryAddress {
+    if (!this.handle) throw new Error('No process attached.');
+    return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache);
   }
 
   /** Captures the current value and stages a proposed write. Does not write anything yet. */
@@ -437,5 +509,7 @@ export class LiveMemorySession {
     this.target = null;
     this.pendingProposals.clear();
     this.unknownSnapshots.clear();
+    this.addressCache.clear();
+    this.lastFingerprint = null;
   }
 }

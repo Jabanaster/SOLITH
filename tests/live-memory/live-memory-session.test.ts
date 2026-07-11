@@ -351,4 +351,59 @@ describe('LiveMemorySession catalog controls', () => {
       }),
     );
   });
+
+  test('attach blocks on executable fingerprint mismatch until drift acknowledged', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    const hash = 'abc123def4567890abcdef1234567890abcdef1234567890abcdef1234567890';
+
+    const blocked = await session.attach(
+      { pid: 1234, executableName: 'demo.exe' },
+      true,
+      { executableHashSHA256: hash, executableHashPrefixes: ['deadbeef'] },
+    );
+    assert.equal(blocked.success, false);
+    assert.equal(blocked.error, 'executable_fingerprint_mismatch');
+    assert.match(blocked.fingerprintWarning ?? '', /Patch Day Drift/);
+    assert.equal(driver.isOpen(), false);
+
+    const allowed = await session.attach(
+      { pid: 1234, executableName: 'demo.exe' },
+      true,
+      { executableHashSHA256: hash, executableHashPrefixes: ['deadbeef'], driftAcknowledged: true },
+    );
+    assert.equal(allowed.success, true);
+    assert.equal(allowed.fingerprint?.status, 'mismatch');
+    assert.match(allowed.fingerprintWarning ?? '', /Patch Day Drift/);
+  });
+
+  test('resolveMemoryFeature uses session cache cleared on detach', async () => {
+    const driver = new FakeMemoryDriver({ '4194320': 42 });
+    driver.addModule('demo.exe', 0x400000n, 0x2000);
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const feature = {
+      id: 'hp',
+      name: 'HP',
+      category: 'Player',
+      type: 'freeze' as const,
+      dataType: 'int32' as const,
+      defaultValue: 999,
+      resolution: {
+        moduleName: 'demo.exe',
+        baseOffset: '0x10',
+      },
+    };
+
+    const first = session.resolveMemoryFeature(feature);
+    const second = session.resolveMemoryFeature(feature);
+    assert.equal(first.address, second.address);
+
+    session.detach();
+
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+    const afterDetach = session.resolveMemoryFeature(feature);
+    assert.equal(afterDetach.address, first.address);
+  });
 });

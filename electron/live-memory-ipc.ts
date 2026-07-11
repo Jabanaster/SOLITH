@@ -68,9 +68,58 @@ export function registerLiveMemoryIpc(): void {
       const mod = await getLiveMemoryModule();
       disposeSession(event.sender.id);
       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
+
+      let fingerprint:
+        | {
+            executableHashSHA256?: string;
+            executableHashPrefixes?: string[];
+            targetSHA256?: string;
+            driftAcknowledged?: boolean;
+            connectionBaseline?: number;
+          }
+        | undefined;
+
+      if (
+        parsed.executableHashSHA256 ||
+        parsed.executableHashPrefixes?.length ||
+        parsed.targetSHA256 ||
+        parsed.catalogGameId
+      ) {
+        fingerprint = {
+          executableHashSHA256: parsed.executableHashSHA256,
+          executableHashPrefixes: parsed.executableHashPrefixes,
+          targetSHA256: parsed.targetSHA256,
+          driftAcknowledged: parsed.driftAcknowledged,
+        };
+      }
+
+      if (parsed.catalogGameId) {
+        const { getModPackForGame } = await import('../src/core/trainer-catalog/store.js');
+        const { modPackToSolithDefinition, definitionFingerprintFields } = await import(
+          '../src/core/definitions/mod-pack-adapter.js'
+        );
+        const pack = getModPackForGame(parsed.catalogGameId);
+        if (pack) {
+          const definition = modPackToSolithDefinition(pack);
+          const fields = definitionFingerprintFields(definition);
+          fingerprint = {
+            ...fingerprint,
+            executableHashPrefixes:
+              fingerprint?.executableHashPrefixes && fingerprint.executableHashPrefixes.length > 0
+                ? fingerprint.executableHashPrefixes
+                : fields.executableHashPrefixes,
+            targetSHA256: fingerprint?.targetSHA256 ?? fields.targetSHA256,
+            connectionBaseline: fields.connectionBaseline,
+            driftAcknowledged: fingerprint?.driftAcknowledged,
+            executableHashSHA256: fingerprint?.executableHashSHA256,
+          };
+        }
+      }
+
       const result = await session.attach(
         { pid: parsed.pid, executableName: parsed.executableName },
         parsed.userConfirmedOffline,
+        fingerprint,
       );
 
       if (result.success) {

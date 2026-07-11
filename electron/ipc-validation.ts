@@ -261,6 +261,11 @@ export const LiveMemoryAttachSchema = z.object({
   executableName: z.string().min(1).max(260),
   // Must be explicitly true — cannot default or be inferred (see PROJECT_SPEC.md Section 3.1).
   userConfirmedOffline: z.literal(true),
+  executableHashSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  executableHashPrefixes: z.array(z.string().regex(/^[a-f0-9]{4,64}$/i)).max(32).optional(),
+  targetSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  driftAcknowledged: z.boolean().optional(),
+  catalogGameId: z.string().min(1).max(128).optional(),
 });
 
 export const LiveMemoryDetachSchema = z.object({});

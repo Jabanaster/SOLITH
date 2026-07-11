@@ -5,6 +5,7 @@ export { nativeMemoryDriver, listLiveMemoryProcesses } from './native-memory-dri
 export type { LiveProcessListEntry } from './native-memory-driver.js';
 export { LiveMemorySession } from './live-memory-session.js';
 export type {
+  AttachFingerprintOptions,
   AttachResult,
   ConfirmWriteResult,
   RollbackResult,
@@ -19,5 +20,8 @@ export { scanForPointerPath } from './pointer-scanner.js';
 export type { PointerScanBounds, PointerPathCandidate, PointerScanResult } from './pointer-scanner.js';
 export { resolvePointerPath } from './pointer-resolver.js';
 export type { LivePointerPath } from './pointer-resolver.js';
+export { parseAobSignature, findAobInBuffer, scanAobInProcess } from './aob-resolver.js';
+export type { AobPattern, AobScanOptions } from './aob-resolver.js';
+export { resolveMemoryFeatureAddress, SessionAddressCache, parseHexOffset } from './feature-resolver.js';
 export { listControlsForGame, getControl, listAllControls } from './live-control-catalog.js';
 export type { LiveTrainerControl } from './live-control-catalog.js';

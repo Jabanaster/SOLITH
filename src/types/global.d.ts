@@ -44,7 +44,16 @@ interface Window {
     // Live Memory Trainer (V2, feature-flagged off by default, single-player/
     // offline only — see PROJECT_SPEC.md Section 3.1)
     liveMemoryListProcesses: () => Promise<{ success: boolean; processes?: { pid: number; name: string }[]; error?: string }>;
-    liveMemoryAttach: (payload: { pid: number; executableName: string; userConfirmedOffline: true }) => Promise<any>;
+    liveMemoryAttach: (payload: {
+      pid: number;
+      executableName: string;
+      userConfirmedOffline: true;
+      executableHashSHA256?: string;
+      executableHashPrefixes?: string[];
+      targetSHA256?: string;
+      driftAcknowledged?: boolean;
+      catalogGameId?: string;
+    }) => Promise<any>;
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
     liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) => Promise<any>;
