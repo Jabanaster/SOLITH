@@ -179,6 +179,8 @@ button, input, select, textarea {
   padding: 0;
   z-index: 10;
   position: relative;
+  overflow-y: auto;
+  padding-bottom: 64px;
 }
 
 /* Sidebar top gradient accent */
