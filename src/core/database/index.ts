@@ -628,6 +628,16 @@ function applySchema(): void {
     )
   `);
 
+  const compatibilityProfileColumnsToAdd = [
+    'sourceUrls TEXT',
+    'sourceConfidence TEXT',
+    'sourceNotes TEXT',
+    'sourceCheckedAt TEXT'
+  ];
+  compatibilityProfileColumnsToAdd.forEach(col => {
+    try { rawDb!.run(`ALTER TABLE compatibility_profiles ADD COLUMN ${col}`); } catch { /* already exists */ }
+  });
+
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS profile_validations (
       id TEXT PRIMARY KEY,

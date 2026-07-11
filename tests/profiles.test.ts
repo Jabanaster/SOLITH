@@ -247,6 +247,92 @@ describe('Compatibility Profiles', () => {
     assert(result.reasons.length > 0, 'Should explain why');
   });
 
+  test('13. Existing profile without source fields loads with safe defaults', async () => {
+    await resetForTesting();
+
+    const gameId = randomUUID();
+    // No sourceUrls/sourceConfidence/sourceNotes/sourceCheckedAt supplied —
+    // simulates a profile written before the citation fields existed.
+    const profile = createProfile(gameId, 'Legacy Profile');
+
+    assert.deepStrictEqual(profile.sourceUrls, [], 'sourceUrls should default to an empty array');
+    assert.strictEqual(profile.sourceConfidence, undefined, 'sourceConfidence should default to undefined');
+    assert.strictEqual(profile.sourceNotes, undefined, 'sourceNotes should default to undefined');
+    assert.strictEqual(profile.sourceCheckedAt, undefined, 'sourceCheckedAt should default to undefined');
+
+    const retrieved = getProfile(profile.id);
+    assert.deepStrictEqual(retrieved!.sourceUrls, [], 'Retrieved sourceUrls should still default to []');
+    assert.strictEqual(retrieved!.sourceConfidence, undefined, 'Retrieved sourceConfidence should be undefined');
+  });
+
+  test('14. New profile can include full source citation', async () => {
+    await resetForTesting();
+
+    const gameId = randomUUID();
+    const checkedAt = new Date().toISOString();
+    const profile = createProfile(gameId, 'Cited Game', {
+      sourceUrls: ['https://www.pcgamingwiki.com/wiki/Example', 'https://example-official-docs.test/saves'],
+      sourceConfidence: 'A',
+      sourceNotes: 'Confirmed via PCGamingWiki and official support docs.',
+      sourceCheckedAt: checkedAt,
+    });
+
+    assert.deepStrictEqual(profile.sourceUrls, [
+      'https://www.pcgamingwiki.com/wiki/Example',
+      'https://example-official-docs.test/saves',
+    ]);
+    assert.strictEqual(profile.sourceConfidence, 'A');
+    assert.strictEqual(profile.sourceNotes, 'Confirmed via PCGamingWiki and official support docs.');
+    assert.strictEqual(profile.sourceCheckedAt, checkedAt);
+
+    const retrieved = getProfile(profile.id);
+    assert.deepStrictEqual(retrieved!.sourceUrls, profile.sourceUrls, 'sourceUrls should round-trip through the DB');
+    assert.strictEqual(retrieved!.sourceConfidence, 'A', 'sourceConfidence should round-trip through the DB');
+  });
+
+  test('15. Invalid sourceConfidence value is rejected', async () => {
+    await resetForTesting();
+
+    const gameId = randomUUID();
+    assert.throws(
+      () => createProfile(gameId, 'Bad Confidence Game', {
+        sourceConfidence: 'Z' as unknown as 'A',
+      }),
+      /Invalid|invalid/,
+      'Zod should reject a sourceConfidence value outside A/B/C'
+    );
+  });
+
+  test('16. sourceUrls must be an array', async () => {
+    await resetForTesting();
+
+    const gameId = randomUUID();
+    assert.throws(
+      () => createProfile(gameId, 'Bad Urls Game', {
+        sourceUrls: 'https://not-an-array.test' as unknown as string[],
+      }),
+      /Invalid|invalid|array/i,
+      'Zod should reject a non-array sourceUrls value'
+    );
+  });
+
+  test('17. updateProfile can add source citation to an existing profile', async () => {
+    await resetForTesting();
+
+    const gameId = randomUUID();
+    const original = createProfile(gameId, 'Needs Citation');
+    assert.deepStrictEqual(original.sourceUrls, [], 'Should start with no sources');
+
+    const updated = updateProfile(original.id, {
+      sourceUrls: ['https://example-wiki.test/game'],
+      sourceConfidence: 'B',
+    });
+
+    assert(updated, 'Update should return the updated profile');
+    assert.deepStrictEqual(updated!.sourceUrls, ['https://example-wiki.test/game']);
+    assert.strictEqual(updated!.sourceConfidence, 'B');
+  });
+
   test('12. Delete profile cascades to validations', async () => {
     await resetForTesting();
 

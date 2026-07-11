@@ -73,6 +73,12 @@ export const CompatibilityProfileSchema = z.object({
   // Cloud sync detection
   hasCloudSync: z.boolean().default(false),
   cloudSyncWarning: z.string().optional(),
+
+  // Source citation — where this profile's save/config/compatibility facts came from
+  sourceUrls: z.array(z.string()).default([]),
+  sourceConfidence: z.enum(['A', 'B', 'C']).optional(),
+  sourceNotes: z.string().optional(),
+  sourceCheckedAt: z.string().datetime().optional(),
 });
 
 export type CompatibilityProfile = z.infer<typeof CompatibilityProfileSchema>;

@@ -44,6 +44,7 @@ export function createProfile(
     fingerprint: {} as Record<string, unknown>,
     validationStatus: 'UNSUPPORTED' as const,
     hasCloudSync: false,
+    sourceUrls: [] as string[],
     ...profileData,
   };
 
@@ -60,8 +61,9 @@ export function createProfile(
       publisherHints, developerHints, saveLocationPatterns, configLocationPatterns,
       supportedAdapters, gameVersion, saveFormatVersion, fingerprint,
       validationStatus, limitations, hasCloudSync, cloudSyncWarning,
+      sourceUrls, sourceConfidence, sourceNotes, sourceCheckedAt,
       createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
@@ -86,6 +88,10 @@ export function createProfile(
     JSON.stringify(validated.limitations),
     validated.hasCloudSync ? 1 : 0,
     validated.cloudSyncWarning ?? null,
+    JSON.stringify(validated.sourceUrls),
+    validated.sourceConfidence ?? null,
+    validated.sourceNotes ?? null,
+    validated.sourceCheckedAt ?? null,
     validated.createdAt || new Date().toISOString(),
     validated.updatedAt || new Date().toISOString()
   ];
@@ -189,6 +195,10 @@ export function updateProfile(
       limitations = ?,
       hasCloudSync = ?,
       cloudSyncWarning = ?,
+      sourceUrls = ?,
+      sourceConfidence = ?,
+      sourceNotes = ?,
+      sourceCheckedAt = ?,
       updatedAt = ?
     WHERE id = ?
   `;
@@ -212,6 +222,10 @@ export function updateProfile(
     JSON.stringify(validated.limitations),
     validated.hasCloudSync ? 1 : 0,
     validated.cloudSyncWarning ?? null,
+    JSON.stringify(validated.sourceUrls),
+    validated.sourceConfidence ?? null,
+    validated.sourceNotes ?? null,
+    validated.sourceCheckedAt ?? null,
     validated.updatedAt,
     profileId
   ];
@@ -321,6 +335,10 @@ function parseProfileRow(row: any): CompatibilityProfile {
     limitations: JSON.parse(row.limitations || '[]'),
     hasCloudSync: row.hasCloudSync === 1,
     cloudSyncWarning: row.cloudSyncWarning || undefined,
+    sourceUrls: JSON.parse(row.sourceUrls || '[]'),
+    sourceConfidence: row.sourceConfidence || undefined,
+    sourceNotes: row.sourceNotes || undefined,
+    sourceCheckedAt: row.sourceCheckedAt || undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     lastValidatedAt: row.lastValidatedAt || undefined,
