@@ -6,3 +6,5 @@ export * from './discovery-export.js';
 export * from './memory-export.js';
 export * from './export-yaml.v1.js';
 export * from './export-definition.js';
+export * from './compile-yaml.v1.js';
+export * from './import-definition.js';

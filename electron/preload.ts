@@ -144,4 +144,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogSyncRemote: () => ipcRenderer.invoke('trainer-catalog-sync-remote'),
   trainerCatalogLoadGame: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-load-game', payload),
+  trainerCatalogImportYaml: (payload: { yamlText: string }) =>
+    ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
 });

@@ -1,6 +1,19 @@
 import db from '../database/index.js';
 import type { ModPack, TrainerCatalogEntry, TrainerCatalogSearchResult, VerificationStatus } from './types.js';
 import { buildSearchableText } from './types.js';
+import {
+  isSolithDefinitionPayload,
+  solithDefinitionToModPack,
+} from '../definitions/mod-pack-adapter.js';
+import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
+
+function parseModPackPayload(payloadJson: string): ModPack {
+  const raw = JSON.parse(payloadJson) as unknown;
+  if (isSolithDefinitionPayload(raw)) {
+    return solithDefinitionToModPack(raw as SolithDefinitionV1);
+  }
+  return raw as ModPack;
+}
 
 function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
   return {
@@ -83,12 +96,43 @@ export function upsertModPack(pack: ModPack): void {
   );
 }
 
+/** Store a compiled schema.v1 JSON payload (minified) in trainer_mod_packs. */
+export function upsertDefinitionPayload(
+  packId: string,
+  catalogGameId: string,
+  payloadJson: string,
+  verificationStatus: VerificationStatus,
+  sourceProvider: string,
+  syncedAt: string,
+): void {
+  db.prepare(
+    `INSERT INTO trainer_mod_packs (packId, catalogGameId, payloadJson, verificationStatus, sourceProvider, syncedAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(packId) DO UPDATE SET
+       catalogGameId = excluded.catalogGameId,
+       payloadJson = excluded.payloadJson,
+       verificationStatus = excluded.verificationStatus,
+       sourceProvider = excluded.sourceProvider,
+       syncedAt = excluded.syncedAt,
+       updatedAt = datetime('now')`,
+  ).run(packId, catalogGameId, payloadJson, verificationStatus, sourceProvider, syncedAt);
+}
+
+export function getDefinitionPayload(catalogGameId: string): SolithDefinitionV1 | null {
+  const row = db
+    .prepare('SELECT payloadJson FROM trainer_mod_packs WHERE catalogGameId = ? ORDER BY syncedAt DESC LIMIT 1')
+    .get(catalogGameId) as { payloadJson: string } | undefined;
+  if (!row) return null;
+  const raw = JSON.parse(row.payloadJson) as unknown;
+  return isSolithDefinitionPayload(raw) ? (raw as SolithDefinitionV1) : null;
+}
+
 export function getModPack(packId: string): ModPack | null {
   const row = db.prepare('SELECT payloadJson FROM trainer_mod_packs WHERE packId = ?').get(packId) as
     | { payloadJson: string }
     | undefined;
   if (!row) return null;
-  return JSON.parse(row.payloadJson) as ModPack;
+  return parseModPackPayload(row.payloadJson);
 }
 
 export function getModPackForGame(catalogGameId: string): ModPack | null {
@@ -96,7 +140,7 @@ export function getModPackForGame(catalogGameId: string): ModPack | null {
     .prepare('SELECT payloadJson FROM trainer_mod_packs WHERE catalogGameId = ? ORDER BY syncedAt DESC LIMIT 1')
     .get(catalogGameId) as { payloadJson: string } | undefined;
   if (!row) return null;
-  return JSON.parse(row.payloadJson) as ModPack;
+  return parseModPackPayload(row.payloadJson);
 }
 
 export function searchCatalog(query: string, limit = 48, offset = 0): TrainerCatalogSearchResult {

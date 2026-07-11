@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
@@ -22,6 +22,8 @@ export default function TrainerLibraryPage({
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'verified' | 'community' | 'metadata-only'>('all');
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (searchQuery = query) => {
     if (!window.electronAPI?.trainerCatalogSearch) return;
@@ -71,6 +73,28 @@ export default function TrainerLibraryPage({
     }
   };
 
+  const handleImportYaml = async (file: File) => {
+    if (!window.electronAPI?.trainerCatalogImportYaml) return;
+    setImporting(true);
+    setMessage('');
+    try {
+      const yamlText = await file.text();
+      const result = await window.electronAPI.trainerCatalogImportYaml({ yamlText });
+      if (result.success) {
+        setMessage(
+          `Imported "${result.title ?? file.name}" (${result.cheatCount ?? 0} cheats) into the catalog.`,
+        );
+        await load(query);
+      } else {
+        const detail = result.errors?.join('; ') ?? result.error ?? 'Import failed';
+        setMessage(detail);
+      }
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+
   const handleLaunch = async (entry: TrainerCatalogEntry) => {
     const loadResult = await window.electronAPI?.trainerCatalogLoadGame?.({
       catalogGameId: entry.catalogGameId,
@@ -94,9 +118,29 @@ export default function TrainerLibraryPage({
         title="Trainer Library"
         description={`${total.toLocaleString()} games · searchable catalog with Steam artwork`}
         actions={
-          <button type="button" className={styles.syncBtn} onClick={() => void handleSync()} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Sync MrAntiFun / FLiNG / Plitch'}
-          </button>
+          <div className={styles.actions}>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".yml,.yaml,text/yaml"
+              className={styles.hiddenFileInput}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImportYaml(file);
+              }}
+            />
+            <button
+              type="button"
+              className={styles.syncBtn}
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+            >
+              {importing ? 'Importing…' : 'Import YAML'}
+            </button>
+            <button type="button" className={styles.syncBtn} onClick={() => void handleSync()} disabled={syncing}>
+              {syncing ? 'Syncing…' : 'Sync MrAntiFun / FLiNG / Plitch'}
+            </button>
+          </div>
         }
       />
 

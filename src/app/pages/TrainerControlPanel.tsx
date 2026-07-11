@@ -35,7 +35,9 @@ import {
 
 // ── Profile-driven control loading ───────────────────────────────────────────
 
-export { buildControls } from './trainer-control-panel-build.js';
+import { buildControls } from './trainer-control-panel-build.js';
+
+export { buildControls };
 
 // Note: The rest of the panel implementation below remains unchanged.
 // Controls are now loaded from profile but the UI behavior is identical:

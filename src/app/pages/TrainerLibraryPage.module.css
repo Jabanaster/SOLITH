@@ -37,6 +37,10 @@
   cursor: pointer;
 }
 
+.hiddenFileInput {
+  display: none;
+}
+
 .searchRow {
   display: flex;
   gap: 0.5rem;

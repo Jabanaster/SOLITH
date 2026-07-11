@@ -13,6 +13,7 @@ import { syncAllTrainerSources } from '../src/core/trainer-catalog/sync/index.js
 import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-loader.js';
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
 import { getSetting } from '../src/core/settings/index.js';
+import { importDefinitionYaml } from '../src/core/definitions/import-definition.js';
 
 const SearchSchema = z.object({
   query: z.string().max(200).optional().default(''),
@@ -22,6 +23,10 @@ const SearchSchema = z.object({
 
 const CatalogGameIdSchema = z.object({
   catalogGameId: z.string().min(1).max(120),
+});
+
+const ImportYamlSchema = z.object({
+  yamlText: z.string().min(1).max(2_000_000),
 });
 
 const moduleFilename = fileURLToPath(import.meta.url);
@@ -93,6 +98,25 @@ export function registerTrainerCatalogIpc(): void {
       return { success: true, gameId: config.gameId, name: config.name, cheatCount: config.cheats.length };
     } catch (error) {
       return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-import-yaml', async (_event, payload: unknown) => {
+    try {
+      const parsed = ImportYamlSchema.parse(payload);
+      const result = importDefinitionYaml(parsed.yamlText);
+      if (!result.success) {
+        return { success: false, errors: result.errors };
+      }
+      return {
+        success: true,
+        catalogGameId: result.catalogGameId,
+        packId: result.packId,
+        cheatCount: result.cheatCount,
+        title: result.definition.title,
+      };
+    } catch (error) {
+      return { success: false, errors: [sanitize(error)] };
     }
   });
 }

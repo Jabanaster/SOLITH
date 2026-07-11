@@ -154,5 +154,14 @@ interface Window {
       cheatCount?: number;
       error?: string;
     }>;
+    trainerCatalogImportYaml: (payload: { yamlText: string }) => Promise<{
+      success: boolean;
+      catalogGameId?: string;
+      packId?: string;
+      cheatCount?: number;
+      title?: string;
+      errors?: string[];
+      error?: string;
+    }>;
   };
 }
