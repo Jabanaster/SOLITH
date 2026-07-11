@@ -16,7 +16,8 @@ export type ModuleViewId =
   | 'controls'
   | 'live-memory'
   | 'multi-game-trainer'
-  | 'trainer-library';
+  | 'trainer-library'
+  | 'catalog-save-controls';
 
 /**
  * Secondary Solith artwork per module (user-provided asset mapping):
@@ -40,6 +41,7 @@ export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtw
   'live-memory': 'trainerController',
   'multi-game-trainer': 'trainerController',
   'trainer-library': 'trainerController',
+  'catalog-save-controls': 'trainerController',
   controls: 'trainerController',
 };
 

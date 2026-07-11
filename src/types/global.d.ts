@@ -159,6 +159,34 @@ interface Window {
       name?: string;
       cheatCount?: number;
       config?: import('../core/cheat-system/types.js').GameConfig;
+      capabilities?: {
+        catalogGameId: string;
+        title: string;
+        memoryCheatCount: number;
+        saveControlCount: number;
+        saveDirectoryHint?: string;
+        saveFormat?: string;
+        saveExtension?: string;
+      };
+      error?: string;
+    }>;
+    trainerCatalogGetTrainerControls: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      controls?: import('../core/trainer-host/trainer-control-schema.js').TrainerControl[];
+      capabilities?: {
+        catalogGameId: string;
+        title: string;
+        memoryCheatCount: number;
+        saveControlCount: number;
+        saveDirectoryHint?: string;
+        saveFormat?: string;
+        saveExtension?: string;
+      };
+      error?: string;
+    }>;
+    trainerCatalogApproveSavePath: (payload: { catalogGameId: string; saveFilePath: string }) => Promise<{
+      success: boolean;
+      locationId?: string;
       error?: string;
     }>;
     trainerCatalogImportYaml: (payload: { yamlText: string }) => Promise<{

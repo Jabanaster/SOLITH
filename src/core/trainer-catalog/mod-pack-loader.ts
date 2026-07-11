@@ -2,6 +2,10 @@ import type { GameConfig, CheatDefinition } from '../cheat-system/types.js';
 import type { ModPack, ModPackCheat, TrainerCatalogEntry } from './types.js';
 import { getModPackForGame } from './store.js';
 
+function isMemoryCheat(cheat: ModPackCheat): boolean {
+  return !cheat.tags?.includes('save-field');
+}
+
 function cheatFromModPack(cheat: ModPackCheat, pack: ModPack): CheatDefinition {
   return {
     id: cheat.id,
@@ -43,7 +47,7 @@ export function modPackToGameConfig(pack: ModPack, entry?: TrainerCatalogEntry):
       id,
       name: id,
     })),
-    cheats: pack.cheats.map((c) => cheatFromModPack(c, pack)),
+    cheats: pack.cheats.filter(isMemoryCheat).map((c) => cheatFromModPack(c, pack)),
     connectionBaseline: pack.connectionBaseline,
     description: entry?.sources?.[0]?.url
       ? `Imported mod pack from ${pack.source.provider}`

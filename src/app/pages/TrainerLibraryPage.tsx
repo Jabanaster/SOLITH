@@ -13,7 +13,11 @@ interface SearchResponse {
 export default function TrainerLibraryPage({
   onLaunchGame,
 }: {
-  onLaunchGame?: (catalogGameId: string, displayName: string) => void;
+  onLaunchGame?: (
+    catalogGameId: string,
+    displayName: string,
+    capabilities?: { memoryCheatCount?: number; saveControlCount?: number },
+  ) => void;
 }) {
   const [query, setQuery] = useState('');
   const [entries, setEntries] = useState<TrainerCatalogEntry[]>([]);
@@ -105,7 +109,7 @@ export default function TrainerLibraryPage({
         : loadResult?.error ?? 'Failed to load game');
       return;
     }
-    onLaunchGame?.(entry.catalogGameId, entry.displayName);
+    onLaunchGame?.(entry.catalogGameId, entry.displayName, loadResult.capabilities);
   };
 
   const visible = entries.filter((e) => filter === 'all' || e.verificationStatus === filter);

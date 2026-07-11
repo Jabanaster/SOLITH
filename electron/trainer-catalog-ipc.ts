@@ -14,6 +14,18 @@ import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
 import { getSetting } from '../src/core/settings/index.js';
 import { importDefinitionYaml } from '../src/core/definitions/import-definition.js';
+import {
+  loadCatalogDefinition,
+  catalogDefinitionCapabilities,
+} from '../src/core/definitions/load-catalog-definition.js';
+import { solithDefinitionToTrainerControls } from '../src/core/definitions/definition-to-trainer-controls.js';
+import { ensureCatalogGameForSaveAccess } from '../src/core/trainer-catalog/catalog-game-record.js';
+import { addUserSelectedLocation } from '../src/core/saves/locations.js';
+
+const ApproveSavePathSchema = z.object({
+  catalogGameId: z.string().min(1).max(120),
+  saveFilePath: z.string().min(1).max(4096),
+});
 
 const SearchSchema = z.object({
   query: z.string().max(200).optional().default(''),
@@ -92,16 +104,65 @@ export function registerTrainerCatalogIpc(): void {
   ipcMain.handle('trainer-catalog-load-game', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
       const config = loadGameConfigFromCatalog(parsed.catalogGameId);
-      if (!config) return { success: false, error: 'no_mod_pack' };
-      registerGame(config);
+      if (!config && !definition) return { success: false, error: 'no_mod_pack' };
+      if (config) registerGame(config);
+
+      const capabilities = definition ? catalogDefinitionCapabilities(definition) : null;
+      if (capabilities && capabilities.saveControlCount > 0) {
+        ensureCatalogGameForSaveAccess(
+          parsed.catalogGameId,
+          capabilities.title,
+          app.getPath('userData'),
+        );
+      }
+
       return {
         success: true,
-        gameId: config.gameId,
-        name: config.name,
-        cheatCount: config.cheats.length,
-        config,
+        gameId: config?.gameId ?? parsed.catalogGameId,
+        name: config?.name ?? capabilities?.title ?? parsed.catalogGameId,
+        cheatCount: config?.cheats.length ?? 0,
+        config: config ?? undefined,
+        capabilities,
       };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-get-trainer-controls', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
+      if (!definition) return { success: false, error: 'no_definition' };
+      const controls = solithDefinitionToTrainerControls(definition);
+      return {
+        success: true,
+        controls,
+        capabilities: catalogDefinitionCapabilities(definition),
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-approve-save-path', async (_event, payload: unknown) => {
+    try {
+      const parsed = ApproveSavePathSchema.parse(payload);
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
+      if (!definition) return { success: false, error: 'no_definition' };
+
+      ensureCatalogGameForSaveAccess(
+        parsed.catalogGameId,
+        definition.title,
+        app.getPath('userData'),
+      );
+
+      const parentDir = path.dirname(parsed.saveFilePath);
+      const result = addUserSelectedLocation(parsed.catalogGameId, parentDir);
+      if (!result.success) return { success: false, error: result.error ?? 'approve_failed' };
+      return { success: true, locationId: result.location?.id };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

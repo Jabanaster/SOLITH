@@ -36,6 +36,7 @@ import {
 // ── Profile-driven control loading ───────────────────────────────────────────
 
 import { buildControls } from './trainer-control-panel-build.js';
+import { resolveCatalogControlFilePath } from '../../core/definitions/definition-to-trainer-controls.js';
 
 export { buildControls };
 
@@ -265,10 +266,34 @@ const ControlRow: React.FC<ControlRowProps> = ({
 interface TrainerControlPanelProps {
   /** If provided, auto-start the TrainerHost when mounted. */
   autoStart?: boolean;
+  /** When set, uses catalog/imported save-field controls instead of the bundled Stardew profile. */
+  controls?: TrainerControl[];
+  panelTitle?: string;
+  saveFilePath?: string;
+  saveDirectoryHint?: string;
+  onSaveFilePathChange?: (path: string) => void;
+  onApproveSavePath?: () => void | Promise<void>;
 }
 
-const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = false }) => {
-  const controls = buildControls();
+const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({
+  autoStart = false,
+  controls: controlsProp,
+  panelTitle,
+  saveFilePath = '',
+  saveDirectoryHint,
+  onSaveFilePathChange,
+  onApproveSavePath,
+}) => {
+  const baseControls = controlsProp ?? buildControls();
+  const controls = baseControls;
+
+  const resolveControl = useCallback(
+    (control: TrainerControl) => {
+      if (!controlsProp || !saveFilePath.trim()) return control;
+      return resolveCatalogControlFilePath(control, saveFilePath.trim());
+    },
+    [controlsProp, saveFilePath],
+  );
   const [hostRunning, setHostRunning] = useState(false);
   const [hostBusy, setHostBusy] = useState(false);
   const [controlStates, setControlStates] = useState<Record<string, ControlState>>(
@@ -331,13 +356,14 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
   };
 
   const handleReadCurrent = useCallback(async (control: TrainerControl) => {
-    if (!electronAPI || !control.saveField) return;
+    const resolved = resolveControl(control);
+    if (!electronAPI || !resolved.saveField) return;
     setControlState(control.id, { phase: 'reading', message: undefined });
     try {
       const res = await electronAPI.trainerHostReadField({
-        gameId: control.saveField.gameId,
-        filePath: control.saveField.filePath,
-        field: control.saveField.fieldPath,
+        gameId: resolved.saveField.gameId,
+        filePath: resolved.saveField.filePath,
+        field: resolved.saveField.fieldPath,
       });
       if (res?.success !== false && res?.value !== undefined) {
         setControlState(control.id, { phase: 'idle', currentValue: String(res.value) });
@@ -348,10 +374,11 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
       console.error('[TrainerControlPanel] read failed:', userSafeErrorDetail(e));
       setControlState(control.id, { phase: 'error', message: localTrainerServiceFailureMessage() });
     }
-  }, [electronAPI, setControlState]);
+  }, [electronAPI, setControlState, resolveControl]);
 
   const handlePropose = useCallback(async (control: TrainerControl, newValue: string) => {
-    if (!electronAPI || !control.saveField) return;
+    const resolved = resolveControl(control);
+    if (!electronAPI || !resolved.saveField) return;
     const current = controlStates[control.id]?.currentValue;
     if (!current) {
       setControlState(control.id, { phase: 'error', message: 'Read the current value first.' });
@@ -360,9 +387,9 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
     setControlState(control.id, { phase: 'proposing', message: undefined });
     try {
       const res = await electronAPI.trainerHostProposeWrite({
-        gameId: control.saveField.gameId,
-        filePath: control.saveField.filePath,
-        field: control.saveField.fieldPath,
+        gameId: resolved.saveField.gameId,
+        filePath: resolved.saveField.filePath,
+        field: resolved.saveField.fieldPath,
         currentValue: current,
         newValue,
       });
@@ -380,7 +407,7 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
       console.error('[TrainerControlPanel] propose failed:', userSafeErrorDetail(e));
       setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
     }
-  }, [electronAPI, controlStates, setControlState]);
+  }, [electronAPI, controlStates, setControlState, resolveControl]);
 
   const handleApprove = useCallback(async (control: TrainerControl) => {
     const cs = controlStates[control.id];
@@ -418,14 +445,15 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
 
   const handleRollback = useCallback(async (control: TrainerControl) => {
     const cs = controlStates[control.id];
-    if (!electronAPI || !control.saveField || !cs?.backupPath) return;
+    const resolved = resolveControl(control);
+    if (!electronAPI || !resolved.saveField || !cs?.backupPath) return;
     setControlState(control.id, { phase: 'rolling_back', message: undefined });
     try {
       const res = await electronAPI.trainerHostRollback({
-        gameId: control.saveField.gameId,
-        filePath: control.saveField.filePath,
+        gameId: resolved.saveField.gameId,
+        filePath: resolved.saveField.filePath,
         backupPath: cs.backupPath,
-        field: control.saveField.fieldPath,
+        field: resolved.saveField.fieldPath,
       });
       if (res?.success) {
         const ts = new Date().toLocaleTimeString();
@@ -442,7 +470,7 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
       console.error('[TrainerControlPanel] rollback failed:', userSafeErrorDetail(e));
       setControlState(control.id, { phase: 'error', message: operationFailedBeforeWriteMessage() });
     }
-  }, [electronAPI, controlStates, setControlState]);
+  }, [electronAPI, controlStates, setControlState, resolveControl]);
 
   if (!electronAPI) {
     return (
@@ -459,9 +487,35 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({ autoStart = f
     <div className="trainer-control-panel" data-testid="trainer-control-panel">
       <PageModuleHeader
         artwork="trainerController"
-        title="Trainer Controls"
-        description="Save-backed trainer controls loaded from verified game profiles. Propose, approve, and rollback with explicit confirmation."
+        title={panelTitle ?? 'Trainer Controls'}
+        description={
+          controlsProp
+            ? 'Save-backed controls from an imported catalog definition. Pick your save file, then propose, approve, and rollback.'
+            : 'Save-backed trainer controls loaded from verified game profiles. Propose, approve, and rollback with explicit confirmation.'
+        }
       />
+      {saveDirectoryHint && onSaveFilePathChange && (
+        <div className="tcp-save-file-bar" data-testid="catalog-save-file-bar">
+          <label htmlFor="catalog-save-file-path">
+            Save file path
+            <span className="tcp-save-hint">Expected near: {saveDirectoryHint}</span>
+          </label>
+          <div className="tcp-save-file-row">
+            <input
+              id="catalog-save-file-path"
+              type="text"
+              value={saveFilePath}
+              onChange={(e) => onSaveFilePathChange(e.target.value)}
+              placeholder="C:\Users\you\AppData\Roaming\Game\Saves\slot\save.xml"
+            />
+            {onApproveSavePath && (
+              <button type="button" className="tcr-btn" onClick={() => void onApproveSavePath()} disabled={!saveFilePath.trim()}>
+                Approve path
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="tcp-host-bar">
         <span className="tcp-local-only-copy" data-testid="trainer-local-only-copy">
           {LOCAL_ONLY_SAFETY_MESSAGE}

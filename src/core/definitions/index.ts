@@ -8,3 +8,5 @@ export * from './export-yaml.v1.js';
 export * from './export-definition.js';
 export * from './compile-yaml.v1.js';
 export * from './import-definition.js';
+export * from './load-catalog-definition.js';
+export * from './definition-to-trainer-controls.js';

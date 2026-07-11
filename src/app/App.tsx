@@ -13,6 +13,7 @@ import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import TrainerLibraryPage from './pages/TrainerLibraryPage';
 import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
+import CatalogTrainerControlsPage from './pages/CatalogTrainerControlsPage';
 import { Icon, type IconName } from './components/icons/index.js';
 import { solithBranding } from './assets/branding/index.js';
 import { BrandingArtwork } from './components/BrandingArtwork.js';
@@ -48,7 +49,8 @@ class ContentErrorBoundary extends React.Component<
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer' | 'trainer-library';
+  | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer' | 'trainer-library'
+  | 'catalog-save-controls';
 
 type NavItem = {
   id: View;
@@ -142,9 +144,27 @@ const App: React.FC = () => {
   >([]);
   const [loading, setLoading] = useState(true);
   const [libraryLaunchGameId, setLibraryLaunchGameId] = useState<string | null>(null);
+  const [libraryLaunchDisplayName, setLibraryLaunchDisplayName] = useState<string>('');
 
-  const handleLibraryLaunch = (catalogGameId: string) => {
+  const handleLibraryLaunch = (
+    catalogGameId: string,
+    displayName: string,
+    capabilities?: {
+      memoryCheatCount?: number;
+      saveControlCount?: number;
+    },
+  ) => {
     setLibraryLaunchGameId(catalogGameId);
+    setLibraryLaunchDisplayName(displayName);
+
+    const memoryCount = capabilities?.memoryCheatCount ?? 0;
+    const saveCount = capabilities?.saveControlCount ?? 0;
+
+    if (saveCount > 0 && memoryCount === 0) {
+      setCurrentView('catalog-save-controls');
+      return;
+    }
+
     setCurrentView('multi-game-trainer');
   };
 
@@ -227,6 +247,15 @@ const App: React.FC = () => {
         return <LiveMemoryTrainerPage />;
       case 'multi-game-trainer':
         return <MultiGameTrainerPage initialGameId={libraryLaunchGameId} />;
+      case 'catalog-save-controls':
+        return libraryLaunchGameId ? (
+          <CatalogTrainerControlsPage
+            catalogGameId={libraryLaunchGameId}
+            displayName={libraryLaunchDisplayName}
+          />
+        ) : (
+          <TrainerLibraryPage onLaunchGame={handleLibraryLaunch} />
+        );
       case 'controls':
         return <TrainerControlPanel />;
       default:
