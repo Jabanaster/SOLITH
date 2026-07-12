@@ -18,6 +18,7 @@ import {
   LiveMemoryListControlsSchema,
   LiveMemoryResolveControlSchema,
   LiveMemoryResolveDefinitionFeatureSchema,
+  LiveMemoryPointerScanSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
@@ -131,6 +132,10 @@ export function registerLiveMemoryIpc(): void {
 
       if (result.success) {
         sessions.set(event.sender.id, session);
+        if (result.fingerprintWarning && parsed.catalogGameId) {
+          const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
+          quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
+        }
       }
       return result;
     } catch (error) {
@@ -388,6 +393,36 @@ export function registerLiveMemoryIpc(): void {
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'resolve_definition_feature_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-pointer-scan', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryPointerScanSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const scanResult = session.pointerScan(BigInt(parsed.address), {
+        maxDepth: parsed.maxDepth,
+        maxOffsetPerLevel: parsed.maxOffsetPerLevel,
+      });
+
+      return {
+        success: true,
+        result: {
+          candidates: scanResult.candidates.map((c) => ({
+            moduleName: c.moduleName,
+            moduleOffset: `0x${c.moduleOffset.toString(16)}`,
+            offsets: c.offsets,
+            depth: c.depth,
+          })),
+          truncated: scanResult.truncated,
+          levelsSearched: scanResult.levelsSearched,
+          scansPerformed: scanResult.scansPerformed,
+        },
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_scan_failed') };
     }
   });
 }

@@ -198,5 +198,45 @@ interface Window {
       errors?: string[];
       error?: string;
     }>;
+    trainerCatalogImportCt: (payload: { xmlText: string; title?: string }) => Promise<{
+      success: boolean;
+      catalogGameId?: string;
+      packId?: string;
+      cheatCount?: number;
+      title?: string;
+      acceptedCount?: number;
+      rejectedCount?: number;
+      rejected?: Array<{ name: string; reason: string }>;
+      validationErrors?: string[];
+      errors?: string[];
+      error?: string;
+    }>;
+    trainerCatalogFeedbackRecord: (payload: {
+      catalogGameId: string;
+      featureId: string;
+      rating: -1 | 0 | 1;
+      executableHashPrefix?: string | null;
+      note?: string | null;
+    }) => Promise<{ success: boolean; summary?: { positive: number; negative: number; total: number }; error?: string }>;
+    trainerCatalogFeedbackSummary: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      summary?: { positive: number; negative: number; total: number };
+      quarantined?: boolean;
+      pendingUpdates?: number;
+      error?: string;
+    }>;
+    liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) => Promise<{
+      success: boolean;
+      result?: {
+        candidates: Array<{ moduleName: string; moduleOffset: string; offsets: number[]; depth: number }>;
+        truncated: boolean;
+        levelsSearched: number;
+        scansPerformed: number;
+      };
+      error?: string;
+    }>;
+    onCatalogProcessDetected?: (
+      callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void,
+    ) => (() => void) | undefined;
   };
 }

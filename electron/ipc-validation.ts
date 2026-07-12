@@ -393,7 +393,26 @@ export const LiveMemoryResolveDefinitionFeatureSchema = z.object({
   featureId: z.string().min(1).max(128),
 });
 
-// Persisted cheat toggle state (Multi-Game Live Trainer) — gameId here is a fixed slug
+export const LiveMemoryPointerScanSchema = z.object({
+  address: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  maxDepth: z.number().int().min(1).max(8).optional(),
+  maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
+});
+
+export const DefinitionFeedbackSchema = z.object({
+  catalogGameId: z.string().min(1).max(128),
+  featureId: z.string().min(1).max(128),
+  executableHashPrefix: z.string().max(64).optional().nullable(),
+  rating: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const ImportCtSchema = z.object({
+  xmlText: z.string().min(1).max(8_000_000),
+  title: z.string().max(200).optional(),
+});
+
+// Persisted cheat toggle state
 // (e.g. 'undisputed'), not a UUID like the games-library gameId schemas above.
 const CHEAT_GAME_ID = z.string().min(1).max(64);
 const CHEAT_ID = z.string().min(1).max(128);

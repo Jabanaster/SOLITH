@@ -10,6 +10,7 @@ import {
 } from './memory-scanner.js';
 import type { ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
+import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
 import {
   fingerprintBlocksAttach,
   verifyDefinitionFingerprint,
@@ -340,6 +341,12 @@ export class LiveMemorySession {
   resolveMemoryFeature(feature: MemoryFeatureV1): LiveMemoryAddress {
     if (!this.handle) throw new Error('No process attached.');
     return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache);
+  }
+
+  /** Reverse pointer scan from a dynamic address (Advanced Scan Mode). */
+  pointerScan(targetAddress: bigint, bounds?: PointerScanBounds) {
+    if (!this.handle) throw new Error('No process attached.');
+    return scanForPointerPath(this.driver, this.handle, targetAddress, bounds);
   }
 
   /** Captures the current value and stages a proposed write. Does not write anything yet. */

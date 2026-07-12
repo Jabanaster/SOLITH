@@ -46,6 +46,7 @@ import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
+import { startCatalogProcessWatch } from './catalog-process-watch.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
@@ -159,6 +160,7 @@ app.whenReady().then(async () => {
 
     try {
       await bootstrapTrainerCatalog();
+      await startCatalogProcessWatch();
     } catch (error) {
       console.error('Trainer catalog bootstrap failed:', error);
     }

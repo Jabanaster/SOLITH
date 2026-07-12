@@ -8,7 +8,8 @@ export type ModPackSourceProvider =
   | 'wemod'
   | 'fearless'
   | 'community'
-  | 'user';
+  | 'user'
+  | 'ct-import';
 
 export type VerificationStatus = 'verified' | 'community' | 'metadata-only' | 'unverified';
 

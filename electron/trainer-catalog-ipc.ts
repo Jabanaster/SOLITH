@@ -15,6 +15,17 @@ import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
 import { getSetting } from '../src/core/settings/index.js';
 import { importDefinitionYaml } from '../src/core/definitions/import-definition.js';
+import { importDefinitionCt } from '../src/core/definitions/import-definition-ct.js';
+import {
+  recordDefinitionFeedback,
+  getDefinitionFeedbackSummary,
+} from '../src/core/trainer-catalog/definition-feedback-store.js';
+import {
+  listPendingDefinitionUpdates,
+  isDefinitionQuarantined,
+} from '../src/core/trainer-catalog/definition-quarantine.js';
+import { evaluatePromotionEligibility, promoteDefinitionToVerified } from '../src/core/trainer-catalog/definition-promotion.js';
+import { DefinitionFeedbackSchema, ImportCtSchema } from './ipc-validation.js';
 import {
   loadCatalogDefinition,
   catalogDefinitionCapabilities,
@@ -165,6 +176,76 @@ export function registerTrainerCatalogIpc(): void {
       const result = addUserSelectedLocation(parsed.catalogGameId, parentDir);
       if (!result.success) return { success: false, error: result.error ?? 'approve_failed' };
       return { success: true, locationId: result.location?.id };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-import-ct', async (_event, payload: unknown) => {
+    try {
+      const parsed = ImportCtSchema.parse(payload);
+      const result = await importDefinitionCt(parsed.xmlText, { title: parsed.title });
+      if (!result.success) {
+        return { success: false, errors: result.errors, rejected: result.rejected };
+      }
+      return {
+        success: true,
+        catalogGameId: result.catalogGameId,
+        packId: result.packId,
+        cheatCount: result.cheatCount,
+        title: result.title,
+        acceptedCount: result.acceptedCount,
+        rejectedCount: result.rejectedCount,
+        rejected: result.rejected,
+        validationErrors: result.validationErrors,
+      };
+    } catch (error) {
+      return { success: false, errors: [sanitize(error)] };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-feedback-record', async (_event, payload: unknown) => {
+    try {
+      const parsed = DefinitionFeedbackSchema.parse(payload);
+      recordDefinitionFeedback(parsed);
+      const summary = getDefinitionFeedbackSummary(parsed.catalogGameId, parsed.featureId);
+      return { success: true, summary };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-feedback-summary', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const summary = getDefinitionFeedbackSummary(parsed.catalogGameId);
+      const quarantined = isDefinitionQuarantined(parsed.catalogGameId);
+      const pending = listPendingDefinitionUpdates(20).filter((r) => r.catalogGameId === parsed.catalogGameId);
+      return { success: true, summary, quarantined, pendingUpdates: pending.length };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-evaluate-promotion', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
+      if (!definition) return { success: false, error: 'no_definition' };
+      const eligibility = evaluatePromotionEligibility(definition);
+      return { success: true, eligibility };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-promote-verified', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
+      if (!definition) return { success: false, error: 'no_definition' };
+      const promoted = promoteDefinitionToVerified(definition);
+      return { success: true, catalogGameId: promoted.id, verificationStatus: promoted.safety.verificationStatus };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

@@ -10,6 +10,14 @@ interface SearchResponse {
   error?: string;
 }
 
+const PAGE_SIZE = 96;
+
+function tierHint(entry: TrainerCatalogEntry): string {
+  if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
+  if (entry.verificationStatus === 'community') return 'First session scan may be required';
+  return 'Metadata only — sync or import a definition';
+}
+
 export default function TrainerLibraryPage({
   onLaunchGame,
 }: {
@@ -22,41 +30,64 @@ export default function TrainerLibraryPage({
   const [query, setQuery] = useState('');
   const [entries, setEntries] = useState<TrainerCatalogEntry[]>([]);
   const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'verified' | 'community' | 'metadata-only'>('all');
   const [importing, setImporting] = useState(false);
-  const importInputRef = useRef<HTMLInputElement>(null);
+  const importYamlRef = useRef<HTMLInputElement>(null);
+  const importCtRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async (searchQuery = query) => {
+  const fetchPage = useCallback(async (searchQuery: string, pageOffset: number, append: boolean) => {
     if (!window.electronAPI?.trainerCatalogSearch) return;
-    setLoading(true);
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     try {
-      await window.electronAPI.trainerCatalogSeed?.();
+      if (pageOffset === 0) await window.electronAPI.trainerCatalogSeed?.();
       const result = (await window.electronAPI.trainerCatalogSearch({
         query: searchQuery,
-        limit: 96,
-        offset: 0,
+        limit: PAGE_SIZE,
+        offset: pageOffset,
       })) as SearchResponse;
       if (result.success && result.entries) {
-        setEntries(result.entries);
+        setEntries((prev) => (append ? [...prev, ...result.entries!] : result.entries!));
         setTotal(result.total ?? result.entries.length);
+        setOffset(pageOffset + result.entries.length);
       } else {
         setMessage(result.error ?? 'Search failed');
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [query]);
+  }, []);
+
+  const load = useCallback(async (searchQuery = query) => {
+    setOffset(0);
+    await fetchPage(searchQuery, 0, false);
+  }, [fetchPage, query]);
 
   useEffect(() => {
     void load('');
   }, [load]);
 
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+      setMessage(`Detected ${payload.displayName} (${payload.executable}) — open Trainer Library to load.`);
+    });
+    return () => unsubscribe?.();
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     void load(query);
+  };
+
+  const handleLoadMore = () => {
+    if (entries.length >= total) return;
+    void fetchPage(query, offset, true);
   };
 
   const handleSync = async () => {
@@ -85,8 +116,28 @@ export default function TrainerLibraryPage({
       const yamlText = await file.text();
       const result = await window.electronAPI.trainerCatalogImportYaml({ yamlText });
       if (result.success) {
+        setMessage(`Imported "${result.title ?? file.name}" (${result.cheatCount ?? 0} cheats) into the catalog.`);
+        await load(query);
+      } else {
+        const detail = result.errors?.join('; ') ?? result.error ?? 'Import failed';
+        setMessage(detail);
+      }
+    } finally {
+      setImporting(false);
+      if (importYamlRef.current) importYamlRef.current.value = '';
+    }
+  };
+
+  const handleImportCt = async (file: File) => {
+    if (!window.electronAPI?.trainerCatalogImportCt) return;
+    setImporting(true);
+    setMessage('');
+    try {
+      const xmlText = await file.text();
+      const result = await window.electronAPI.trainerCatalogImportCt({ xmlText, title: file.name.replace(/\.ct$/i, '') });
+      if (result.success) {
         setMessage(
-          `Imported "${result.title ?? file.name}" (${result.cheatCount ?? 0} cheats) into the catalog.`,
+          `Imported "${result.title ?? file.name}" — ${result.acceptedCount ?? 0} accepted, ${result.rejectedCount ?? 0} rejected.`,
         );
         await load(query);
       } else {
@@ -95,7 +146,7 @@ export default function TrainerLibraryPage({
       }
     } finally {
       setImporting(false);
-      if (importInputRef.current) importInputRef.current.value = '';
+      if (importCtRef.current) importCtRef.current.value = '';
     }
   };
 
@@ -124,7 +175,7 @@ export default function TrainerLibraryPage({
         actions={
           <div className={styles.actions}>
             <input
-              ref={importInputRef}
+              ref={importYamlRef}
               type="file"
               accept=".yml,.yaml,text/yaml"
               className={styles.hiddenFileInput}
@@ -133,13 +184,21 @@ export default function TrainerLibraryPage({
                 if (file) void handleImportYaml(file);
               }}
             />
-            <button
-              type="button"
-              className={styles.syncBtn}
-              onClick={() => importInputRef.current?.click()}
-              disabled={importing}
-            >
-              {importing ? 'Importing…' : 'Import YAML'}
+            <input
+              ref={importCtRef}
+              type="file"
+              accept=".ct,.xml,text/xml"
+              className={styles.hiddenFileInput}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleImportCt(file);
+              }}
+            />
+            <button type="button" className={styles.syncBtn} onClick={() => importCtRef.current?.click()} disabled={importing}>
+              {importing ? 'Importing…' : 'Import CT'}
+            </button>
+            <button type="button" className={styles.syncBtn} onClick={() => importYamlRef.current?.click()} disabled={importing}>
+              Import YAML
             </button>
             <button type="button" className={styles.syncBtn} onClick={() => void handleSync()} disabled={syncing}>
               {syncing ? 'Syncing…' : 'Sync community listings'}
@@ -184,18 +243,7 @@ export default function TrainerLibraryPage({
               ) : (
                 <div className={styles.coverFallback}>{entry.displayName.charAt(0)}</div>
               )}
-              <span
-                className={styles.badge}
-                title={
-                  entry.verificationStatus === 'verified'
-                    ? 'Bundled definition with verified save or memory controls'
-                    : entry.verificationStatus === 'metadata-only'
-                      ? 'Catalog metadata only — no bundled trainer definition yet'
-                      : entry.verificationStatus === 'community'
-                        ? 'Imported listing — pointer paths require discovery'
-                        : 'Unverified trainer listing'
-                }
-              >
+              <span className={styles.badge} title={tierHint(entry)}>
                 {entry.verificationStatus}
               </span>
             </div>
@@ -205,6 +253,7 @@ export default function TrainerLibraryPage({
               <p className={styles.meta}>
                 {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
               </p>
+              <p className={styles.meta}>{tierHint(entry)}</p>
               <button type="button" className={styles.launchBtn} onClick={() => void handleLaunch(entry)}>
                 {entry.hasModPack ? 'Load Trainer' : 'View'}
               </button>
@@ -212,6 +261,14 @@ export default function TrainerLibraryPage({
           </article>
         ))}
       </div>
+
+      {!loading && entries.length < total && (
+        <div className={styles.searchRow}>
+          <button type="button" onClick={handleLoadMore} disabled={loadingMore}>
+            {loadingMore ? 'Loading…' : `Load more (${entries.length} / ${total})`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

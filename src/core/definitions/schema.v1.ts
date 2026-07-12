@@ -28,6 +28,9 @@ export type SaveFormatType = (typeof SAVE_FORMAT_TYPES)[number];
 export const MEMORY_DATA_TYPES = ['int32', 'int64', 'float', 'double', 'boolean', 'byte'] as const;
 export type MemoryDataType = (typeof MEMORY_DATA_TYPES)[number];
 
+export const CERTIFICATION_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4'] as const;
+export type CertificationLevel = (typeof CERTIFICATION_LEVELS)[number];
+
 export interface SolithDefinitionV1 {
   schemaVersion: typeof SOLITH_DEFINITION_SCHEMA_VERSION;
   id: string;
@@ -70,6 +73,8 @@ export interface MemoryFeatureV1 {
   dataType: MemoryDataType;
   defaultValue: number | boolean;
   resolution: MemoryFeatureResolutionV1;
+  /** Offline certification tier — L3+ required for bundled verified cheats. */
+  certificationLevel?: CertificationLevel;
 }
 
 export interface SaveFieldFeatureV1 {
@@ -108,6 +113,7 @@ export const MemoryFeatureV1Schema = z.object({
   dataType: z.enum(MEMORY_DATA_TYPES),
   defaultValue: z.union([z.number().finite(), z.boolean()]),
   resolution: MemoryFeatureResolutionV1Schema,
+  certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
 });
 
 export const SaveFieldFeatureV1Schema = z.object({

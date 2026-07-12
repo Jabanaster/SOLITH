@@ -730,6 +730,33 @@ function applySchema(): void {
     )
   `);
 
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS definition_feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      catalogGameId TEXT NOT NULL,
+      featureId TEXT NOT NULL,
+      executableHashPrefix TEXT,
+      rating INTEGER NOT NULL,
+      note TEXT,
+      recordedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS definition_update_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      catalogGameId TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      previousVerificationStatus TEXT,
+      queuedAt TEXT DEFAULT (datetime('now')),
+      resolvedAt TEXT,
+      resolvedBy TEXT
+    )
+  `);
+
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_definition_feedback_game ON definition_feedback(catalogGameId, featureId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_definition_update_queue_game ON definition_update_queue(catalogGameId)');
+
   // Indexes
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_games_path ON games(path)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_scans_gameId ON scans(gameId)');

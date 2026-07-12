@@ -82,6 +82,13 @@ const LiveMemoryTrainerPage: React.FC = () => {
   const [freezeIntervalMs, setFreezeIntervalMs] = useState('200');
   const [freezeStatus, setFreezeStatus] = useState<FreezeStatusView | null>(null);
 
+  const [pointerScanDepth, setPointerScanDepth] = useState('3');
+  const [pointerScanMaxOffset, setPointerScanMaxOffset] = useState('4096');
+  const [pointerCandidates, setPointerCandidates] = useState<
+    Array<{ moduleName: string; moduleOffset: string; offsets: number[]; depth: number }>
+  >([]);
+  const [pointerScanInfo, setPointerScanInfo] = useState('');
+
   const [savedControls, setSavedControls] = useState<SavedControl[]>([]);
   const [controlsChecked, setControlsChecked] = useState(false);
 
@@ -254,6 +261,31 @@ const LiveMemoryTrainerPage: React.FC = () => {
     setAddress(match.address);
     setReadValue(match.value);
     setMessage(`Loaded ${match.address} into the manual read/write section below — review and propose from there.`);
+  };
+
+  const handlePointerScan = async () => {
+    if (!address.trim()) return;
+    setBusy(true);
+    setPointerScanInfo('');
+    setPointerCandidates([]);
+    try {
+      const result = await api.liveMemoryPointerScan({
+        address: address.trim(),
+        maxDepth: pointerScanDepth.trim() ? Number(pointerScanDepth) : undefined,
+        maxOffsetPerLevel: pointerScanMaxOffset.trim() ? Number(pointerScanMaxOffset) : undefined,
+      });
+      if (result?.success && result.result) {
+        setPointerCandidates(result.result.candidates);
+        setPointerScanInfo(
+          `Found ${result.result.candidates.length} candidate path(s) · depth ${result.result.levelsSearched} · ${result.result.scansPerformed} scan(s)${result.result.truncated ? ' · truncated' : ''}`,
+        );
+        setMessage('Pointer scan complete — review candidates below before exporting a definition.');
+      } else {
+        setMessage(`Pointer scan failed: ${result?.error ?? 'unknown error'}`);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const refreshFreezeStatus = useCallback(async () => {
@@ -500,6 +532,66 @@ const LiveMemoryTrainerPage: React.FC = () => {
               </button>
             )}
           </div>
+        </section>
+      )}
+
+      {attached && (
+        <section className="v2-monitor-section" aria-label="Pointer path discovery">
+          <h3>Pointer Path Discovery</h3>
+          <p className="v2-meta">
+            Reverse-scans from the address above to find module + offset + pointer-chain candidates.
+            Use this after you have a stable dynamic address from the value scan — export a definition
+            once you confirm a path survives a game restart.
+          </p>
+
+          <div className="v2-controls-row">
+            <label htmlFor="lm-pointer-depth">Max depth</label>
+            <input
+              id="lm-pointer-depth"
+              type="number"
+              min={1}
+              max={6}
+              value={pointerScanDepth}
+              onChange={e => setPointerScanDepth(e.target.value)}
+              disabled={busy || !address.trim()}
+            />
+            <label htmlFor="lm-pointer-offset">Max offset / level</label>
+            <input
+              id="lm-pointer-offset"
+              type="number"
+              min={256}
+              max={65536}
+              value={pointerScanMaxOffset}
+              onChange={e => setPointerScanMaxOffset(e.target.value)}
+              disabled={busy || !address.trim()}
+            />
+            <button
+              className="btn-secondary"
+              onClick={() => void handlePointerScan()}
+              disabled={busy || !address.trim()}
+            >
+              Scan for Pointer Paths
+            </button>
+          </div>
+
+          {pointerScanInfo && <p className="v2-meta">{pointerScanInfo}</p>}
+
+          {pointerCandidates.length > 0 && (
+            <ul className="v2-scan-results" aria-label="Pointer path candidates">
+              {pointerCandidates.slice(0, 50).map((c, i) => (
+                <li key={`${c.moduleName}-${c.moduleOffset}-${i}`}>
+                  <code>
+                    {c.moduleName}+{c.moduleOffset}
+                    {c.offsets.length > 0 ? ` → [${c.offsets.map((o) => `0x${o.toString(16)}`).join(', ')}]` : ''}
+                  </code>
+                  {' '}(depth {c.depth})
+                </li>
+              ))}
+              {pointerCandidates.length > 50 && (
+                <li className="v2-meta">…and {pointerCandidates.length - 50} more (narrow depth/offset to refine)</li>
+              )}
+            </ul>
+          )}
         </section>
       )}
 

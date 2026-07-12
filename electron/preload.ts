@@ -152,4 +152,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-catalog-approve-save-path', payload),
   trainerCatalogImportYaml: (payload: { yamlText: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
+  trainerCatalogImportCt: (payload: { xmlText: string; title?: string }) =>
+    ipcRenderer.invoke('trainer-catalog-import-ct', payload),
+  trainerCatalogFeedbackRecord: (payload: {
+    catalogGameId: string;
+    featureId: string;
+    rating: -1 | 0 | 1;
+    executableHashPrefix?: string | null;
+    note?: string | null;
+  }) => ipcRenderer.invoke('trainer-catalog-feedback-record', payload),
+  trainerCatalogFeedbackSummary: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-feedback-summary', payload),
+  liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
+    ipcRenderer.invoke('live-memory-pointer-scan', payload),
+  onCatalogProcessDetected: (callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void) => {
+    const listener = (_event: unknown, payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => callback(payload);
+    ipcRenderer.on('catalog-process-detected', listener);
+    return () => ipcRenderer.removeListener('catalog-process-detected', listener);
+  },
 });

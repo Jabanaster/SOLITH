@@ -7,6 +7,42 @@
 
 ---
 
+## Offline-first execution order (no live game required)
+
+Work that can ship without running target games or user input — **do these first**:
+
+| Phase | Deliverables | Milestones |
+|-------|--------------|------------|
+| **A — Brand & schema** | Advanced Scan Mode naming, neutral catalog types, `certificationLevel` in schema.v1 | R, U (schema) |
+| **B — Catalog factory** | CT import parser + IPC, drift quarantine, feedback store, promotion rules, verifier scripts | T, V, W (parser) |
+| **C — Library & scan UX** | Paginated library, CT/YAML import buttons, pointer-scan UI, process-watch notification | T, W, Y (watch) |
+| **D — Binary scaffold** | Format registry + detection stubs; no real-game binary writes yet | X (architecture) |
+| **E — Docs & scripts** | `verify-game-definition.mjs`, `verify-pointer-path.mjs`, `certify-cheat.mjs`, managed-runtime strategy doc | T, U, Z (doc) |
+
+**Blocked on live sessions** (do not fake evidence):
+
+| Item | Why blocked |
+|------|-------------|
+| Connection baselines (Avowed, Dredge, Crimson Desert) | Requires solo play measurement |
+| Restart-verify pointer paths for bundled games | Requires kill/relaunch ritual |
+| L2–L4 certification on real cheats | Requires attach + in-game confirmation |
+| Managed-runtime live memory (.NET/Mono) | KI-018 — spike only until proven |
+
+**Reordered sprint stack:**
+
+```
+Sprint 1 (A+B):  Brand rename + CT import + quarantine + feedback/promotion + scripts
+Sprint 2 (C):    Library pagination + pointer scan UI + process watch
+Sprint 3 (D+E):  Binary registry scaffold + managed-runtime strategy doc
+Sprint 4 (LIVE): Connection baselines + restart-verify 15 cheats  ← requires games
+Sprint 5 (LIVE): Certification L3 runs on bundled cheats
+Sprint 6 (scale): 50-game seed + 500 metadata pipeline
+Sprint 7 (X):    Binary saves wave 1 (per-format research)
+Ongoing (Z):     Managed runtime spike when scoped
+```
+
+---
+
 ## Executive summary
 
 | Pillar | What “pinnacle” means | Primary milestones |
@@ -465,15 +501,22 @@ Executor that writes to SMAPI console pipe or simulates `debug` commands with us
 
 ## Part 4 — Suggested build order (sprints)
 
+**Offline-first** (current execution track):
+
 ```
-Sprint 1 (R+S):     Brand rename + baseline measurement tool + 3 baselines
-Sprint 2 (S):       Restart-verify 15 cheats + pointer registry wiring
-Sprint 3 (T):       50-game seed + drift quarantine
-Sprint 4 (U+V):     Certification harness + feedback loop
-Sprint 5 (W):       CT import + pointer scan UI
-Sprint 6 (Y):       Overlay/hotkey/auto-launch polish
-Sprint 7 (X):       Binary saves wave 1 (5 formats)
-Sprint 8 (T scale): 500 metadata → 50 verified pipeline
+Sprint 1 (R+T+V+W parser): Brand rename + CT import + quarantine + feedback/promotion + verifier scripts
+Sprint 2 (T+W+Y watch):     Library pagination + pointer scan UI + process watch
+Sprint 3 (X+Z doc):         Binary registry scaffold + managed-runtime strategy
+```
+
+**Live verification** (requires running games):
+
+```
+Sprint 4 (S):       Connection baselines (3 remaining) + restart-verify 15 cheats
+Sprint 5 (U):       L3 certification runs on bundled cheats
+Sprint 6 (T scale): 50-game seed + drift quarantine demo on real patch
+Sprint 7 (Y):       Overlay/hotkey polish
+Sprint 8 (X):       Binary saves wave 1 (5 formats)
 Ongoing (Z):        Managed runtime spike
 ```
 
