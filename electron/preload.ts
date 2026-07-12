@@ -138,8 +138,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('trainer-hotkey', listener);
   },
 
-  trainerCatalogSearch: (payload: { query?: string; limit?: number; offset?: number }) =>
-    ipcRenderer.invoke('trainer-catalog-search', payload),
+  trainerCatalogSearch: (payload: {
+    query?: string;
+    limit?: number;
+    offset?: number;
+    categories?: string[];
+    verificationStatus?: 'all' | 'verified' | 'community' | 'metadata-only' | 'unverified';
+  }) => ipcRenderer.invoke('trainer-catalog-search', payload),
   trainerCatalogStats: () => ipcRenderer.invoke('trainer-catalog-stats'),
   trainerCatalogGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-catalog-get', payload),
   trainerCatalogSeed: () => ipcRenderer.invoke('trainer-catalog-seed'),

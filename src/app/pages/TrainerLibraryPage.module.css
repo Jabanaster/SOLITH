@@ -68,8 +68,55 @@
 .filters {
   display: flex;
   gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.filterSection {
+  margin-bottom: 0.65rem;
+}
+
+.filterLabel {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7a92b8;
+  margin-bottom: 0.35rem;
+}
+
+.genreFilters {
+  display: flex;
+  gap: 0.35rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.genreChip,
+.genreChipActive {
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  background: rgba(12, 18, 30, 0.85);
+  color: #b8c8e6;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.genreChipActive {
+  background: rgba(80, 130, 200, 0.35);
+  border-color: rgba(120, 180, 255, 0.45);
+  color: #fff;
+}
+
+.clearGenresBtn {
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  border: 1px dashed rgba(120, 180, 255, 0.25);
+  background: transparent;
+  color: #8fa3c7;
+  cursor: pointer;
+  font-size: 0.75rem;
 }
 
 .filterBtn,

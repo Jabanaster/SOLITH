@@ -1,6 +1,7 @@
 import db from '../database/index.js';
 import type { ModPack, TrainerCatalogEntry, TrainerCatalogSearchResult, VerificationStatus } from './types.js';
 import { buildSearchableText } from './types.js';
+import { categoryJsonLikePattern, normalizeGenreFilterList } from './catalog-genres.js';
 import {
   isSolithDefinitionPayload,
   solithDefinitionToModPack,
@@ -143,37 +144,61 @@ export function getModPackForGame(catalogGameId: string): ModPack | null {
   return parseModPackPayload(row.payloadJson);
 }
 
-export function searchCatalog(query: string, limit = 48, offset = 0): TrainerCatalogSearchResult {
-  const q = query.trim().toLowerCase();
-  let rows: Record<string, unknown>[];
-  let total: number;
+export interface CatalogSearchFilters {
+  categories?: string[];
+  verificationStatus?: VerificationStatus | 'all';
+}
 
-  if (!q) {
-    total = (db.prepare('SELECT COUNT(*) as c FROM trainer_catalog_games').get() as { c: number }).c;
-    rows = db
-      .prepare(
-        `SELECT * FROM trainer_catalog_games ORDER BY
-          CASE verificationStatus WHEN 'verified' THEN 0 WHEN 'community' THEN 1 ELSE 2 END,
-          displayName COLLATE NOCASE LIMIT ? OFFSET ?`,
-      )
-      .all(limit, offset) as Record<string, unknown>[];
-  } else {
-    const like = `%${q.replace(/[%_]/g, '')}%`;
-    total = (
-      db
-        .prepare('SELECT COUNT(*) as c FROM trainer_catalog_games WHERE searchableText LIKE ?')
-        .get(like) as { c: number }
-    ).c;
-    rows = db
-      .prepare(
-        `SELECT * FROM trainer_catalog_games WHERE searchableText LIKE ?
-         ORDER BY
-           CASE verificationStatus WHEN 'verified' THEN 0 WHEN 'community' THEN 1 ELSE 2 END,
-           displayName COLLATE NOCASE
-         LIMIT ? OFFSET ?`,
-      )
-      .all(like, limit, offset) as Record<string, unknown>[];
+function buildCatalogSearchWhere(
+  query: string,
+  filters: CatalogSearchFilters = {},
+): { whereSql: string; params: Array<string | number> } {
+  const clauses: string[] = [];
+  const params: Array<string | number> = [];
+
+  const q = query.trim().toLowerCase();
+  if (q) {
+    clauses.push('searchableText LIKE ?');
+    params.push(`%${q.replace(/[%_]/g, '')}%`);
   }
+
+  const genres = normalizeGenreFilterList(filters.categories);
+  if (genres.length > 0) {
+    const genreClauses = genres.map(() => 'categoriesJson LIKE ?');
+    clauses.push(`(${genreClauses.join(' OR ')})`);
+    params.push(...genres.map((g) => categoryJsonLikePattern(g)));
+  }
+
+  if (filters.verificationStatus && filters.verificationStatus !== 'all') {
+    clauses.push('verificationStatus = ?');
+    params.push(filters.verificationStatus);
+  }
+
+  const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  return { whereSql, params };
+}
+
+export function searchCatalog(
+  query: string,
+  limit = 48,
+  offset = 0,
+  filters: CatalogSearchFilters = {},
+): TrainerCatalogSearchResult {
+  const { whereSql, params } = buildCatalogSearchWhere(query, filters);
+
+  const total = (
+    db.prepare(`SELECT COUNT(*) as c FROM trainer_catalog_games ${whereSql}`).get(...params) as { c: number }
+  ).c;
+
+  const rows = db
+    .prepare(
+      `SELECT * FROM trainer_catalog_games ${whereSql}
+       ORDER BY
+         CASE verificationStatus WHEN 'verified' THEN 0 WHEN 'community' THEN 1 ELSE 2 END,
+         displayName COLLATE NOCASE
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...params, limit, offset) as Record<string, unknown>[];
 
   return {
     entries: rows.map(rowToEntry),

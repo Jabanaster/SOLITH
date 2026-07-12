@@ -1,5 +1,7 @@
 # Next Actions
 
+> **ARCHIVED working notes** — See `ROADMAP.md` and `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` for current priorities.
+
 **Updated:** 2026-07-07 — Trainer accessibility polish: `aria-disabled`/`aria-describedby` completed on all `TrainerCard.tsx` controls; confirmed `prefers-reduced-motion` already covers all animation code paths (CSS-only, no JS rAF loops exist)
 
 **Updated:** 2026-07-06 — Live Memory Trainer: pointer-path discovery + one real, restart-verified control (Atomfall ammo) landed
@@ -11,8 +13,8 @@
 - [x] Verify attach mechanics (`openProcess`/`closeProcess`) against real running commercial games (Stardew Valley.exe, Atomfall_dx12.exe) — no memory read/written against either real game.
 - [x] Add IPC channels + preload exposure + Trainer-mode UI (process picker, offline confirmation, manual read/write, saved controls, scan workflow, freeze toggle).
 - [x] Fix the remote-connection observer's real-world output-size bug (KI-017) — rewritten to a PID-scoped `Get-NetTCPConnection` query.
-- [x] Add Cheat-Engine-style memory scanning (first scan + next scan) — verified read-only against 2 real games (Stardew Valley gold, Atomfall ammo), including a real narrowing sequence (5000 candidates → 1).
-- [x] Add WeMod/Wand-style freeze-value loop (guard-rechecked every tick) — unit-tested only; not yet exercised against a real game with a real write.
+- [x] Add memory scanning (first scan + next scan) — verified read-only against 2 real games (Stardew Valley gold, Atomfall ammo), including a real narrowing sequence (5000 candidates → 1).
+- [x] Add freeze-value loop (guard-rechecked every tick) — unit-tested only; not yet exercised against a real game with a real write.
 - [x] Decide the KI-017 policy question for two specific, reviewed games (not the general default): added `acceptedConnectionBaseline` — Stardew Valley (5) and Atomfall (2), both measured live. Any other game still gets the strict default (0).
 - [x] Add module enumeration, a reverse pointer scanner, and a pointer-path resolver — needed because a raw scanned address is only valid for the current process instance.
 - [x] Build one real per-game trainer control end-to-end: Atomfall "Set Current Weapon Ammo", discovered via real gameplay (scan → narrow → pointer scan) and proven restart-stable (verified across a full game close/relaunch — 1 of 20 candidates survived; the other 19 were session-local coincidences).

@@ -139,7 +139,13 @@ interface Window {
     trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
     onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
 
-    trainerCatalogSearch: (payload: { query?: string; limit?: number; offset?: number }) => Promise<{
+    trainerCatalogSearch: (payload: {
+      query?: string;
+      limit?: number;
+      offset?: number;
+      categories?: string[];
+      verificationStatus?: 'all' | 'verified' | 'community' | 'metadata-only' | 'unverified';
+    }) => Promise<{
       success: boolean;
       entries?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry[];
       total?: number;

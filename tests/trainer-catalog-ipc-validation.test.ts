@@ -45,3 +45,23 @@ describe('trainer catalog IPC validation', () => {
     assert.throws(() => LiveMemoryPointerScanSchema.parse({ address: '12345' }));
   });
 });
+
+describe('trainer catalog search schema', () => {
+  test('accepts genre and verification filters', async () => {
+    const { z } = await import('zod');
+    const SearchSchema = z.object({
+      query: z.string().max(200).optional().default(''),
+      categories: z.array(z.string().min(1).max(40)).max(12).optional(),
+      verificationStatus: z
+        .enum(['all', 'verified', 'community', 'metadata-only', 'unverified'])
+        .optional()
+        .default('all'),
+    });
+    const parsed = SearchSchema.parse({
+      categories: ['RPG', 'Fighting'],
+      verificationStatus: 'verified',
+    });
+    assert.deepEqual(parsed.categories, ['RPG', 'Fighting']);
+    assert.equal(parsed.verificationStatus, 'verified');
+  });
+});

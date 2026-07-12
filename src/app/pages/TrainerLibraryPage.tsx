@@ -4,7 +4,10 @@ import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
 import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
+import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
+
+type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 
 interface SearchResponse {
   success: boolean;
@@ -109,16 +112,27 @@ export default function TrainerLibraryPage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState('');
-  const [filter, setFilter] = useState<'all' | 'verified' | 'community' | 'metadata-only'>('all');
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
+  const [genreFilters, setGenreFilters] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
   const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
   const [quarantineCount, setQuarantineCount] = useState(0);
   const importYamlRef = useRef<HTMLInputElement>(null);
   const importCtRef = useRef<HTMLInputElement>(null);
   const queryRef = useRef(query);
+  const tierFilterRef = useRef(tierFilter);
+  const genreFiltersRef = useRef(genreFilters);
   queryRef.current = query;
+  tierFilterRef.current = tierFilter;
+  genreFiltersRef.current = genreFilters;
 
-  const fetchPage = useCallback(async (searchQuery: string, pageOffset: number, append: boolean) => {
+  const fetchPage = useCallback(async (
+    searchQuery: string,
+    pageOffset: number,
+    append: boolean,
+    tier: TierFilter,
+    genres: string[],
+  ) => {
     if (!window.electronAPI?.trainerCatalogSearch) return;
     if (append) setLoadingMore(true);
     else setLoading(true);
@@ -128,6 +142,8 @@ export default function TrainerLibraryPage({
         query: searchQuery,
         limit: PAGE_SIZE,
         offset: pageOffset,
+        verificationStatus: tier,
+        categories: genres.length > 0 ? genres : undefined,
       })) as SearchResponse;
       if (result.success && result.entries) {
         setEntries((prev) => (append ? [...prev, ...result.entries!] : result.entries!));
@@ -142,14 +158,18 @@ export default function TrainerLibraryPage({
     }
   }, []);
 
-  const load = useCallback(async (searchQuery = query) => {
+  const load = useCallback(async (
+    searchQuery = query,
+    tier: TierFilter = tierFilter,
+    genres: string[] = genreFilters,
+  ) => {
     setOffset(0);
-    await fetchPage(searchQuery, 0, false);
-  }, [fetchPage, query]);
+    await fetchPage(searchQuery, 0, false, tier, genres);
+  }, [fetchPage, query, tierFilter, genreFilters]);
 
   useEffect(() => {
-    void load('');
-  }, [load]);
+    void load(query, tierFilter, genreFilters);
+  }, [tierFilter, genreFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
 
   useEffect(() => {
     const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
@@ -203,8 +223,22 @@ export default function TrainerLibraryPage({
 
   const handleLoadMore = useCallback(() => {
     if (loadingMore || loading || entries.length >= total) return;
-    void fetchPage(queryRef.current, offset, true);
+    void fetchPage(
+      queryRef.current,
+      offset,
+      true,
+      tierFilterRef.current,
+      genreFiltersRef.current,
+    );
   }, [loadingMore, loading, entries.length, total, offset, fetchPage]);
+
+  const toggleGenre = (genre: string) => {
+    setGenreFilters((prev) =>
+      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre],
+    );
+  };
+
+  const clearGenres = () => setGenreFilters([]);
 
   const handleSync = async () => {
     if (!window.electronAPI?.trainerCatalogSyncRemote) return;
@@ -312,7 +346,14 @@ export default function TrainerLibraryPage({
     }
   };
 
-  const visible = entries.filter((e) => filter === 'all' || e.verificationStatus === filter);
+  const visible = entries;
+
+  const activeFilterSummary =
+    genreFilters.length > 0
+      ? `${genreFilters.join(', ')}${tierFilter !== 'all' ? ` · ${tierFilter}` : ''}`
+      : tierFilter !== 'all'
+        ? tierFilter
+        : null;
 
   return (
     <div className={styles.page}>
@@ -320,7 +361,7 @@ export default function TrainerLibraryPage({
         artwork="trainerController"
         className={styles.header}
         title="Trainer Library"
-        description={`${total.toLocaleString()} games · virtualized grid · Steam artwork on verified App IDs`}
+        description={`${total.toLocaleString()} games${activeFilterSummary ? ` · ${activeFilterSummary}` : ''} · virtualized grid`}
         actions={
           <div className={styles.actions}>
             <input
@@ -367,17 +408,42 @@ export default function TrainerLibraryPage({
         <button type="submit">Search</button>
       </form>
 
-      <div className={styles.filters}>
-        {(['all', 'verified', 'community', 'metadata-only'] as const).map((f) => (
-          <button
-            key={f}
-            type="button"
-            className={filter === f ? styles.filterActive : styles.filterBtn}
-            onClick={() => setFilter(f)}
-          >
-            {f === 'metadata-only' ? 'Metadata' : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Verification</span>
+        <div className={styles.filters}>
+          {(['all', 'verified', 'community', 'metadata-only'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={tierFilter === f ? styles.filterActive : styles.filterBtn}
+              onClick={() => setTierFilter(f)}
+            >
+              {f === 'metadata-only' ? 'Metadata' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Genre (optional)</span>
+        <div className={styles.genreFilters}>
+          {CATALOG_GENRE_FILTERS.map((genre) => (
+            <button
+              key={genre}
+              type="button"
+              className={genreFilters.includes(genre) ? styles.genreChipActive : styles.genreChip}
+              onClick={() => toggleGenre(genre)}
+              aria-pressed={genreFilters.includes(genre)}
+            >
+              {genre}
+            </button>
+          ))}
+          {genreFilters.length > 0 && (
+            <button type="button" className={styles.clearGenresBtn} onClick={clearGenres}>
+              Clear genres
+            </button>
+          )}
+        </div>
       </div>
 
       {message && <p className={styles.message}>{message}</p>}
@@ -387,6 +453,10 @@ export default function TrainerLibraryPage({
         </p>
       )}
       {loading && <p className={styles.loading}>Loading catalog…</p>}
+
+      {!loading && visible.length === 0 && (
+        <p className={styles.loading}>No games match your filters — try clearing genre chips or search.</p>
+      )}
 
       {!loading && visible.length > 0 && (
         <VirtualCatalogGrid

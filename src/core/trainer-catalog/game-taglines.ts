@@ -23,6 +23,10 @@ export const CURATED_GAME_TAGLINES: Record<string, string> = {
   valheim: 'Viking survival crafting with procedural worlds.',
   hades: 'Roguelike action through the underworld.',
   'hollow-knight': 'Metroidvania exploration in a fallen kingdom.',
+  'street-fighter-6': 'Competitive fighting with modern Drive System.',
+  'tekken-8': '3D fighting tournament with heat mechanics.',
+  'monster-hunter-world': 'Co-op action hunting gigantic monsters.',
+  'project-zomboid': 'Isometric zombie survival sandbox.',
 };
 
 export function getCatalogTagline(entry: TrainerCatalogEntry): string {

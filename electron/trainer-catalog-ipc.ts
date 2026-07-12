@@ -44,6 +44,11 @@ const SearchSchema = z.object({
   query: z.string().max(200).optional().default(''),
   limit: z.number().int().min(1).max(200).optional().default(48),
   offset: z.number().int().min(0).optional().default(0),
+  categories: z.array(z.string().min(1).max(40)).max(12).optional(),
+  verificationStatus: z
+    .enum(['all', 'verified', 'community', 'metadata-only', 'unverified'])
+    .optional()
+    .default('all'),
 });
 
 const CatalogGameIdSchema = z.object({
@@ -62,7 +67,10 @@ export function registerTrainerCatalogIpc(): void {
   ipcMain.handle('trainer-catalog-search', async (_event, payload: unknown) => {
     try {
       const parsed = SearchSchema.parse(payload ?? {});
-      const result = searchCatalog(parsed.query, parsed.limit, parsed.offset);
+      const result = searchCatalog(parsed.query, parsed.limit, parsed.offset, {
+        categories: parsed.categories,
+        verificationStatus: parsed.verificationStatus,
+      });
       return { success: true, ...result };
     } catch (error) {
       return { success: false, error: sanitize(error) };
