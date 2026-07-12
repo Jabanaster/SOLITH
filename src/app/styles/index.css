@@ -836,7 +836,7 @@ button, input, select, textarea {
 
 .checkbox-text p {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 

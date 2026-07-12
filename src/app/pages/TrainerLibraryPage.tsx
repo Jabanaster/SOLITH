@@ -50,7 +50,7 @@ function CatalogCard({
         {entry.coverUrl && entry.steamAppId && entry.steamAppId < 1_000_000 ? (
           <img
             src={entry.coverUrl}
-            alt=""
+            alt={`${entry.displayName} cover art`}
             loading="lazy"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';

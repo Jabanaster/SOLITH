@@ -15,12 +15,30 @@
  */
 
 import { test, expect, _electron as electron, Page } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 
 const MAIN_BUNDLE = path.join('dist-electron', 'main.js');
+const AXE_BUNDLE = path.join(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
+const DIST_AXE = path.join('dist-electron', 'dist', 'axe.min.js');
+
+async function runAxeInElectron(page: Page) {
+  fs.mkdirSync(path.dirname(DIST_AXE), { recursive: true });
+  fs.copyFileSync(AXE_BUNDLE, DIST_AXE);
+
+  const pageOrigin = await page.evaluate(() => {
+    const href = window.location.href;
+    return href.slice(0, href.lastIndexOf('/') + 1);
+  });
+  await page.addScriptTag({ url: `${pageOrigin}axe.min.js` });
+  await page.waitForFunction(() => Boolean((window as unknown as { axe?: unknown }).axe));
+  return page.evaluate(() =>
+    (window as unknown as { axe: { run: (ctx: Document) => Promise<{ violations: Array<{ impact?: string }> }> } }).axe.run(
+      document,
+    ),
+  );
+}
 
 async function launchFresh(label: string) {
   if (!fs.existsSync(MAIN_BUNDLE)) return null;
@@ -66,7 +84,10 @@ test('a11y-01 — all <img> elements have non-empty alt or role="presentation"',
         .filter(img => {
           const alt = img.getAttribute('alt');
           const role = img.getAttribute('role');
-          return role !== 'presentation' && role !== 'none' && (alt === null || alt.trim() === '');
+          if (role === 'presentation' || role === 'none') return false;
+          if (img.getAttribute('aria-hidden') === 'true') return false;
+          if (img.closest('[aria-hidden="true"]')) return false;
+          return alt === null || alt.trim() === '';
         })
         .map(img => img.outerHTML.slice(0, 120));
     });
@@ -206,7 +227,7 @@ test('a11y-08 — axe-core reports no critical violations on Trainer Library', a
   try {
     await ctx!.win.locator('text=Trainer Library').first().click({ timeout: 10_000 }).catch(() => {});
     await ctx!.win.waitForTimeout(500);
-    const results = await new AxeBuilder({ page: ctx!.win }).analyze();
+    const results = await runAxeInElectron(ctx!.win);
     const critical = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
     expect(critical, JSON.stringify(critical, null, 2)).toHaveLength(0);
   } finally { await cleanup(ctx); }
