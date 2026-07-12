@@ -15,7 +15,7 @@
 import fs from 'fs';
 import path from 'path';
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
-import { validateJsonSaveFieldProposal } from '../saves/json-save-field';
+import { readJsonSaveField, validateJsonSaveFieldProposal, writeJsonSaveField } from '../saves/json-save-field';
 import { validateIniSaveFieldProposal } from '../saves/ini-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 
@@ -126,6 +126,12 @@ export async function executeWriteField(params: unknown): Promise<ExecuteWriteRe
   if (!fs.existsSync(filePath)) throw new Error('file_not_found');
   assertPathSaveFormatSupportsOperation(filePath, 'save_field_write');
 
+  const format = detectSaveFormatFromPath(filePath);
+  if (format === 'json') {
+    const result = writeJsonSaveField(filePath, field, currentValue, newValue);
+    return { written: true, verifiedValue: result.verifiedValue, backupPath: result.backupPath };
+  }
+
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
   if (!safety.safe) throw new Error(`xml_safety: ${safety.error}`);
@@ -196,7 +202,14 @@ export async function rollbackWriteField(params: unknown): Promise<RollbackResul
   fs.copyFileSync(backupPath, tmpPath);
   fs.renameSync(tmpPath, filePath);
 
-  // Validate restored file
+  const format = detectSaveFormatFromPath(filePath);
+  if (format === 'json') {
+    const verify = readJsonSaveField(filePath, field);
+    if (!verify.found) throw new Error('verify_field_not_found_after_rollback');
+    return { restored: true, verifiedValue: String(verify.value) };
+  }
+
+  // Validate restored XML file
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
   if (!safety.safe) throw new Error(`restored_xml_safety: ${safety.error}`);

@@ -184,7 +184,20 @@ export default function TrainerLibraryPage({
               ) : (
                 <div className={styles.coverFallback}>{entry.displayName.charAt(0)}</div>
               )}
-              <span className={styles.badge}>{entry.verificationStatus}</span>
+              <span
+                className={styles.badge}
+                title={
+                  entry.verificationStatus === 'verified'
+                    ? 'Bundled definition with verified save or memory controls'
+                    : entry.verificationStatus === 'metadata-only'
+                      ? 'Catalog metadata only — no bundled trainer definition yet'
+                      : entry.verificationStatus === 'community'
+                        ? 'Imported listing — pointer paths require discovery'
+                        : 'Unverified trainer listing'
+                }
+              >
+                {entry.verificationStatus}
+              </span>
             </div>
             <div className={styles.cardBody}>
               <h2>{entry.displayName}</h2>

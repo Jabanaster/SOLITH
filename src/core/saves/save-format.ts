@@ -36,7 +36,7 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     canInspect: true,
     canReadSaveField: true,
     canProposeSaveField: true,
-    canWriteSaveField: false,
+    canWriteSaveField: true,
   },
   ini: {
     id: 'ini',

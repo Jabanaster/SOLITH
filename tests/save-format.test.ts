@@ -42,23 +42,23 @@ describe('save format capabilities', () => {
     assert.equal(json.recognized, true);
     assert.equal(json.canReadSaveField, true);
     assert.equal(json.canProposeSaveField, true);
-    assert.equal(json.canWriteSaveField, false);
+    assert.equal(json.canWriteSaveField, true);
     assert.equal(ini.recognized, true);
     assert.equal(ini.canReadSaveField, true);
     assert.equal(ini.canProposeSaveField, true);
     assert.equal(ini.canWriteSaveField, false);
   });
 
-  test('throws typed unsupported-format errors for save-field operations', () => {
+  test('throws typed unsupported-format errors for INI write operations', () => {
     assert.throws(
-      () => assertPathSaveFormatSupportsOperation(path.join('C:\\Users\\private', 'player.json'), 'save_field_write'),
+      () => assertPathSaveFormatSupportsOperation(path.join('C:\\Users\\private', 'settings.ini'), 'save_field_write'),
       (error: unknown) => {
         assert.ok(error instanceof UnsupportedSaveFormatError);
         assert.equal(error.code, 'unsupported_save_format');
-        assert.equal(error.format, 'json');
+        assert.equal(error.format, 'ini');
         assert.equal(error.operation, 'save_field_write');
-        assert.equal(error.targetName, 'player.json');
-        assert.match(error.message, /player\.json/);
+        assert.equal(error.targetName, 'settings.ini');
+        assert.match(error.message, /settings\.ini/);
         assert.equal(error.message.includes('C:\\Users\\private'), false);
         return true;
       },
@@ -72,13 +72,11 @@ describe('save format capabilities', () => {
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('farm.xml', 'save_field_rollback'));
   });
 
-  test('allows JSON read/propose but rejects write execution', () => {
+  test('allows JSON save-field operations including write execution', () => {
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_read'));
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_propose'));
-    assert.throws(
-      () => assertPathSaveFormatSupportsOperation('player.json', 'save_field_write'),
-      /unsupported_save_format/,
-    );
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_write'));
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_rollback'));
   });
 
   test('allows INI read/propose but rejects write execution', () => {

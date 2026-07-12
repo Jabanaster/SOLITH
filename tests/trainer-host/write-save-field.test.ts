@@ -119,7 +119,7 @@ describe('proposeWriteField', () => {
       assert.equal(result.valid, true);
       assert.equal(result.currentValue, KNOWN_VALUE);
       assert.equal(result.proposedValue, NEW_VALUE);
-      assert.match(result.preview ?? '', /JSON write execution is not supported/);
+      assert.match(result.preview ?? '', /backup \+ atomic write on approval/);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -246,21 +246,45 @@ describe('executeWriteField', () => {
     );
   });
 
-  test('rejects JSON write execution with unsupported-format error', async () => {
+  test('writes JSON scalar fields with backup and verification', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-execute-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
     try {
-      await assert.rejects(
-        () => executeWriteField({ filePath: jsonPath, field: 'player.money', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
-        (error: unknown) => {
-          assert.ok(error instanceof Error);
-          assert.equal(error.name, 'UnsupportedSaveFormatError');
-          assert.match(error.message, /unsupported_save_format/);
-          assert.equal(error.message.includes(tmpDir), false);
-          return true;
-        },
-      );
+      const result = await executeWriteField({
+        filePath: jsonPath,
+        field: 'player.money',
+        currentValue: KNOWN_VALUE,
+        newValue: NEW_VALUE,
+      });
+      assert.equal(result.written, true);
+      assert.equal(result.verifiedValue, NEW_VALUE);
+      assert.ok(result.backupPath.endsWith('.trainer-backup'));
+      const written = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')) as { player: { money: number } };
+      assert.equal(written.player.money, Number(NEW_VALUE));
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('rolls back JSON writes from verified backup', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-rollback-'));
+    const jsonPath = path.join(tmpDir, 'player.json');
+    fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
+    try {
+      const writeResult = await executeWriteField({
+        filePath: jsonPath,
+        field: 'player.money',
+        currentValue: KNOWN_VALUE,
+        newValue: NEW_VALUE,
+      });
+      const rollbackResult = await rollbackWriteField({
+        filePath: jsonPath,
+        backupPath: writeResult.backupPath,
+        field: 'player.money',
+      });
+      assert.equal(rollbackResult.restored, true);
+      assert.equal(rollbackResult.verifiedValue, KNOWN_VALUE);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

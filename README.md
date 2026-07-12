@@ -17,7 +17,7 @@ ResourceForge includes a **WeMod-style live trainer** with pre-curated cheats fo
 | **Atomfall** | 10 | Memory scan | ✅ |
 | **Avowed** | 10 | Memory scan | ✅ |
 | **Dredge** | 10 | Memory scan | ✅ |
-| **Stardew Valley** | 9 | Console command | ⏳ Cataloged only — command executor not yet built |
+| **Stardew Valley** | 9 | Save fields + console catalog | ✅ Save editor (money, stamina, XP, max stamina) · ⏳ Console executor not built |
 | **Crimson Desert** | 8 | Memory scan | ✅ |
 
 ### **Features:**
@@ -26,7 +26,8 @@ ResourceForge includes a **WeMod-style live trainer** with pre-curated cheats fo
 ✅ **Freeze value** (infinite health/stamina toggle — continuous re-write at 200ms)  
 ✅ **Online-session guard** (fails-closed if game has active network connections)  
 ✅ **Session-local caching** (discovered addresses cached for the session)  
-✅ **Defensive wrapping** (validates all memory operations to reduce antivirus flags)  
+✅ **F1–F12 trainer hotkeys** for armed cheats during a live session (gated live-memory mode)  
+✅ **In-game overlay** sync for active cheat state (gated live-memory mode)  
 
 ### **Quick Start:**
 
@@ -139,9 +140,12 @@ To prevent accidental data loss, anti-cheat flags, or system instability, Resour
 - DRM bypass.
 - Executable patching (.exe, .dll, .sys, .drv modification).
 - Online/multiplayer game support.
-- Trainer overlays or live hotkey listening.
 - Live memory access outside the gated, catalogued subsystem above (no freeform address entry,
   no unsupported-game targeting).
+
+**Not blocked in Solith 2.0 (when live-memory mode is enabled and offline-confirmed):** trainer overlay
+sync and F1–F12 hotkey listening for catalogued cheats. These remain gated behind offline confirmation
+and the online-session guard — they are not available for arbitrary games or unverified controls.
 
 ---
 

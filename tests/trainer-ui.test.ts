@@ -278,9 +278,8 @@ describe('Save edit risk messaging', () => {
   });
 
   test('35. JSON and INI are preview-only, not executable', () => {
-    assert.strictEqual(saveEditRiskLabelForFormat('json'), 'Preview-only');
+    assert.strictEqual(saveEditRiskLabelForFormat('json'), 'Executable');
     assert.strictEqual(saveEditRiskLabelForFormat('ini'), 'Preview-only');
-    assert.notStrictEqual(saveEditRiskLabelForFormat('json'), 'Executable');
     assert.notStrictEqual(saveEditRiskLabelForFormat('ini'), 'Executable');
   });
 

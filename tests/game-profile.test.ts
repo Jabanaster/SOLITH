@@ -283,7 +283,7 @@ describe('validateProfileAuthoringWorkflow â€” fixture-backed reports', () 
     assert.ok(report.supportedOperations.includes('save_field_write'));
   });
 
-  it('generates a valid JSON read-only profile report', () => {
+  it('generates a valid JSON profile report with format-level write support', () => {
     const report = validateProfileAuthoringWorkflow({
       profile: authoringProfile({ saveFormat: 'json', controls: [] }),
       fixturePath: JSON_FIXTURE_PATH,
@@ -293,7 +293,8 @@ describe('validateProfileAuthoringWorkflow â€” fixture-backed reports', () 
     assert.equal(report.fixture?.fileName, 'player_save.json');
     assert.ok(report.supportedOperations.includes('save_field_read'));
     assert.ok(report.supportedOperations.includes('save_field_propose'));
-    assert.ok(report.blockedOperations.includes('save_field_write'));
+    assert.ok(report.supportedOperations.includes('save_field_write'));
+    assert.ok(!report.blockedOperations.includes('save_field_write'));
     assert.deepStrictEqual(report.executableControlIds, []);
   });
 

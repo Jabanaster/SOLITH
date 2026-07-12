@@ -121,6 +121,74 @@ export function validateJsonSaveFieldProposal(
     currentType,
     proposedValue: String(proposedValue),
     proposedTypedValue,
-    preview: `Preview ${field}: ${currentValue} -> ${String(proposedValue)} (${currentType}; JSON write execution is not supported)`,
+    preview: `Preview ${field}: ${currentValue} -> ${String(proposedValue)} (${currentType}; backup + atomic write on approval)`,
   };
+}
+
+export interface JsonSaveFieldWriteResult {
+  verifiedValue: string;
+  backupPath: string;
+}
+
+/**
+ * Backs up the JSON file, applies a scalar field change, and verifies the write.
+ * Caller must have already validated the proposal (supervisor approval gate).
+ */
+export function writeJsonSaveField(
+  filePath: string,
+  field: string,
+  expectedCurrentValue: string,
+  proposedValue: string,
+): JsonSaveFieldWriteResult {
+  const proposal = validateJsonSaveFieldProposal(filePath, field, expectedCurrentValue, proposedValue);
+  const parts = assertSimpleJsonFieldPath(field);
+  const doc = readJsonDocument(filePath) as Record<string, unknown>;
+
+  let current: unknown = doc;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i]!;
+    if (
+      current === null ||
+      typeof current !== 'object' ||
+      Array.isArray(current) ||
+      !Object.prototype.hasOwnProperty.call(current, part)
+    ) {
+      throw new Error('field_not_found');
+    }
+    current = (current as Record<string, unknown>)[part];
+  }
+
+  const leaf = parts[parts.length - 1]!;
+  if (
+    current === null ||
+    typeof current !== 'object' ||
+    Array.isArray(current) ||
+    !Object.prototype.hasOwnProperty.call(current, leaf)
+  ) {
+    throw new Error('field_not_found');
+  }
+
+  const live = String((current as Record<string, unknown>)[leaf]);
+  if (live !== proposal.currentValue) {
+    throw new Error(`value_changed_since_proposal: current=${live} expected=${proposal.currentValue}`);
+  }
+
+  (current as Record<string, unknown>)[leaf] = proposal.proposedTypedValue;
+
+  const backupPath = filePath + '.trainer-backup';
+  fs.copyFileSync(filePath, backupPath);
+
+  const tmpPath = filePath + '.trainer-tmp';
+  const output = `${JSON.stringify(doc, null, 2)}\n`;
+  fs.writeFileSync(tmpPath, output, 'utf-8');
+  fs.renameSync(tmpPath, filePath);
+
+  const verify = readJsonSaveField(filePath, field);
+  if (!verify.found) throw new Error('verify_field_not_found');
+  const verifiedValue = String(verify.value);
+  if (verifiedValue !== String(proposal.proposedTypedValue)) {
+    throw new Error(`verify_mismatch: current=${verifiedValue} expected=${proposal.proposedTypedValue}`);
+  }
+
+  return { verifiedValue, backupPath };
 }

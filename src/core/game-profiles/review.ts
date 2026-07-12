@@ -35,7 +35,10 @@ export function reviewGameProfileExchange(
     profile: catalogEntry.profile,
   });
   const importSupported = authoring.supportedOperations.includes('save_field_read') || authoring.supportedOperations.includes('inspect');
-  const exportSupported = authoring.supportedOperations.includes('save_field_write') && catalogEntry.writeSupportStatus === 'supported';
+  const exportSupported =
+    authoring.supportedOperations.includes('save_field_write') &&
+    catalogEntry.writeSupportStatus === 'supported' &&
+    catalogEntry.supportStatus === 'supported';
   const blockedReasons = [
     ...catalogEntry.unsupportedReasons.map(reason => `catalog:${reason}`),
     ...authoring.blockedOperations.map(operation => `save-format:${operation}`),
