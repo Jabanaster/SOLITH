@@ -20,35 +20,27 @@ export type ModuleViewId =
   | 'catalog-save-controls';
 
 /**
- * Secondary Solith artwork per module (user-provided asset mapping):
- * - trainerController: trainer / live memory controls
- * - recoveryPhoenix: backup, restore, rollback, recovery
- * - advancedDragon: advanced / discovery utilities
- * - hoodedProfile: profiles, library, compatibility, specialized tools
+ * Custom Solith artwork for sidebar nav items only where semantic match is strong.
+ * All other items use vendored Tabler SVG icons from `Icon`.
+ *
+ * Custom usage rules:
+ * - trainerController (winged): Game Library, Live Memory Trainer, Multi-Game Cheats, game trainer context
+ * - recoveryPhoenix: Backups / recovery flows
+ * - advancedDragon: Advanced / V2 section label only (not per-item nav)
+ * - hoodedProfile: profiles / sensitive tools on pages — not normal sidebar nav
  */
 export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtwork>> = {
-  library: 'hoodedProfile',
+  library: 'trainerController',
   trainer: 'trainerController',
-  saves: 'trainerController',
   backups: 'recoveryPhoenix',
-  journal: 'recoveryPhoenix',
-  locations: 'hoodedProfile',
-  discovery: 'advancedDragon',
-  data: 'advancedDragon',
-  recipes: 'advancedDragon',
-  compatibility: 'hoodedProfile',
-  'session-monitor': 'advancedDragon',
   'live-memory': 'trainerController',
   'multi-game-trainer': 'trainerController',
-  'trainer-library': 'trainerController',
-  'catalog-save-controls': 'trainerController',
-  controls: 'trainerController',
 };
 
+/** Section header artwork — smaller than nav icons; decorative grouping only. */
 export const SECTION_ARTWORK: Partial<Record<string, SolithBrandingArtwork>> = {
-  Library: 'hoodedProfile',
+  Library: 'trainerController',
   'Core Tools': 'recoveryPhoenix',
-  Utilities: 'advancedDragon',
   Advanced: 'advancedDragon',
 };
 

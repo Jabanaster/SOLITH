@@ -357,7 +357,7 @@ const App: React.FC = () => {
                     {artwork ? (
                       <BrandingArtwork artwork={artwork} size="nav" />
                     ) : (
-                      <Icon name={item.icon} />
+                      <Icon name={item.icon} size={18} />
                     )}
                   </span>
                   <span className="nav-label">{item.label}</span>
