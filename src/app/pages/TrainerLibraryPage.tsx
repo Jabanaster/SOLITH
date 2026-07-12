@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { downloadTextFile } from '../utils/download-text-file.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 
 interface SearchResponse {
@@ -8,6 +9,12 @@ interface SearchResponse {
   entries?: TrainerCatalogEntry[];
   total?: number;
   error?: string;
+}
+
+interface TrustMeta {
+  positive: number;
+  negative: number;
+  quarantined: boolean;
 }
 
 const PAGE_SIZE = 96;
@@ -37,6 +44,8 @@ export default function TrainerLibraryPage({
   const [message, setMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'verified' | 'community' | 'metadata-only'>('all');
   const [importing, setImporting] = useState(false);
+  const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
+  const [quarantineCount, setQuarantineCount] = useState(0);
   const importYamlRef = useRef<HTMLInputElement>(null);
   const importCtRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +88,44 @@ export default function TrainerLibraryPage({
     });
     return () => unsubscribe?.();
   }, []);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogFeedbackSummary) return;
+    const withPacks = entries.filter((e) => e.hasModPack);
+    if (withPacks.length === 0) {
+      setTrustMeta({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const next: Record<string, TrustMeta> = {};
+      await Promise.all(
+        withPacks.map(async (entry) => {
+          const result = await api.trainerCatalogFeedbackSummary!({ catalogGameId: entry.catalogGameId });
+          if (result.success && result.summary) {
+            next[entry.catalogGameId] = {
+              positive: result.summary.positive,
+              negative: result.summary.negative,
+              quarantined: Boolean(result.quarantined),
+            };
+          }
+        }),
+      );
+      if (!cancelled) setTrustMeta(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogPendingQuarantine) return;
+    void api.trainerCatalogPendingQuarantine().then((result) => {
+      if (result.success && result.pending) setQuarantineCount(result.pending.length);
+    });
+  }, [entries, message]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +210,39 @@ export default function TrainerLibraryPage({
     onLaunchGame?.(entry.catalogGameId, entry.displayName, loadResult.capabilities);
   };
 
+  const handleExportYaml = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogExportDefinition) return;
+    const result = await api.trainerCatalogExportDefinition({ catalogGameId: entry.catalogGameId });
+    if (result.success && result.yaml && result.filename) {
+      downloadTextFile(result.filename, result.yaml);
+      setMessage(`Exported community pack for ${entry.displayName}.`);
+    } else {
+      setMessage(result.error ?? 'Export failed — no definition payload found.');
+    }
+  };
+
+  const handleThumbUp = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogFeedbackRecord) return;
+    const result = await api.trainerCatalogFeedbackRecord({
+      catalogGameId: entry.catalogGameId,
+      featureId: '_pack',
+      rating: 1,
+    });
+    if (result.success && result.summary) {
+      setTrustMeta((prev) => ({
+        ...prev,
+        [entry.catalogGameId]: {
+          positive: result.summary!.positive,
+          negative: result.summary!.negative,
+          quarantined: prev[entry.catalogGameId]?.quarantined ?? false,
+        },
+      }));
+      setMessage(`Thanks — community confirmation recorded for ${entry.displayName}.`);
+    }
+  };
+
   const visible = entries.filter((e) => filter === 'all' || e.verificationStatus === filter);
 
   return (
@@ -232,6 +312,11 @@ export default function TrainerLibraryPage({
       </div>
 
       {message && <p className={styles.message}>{message}</p>}
+      {quarantineCount > 0 && (
+        <p className={styles.quarantineBanner} role="status">
+          {quarantineCount} definition{quarantineCount === 1 ? '' : 's'} queued for re-verification after executable drift.
+        </p>
+      )}
       {loading && <p className={styles.loading}>Loading catalog…</p>}
 
       <div className={styles.grid}>
@@ -252,11 +337,27 @@ export default function TrainerLibraryPage({
               <p>{entry.categories.slice(0, 2).join(' · ')}</p>
               <p className={styles.meta}>
                 {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
+                {trustMeta[entry.catalogGameId]?.positive ? ` · ${trustMeta[entry.catalogGameId].positive} confirmed` : ''}
+                {trustMeta[entry.catalogGameId]?.quarantined ? ' · needs re-verify' : ''}
               </p>
               <p className={styles.meta}>{tierHint(entry)}</p>
-              <button type="button" className={styles.launchBtn} onClick={() => void handleLaunch(entry)}>
-                {entry.hasModPack ? 'Load Trainer' : 'View'}
-              </button>
+              <div className={styles.cardActions}>
+                <button type="button" className={styles.launchBtn} onClick={() => void handleLaunch(entry)}>
+                  {entry.hasModPack ? 'Load Trainer' : 'View'}
+                </button>
+                {entry.hasModPack && (
+                  <>
+                    <button type="button" className={styles.secondaryBtn} onClick={() => void handleExportYaml(entry)}>
+                      Export YAML
+                    </button>
+                    {entry.verificationStatus === 'community' && (
+                      <button type="button" className={styles.secondaryBtn} onClick={() => void handleThumbUp(entry)}>
+                        Confirm works
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </article>
         ))}

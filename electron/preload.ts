@@ -163,6 +163,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('trainer-catalog-feedback-record', payload),
   trainerCatalogFeedbackSummary: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-feedback-summary', payload),
+  trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-evaluate-promotion', payload),
+  trainerCatalogPromoteVerified: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-promote-verified', payload),
+  trainerCatalogExportDefinition: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-export-definition', payload),
+  trainerCatalogPendingQuarantine: () => ipcRenderer.invoke('trainer-catalog-pending-quarantine'),
   liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
   onCatalogProcessDetected: (callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void) => {

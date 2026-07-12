@@ -26,6 +26,7 @@ import {
 } from '../src/core/trainer-catalog/definition-quarantine.js';
 import { evaluatePromotionEligibility, promoteDefinitionToVerified } from '../src/core/trainer-catalog/definition-promotion.js';
 import { DefinitionFeedbackSchema, ImportCtSchema } from './ipc-validation.js';
+import { exportCatalogDefinitionToYaml } from '../src/core/definitions/export-catalog-definition.js';
 import {
   loadCatalogDefinition,
   catalogDefinitionCapabilities,
@@ -246,6 +247,33 @@ export function registerTrainerCatalogIpc(): void {
       if (!definition) return { success: false, error: 'no_definition' };
       const promoted = promoteDefinitionToVerified(definition);
       return { success: true, catalogGameId: promoted.id, verificationStatus: promoted.safety.verificationStatus };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-export-definition', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const bundle = exportCatalogDefinitionToYaml(parsed.catalogGameId);
+      if (!bundle) return { success: false, error: 'no_definition' };
+      return {
+        success: true,
+        catalogGameId: parsed.catalogGameId,
+        filename: bundle.filename,
+        yaml: bundle.yaml,
+        title: bundle.definition.title,
+        verificationStatus: bundle.definition.safety.verificationStatus,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-pending-quarantine', async () => {
+    try {
+      const pending = listPendingDefinitionUpdates(100);
+      return { success: true, pending };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

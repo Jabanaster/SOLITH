@@ -1,49 +1,57 @@
 ﻿# Solith / ResourceForge Roadmap
 
-## Current Baseline (Solith 2.0)
+## Current Baseline (Solith 2.0+)
 
-Product UI: **Solith** Â· package `resourceforge@2.0.0`
+Product UI: **Solith** · package `resourceforge@2.0.0`
 
 * Branch: `master`
-* Latest milestone work: **Mâ€“Q** (live trainer parity, schema.v1 definitions, catalog routing, hotkeys)
-* Head (local): see `git log -1` â€” push state may advance independently of this doc
+* Latest milestone work: **M–Q** (live trainer parity, schema.v1 definitions, catalog routing, hotkeys)
+* Post-2.0 offline pinnacle batch: CT import, drift quarantine, community feedback/promotion, pointer-scan UI, catalog export
 
 ### Accepted capability stack
 
 ```
-schema.v1.yml â†’ compile â†’ SQLite payloadJson
-         â†‘ export                    â†“ lazy load
+schema.v1.yml → compile → SQLite payloadJson
+         ↑ export                    ↓ lazy load
    Discovery Lab              Trainer Library
-                                    â”œâ”€ memoryFeatures â†’ LiveMemorySession
-                                    â””â”€ saveEditor.saveFields â†’ TrainerHost (catalog save controls)
+                                    ├─ memoryFeatures → LiveMemorySession
+                                    └─ saveEditor.saveFields → TrainerHost (catalog save controls)
 ```
 
 ### Milestone map (recent)
 
 | Milestone | Theme | Status |
 |-----------|--------|--------|
-| **M** | Live trainer parity â€” overlay, hotkeys, memory_write unlock | Accepted |
-| **N** | Trainer Library â€” 1000+ metadata seed, remote sync, Steam art | Accepted |
+| **M** | Live trainer parity — overlay, hotkeys, memory_write unlock | Accepted |
+| **N** | Trainer Library — 1000+ metadata seed, remote sync, Steam art | Accepted |
 | **O.1** | schema.v1 guard, fingerprint, AOB resolver | Accepted |
 | **O.2** | YAML export + Solith module branding | Accepted |
 | **O.3** | YAML compiler + catalog import | Accepted |
-| **O+** | Catalog â†’ live memory wiring | Accepted |
+| **O+** | Catalog → live memory wiring | Accepted |
 | **P** | Save-field execution router from catalog | Accepted |
 | **Q** | F1–F12 cheat hotkeys, hybrid launch chooser, drift modal | Accepted |
+| **R–W (offline)** | Brand neutrality, CT import, quarantine, feedback, pointer scan UI | In progress on `master` |
 
 ### Bundled schema.v1 definitions
 
 All seven curated games (`games.ts`) ship as `schema.v1` payloads via `bundled-definition-seed.ts`:
 Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats as `scan_unknown` features).
 
-### Next suggested work (post-2.0)
+### Next suggested work
 
-See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
+See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap (offline-first section at top).
 
-1. Measure and document connection baselines for Avowed, Dredge, Crimson Desert (KI-017)
-2. Restart verifier + pointer registry (7 → 50 → 500 games)
-3. Remote catalog sync quality pass (community pointer paths from remote listings)
-4. Real-game freeze/write certification with explicit save backup authorization
+**Requires live game sessions (do not fake):**
+
+1. Measure connection baselines for Avowed, Dredge, Crimson Desert (KI-017)
+2. Restart verifier + pointer registry (15 cheats, then scale)
+3. L3 certification runs on bundled cheats with in-game evidence
+
+**Can continue offline:**
+
+- Catalog seed executable enrichment (`scripts/generate-trainer-catalog-seed.mjs`)
+- Community pack export/import polish
+- Binary save profile research (architecture in place)
 
 ---
 

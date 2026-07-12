@@ -27,6 +27,18 @@ function normalizeParsedDefinition(raw: unknown): unknown {
   if (record.schemaVersion === '1' || record.schemaVersion === 1) {
     record.schemaVersion = 1;
   }
+  const features = record.memoryFeatures;
+  if (Array.isArray(features)) {
+    for (const feature of features) {
+      if (!feature || typeof feature !== 'object') continue;
+      const resolution = (feature as Record<string, unknown>).resolution;
+      if (!resolution || typeof resolution !== 'object') continue;
+      const baseOffset = (resolution as Record<string, unknown>).baseOffset;
+      if (typeof baseOffset === 'number' && Number.isFinite(baseOffset)) {
+        (resolution as Record<string, unknown>).baseOffset = `0x${baseOffset.toString(16)}`;
+      }
+    }
+  }
   return record;
 }
 

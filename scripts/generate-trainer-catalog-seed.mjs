@@ -149,8 +149,26 @@ const GENRES = ['Action', 'RPG', 'Strategy', 'Simulation', 'Horror', 'Indie', 'S
 const PREFIXES = ['Legend of', 'Chronicles of', 'Tales of', 'Return to', 'Escape from', 'War for', 'Rise of', 'Fall of', 'Age of', 'Call of'];
 const NOUNS = ['Darkness', 'Empire', 'Kingdom', 'Shadows', 'Legends', 'Destiny', 'Revenge', 'Silence', 'Storm', 'Ashes', 'Blood', 'Steel', 'Fire', 'Ice', 'Void'];
 
+/** Best-effort executable guesses for metadata-only catalog rows (offline seed enrichment). */
+function guessExecutables(name) {
+  const compact = name.replace(/[^\w\s]/g, '').trim().replace(/\s+/g, '');
+  const spaced = name.replace(/[^\w\s]/g, '').trim();
+  const candidates = [
+    `${compact}.exe`,
+    `${spaced}.exe`,
+    `${compact}-Win64-Shipping.exe`,
+    `${compact}Game.exe`,
+  ];
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+function withExecutableGuesses(game) {
+  if (game.executables?.length) return game;
+  return { ...game, executables: guessExecutables(game.name) };
+}
+
 function syntheticGames(targetCount) {
-  const games = [...BASE_GAMES];
+  const games = BASE_GAMES.map(withExecutableGuesses);
   let i = 0;
   while (games.length < targetCount) {
     const prefix = PREFIXES[i % PREFIXES.length];
@@ -158,12 +176,12 @@ function syntheticGames(targetCount) {
     const suffix = i % 3 === 0 ? ' Remastered' : i % 3 === 1 ? ' II' : ' Chronicles';
     const name = `${prefix} ${noun}${suffix}`;
     const steamAppId = 1_000_000 + i;
-    games.push({
+    games.push(withExecutableGuesses({
       name,
       steamAppId,
       categories: [GENRES[i % GENRES.length], GENRES[(i + 3) % GENRES.length]],
       verificationStatus: 'metadata-only',
-    });
+    }));
     i += 1;
   }
   return games;

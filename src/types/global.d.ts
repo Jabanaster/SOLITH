@@ -225,6 +225,37 @@ interface Window {
       pendingUpdates?: number;
       error?: string;
     }>;
+    trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      eligibility?: { eligible: boolean; reasons: string[] };
+      error?: string;
+    }>;
+    trainerCatalogPromoteVerified: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      catalogGameId?: string;
+      verificationStatus?: string;
+      error?: string;
+    }>;
+    trainerCatalogExportDefinition: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      catalogGameId?: string;
+      filename?: string;
+      yaml?: string;
+      title?: string;
+      verificationStatus?: string;
+      error?: string;
+    }>;
+    trainerCatalogPendingQuarantine: () => Promise<{
+      success: boolean;
+      pending?: Array<{
+        id: number;
+        catalogGameId: string;
+        reason: string;
+        previousVerificationStatus: string | null;
+        queuedAt: string;
+      }>;
+      error?: string;
+    }>;
     liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) => Promise<{
       success: boolean;
       result?: {

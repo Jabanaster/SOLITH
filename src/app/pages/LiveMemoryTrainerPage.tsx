@@ -361,6 +361,29 @@ const LiveMemoryTrainerPage: React.FC = () => {
     setMessage(`Exported ${bundle.filename} — review pointer stability before distributing.`);
   };
 
+  const handleExportPointerCandidate = (
+    candidate: { moduleName: string; moduleOffset: string; offsets: number[] },
+  ) => {
+    if (!attached || !attachedExecutable) return;
+    const featureName = window.prompt('Feature name for this pointer path:', 'Pointer Feature')?.trim();
+    if (!featureName) return;
+    const moduleOffset = parseInt(candidate.moduleOffset.replace(/^0x/i, ''), 16);
+    const bundle = exportMemoryFeatureToYaml({
+      gameName: attachedExecutable.replace(/\.exe$/i, ''),
+      executableName: attachedExecutable,
+      featureName,
+      dataType,
+      sessionAddress: address.trim(),
+      defaultValue: readValue ?? undefined,
+      moduleName: candidate.moduleName,
+      moduleOffset: Number.isFinite(moduleOffset) ? moduleOffset : undefined,
+      pointerChain: candidate.offsets,
+      featureType: 'toggle',
+    });
+    downloadTextFile(bundle.filename, bundle.yaml);
+    setMessage(`Exported pointer path to ${bundle.filename} — restart-verify before marking verified.`);
+  };
+
   const handleUseControl = async (control: SavedControl) => {
     setBusy(true);
     try {
@@ -584,7 +607,10 @@ const LiveMemoryTrainerPage: React.FC = () => {
                     {c.moduleName}+{c.moduleOffset}
                     {c.offsets.length > 0 ? ` → [${c.offsets.map((o) => `0x${o.toString(16)}`).join(', ')}]` : ''}
                   </code>
-                  {' '}(depth {c.depth})
+                  {' '}(depth {c.depth}){' '}
+                  <button className="btn-secondary" onClick={() => handleExportPointerCandidate(c)} disabled={busy}>
+                    Export YAML
+                  </button>
                 </li>
               ))}
               {pointerCandidates.length > 50 && (

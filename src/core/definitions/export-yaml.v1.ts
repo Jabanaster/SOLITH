@@ -75,7 +75,7 @@ function renderMemoryFeature(feature: MemoryFeatureV1, sessionNote?: string): st
     lines.push(`    signature: ${yamlString(feature.resolution.signature)}`);
   }
   if (feature.resolution.baseOffset) {
-    lines.push(`    baseOffset: ${yamlString(feature.resolution.baseOffset)}`);
+    lines.push(`    baseOffset: ${JSON.stringify(String(feature.resolution.baseOffset))}`);
   }
   if (feature.resolution.pointerChain && feature.resolution.pointerChain.length > 0) {
     lines.push(`    pointerChain: [${feature.resolution.pointerChain.join(', ')}]`);
