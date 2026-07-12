@@ -39,8 +39,9 @@
 
 ## Installer artifacts
 
-- `dist/Solith Setup 2.0.0.exe`
-- `dist/win-unpacked/Solith.exe`
+- `dist/Solith Setup 2.0.0.exe` (local build)
+- `dist/Solith Setup 2.0.0.exe.blockmap`
+- **GitHub release assets uploaded:** `v2.0.0-solith-accepted` (2026-07-12)
 
 ## Deliberately out of scope (post-2.0)
 

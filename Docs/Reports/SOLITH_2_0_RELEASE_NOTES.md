@@ -16,6 +16,8 @@
 - Evidence: Docs/Reports/SOLITH_2_0_RELEASE_EVIDENCE.md
 
 ### Install
-Build locally: `npm run build` produces `dist/Solith Setup 2.0.0.exe`
+Download **Solith Setup 2.0.0.exe** from the [release assets](https://github.com/Jabanaster/ResourceForge/releases/tag/v2.0.0-solith-accepted) (uploaded 2026-07-12).
+
+Local build: `npm run build` → `dist/Solith Setup 2.0.0.exe`
 
 Note: `v2.0.0` tag is an earlier V2 milestone; `v2.0.0-solith-accepted` marks the complete Solith 2.0 stack.
