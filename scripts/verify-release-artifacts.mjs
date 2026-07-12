@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   findRepoRoot,
-  findResourceForgeSetupArtifacts,
+  findProductSetupArtifacts,
+  packagedExecutableFileName,
+  packagedProductName,
   readPackageMetadata,
   releaseArtifactPaths,
 } from './release-artifact-utils.mjs';
@@ -15,6 +17,7 @@ const root = process.env.RESOURCEFORGE_RELEASE_ROOT
 
 const pkg = readPackageMetadata(root);
 const paths = releaseArtifactPaths(root, pkg);
+const productName = packagedProductName(pkg);
 let failures = 0;
 let checks = 0;
 
@@ -32,20 +35,30 @@ function exists(filePath) {
   return fs.existsSync(filePath);
 }
 
-console.log('\nResourceForge release artifact verifier\n');
+console.log('\nSolith release artifact verifier\n');
 console.log(`Root: ${root}`);
 console.log(`Version: ${pkg.version}`);
+console.log(`Product: ${productName}`);
 
 check('package version is non-empty', typeof pkg.version === 'string' && pkg.version.length > 0, String(pkg.version));
-check('productName is ResourceForge', pkg.build?.productName === 'ResourceForge', pkg.build?.productName);
+check('productName is Solith', productName === 'Solith', productName);
 check('appId is stable', pkg.build?.appId === 'com.resourceforge.app', pkg.build?.appId);
 check('publish config is absent', pkg.build?.publish === undefined);
-check('Windows executableName is ResourceForge', pkg.build?.win?.executableName === 'ResourceForge', pkg.build?.win?.executableName);
-check('NSIS installer artifactName is versioned', pkg.build?.nsis?.artifactName === 'ResourceForge Setup ${version}.${ext}', pkg.build?.nsis?.artifactName);
+check('Windows executableName is Solith', pkg.build?.win?.executableName === 'Solith', pkg.build?.win?.executableName);
+check(
+  'NSIS installer artifactName is versioned',
+  pkg.build?.nsis?.artifactName === 'Solith Setup ${version}.${ext}',
+  pkg.build?.nsis?.artifactName,
+);
 
 check('installer exists', exists(paths.installer), paths.installer);
 check('installer blockmap exists', exists(paths.installerBlockMap), paths.installerBlockMap);
 check('unpacked executable exists', exists(paths.executable), paths.executable);
+check(
+  'unpacked executable file name matches product',
+  path.basename(paths.executable) === packagedExecutableFileName(pkg),
+  paths.executable,
+);
 check('app.asar exists', exists(paths.appAsar), paths.appAsar);
 check('packaged TrainerHost exists unpacked', exists(paths.unpackedHost), paths.unpackedHost);
 check('built renderer asset directory exists before packaging', exists(paths.rendererAssets), paths.rendererAssets);
@@ -53,9 +66,9 @@ check('compiled main bundle exists', exists(paths.mainBundle), paths.mainBundle)
 check('compiled preload bundle exists', exists(paths.preloadBundle), paths.preloadBundle);
 check('compiled host bundle exists', exists(paths.hostBundle), paths.hostBundle);
 
-const setupArtifacts = findResourceForgeSetupArtifacts(root);
+const setupArtifacts = findProductSetupArtifacts(root, pkg);
 const artifactNames = setupArtifacts.join(', ');
-check('no ResourceForge installer artifact name includes 1.4.0', !artifactNames.includes('1.4.0'), artifactNames);
+check('no Solith installer artifact name includes 1.4.0', !artifactNames.includes('1.4.0'), artifactNames);
 
 const installerName = path.basename(paths.installer);
 check('installer name includes current package version', installerName.includes(pkg.version), installerName);

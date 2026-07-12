@@ -29,25 +29,19 @@ schema.v1.yml â†’ compile â†’ SQLite payloadJson
 | **O.3** | YAML compiler + catalog import | Accepted |
 | **O+** | Catalog â†’ live memory wiring | Accepted |
 | **P** | Save-field execution router from catalog | Accepted |
-| **Q** | F1â€“F12 cheat hotkeys, hybrid launch chooser, drift modal | In progress |
+| **Q** | F1–F12 cheat hotkeys, hybrid launch chooser, drift modal | Accepted |
 
 ### Bundled schema.v1 definitions
 
-Palworld (live memory) and Stardew Valley (save-field controls) ship as `schema.v1` payloads via `bundled-definition-seed.ts`, upserted on catalog bootstrap.
+All seven curated games (`games.ts`) ship as `schema.v1` payloads via `bundled-definition-seed.ts`:
+Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats as `scan_unknown` features).
 
-### Connection baselines (KI-017)
+### Next suggested work (post-2.0)
 
-Reviewed baselines live in `src/core/live-memory/game-connection-baselines.ts`. New entries require a measured observation â€” catalog seed executable names alone do not loosen the online guard.
-
-Current reviewed executables: Stardew Valley, Atomfall, Palworld, Undisputed.
-
-### Next suggested work
-
-1. Hybrid definitions â€” launch chooser when both memory and save controls exist (wired in App)
-2. Expand bundled definitions for Atomfall / Undisputed / Dredge with verified pointer paths
-3. Measure and document connection baselines for Avowed, Dredge, Crimson Desert
-4. Release evidence gates on current `master`
-5. JSON save-field write verification per game profile
+1. Measure and document connection baselines for Avowed, Dredge, Crimson Desert (KI-017)
+2. JSON save-field write execution per game profile (read path exists; writes remain XML-first)
+3. Remote catalog sync quality pass (community pointer paths from MrAntiFun / FLiNG)
+4. Real-game freeze/write verification with explicit save backup authorization
 
 ---
 
