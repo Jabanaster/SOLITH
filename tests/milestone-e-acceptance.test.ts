@@ -1,7 +1,7 @@
 /**
  * tests/milestone-e-acceptance.test.ts — Milestone E Packaged UI Acceptance
  *
- * Validates the Milestone E deliverables in the real packaged ResourceForge.exe:
+ * Validates the Milestone E deliverables in the real packaged Solith.exe:
  *   1. Controls view navigates and renders the accepted shipped controls
  *   2. Removed unsafe/future controls are absent from the shipped UI
  *   3. Money IPC workflow: propose → approve → verify → rollback → verify
@@ -29,8 +29,13 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
-const ROOT     = path.resolve(import.meta.dirname ?? '.', '..');
-const EXE_PATH = path.join(ROOT, 'dist', 'win-unpacked', 'ResourceForge.exe');
+import {
+  findRepoRoot,
+  resolvePackagedExecutable,
+} from '../scripts/release-artifact-utils.mjs';
+
+const ROOT     = findRepoRoot(import.meta.url);
+const EXE_PATH = resolvePackagedExecutable(ROOT);
 
 // Per-run isolation
 const RUN_ID    = `rf-me-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -53,7 +58,7 @@ const rendererErrors: string[] = [];
 
 // ── Pre-flight ────────────────────────────────────────────────────────────────
 
-test('preflight — packaged exe exists at dist/win-unpacked/ResourceForge.exe', () => {
+test('preflight — packaged exe exists at dist/win-unpacked', () => {
   expect(
     fs.existsSync(EXE_PATH),
     `EXE not found: ${EXE_PATH}\nRun: npm run build`

@@ -1,8 +1,8 @@
 /**
  * tests/packaged-smoke.test.ts — Gate 18
  *
- * Verifies 15 runtime points against the final packaged ResourceForge.exe
- * produced by electron-builder (dist/win-unpacked/ResourceForge.exe).
+ * Verifies 15 runtime points against the final packaged Solith.exe
+ * produced by electron-builder (dist/win-unpacked/Solith.exe).
  *
  * This test MUST NOT launch npx electron or the dev bundle.
  * It launches the real packaged executable and drives it via Playwright.
@@ -14,8 +14,13 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
-const ROOT       = path.resolve(import.meta.dirname ?? '.', '..');
-const EXE_PATH   = path.join(ROOT, 'dist', 'win-unpacked', 'ResourceForge.exe');
+import {
+  findRepoRoot,
+  resolvePackagedExecutable,
+} from '../scripts/release-artifact-utils.mjs';
+
+const ROOT       = findRepoRoot(import.meta.url);
+const EXE_PATH   = resolvePackagedExecutable(ROOT);
 
 // Isolated userData per run — never touches production data
 const RUN_ID     = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -31,10 +36,10 @@ const mainErrors: string[] = [];
 const rendererErrors: string[] = [];
 
 // ── Point 1: packaged exe exists ──────────────────────────────────────────────
-test('point 01 — packaged exe exists at dist/win-unpacked/ResourceForge.exe', () => {
+test('point 01 — packaged exe exists at dist/win-unpacked', () => {
   expect(
     fs.existsSync(EXE_PATH),
-    `ResourceForge.exe not found at: ${EXE_PATH}\nRun: npm run dist`
+    `Packaged exe not found at: ${EXE_PATH}\nRun: npm run dist`
   ).toBe(true);
 });
 
