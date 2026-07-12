@@ -168,6 +168,9 @@ function dedupeGames(games) {
   }
   return [...byKey.values()];
 }
+
+/** Synthetic AppIDs — never collide with real Steam IDs; excluded from hotlinked art. */
+const SYNTHETIC_STEAM_APP_ID_BASE = 9_000_000;
 const PREFIXES = ['Legend of', 'Chronicles of', 'Tales of', 'Return to', 'Escape from', 'War for', 'Rise of', 'Fall of', 'Age of', 'Call of'];
 const NOUNS = ['Darkness', 'Empire', 'Kingdom', 'Shadows', 'Legends', 'Destiny', 'Revenge', 'Silence', 'Storm', 'Ashes', 'Blood', 'Steel', 'Fire', 'Ice', 'Void'];
 
@@ -191,7 +194,7 @@ function withExecutableGuesses(game) {
 }
 
 function syntheticGames(targetCount) {
-  const games = BASE_GAMES.map(withExecutableGuesses);
+  const games = dedupeGames(BASE_GAMES.map(withExecutableGuesses));
   let i = 0;
   while (games.length < targetCount) {
     const prefix = PREFIXES[i % PREFIXES.length];
@@ -200,6 +203,7 @@ function syntheticGames(targetCount) {
     const name = `${prefix} ${noun}${suffix}`;
     games.push(withExecutableGuesses({
       name,
+      steamAppId: SYNTHETIC_STEAM_APP_ID_BASE + i,
       categories: [GENRES[i % GENRES.length], GENRES[(i + 3) % GENRES.length]],
       verificationStatus: 'metadata-only',
     }));
@@ -208,7 +212,7 @@ function syntheticGames(targetCount) {
   return games;
 }
 
-const games = dedupeGames(syntheticGames(1000));
+const games = syntheticGames(1000);
 const outPath = path.join(root, 'data', 'trainer-catalog-seed.json');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify({ version: 1, generatedAt: new Date().toISOString(), games }, null, 0));
