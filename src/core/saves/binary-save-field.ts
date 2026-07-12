@@ -12,6 +12,7 @@ import {
   writeGenericFields,
 } from './binary-formats/generic-le.js';
 import { detectBinarySaveProfile } from './binary-formats/index.js';
+import { detectResearchBinaryProfile } from './binary-formats/research-profiles.js';
 
 export interface BinarySaveFieldReadResult {
   success: boolean;
@@ -26,7 +27,8 @@ export interface BinarySaveFieldWriteResult {
 
 function loadProfile(filePath: string): { bytes: Uint8Array; profile: BinarySaveFormatProfile } | null {
   const bytes = new Uint8Array(fs.readFileSync(filePath));
-  const profile = detectBinarySaveProfile(filePath, bytes);
+  const profile =
+    detectBinarySaveProfile(filePath, bytes) ?? detectResearchBinaryProfile(filePath);
   if (!profile) return null;
   return { bytes, profile };
 }
@@ -37,16 +39,23 @@ export function readBinarySaveField(
 ): BinarySaveFieldReadResult {
   try {
     const loaded = loadProfile(filePath);
-    if (!loaded || !loaded.profile.canWrite) {
+    if (!loaded) {
       return { success: false, error: 'unsupported_binary_profile' };
     }
     const field = loaded.profile.fields.find((f) => f.id === fieldId);
     if (!field) return { success: false, error: 'unknown_field' };
-    const valid =
-      loaded.profile.id === 'rfsa-v1'
-        ? validateRfsaHeader(loaded.bytes)
-        : validateGenericHeader(loaded.bytes, loaded.profile);
-    if (!valid) return { success: false, error: 'invalid_binary_header' };
+
+    if (loaded.profile.canWrite) {
+      const valid =
+        loaded.profile.id === 'rfsa-v1'
+          ? validateRfsaHeader(loaded.bytes)
+          : validateGenericHeader(loaded.bytes, loaded.profile);
+      if (!valid) return { success: false, error: 'invalid_binary_header' };
+    }
+
+    if (loaded.bytes.length < field.offset + 4) {
+      return { success: false, error: 'file_too_small' };
+    }
     return { success: true, value: readGenericField(loaded.bytes, field) };
   } catch (err) {
     return { success: false, error: String(err) };
