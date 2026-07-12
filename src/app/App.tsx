@@ -305,31 +305,27 @@ const App: React.FC = () => {
         className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}`}
         aria-label="Main navigation"
       >
-        <div className="sidebar-identity">
-          <div className="sidebar-identity__mark" aria-hidden="true">
-            <img src={solithBranding.trainerController} alt="" />
-          </div>
-          {!sidebarCollapsed && (
-            <div className="sidebar-identity__text">
-              <div className="sidebar-identity__title">Solith</div>
-              <div className="sidebar-identity__subtitle">Game control, saves, and recovery.</div>
+        <div className="sidebar-header">
+          <div className="sidebar-header__brand">
+            <div className="sidebar-header__mark" aria-hidden="true">
+              <img src={solithBranding.trainerController} alt="" />
             </div>
-          )}
-        </div>
-
-        <div className="sidebar-toolbar">
+            {!sidebarCollapsed && (
+              <span className="sidebar-header__label">Solith</span>
+            )}
+          </div>
           <button
             type="button"
             className="sidebar-collapse-btn"
             onClick={toggleSidebar}
             aria-expanded={!sidebarCollapsed}
             aria-controls="app-nav"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <span className="sidebar-collapse-icon" aria-hidden="true">
               {sidebarCollapsed ? '»' : '«'}
             </span>
-            {!sidebarCollapsed && <span className="nav-label">Collapse</span>}
           </button>
         </div>
 
