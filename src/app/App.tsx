@@ -18,6 +18,7 @@ import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode }
 import { Icon, type IconName } from './components/icons/index.js';
 import { solithBranding } from './assets/branding/index.js';
 import { BrandingArtwork } from './components/BrandingArtwork.js';
+import { SolithTopBanner } from './components/SolithTopBanner.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 
@@ -402,13 +403,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className="main-content">
-        <header className="solith-top-banner" aria-label="Solith">
-          <img
-            className="solith-top-banner__image"
-            src={solithBranding.topBanner}
-            alt="Solith — Your saves. Your rules. Your machine."
-          />
-        </header>
+        <SolithTopBanner />
 
         {selectedGame && (
           <div className="game-context-bar">

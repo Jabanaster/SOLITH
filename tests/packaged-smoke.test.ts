@@ -249,7 +249,7 @@ test('point 15 — app exits cleanly (close() resolves without timeout)', async 
 // ── Points 16-20: Trainer UX survived packaging ───────────────────────────────
 
 test('point 16 — unified sidebar navigation renders in packaged app', async () => {
-  await expect(win.locator('.solith-top-banner__image')).toBeVisible();
+  await expect(win.locator('.solith-top-banner__title')).toBeVisible();
   await expect(win.locator('button', { hasText: 'Game Library' })).toBeVisible();
   await expect(win.locator('button', { hasText: 'Save Editor' })).toBeVisible();
   await expect(win.locator('button', { hasText: 'Compatibility' })).toBeVisible();

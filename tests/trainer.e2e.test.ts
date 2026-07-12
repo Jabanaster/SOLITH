@@ -120,7 +120,7 @@ test('trainer-e2e 01–25 — full Trainer UX workflow', async () => {
     win.on('pageerror', err => rendererErrors.push(err.message));
 
     // ── Test 01: Solith top banner present ──────────────────────────────────
-    await expect(win.locator('.solith-top-banner__image')).toBeVisible();
+    await expect(win.locator('.solith-top-banner__title')).toBeVisible();
 
     // ── Test 02: Unified sidebar navigation visible ─────────────────────────
     await expect(win.locator('button', { hasText: 'Game Library' })).toBeVisible();
