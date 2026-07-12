@@ -162,7 +162,7 @@ ResourceForge V2 surfaces support state as **reviewable evidence**, not implicit
 
 Execution scope remains narrow:
 
-- JSON/INI remain read-only or preview-only unless already proven in accepted behavior.
+- JSON, XML, and INI save-field writes use the propose → approve → backup → verify → rollback workflow when the game profile declares the format supported.
 - Discovery findings remain advisory unless mapped to existing supported write paths.
 - Executable writes remain limited to accepted supported XML controls with approval + backup/rollback safeguards.
 

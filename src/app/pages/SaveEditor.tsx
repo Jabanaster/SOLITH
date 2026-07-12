@@ -319,7 +319,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
           <div className="modal-content glass">
             <h3>Modify Parameter</h3>
             <p className="modal-description">
-              This local save/data edit must be reviewed before any write. JSON and INI proposals remain preview-only unless a supported write path is separately accepted.
+              Supported XML, JSON, and INI save-field writes require explicit approval. Solith creates a verified backup before writing and offers rollback after a supported write.
             </p>
             <p className={`modal-description ${isDemoGame ? 'risk-caution' : 'risk-safe'}`}>
               {isDemoGame ? 'Demo fixture edit' : 'Registered game edit'}

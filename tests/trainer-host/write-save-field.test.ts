@@ -181,7 +181,7 @@ describe('proposeWriteField', () => {
       assert.equal(result.valid, true);
       assert.equal(result.currentValue, KNOWN_VALUE);
       assert.equal(result.proposedValue, NEW_VALUE);
-      assert.match(result.preview ?? '', /INI write execution is not supported/);
+      assert.match(result.preview ?? '', /backup \+ atomic write on approval/);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -290,21 +290,31 @@ describe('executeWriteField', () => {
     }
   });
 
-  test('rejects INI write execution with unsupported-format error', async () => {
+  test('writes INI fields with backup, verification, and rollback', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-execute-'));
     const iniPath = path.join(tmpDir, 'settings.ini');
-    fs.writeFileSync(iniPath, '[player]\nmoney=5000\n', 'utf-8');
+    fs.writeFileSync(iniPath, '; player config\n[player]\nmoney=5000\n', 'utf-8');
     try {
-      await assert.rejects(
-        () => executeWriteField({ filePath: iniPath, field: 'player.money', currentValue: KNOWN_VALUE, newValue: NEW_VALUE }),
-        (error: unknown) => {
-          assert.ok(error instanceof Error);
-          assert.equal(error.name, 'UnsupportedSaveFormatError');
-          assert.match(error.message, /unsupported_save_format/);
-          assert.equal(error.message.includes(tmpDir), false);
-          return true;
-        },
-      );
+      const result = await executeWriteField({
+        filePath: iniPath,
+        field: 'player.money',
+        currentValue: KNOWN_VALUE,
+        newValue: NEW_VALUE,
+      });
+      assert.equal(result.written, true);
+      assert.equal(result.verifiedValue, NEW_VALUE);
+      assert.ok(result.backupPath.endsWith('.trainer-backup'));
+      const content = fs.readFileSync(iniPath, 'utf-8');
+      assert.match(content, /money=12345/);
+      assert.match(content, /; player config/);
+
+      const rollbackResult = await rollbackWriteField({
+        filePath: iniPath,
+        backupPath: result.backupPath,
+        field: 'player.money',
+      });
+      assert.equal(rollbackResult.restored, true);
+      assert.equal(rollbackResult.verifiedValue, KNOWN_VALUE);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

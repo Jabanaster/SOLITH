@@ -46,19 +46,19 @@ describe('save format capabilities', () => {
     assert.equal(ini.recognized, true);
     assert.equal(ini.canReadSaveField, true);
     assert.equal(ini.canProposeSaveField, true);
-    assert.equal(ini.canWriteSaveField, false);
+    assert.equal(ini.canWriteSaveField, true);
   });
 
-  test('throws typed unsupported-format errors for INI write operations', () => {
+  test('throws typed unsupported-format errors for unknown extension write operations', () => {
     assert.throws(
-      () => assertPathSaveFormatSupportsOperation(path.join('C:\\Users\\private', 'settings.ini'), 'save_field_write'),
+      () => assertPathSaveFormatSupportsOperation(path.join('C:\\Users\\private', 'player.bin'), 'save_field_write'),
       (error: unknown) => {
         assert.ok(error instanceof UnsupportedSaveFormatError);
         assert.equal(error.code, 'unsupported_save_format');
-        assert.equal(error.format, 'ini');
+        assert.equal(error.format, 'unsupported');
         assert.equal(error.operation, 'save_field_write');
-        assert.equal(error.targetName, 'settings.ini');
-        assert.match(error.message, /settings\.ini/);
+        assert.equal(error.targetName, 'player.bin');
+        assert.match(error.message, /player\.bin/);
         assert.equal(error.message.includes('C:\\Users\\private'), false);
         return true;
       },
@@ -79,13 +79,11 @@ describe('save format capabilities', () => {
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('player.json', 'save_field_rollback'));
   });
 
-  test('allows INI read/propose but rejects write execution', () => {
+  test('allows INI save-field operations including write execution', () => {
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_read'));
     assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_propose'));
-    assert.throws(
-      () => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_write'),
-      /unsupported_save_format/,
-    );
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_write'));
+    assert.doesNotThrow(() => assertPathSaveFormatSupportsOperation('settings.ini', 'save_field_rollback'));
   });
 
   test('runtime save-location binding requires approved roots', () => {

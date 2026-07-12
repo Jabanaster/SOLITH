@@ -277,15 +277,17 @@ describe('Save edit risk messaging', () => {
     assert.strictEqual(SAVE_EDIT_RISK_COPY.blocked.label, 'Blocked');
   });
 
-  test('35. JSON and INI are preview-only, not executable', () => {
+  test('35. JSON and INI are executable save-field formats', () => {
     assert.strictEqual(saveEditRiskLabelForFormat('json'), 'Executable');
-    assert.strictEqual(saveEditRiskLabelForFormat('ini'), 'Preview-only');
-    assert.notStrictEqual(saveEditRiskLabelForFormat('ini'), 'Executable');
+    assert.strictEqual(saveEditRiskLabelForFormat('ini'), 'Executable');
+    assert.strictEqual(saveEditRiskLabelForFormat('cfg'), 'Preview-only');
   });
 
-  test('36. XML executable copy keeps approval, backup, and rollback language', () => {
+  test('36. executable copy keeps approval, backup, and rollback language', () => {
     const copy = SAVE_EDIT_RISK_COPY.executable.detail.toLowerCase();
     assert.match(copy, /xml/);
+    assert.match(copy, /json/);
+    assert.match(copy, /ini/);
     assert.match(copy, /approval/);
     assert.match(copy, /backup/);
     assert.match(copy, /rollback/);
@@ -314,7 +316,7 @@ describe('Save edit risk messaging', () => {
     assert.ok(!allCopy.includes('debugger attachment'));
   });
 
-  test('39. preview-only JSON and INI copy does not claim backup or rollback execution', () => {
+  test('39. preview-only cfg/config copy does not claim backup or rollback execution', () => {
     const copy = SAVE_EDIT_RISK_COPY.preview_only.detail.toLowerCase();
     assert.ok(copy.includes(PREVIEW_ONLY_FORMAT_MESSAGE.toLowerCase()));
     assert.match(copy, /write execution/);

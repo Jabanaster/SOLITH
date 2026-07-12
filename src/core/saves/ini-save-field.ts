@@ -100,6 +100,74 @@ export function validateIniSaveFieldProposal(
   return {
     currentValue: readResult.value,
     proposedValue: String(proposedValue),
-    preview: `Preview ${field}: ${readResult.value} -> ${String(proposedValue)} (INI write execution is not supported)`,
+    preview: `Preview ${field}: ${readResult.value} -> ${String(proposedValue)} (backup + atomic write on approval)`,
   };
+}
+
+export interface IniSaveFieldWriteResult {
+  verifiedValue: string;
+  backupPath: string;
+}
+
+/**
+ * Replaces a single INI key value in-place (preserving comments, section order, and separators).
+ */
+export function writeIniSaveField(
+  filePath: string,
+  field: string,
+  expectedCurrentValue: string,
+  proposedValue: string,
+): IniSaveFieldWriteResult {
+  const proposal = validateIniSaveFieldProposal(filePath, field, expectedCurrentValue, proposedValue);
+  const target = assertSimpleIniFieldPath(field);
+  const raw = readIniText(filePath);
+  const lines = raw.split(/\r?\n/);
+  let currentSection = '';
+  let replaced = false;
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!;
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(';') || trimmed.startsWith('#')) continue;
+
+    const sectionMatch = trimmed.match(/^\[([A-Za-z0-9_$-]+)\]$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1]!;
+      continue;
+    }
+
+    const separatorIndex = line.search(/[=:]/);
+    if (separatorIndex <= 0) continue;
+
+    const key = line.slice(0, separatorIndex).trim();
+    const sectionMatches = (target.section ?? '') === currentSection;
+    if (!sectionMatches || key !== target.key) continue;
+
+    const liveValue = line.slice(separatorIndex + 1).trim();
+    if (liveValue !== proposal.currentValue) {
+      throw new Error(`value_changed_since_proposal: current=${liveValue} expected=${proposal.currentValue}`);
+    }
+
+    lines[index] = `${line.slice(0, separatorIndex + 1)}${String(proposedValue)}`;
+    replaced = true;
+    break;
+  }
+
+  if (!replaced) throw new Error('field_not_found');
+
+  const backupPath = filePath + '.trainer-backup';
+  fs.copyFileSync(filePath, backupPath);
+
+  const tmpPath = filePath + '.trainer-tmp';
+  const output = lines.join('\n');
+  fs.writeFileSync(tmpPath, output.endsWith('\n') ? output : `${output}\n`, 'utf-8');
+  fs.renameSync(tmpPath, filePath);
+
+  const verify = readIniSaveField(filePath, field);
+  if (!verify.found || verify.value === null) throw new Error('verify_field_not_found');
+  if (verify.value !== String(proposedValue)) {
+    throw new Error(`verify_mismatch: current=${verify.value} expected=${proposedValue}`);
+  }
+
+  return { verifiedValue: verify.value, backupPath };
 }

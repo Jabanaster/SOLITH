@@ -144,14 +144,21 @@ export const TrainerCard: React.FC<TrainerCardProps> = ({
       <div className="tc-header">
         <div className="tc-badges">
           <span className="tc-category">{item.category}</span>
-          <span className={`tc-state-badge tc-state-${stateInfo.color}`}>{stateInfo.label}</span>
+          <span
+            className={`tc-state-badge tc-state-${stateInfo.color}`}
+            aria-describedby={stateDescriptionId}
+          >
+            {stateInfo.label}
+          </span>
         </div>
         <h4 className="tc-name">{item.name}</h4>
         <span className={`tc-risk risk-chip risk-${item.risk.toLowerCase()}`}>{item.risk}</span>
       </div>
 
-      {stateInfo.explanation && (
+      {stateInfo.explanation ? (
         <p className="tc-state-msg" id={stateDescriptionId}>{stateInfo.explanation}</p>
+      ) : (
+        <p className="sr-only" id={stateDescriptionId}>{`Trainer control state: ${stateInfo.label}`}</p>
       )}
 
       <div className="tc-value-row">

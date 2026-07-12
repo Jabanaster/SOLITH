@@ -45,7 +45,7 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     canInspect: true,
     canReadSaveField: true,
     canProposeSaveField: true,
-    canWriteSaveField: false,
+    canWriteSaveField: true,
   },
   unknown: {
     id: 'unknown',

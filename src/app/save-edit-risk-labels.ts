@@ -25,7 +25,7 @@ export const SAVE_EDIT_RISK_COPY: Record<SaveEditRiskState, SaveEditRiskCopy> = 
   executable: {
     label: 'Executable',
     summary: 'Approval, backup, rollback',
-    detail: 'Supported XML and JSON save-field writes require a proposal and explicit approval; Solith creates a verified backup before writing and offers rollback after a supported write.',
+    detail: 'Supported XML, JSON, and INI save-field writes require a proposal and explicit approval; Solith creates a verified backup before writing and offers rollback after a supported write.',
   },
   blocked: {
     label: 'Blocked',
@@ -34,11 +34,11 @@ export const SAVE_EDIT_RISK_COPY: Record<SaveEditRiskState, SaveEditRiskCopy> = 
   },
 };
 
-const PREVIEW_ONLY_FORMATS = new Set(['ini', 'cfg', 'config']);
+const PREVIEW_ONLY_FORMATS = new Set(['cfg', 'config']);
 
 export function saveEditRiskStateForFormat(format: string): SaveEditRiskState {
   const normalized = format.trim().toLowerCase();
-  if (normalized === 'xml' || normalized === 'json') return 'executable';
+  if (normalized === 'xml' || normalized === 'json' || normalized === 'ini') return 'executable';
   if (PREVIEW_ONLY_FORMATS.has(normalized)) return 'preview_only';
   if (normalized === 'unknown' || normalized === 'unsupported' || normalized === '') return 'blocked';
   return 'read_only';

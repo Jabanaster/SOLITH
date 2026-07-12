@@ -82,6 +82,11 @@ implemented yet:
 No default has been changed; this is documented for a deliberate decision,
 not silently patched around.
 
+**Pending baseline measurement (strict default = 0 until measured):**
+`Avowed.exe`, `Dredge.exe`, `CrimsonDesert.exe` — bundled memory-scan trainers
+use the strict guard until a live solo-session connection count is recorded in
+`game-connection-baselines.ts` with evidence.
+
 ### KI-016: Gate 13 electron-e2e "Full Demo Workflow" fails in this build environment (pre-existing, not caused by Live Memory Trainer work)
 
 `npm run test:electron-e2e` fails deterministically (2 runs, same result) at
@@ -109,20 +114,20 @@ path. During the Drill Core `master_volume` pilot the suite passed 7/7 with no
 crash. Mitigation if it recurs: ensure no other Electron instance holds the
 single-instance lock and re-run; do not mask it by looping until green.
 
-### KI-006: Apply dialog does not trap focus
-Pressing Tab past the last button in `ApplyDialog.tsx` exits the modal. A focus trap with cycle-back behavior should be added. Escape key does not close the dialog either.
+### KI-006 (RESOLVED 2026-07-11): Apply dialog focus trap
+`ApplyDialog.tsx` traps Tab focus within the modal, cycles from last→first focusable control, restores focus on close, and closes on Escape when not busy.
 
-### KI-007: Card state badges communicate meaning through color class only
-`TrainerCard.tsx` state badges use CSS class names (e.g., `.state-applied`) for color. A screen reader sees only the text. Cards should add `aria-describedby` pointing to a visually hidden description of the state.
+### KI-007 (RESOLVED 2026-07-11): Card state badges lack screen-reader context
+`TrainerCard.tsx` state badges now use `aria-describedby` pointing to a visible or screen-reader-only state description.
 
-### KI-008: Slider control has no visible label element
-The range input in `TrainerCard.tsx` renders with no wrapping `<label>` element. The field name is rendered as a heading sibling, but the control is not programmatically linked to it.
+### KI-008 (RESOLVED 2026-07-11): Slider control label linkage
+The slider input in `TrainerCard.tsx` is wrapped in a `<label htmlFor=...>` linked to the range control.
 
-### KI-009: Disabled controls lack aria-disabled and explanatory description
-When a card is in BLOCKED, BROKEN, GAME_RUNNING, or APPLYING state, the control is `disabled` but there is no `aria-disabled` attribute and no `aria-describedby` pointing to a reason.
+### KI-009 (RESOLVED 2026-07-11): Disabled controls lack aria-disabled
+Trainer card controls set `aria-disabled` alongside the native `disabled` attribute and link blocking reasons via `aria-describedby` when present.
 
-### KI-010: Reduced-motion not detected by Trainer UI components
-CSS `prefers-reduced-motion` is respected in `index.css` global transitions, but `TrainerCard.tsx` and `ApplyDialog.tsx` do not read `window.matchMedia('(prefers-reduced-motion: reduce)')` for JS-controlled animations.
+### KI-010 (PARTIAL): Reduced-motion in Trainer UI
+Global CSS in `index.css` honors `prefers-reduced-motion: reduce` for transitions/animations app-wide. Trainer-specific JS animations are not used.
 
 ### KI-011: No pagination on trainer cards
 The trainer cards list in `TrainerPage.tsx` renders all recipes without pagination or virtual scrolling. This is acceptable for small recipe sets (< 50 items) but will degrade for games with 100+ recipes.

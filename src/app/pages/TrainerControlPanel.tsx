@@ -164,7 +164,7 @@ const ControlRow: React.FC<ControlRowProps> = ({
       {/* Awaiting approval: show diff + approve/cancel */}
       {state.phase === 'awaiting_approval' && (
         <div className="tcr-proposal-box" data-testid={`proposal-${control.id}`}>
-          <p className="tcr-proposal-label">Executable XML save-field write — review proposal, approve explicitly, then write with a verified backup:</p>
+          <p className="tcr-proposal-label">Executable save-field write (XML, JSON, or INI) — review proposal, approve explicitly, then write with a verified backup:</p>
           <div className="tcr-diff">
             <span className="diff-old">{state.currentValue ?? '?'}</span>
             <span className="diff-arrow">→</span>

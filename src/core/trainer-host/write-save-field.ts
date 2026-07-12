@@ -16,7 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
 import { readJsonSaveField, validateJsonSaveFieldProposal, writeJsonSaveField } from '../saves/json-save-field';
-import { validateIniSaveFieldProposal } from '../saves/ini-save-field';
+import { readIniSaveField, validateIniSaveFieldProposal, writeIniSaveField } from '../saves/ini-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -131,6 +131,10 @@ export async function executeWriteField(params: unknown): Promise<ExecuteWriteRe
     const result = writeJsonSaveField(filePath, field, currentValue, newValue);
     return { written: true, verifiedValue: result.verifiedValue, backupPath: result.backupPath };
   }
+  if (format === 'ini') {
+    const result = writeIniSaveField(filePath, field, currentValue, newValue);
+    return { written: true, verifiedValue: result.verifiedValue, backupPath: result.backupPath };
+  }
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
@@ -207,6 +211,11 @@ export async function rollbackWriteField(params: unknown): Promise<RollbackResul
     const verify = readJsonSaveField(filePath, field);
     if (!verify.found) throw new Error('verify_field_not_found_after_rollback');
     return { restored: true, verifiedValue: String(verify.value) };
+  }
+  if (format === 'ini') {
+    const verify = readIniSaveField(filePath, field);
+    if (!verify.found || verify.value === null) throw new Error('verify_field_not_found_after_rollback');
+    return { restored: true, verifiedValue: verify.value };
   }
 
   // Validate restored XML file
