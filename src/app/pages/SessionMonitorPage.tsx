@@ -295,7 +295,7 @@ const SessionMonitorPage: React.FC = () => {
               type="text"
               value={startForm.markerFilePath}
               onChange={e => setStartForm(f => ({ ...f, markerFilePath: e.target.value }))}
-              placeholder="%APPDATA%\Wand\service-ports.json"
+              placeholder="%APPDATA%\ExampleApp\service-ports.json"
               aria-describedby="v2-marker-hint"
             />
             <p id="v2-marker-hint" className="v2-meta">

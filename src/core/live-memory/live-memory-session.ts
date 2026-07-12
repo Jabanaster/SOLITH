@@ -270,7 +270,7 @@ export class LiveMemorySession {
    * those regions now and keeps cells whose value satisfies `comparison`
    * against the baseline (e.g. `{kind: 'decreased'}` after taking damage),
    * trying every dataType in `dataTypes` at each offset rather than
-   * committing to one interpretation upfront (Cheat Engine's "All" scan
+   * committing to one interpretation upfront (multi-type "All" scan
    * type) — see scanNextFromSnapshotMultiType's doc comment for why this
    * matters. Single-use per key — clears that slot once called, since its
    * raw bytes are only valid as a baseline for the very next comparison.
@@ -420,7 +420,7 @@ export class LiveMemorySession {
 
   /**
    * Starts continuously re-writing `value` to `address` on an interval —
-   * mirrors WeMod/Wand-style "Infinite Health"/"Infinite Ammo" toggles. Every
+   * mirrors mainstream "Infinite Health"/"Infinite Ammo" toggles. Every
    * tick re-runs the online-session guard before writing (same recheck
    * principle as confirmWrite/rollback); the first guard failure stops the
    * freeze outright rather than silently retrying, so a session that goes

@@ -44,7 +44,7 @@ export function parseTrainerListHtml(baseUrl: string, html: string): ParsedRemot
   return results;
 }
 
-export function parseFlingHomeHtml(html: string): ParsedRemoteTrainer[] {
+export function parseRemoteTrainerIndexHtml(html: string): ParsedRemoteTrainer[] {
   const results: ParsedRemoteTrainer[] = [];
   const seen = new Set<string>();
   const regex = /<a[^>]+href="([^"]+)"[^>]*>([^<]{3,120})<\/a>/gi;
@@ -67,7 +67,7 @@ export function parseFlingHomeHtml(html: string): ParsedRemoteTrainer[] {
   return results;
 }
 
-export function parsePlitchGamesHtml(html: string): ParsedRemoteTrainer[] {
+export function parseRemoteGameCatalogHtml(html: string): ParsedRemoteTrainer[] {
   const results: ParsedRemoteTrainer[] = [];
   const seen = new Set<string>();
   const regex = /<a[^>]+href="([^"]*\/games\/[^"]+)"[^>]*>([^<]{3,120})<\/a>/gi;

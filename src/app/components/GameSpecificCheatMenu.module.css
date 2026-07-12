@@ -9,7 +9,7 @@
 }
 
 /* ============================================================
-   Header (WeMod-style banner + icon)
+   Header (trainer banner + icon)
    ============================================================ */
 
 .game-header {
@@ -365,7 +365,7 @@
   }
 }
 
-/* Off/On toggle (WeMod pill style) */
+/* Off/On toggle (pill style) */
 .off-on-toggle {
   display: flex;
   align-items: center;
@@ -548,7 +548,7 @@
 }
 
 /* ============================================================
-   Light theme override (menu is intentionally dark-only, like WeMod,
+   Light theme override (menu is intentionally dark-only, like mainstream trainer UIs,
    but respect a light host page background around it)
    ============================================================ */
 

@@ -361,7 +361,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
     return (
       <div className="v2-monitor-page">
         <div className="v2-monitor-header">
-          <h2>Cheat Engine Mode</h2>
+          <h2>Advanced Scan Mode</h2>
           <p className="v2-safety-notice">Full freeform memory editor — any process, any address, scan/narrow/freeze</p>
         </div>
         <div className="v2-monitor-disabled">
@@ -383,7 +383,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
     <div className="v2-monitor-page">
       <PageModuleHeader
         artwork="trainerController"
-        title={<>Cheat Engine Mode</>}
+        title={<>Advanced Scan Mode</>}
         description="Freeform ReadProcessMemory/WriteProcessMemory — scan any value, enter any address, freeze, pointer workflows"
       />
 
@@ -509,7 +509,7 @@ const LiveMemoryTrainerPage: React.FC = () => {
           <p className="v2-meta">
             Finds addresses currently holding a value you tell it — e.g. your current in-game gold or
             health. Nothing is written during a scan. Use the comparison scan to narrow down after the
-            value changes in-game, the same way Cheat Engine's scan workflow works.
+            value changes in-game, the same way advanced memory scan workflows operate.
           </p>
 
           <label htmlFor="lm-scan-first-value">First scan: exact value</label>

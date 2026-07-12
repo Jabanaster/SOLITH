@@ -80,7 +80,7 @@ export default function MultiGameTrainerPage({ initialGameId }: { initialGameId?
         artwork="trainerController"
         className={styles['page-header']}
         title="Live Trainer"
-        description="WeMod-class live memory trainer — auto-detect running games, toggle cheats in-session, F1–F12 hotkeys, Ctrl+Shift+O overlay"
+        description="Solith-class live memory trainer — auto-detect running games, toggle cheats in-session, F1–F12 hotkeys, Ctrl+Shift+O overlay"
         actions={
           <div className={styles['header-actions']}>
             <button type="button" className={styles['overlay-btn']} onClick={() => void handleToggleOverlay()}>

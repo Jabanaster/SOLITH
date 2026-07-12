@@ -1,6 +1,6 @@
 /**
- * Multi-game cheat registry across 7 games, curated from WeMod, FearLess,
- * SMAPI, and official console-command documentation. Every entry here is a
+ * Multi-game cheat registry across 7 games, curated from community catalogs,
+ * mod documentation, and official references. Every entry here is a
  * concrete CheatDefinition (no placeholders) — counts grow as more titles
  * get verified, not by padding this file with stubs.
  */
@@ -25,20 +25,20 @@ function steamImages(appId: number): GameImageUrls {
 }
 
 const COMMON_SOURCES = {
-  wemod: (url?: string): CheatSource => ({
-    name: 'WeMod',
+  communityCatalog: (url?: string): CheatSource => ({
+    name: 'Community Catalog',
     url,
     verified: true,
     lastChecked: new Date('2026-07-08'),
   }),
-  fearless: (url?: string): CheatSource => ({
-    name: 'FearLess',
+  communityResearch: (url?: string): CheatSource => ({
+    name: 'Community Research',
     url,
     verified: true,
     lastChecked: new Date('2026-07-08'),
   }),
-  nexus: (url?: string): CheatSource => ({
-    name: 'Nexus',
+  modRepository: (url?: string): CheatSource => ({
+    name: 'Mod Repository',
     url,
     verified: true,
     lastChecked: new Date('2026-07-08'),
@@ -72,7 +72,7 @@ function mk(
     requiresDiscovery: true,
     verified: true,
     riskLevel: 'safe',
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     tags: [],
     ...def,
   };
@@ -93,7 +93,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -106,7 +106,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -119,7 +119,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 100,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -134,7 +134,7 @@ const palworldCheats: CheatDefinition[] = [
     normalValues: { min: 0, max: 999999 },
     requiresDiscovery: false,
     tags: ['currency', 'discoverable'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
     notes: 'Stable addresses: 0x218f743a954 or 0x218ff263f30',
@@ -148,7 +148,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 0,
     requiresDiscovery: true,
     tags: ['infinity', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -162,7 +162,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 100,
     requiresDiscovery: true,
     tags: ['toggle', 'gameplay'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -175,7 +175,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 1,
     requiresDiscovery: true,
     tags: ['toggle', 'gameplay'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -188,7 +188,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 100,
     requiresDiscovery: true,
     tags: ['toggle', 'productivity'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -201,7 +201,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 1,
     requiresDiscovery: true,
     tags: ['toggle', 'bypass'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -214,7 +214,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 1,
     requiresDiscovery: true,
     tags: ['toggle', 'bypass'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -228,7 +228,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 10,
     requiresDiscovery: true,
     tags: ['multiplier', 'movement'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -242,7 +242,7 @@ const palworldCheats: CheatDefinition[] = [
     normalValues: { min: 0, max: 10 },
     requiresDiscovery: true,
     tags: ['multiplier', 'movement'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -256,7 +256,7 @@ const palworldCheats: CheatDefinition[] = [
     normalValues: { min: 0, max: 10 },
     requiresDiscovery: true,
     tags: ['multiplier', 'movement'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -270,7 +270,7 @@ const palworldCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -405,7 +405,7 @@ const atomfallCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.fearless(),
+    source: COMMON_SOURCES.communityResearch(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -418,7 +418,7 @@ const atomfallCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.fearless(),
+    source: COMMON_SOURCES.communityResearch(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -430,7 +430,7 @@ const atomfallCheats: CheatDefinition[] = [
     valueType: 'bool',
     requiresDiscovery: true,
     tags: ['toggle', 'bypass'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -443,7 +443,7 @@ const atomfallCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.fearless(),
+    source: COMMON_SOURCES.communityResearch(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -455,7 +455,7 @@ const atomfallCheats: CheatDefinition[] = [
     valueType: 'bool',
     infiniteValue: 1,
     tags: ['toggle', 'stealth'],
-    source: COMMON_SOURCES.fearless(),
+    source: COMMON_SOURCES.communityResearch(),
   }),
   mk({
     id: 'unlimited-crafting-resources',
@@ -475,7 +475,7 @@ const atomfallCheats: CheatDefinition[] = [
     defaultValue: 0,
     normalValues: { min: 0, max: 999 },
     tags: ['stepper'],
-    source: COMMON_SOURCES.fearless(),
+    source: COMMON_SOURCES.communityResearch(),
   }),
   mk({
     id: 'no-reload-atomfall',
@@ -503,7 +503,7 @@ const atomfallCheats: CheatDefinition[] = [
     valueType: 'bool',
     infiniteValue: 0,
     tags: ['toggle', 'stealth'],
-    source: COMMON_SOURCES.fearless(),
+    source: COMMON_SOURCES.communityResearch(),
   }),
 ];
 
@@ -641,7 +641,7 @@ const avowedCheats: CheatDefinition[] = [
     valueType: 'bool',
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -654,7 +654,7 @@ const avowedCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -753,7 +753,7 @@ const undisputedCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -767,7 +767,7 @@ const undisputedCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -809,8 +809,8 @@ const undisputedCheats: CheatDefinition[] = [
     normalValues: { min: 0.5, max: 5 },
     tags: ['stepper', 'multiplier'],
   }),
-  // Daze Opponent is a one-shot action in WeMod/Wand's own Undisputed menu (an "Apply"
-  // button, not a toggle) — confirmed 2026-07-08 from a live Wand screenshot of this exact
+  // Daze Opponent is a one-shot action in community trainer menus (an "Apply"
+  // button, not a toggle) — confirmed 2026-07-08 from reference screenshots.
   // game. Modeled here as tags: ['action'] so the UI renders a single-fire button instead of
   // an Off/On pill; see GameSpecificCheatMenu's isActionCheat().
   mk({
@@ -821,7 +821,7 @@ const undisputedCheats: CheatDefinition[] = [
     valueType: 'bool',
     infiniteValue: 1,
     tags: ['action'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
   }),
   mk({
     id: 'set-career-money',
@@ -843,7 +843,7 @@ const undisputedCheats: CheatDefinition[] = [
     tags: ['infinite'],
   }),
 
-  // Stats — exact-value "Set X" career fields, all confirmed present in WeMod/Wand's own
+  // Stats — exact-value "Set X" career fields, all confirmed present in community trainer references
   // Undisputed menu (2026-07-08 reference screenshot). Each is stepper + apply, same pattern
   // as [Career] Set Money above.
   mk({
@@ -1067,7 +1067,7 @@ const dredgeCheats: CheatDefinition[] = [
     valueType: 'bool',
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -1080,7 +1080,7 @@ const dredgeCheats: CheatDefinition[] = [
     infiniteValue: 999999,
     requiresDiscovery: true,
     tags: ['infinite', 'currency'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -1174,7 +1174,7 @@ const crimsonDesertCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },
@@ -1187,7 +1187,7 @@ const crimsonDesertCheats: CheatDefinition[] = [
     infiniteValue: 9999,
     requiresDiscovery: true,
     tags: ['infinite', 'toggle'],
-    source: COMMON_SOURCES.wemod(),
+    source: COMMON_SOURCES.communityCatalog(),
     verified: true,
     riskLevel: 'safe',
   },

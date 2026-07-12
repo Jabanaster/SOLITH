@@ -191,7 +191,7 @@ export interface ScanBounds {
   maxMatches?: number;
 }
 
-// ── Freeze (continuous re-write, mirrors WeMod/Wand "Infinite X" toggles) ──
+// ── Freeze (continuous re-write, mirrors mainstream "Infinite X" toggles) ──
 
 export interface FreezeTarget {
   address: LiveMemoryAddress;

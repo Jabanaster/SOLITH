@@ -4,7 +4,7 @@ import type { TrainerSyncSourceConfig } from '../types.js';
 export const TRAINER_SYNC_SOURCES: TrainerSyncSourceConfig[] = [
   {
     id: 'mrantifun',
-    displayName: 'MrAntiFun',
+    displayName: 'Community forum listings',
     baseUrl: 'https://mrantifun.net',
     listPath: '/forums/game-trainers.20/',
     enabled: true,
@@ -12,7 +12,7 @@ export const TRAINER_SYNC_SOURCES: TrainerSyncSourceConfig[] = [
   },
   {
     id: 'fling',
-    displayName: 'FLiNG',
+    displayName: 'Community trainer index',
     baseUrl: 'https://flingtrainer.com',
     listPath: '/',
     enabled: true,
@@ -20,7 +20,7 @@ export const TRAINER_SYNC_SOURCES: TrainerSyncSourceConfig[] = [
   },
   {
     id: 'plitch',
-    displayName: 'Plitch',
+    displayName: 'Community game catalog',
     baseUrl: 'https://www.plitch.com',
     listPath: '/en/games',
     enabled: true,

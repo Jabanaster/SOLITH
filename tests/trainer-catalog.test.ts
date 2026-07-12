@@ -2,15 +2,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseTrainerListHtml,
-  parseFlingHomeHtml,
-  parsePlitchGamesHtml,
+  parseRemoteTrainerIndexHtml,
+  parseRemoteGameCatalogHtml,
 } from '../src/core/trainer-catalog/sync/parse-html.js';
 import { remoteTrainerToModPack, remoteTrainerToCatalogEntry } from '../src/core/trainer-catalog/sync/remote-sync.js';
 import { seedRecordToEntry } from '../src/core/trainer-catalog/seed.js';
 import { buildSearchableText, validateModPack } from '../src/core/trainer-catalog/types.js';
 
 describe('trainer catalog HTML parsers', () => {
-  it('parses XenForo-style MrAntiFun trainer thread titles', () => {
+  it('parses XenForo-style community forum trainer thread titles', () => {
     const html = `
       <a href="/threads/sniper-elite-resistance-trainer.123/">Sniper Elite: Resistance Trainer</a>
       <a href="/threads/cat-mail-co-trainer.456/">Cat Mail Co. Trainer</a>
@@ -20,16 +20,16 @@ describe('trainer catalog HTML parsers', () => {
     assert.ok(trainers.some((t) => t.gameName.includes('Sniper Elite')));
   });
 
-  it('parses FLiNG trainer links', () => {
+  it('parses remote trainer index links', () => {
     const html = `<a href="/trainer/foo/">Palworld Trainer</a>`;
-    const trainers = parseFlingHomeHtml(html);
+    const trainers = parseRemoteTrainerIndexHtml(html);
     assert.equal(trainers.length, 1);
     assert.equal(trainers[0].gameName, 'Palworld');
   });
 
-  it('parses Plitch game links', () => {
+  it('parses remote game catalog links', () => {
     const html = `<a href="/en/games/palworld">Palworld</a>`;
-    const trainers = parsePlitchGamesHtml(html);
+    const trainers = parseRemoteGameCatalogHtml(html);
     assert.equal(trainers.length, 1);
     assert.equal(trainers[0].gameName, 'Palworld');
   });

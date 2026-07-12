@@ -245,7 +245,7 @@ export function registerLiveMemoryIpc(): void {
   });
 
   // Consumes the snapshot from scan-first-unknown; filters by comparison against the baseline,
-  // trying every dataType in parsed.dataTypes at each offset (Cheat Engine's "All" scan type).
+  // trying every dataType in parsed.dataTypes at each offset (multi-type "All" scan).
   // Survivors are typically still numerous enough that the renderer should route them into the
   // Watch Live Values panel next, not assume a single address — this endpoint's job is only to
   // turn "every writable byte" into a workable candidate list, one real filter.

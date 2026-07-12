@@ -8,7 +8,7 @@ export interface AobPattern {
 const TOKEN_RE = /^(\?{1,2}|[0-9a-fA-F]{2})$/;
 
 /**
- * Parse a Cheat Engine-style AOB string into a byte pattern.
+ * Parse a hex AOB (array-of-bytes) pattern string into a byte pattern.
  * Example: "48 8B 05 ? ? ? ?"
  */
 export function parseAobSignature(signature: string): AobPattern {

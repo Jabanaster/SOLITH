@@ -419,7 +419,7 @@ NEXT_SAFE_ACTION=Stop and request user approval
 
 ## Milestone M — Live Trainer Parity (USER AUTHORIZED)
 
-User authorized unlocking WeMod / Cheat Engine class capabilities where already implemented.
+User authorized unlocking mainstream one-click trainer class capabilities where already implemented.
 
 **Enabled by default:**
 ```
@@ -435,15 +435,15 @@ DLL injection / code injection / kernel drivers
 anti-cheat bypass / stealth / debugger attachment for bypass
 packet capture
 online or multiplayer targeting (online guard remains fail-closed)
-scraping or auto-installing third-party trainer binaries (MrAntiFun, FLiNG, etc.)
+scraping or auto-installing third-party trainer binaries (remote listing sites, etc.)
 ```
 
 **Milestone N (USER AUTHORIZED) adds:**
 ```
 1000+ game metadata catalog (bundled seed + SQLite search)
-remote definition sync from MrAntiFun / FLiNG / Plitch (HTML listings → mod pack JSON, no .exe download)
+remote definition sync from community listing sites (HTML listings → mod pack JSON, no .exe download)
 versioned mod pack schema with per-title cheats (community = scan-required, verified = pointer paths)
-Cheat Engine freeform mode (any process / address / scan — v2FreeformMemoryEnabled)
+Advanced Scan Mode / freeform memory tools (any process / address / scan — v2FreeformMemoryEnabled)
 ```
 
 **Allowed Milestone M work:**

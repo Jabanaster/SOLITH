@@ -67,7 +67,7 @@ export default function TrainerLibraryPage({
       const result = await window.electronAPI.trainerCatalogSyncRemote();
       if (result.success && result.report) {
         const imported = result.report.totalImported ?? 0;
-        setMessage(`Synced ${imported} trainer definitions from MrAntiFun / FLiNG / Plitch`);
+        setMessage(`Synced ${imported} trainer definitions from community listings`);
         await load(query);
       } else {
         setMessage(result.error ?? 'Sync failed');
@@ -105,7 +105,7 @@ export default function TrainerLibraryPage({
     });
     if (!loadResult?.success) {
       setMessage(loadResult?.error === 'no_mod_pack'
-        ? `${entry.displayName} is in the catalog but has no mod pack yet — use Cheat Engine mode or sync remote sources.`
+        ? `${entry.displayName} is in the catalog but has no mod pack yet — use Advanced Scan Mode or sync remote sources.`
         : loadResult?.error ?? 'Failed to load game');
       return;
     }
@@ -142,7 +142,7 @@ export default function TrainerLibraryPage({
               {importing ? 'Importing…' : 'Import YAML'}
             </button>
             <button type="button" className={styles.syncBtn} onClick={() => void handleSync()} disabled={syncing}>
-              {syncing ? 'Syncing…' : 'Sync MrAntiFun / FLiNG / Plitch'}
+              {syncing ? 'Syncing…' : 'Sync community listings'}
             </button>
           </div>
         }

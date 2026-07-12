@@ -8,7 +8,7 @@ ResourceForge is strictly designed for single-player, offline games or applicati
 
 ## 🎮 Multi-Game Live Trainer & Cheat Hub
 
-ResourceForge includes a **WeMod-style live trainer** with pre-curated cheats for 7 popular games. Toggling a cheat drives a real scan → narrow → confirm → write workflow against live process memory (no stubs) for the six memory-scan titles; Stardew Valley's console-command cheats are catalogued but not yet executed automatically.
+ResourceForge includes a **one-click live trainer** with pre-curated cheats for 7 popular games. Toggling a cheat drives a real scan → narrow → confirm → write workflow against live process memory (no stubs) for the six memory-scan titles; Stardew Valley's console-command cheats are catalogued but not yet executed automatically.
 
 | Game | Cheats defined | Discovery | Wired to real memory I/O |
 |------|-----------------|-----------|---------------------------|

@@ -73,7 +73,7 @@ function confidenceColor(score: number): string {
 }
 
 /**
- * "Watch Live Values" — Cheat Engine's live address-list view, adapted for a
+ * "Watch Live Values" — live address-list view for Advanced Scan Mode,
  * candidate set that's still too large to narrow by exact-value guessing.
  * Instead of blindly clicking Increased/Decreased and hoping the timing lines
  * up, the user watches every candidate's real value update a few times a

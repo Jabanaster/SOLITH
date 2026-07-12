@@ -113,7 +113,7 @@ function decodeValue(dataType: LiveValueType, buf: Buffer, offset: number): numb
  * attached process's writable, committed memory regions.
  *
  * Read-only regions are skipped — the only reason ResourceForge scans memory
- * at all is to eventually write to a found address (mirrors Cheat Engine's
+ * at all is to eventually write to a found address (mirrors classic memory-scanner
  * "value scan" step, but scoped from the start to writable candidates so the
  * result set is never full of addresses a later write would just fail on).
  *
@@ -252,7 +252,7 @@ function matchesComparison(comparison: ScanComparison, previousValue: number, cu
 }
 
 /**
- * "Unknown initial value" first scan — the Cheat Engine / WeMod-researcher
+ * "Unknown initial value" first scan — standard memory-researcher
  * technique for finding a stat that has no visible on-screen number (a bar,
  * a percentage with no digits, an internal cooldown, etc.). Instead of
  * searching for one target value, this captures the raw bytes of every
@@ -363,7 +363,7 @@ export interface TypedScanResult {
 /**
  * Same idea as scanNextFromSnapshot, but tries every dataType in `dataTypes`
  * at each offset instead of committing to one interpretation upfront — the
- * Cheat Engine "All" scan-type equivalent. A bar with no visible number could
+ * Multi-type "All" scan equivalent. A bar with no visible number could
  * be stored as int32, float, or double; guessing wrong (as this project
  * initially did for Undisputed, assuming int32 for what turned out to be a
  * float) converges on a false-positive address that happens to match the

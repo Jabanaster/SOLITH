@@ -31,7 +31,17 @@ export interface CheatDefinition {
 }
 
 export interface CheatSource {
-  name: 'WeMod' | 'FearLess' | 'Nexus' | 'SMAPI' | 'Console' | 'Community' | 'Official' | 'MrAntiFun' | 'FLiNG' | 'Plitch';
+  name:
+    | 'Community Catalog'
+    | 'Community Research'
+    | 'Mod Repository'
+    | 'SMAPI'
+    | 'Console'
+    | 'Community'
+    | 'Official'
+    | 'Remote Forum'
+    | 'Remote Listing'
+    | 'Remote Catalog';
   url?: string;
   verified: boolean;
   lastChecked: Date;
@@ -64,7 +74,7 @@ export interface GameConfig {
   releaseDate?: string;
   lastUpdated: Date;
   images?: GameImageUrls;
-  pinnedCheatIds?: string[]; // Cheats shown in the "Pinned" section at top (WeMod-style)
+  pinnedCheatIds?: string[]; // Cheats shown in the "Pinned" section at top
 }
 
 export interface GameRegistry {

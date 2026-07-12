@@ -41,7 +41,7 @@ const IDLE_STATE: CheatSessionState = {
   unknownScanActive: false,
 };
 
-/** Types tried at once for an unknown-value scan — Cheat Engine's "All" equivalent, scoped to the types that actually show up as game stats (byte/int64 are rare for a bar/meter and would mostly add noise). */
+/** Types tried at once for an unknown-value scan — multi-type "All" scan equivalent, scoped to the types that actually show up as game stats (byte/int64 are rare for a bar/meter and would mostly add noise). */
 const UNKNOWN_SCAN_DATA_TYPES = ['float', 'int32', 'double'];
 
 /**
@@ -337,7 +337,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   );
 
   /**
-   * "Unknown initial value" first scan — the Cheat Engine / WeMod-researcher
+   * "Unknown initial value" first scan — standard memory-researcher workflow:
    * technique for a stat with no visible number (a bar, a percentage with no
    * digits). Captures a baseline snapshot instead of searching for a target
    * value; call narrowUnknown after provoking a real in-game change (taking

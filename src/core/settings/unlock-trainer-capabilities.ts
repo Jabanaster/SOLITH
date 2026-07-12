@@ -9,7 +9,7 @@ const TRAINER_CAPABILITY_KEYS = [
 ] as const;
 
 /**
- * One-time unlock for live trainer parity (WeMod / Cheat Engine class UX).
+ * One-time unlock for live trainer parity (mainstream one-click trainer class UX).
  * Enables live memory, global hotkeys, and the in-game overlay unless the
  * user has explicitly disabled a capability after unlock.
  */

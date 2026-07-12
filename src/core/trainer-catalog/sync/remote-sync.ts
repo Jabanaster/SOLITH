@@ -3,8 +3,8 @@ import { slugifyGameId, steamCdnImages } from '../types.js';
 import type { ParsedRemoteTrainer } from './parse-html.js';
 import {
   parseTrainerListHtml,
-  parseFlingHomeHtml,
-  parsePlitchGamesHtml,
+  parseRemoteTrainerIndexHtml,
+  parseRemoteGameCatalogHtml,
 } from './parse-html.js';
 import type { TrainerSyncSourceConfig } from '../types.js';
 
@@ -106,7 +106,7 @@ export function remoteTrainerToModPack(
     platform: 'unknown',
     syncedAt: now,
     notes: [
-      `Imported trainer listing from ${provider}. Pointer paths are not verified — use memory scan or Cheat Engine mode.`,
+      `Imported trainer listing from ${provider}. Pointer paths are not verified — use Advanced Scan Mode or memory scan.`,
       'Definitions only; no third-party trainer executable was downloaded.',
     ],
   };
@@ -122,9 +122,9 @@ export async function syncTrainerSource(source: TrainerSyncSourceConfig): Promis
     if (source.id === 'mrantifun') {
       trainers = parseTrainerListHtml(source.baseUrl, html);
     } else if (source.id === 'fling') {
-      trainers = parseFlingHomeHtml(html);
+      trainers = parseRemoteTrainerIndexHtml(html);
     } else if (source.id === 'plitch') {
-      trainers = parsePlitchGamesHtml(html);
+      trainers = parseRemoteGameCatalogHtml(html);
     } else {
       trainers = parseTrainerListHtml(source.baseUrl, html);
     }

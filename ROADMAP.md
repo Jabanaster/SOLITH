@@ -38,10 +38,12 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 
 ### Next suggested work (post-2.0)
 
+See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
+
 1. Measure and document connection baselines for Avowed, Dredge, Crimson Desert (KI-017)
-2. JSON save-field write execution per game profile (read path exists; writes remain XML-first)
-3. Remote catalog sync quality pass (community pointer paths from MrAntiFun / FLiNG)
-4. Real-game freeze/write verification with explicit save backup authorization
+2. Restart verifier + pointer registry (7 → 50 → 500 games)
+3. Remote catalog sync quality pass (community pointer paths from remote listings)
+4. Real-game freeze/write certification with explicit save backup authorization
 
 ---
 

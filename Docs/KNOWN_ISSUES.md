@@ -24,7 +24,7 @@ heap's static roots live inside the runtime's own internal structures (GC
 handle tables, thread-stack roots at safepoints, etc.), not as plain
 pointers sitting at a fixed offset inside the game's PE module image the way
 they do in native C/C++ games (which is what this generic "any module +
-offset" scan technique is built for, and is exactly how real Cheat Engine
+offset" scan technique is built for, and is exactly how classic memory-scanner
 pointer tables work for most Unreal/native-engine titles).
 
 Practical takeaway: this pointer-scanning approach should work well against

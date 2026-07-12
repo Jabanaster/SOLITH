@@ -1,4 +1,4 @@
-# WeMod-Equivalent Live Trainer for Palworld
+# Solith Live Trainer Parity (Palworld reference implementation)
 
 > **Superseded (checkpoint `806ba56`, 2026-07-09).** `PalworldCheatMenu.tsx`,
 > `PalworldCheatMenu.test.tsx`, and `useFreezeValue.ts` referenced below were intentionally
@@ -10,7 +10,7 @@
 
 ## Overview
 
-ResourceForge now includes a complete WeMod-equivalent live trainer for Palworld with all requested features:
+Solith includes a complete one-click live trainer reference implementation for Palworld with all requested features:
 
 1. **Pre-curated cheat menu** with 50+ one-click toggles organized by category
 2. **Real-time write verification** confirming changes apply immediately in-game
@@ -256,10 +256,10 @@ In `PalworldTrainerPage`:
 />
 ```
 
-## Comparison with WeMod
+## Comparison with mainstream cloud trainers
 
-| Feature | WeMod | ResourceForge |
-|---------|-------|---------------|
+| Feature | Mainstream cloud trainers | Solith |
+|---------|---------------------------|--------|
 | Pre-curated menu | ✅ | ✅ |
 | One-click toggles | ✅ | ✅ |
 | Freeze/infinite | ✅ | ✅ |

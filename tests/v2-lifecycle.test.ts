@@ -1,7 +1,7 @@
 /**
  * V2 Session Lifecycle Monitor — Unit and Integration Tests
  *
- * All tests are deterministic and do not require Wand, WeMod, or
+ * All tests are deterministic and do not require external trainer products or
  * Tale of Immortal to be installed. Fixtures represent the captured
  * session states from the 2026-06-25/26 investigation.
  */
