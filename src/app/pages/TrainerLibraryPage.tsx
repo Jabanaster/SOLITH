@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
+import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 
 interface SearchResponse {
@@ -17,12 +19,77 @@ interface TrustMeta {
   quarantined: boolean;
 }
 
-const PAGE_SIZE = 96;
+const PAGE_SIZE = 120;
 
 function tierHint(entry: TrainerCatalogEntry): string {
   if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
   if (entry.verificationStatus === 'community') return 'First session scan may be required';
   return 'Metadata only — sync or import a definition';
+}
+
+function CatalogCard({
+  entry,
+  trust,
+  onLaunch,
+  onExport,
+  onThumbUp,
+}: {
+  entry: TrainerCatalogEntry;
+  trust?: TrustMeta;
+  onLaunch: (entry: TrainerCatalogEntry) => void;
+  onExport: (entry: TrainerCatalogEntry) => void;
+  onThumbUp: (entry: TrainerCatalogEntry) => void;
+}) {
+  const tagline = getCatalogTagline(entry);
+  return (
+    <article className={styles.card}>
+      <div className={styles.coverWrap}>
+        {entry.coverUrl && entry.steamAppId && entry.steamAppId < 1_000_000 ? (
+          <img
+            src={entry.coverUrl}
+            alt=""
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className={styles.coverFallback}>{entry.displayName.charAt(0)}</div>
+        )}
+        <span className={styles.badge} title={tierHint(entry)}>
+          {entry.verificationStatus}
+        </span>
+      </div>
+      <div className={styles.cardBody}>
+        <h2>{entry.displayName}</h2>
+        <p className={styles.tagline}>{tagline}</p>
+        <p>{entry.categories.slice(0, 2).join(' · ')}</p>
+        <p className={styles.meta}>
+          {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
+          {trust?.positive ? ` · ${trust.positive} confirmed` : ''}
+          {trust?.quarantined ? ' · needs re-verify' : ''}
+        </p>
+        <p className={styles.meta}>{tierHint(entry)}</p>
+        <div className={styles.cardActions}>
+          <button type="button" className={styles.launchBtn} onClick={() => void onLaunch(entry)}>
+            {entry.hasModPack ? 'Load Trainer' : 'View'}
+          </button>
+          {entry.hasModPack && (
+            <>
+              <button type="button" className={styles.secondaryBtn} onClick={() => void onExport(entry)}>
+                Export YAML
+              </button>
+              {entry.verificationStatus === 'community' && (
+                <button type="button" className={styles.secondaryBtn} onClick={() => void onThumbUp(entry)}>
+                  Confirm works
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function TrainerLibraryPage({
@@ -48,6 +115,8 @@ export default function TrainerLibraryPage({
   const [quarantineCount, setQuarantineCount] = useState(0);
   const importYamlRef = useRef<HTMLInputElement>(null);
   const importCtRef = useRef<HTMLInputElement>(null);
+  const queryRef = useRef(query);
+  queryRef.current = query;
 
   const fetchPage = useCallback(async (searchQuery: string, pageOffset: number, append: boolean) => {
     if (!window.electronAPI?.trainerCatalogSearch) return;
@@ -101,7 +170,7 @@ export default function TrainerLibraryPage({
     void (async () => {
       const next: Record<string, TrustMeta> = {};
       await Promise.all(
-        withPacks.map(async (entry) => {
+        withPacks.slice(0, 40).map(async (entry) => {
           const result = await api.trainerCatalogFeedbackSummary!({ catalogGameId: entry.catalogGameId });
           if (result.success && result.summary) {
             next[entry.catalogGameId] = {
@@ -132,10 +201,10 @@ export default function TrainerLibraryPage({
     void load(query);
   };
 
-  const handleLoadMore = () => {
-    if (entries.length >= total) return;
-    void fetchPage(query, offset, true);
-  };
+  const handleLoadMore = useCallback(() => {
+    if (loadingMore || loading || entries.length >= total) return;
+    void fetchPage(queryRef.current, offset, true);
+  }, [loadingMore, loading, entries.length, total, offset, fetchPage]);
 
   const handleSync = async () => {
     if (!window.electronAPI?.trainerCatalogSyncRemote) return;
@@ -251,7 +320,7 @@ export default function TrainerLibraryPage({
         artwork="trainerController"
         className={styles.header}
         title="Trainer Library"
-        description={`${total.toLocaleString()} games · searchable catalog with Steam artwork`}
+        description={`${total.toLocaleString()} games · virtualized grid · Steam artwork on verified App IDs`}
         actions={
           <div className={styles.actions}>
             <input
@@ -319,57 +388,26 @@ export default function TrainerLibraryPage({
       )}
       {loading && <p className={styles.loading}>Loading catalog…</p>}
 
-      <div className={styles.grid}>
-        {visible.map((entry) => (
-          <article key={entry.catalogGameId} className={styles.card}>
-            <div className={styles.coverWrap}>
-              {entry.coverUrl ? (
-                <img src={entry.coverUrl} alt="" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              ) : (
-                <div className={styles.coverFallback}>{entry.displayName.charAt(0)}</div>
-              )}
-              <span className={styles.badge} title={tierHint(entry)}>
-                {entry.verificationStatus}
-              </span>
-            </div>
-            <div className={styles.cardBody}>
-              <h2>{entry.displayName}</h2>
-              <p>{entry.categories.slice(0, 2).join(' · ')}</p>
-              <p className={styles.meta}>
-                {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
-                {trustMeta[entry.catalogGameId]?.positive ? ` · ${trustMeta[entry.catalogGameId].positive} confirmed` : ''}
-                {trustMeta[entry.catalogGameId]?.quarantined ? ' · needs re-verify' : ''}
-              </p>
-              <p className={styles.meta}>{tierHint(entry)}</p>
-              <div className={styles.cardActions}>
-                <button type="button" className={styles.launchBtn} onClick={() => void handleLaunch(entry)}>
-                  {entry.hasModPack ? 'Load Trainer' : 'View'}
-                </button>
-                {entry.hasModPack && (
-                  <>
-                    <button type="button" className={styles.secondaryBtn} onClick={() => void handleExportYaml(entry)}>
-                      Export YAML
-                    </button>
-                    {entry.verificationStatus === 'community' && (
-                      <button type="button" className={styles.secondaryBtn} onClick={() => void handleThumbUp(entry)}>
-                        Confirm works
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {!loading && entries.length < total && (
-        <div className={styles.searchRow}>
-          <button type="button" onClick={handleLoadMore} disabled={loadingMore}>
-            {loadingMore ? 'Loading…' : `Load more (${entries.length} / ${total})`}
-          </button>
-        </div>
+      {!loading && visible.length > 0 && (
+        <VirtualCatalogGrid
+          className={styles.virtualScroll}
+          gridClassName={styles.grid}
+          items={visible}
+          getKey={(entry) => entry.catalogGameId}
+          onEndReached={handleLoadMore}
+          renderItem={(entry) => (
+            <CatalogCard
+              entry={entry}
+              trust={trustMeta[entry.catalogGameId]}
+              onLaunch={handleLaunch}
+              onExport={handleExportYaml}
+              onThumbUp={handleThumbUp}
+            />
+          )}
+        />
       )}
+
+      {loadingMore && <p className={styles.loading}>Loading more… ({entries.length} / {total})</p>}
     </div>
   );
 }

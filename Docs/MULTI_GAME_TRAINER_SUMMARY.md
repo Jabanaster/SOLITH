@@ -1,5 +1,9 @@
 # ResourceForge Multi-Game Live Trainer - Complete Summary
 
+> **ARCHIVED (2026-07-12)** — Historical milestone summary. Superseded by
+> `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` and `Docs/SOLITH_LIVE_TRAINER_PARITY.md`.
+> Competitor product names below appear only in historical research context.
+
 > **Partially superseded (checkpoint `806ba56`, 2026-07-09).** `useLiveTrainerWorkflow.ts`,
 > `useFreezeValue.ts`, `PalworldCheatMenu.tsx`, and `LiveTrainer.tsx` referenced below were
 > intentionally removed as obsolete. Cheat toggle persistence now runs through
@@ -14,13 +18,13 @@
 
 A **production-ready, extensible multi-game cheat system** with support for 7 games and 245+ pre-curated cheats, all integrated into a single, unified application.
 
-**Total Development:** ~2.5 hours (from "WEMOD comparison" to "complete multi-game system")
+**Total Development:** ~2.5 hours (from legacy commercial trainer comparison to complete multi-game system)
 
 ---
 
 ## 📦 The Complete Stack
 
-### **Phase 1: Palworld WeMod-Equivalent** ✅
+### **Phase 1: Palworld live trainer parity** ✅
 - 54+ pre-curated cheats (Palworld only initially)
 - Real-time scanning with auto-narrowing
 - Freeze value (continuous 200ms re-write)

@@ -1,0 +1,111 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 8, 16, 0.82);
+  backdrop-filter: blur(4px);
+  padding: 1rem;
+}
+
+.panel {
+  width: min(520px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: linear-gradient(160deg, #121a2b 0%, #0b101a 100%);
+  padding: 1.25rem 1.35rem 1rem;
+  color: #e8f0ff;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.art {
+  max-width: 200px;
+  margin: 0 auto 0.75rem;
+  opacity: 0.95;
+}
+
+.panel h1 {
+  margin: 0 0 0.65rem;
+  font-size: 1.35rem;
+}
+
+.panel p,
+.panel li {
+  color: #b8c8e6;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.panel ul,
+.panel ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.note {
+  margin-top: 0.75rem;
+  font-size: 0.85rem !important;
+  color: #8fa3c7 !important;
+}
+
+.progress {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: center;
+  margin: 1rem 0 0.85rem;
+}
+
+.dot,
+.dotActive {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(120, 180, 255, 0.25);
+}
+
+.dotActive {
+  background: rgba(120, 180, 255, 0.9);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.primary,
+.secondary,
+.skip {
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.primary {
+  border: 1px solid rgba(120, 180, 255, 0.45);
+  background: rgba(50, 100, 180, 0.9);
+  color: #fff;
+}
+
+.secondary {
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: transparent;
+  color: #cde0ff;
+}
+
+.skip {
+  margin-right: auto;
+  border: none;
+  background: transparent;
+  color: #8fa3c7;
+}
+
+.panel code {
+  font-size: 0.82rem;
+  color: #cde0ff;
+}

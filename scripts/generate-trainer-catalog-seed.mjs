@@ -132,7 +132,7 @@ const BASE_GAMES = [
   { name: 'Ghost of Tsushima', steamAppId: 2215430, categories: ['Action', 'Adventure'] },
   { name: 'Death Stranding', steamAppId: 1190460, categories: ['Action', 'Adventure'] },
   { name: 'Control', steamAppId: 870780, categories: ['Action', 'Supernatural'] },
-  { name: 'Alan Wake 2', steamAppId: 1086940, categories: ['Horror', 'Action'] },
+  { name: 'Alan Wake 2', steamAppId: 2475420, categories: ['Horror', 'Action'] },
   { name: 'Alan Wake', steamAppId: 108710, categories: ['Horror', 'Action'] },
   { name: 'Metro Exodus', steamAppId: 412020, categories: ['Shooter', 'Survival'] },
   { name: 'Metro: Last Light Redux', steamAppId: 287390, categories: ['Shooter', 'Survival'] },
@@ -175,10 +175,8 @@ function syntheticGames(targetCount) {
     const noun = NOUNS[Math.floor(i / PREFIXES.length) % NOUNS.length];
     const suffix = i % 3 === 0 ? ' Remastered' : i % 3 === 1 ? ' II' : ' Chronicles';
     const name = `${prefix} ${noun}${suffix}`;
-    const steamAppId = 1_000_000 + i;
     games.push(withExecutableGuesses({
       name,
-      steamAppId,
       categories: [GENRES[i % GENRES.length], GENRES[(i + 3) % GENRES.length]],
       verificationStatus: 'metadata-only',
     }));

@@ -3,6 +3,8 @@
  * Each profile declares magic bytes, endianness, and field maps — no blind blob writes.
  */
 
+export { createDefaultRfsaBuffer, readRfsaFields, validateRfsaHeader, writeRfsaFields } from './rfsa.js';
+
 export type BinarySaveEndian = 'le' | 'be';
 
 export interface BinarySaveFieldMap {
@@ -29,8 +31,24 @@ export interface BinarySaveFormatProfile {
 
 const PROFILES: BinarySaveFormatProfile[] = [
   {
+    id: 'rfsa-v1',
+    label: 'RFSA structured save (demo format #1)',
+    magicBytes: [0x52, 0x46, 0x53, 0x41],
+    extension: '.rfsa',
+    endian: 'le',
+    maxFileBytes: 64 * 1024,
+    fields: [
+      { id: 'gold', name: 'Gold', offset: 16, dataType: 'int32', min: 0, max: 999_999_999 },
+      { id: 'hp', name: 'HP', offset: 20, dataType: 'float', min: 0, max: 9999 },
+      { id: 'stamina', name: 'Stamina', offset: 24, dataType: 'int32', min: 0, max: 9999 },
+    ],
+    evidence:
+      'Documented ResourceForge RFSA v1 layout (Docs/BinaryFormats/RFSA_v1.md). Demo file: demo-game/save/player.rfsa.',
+    canWrite: true,
+  },
+  {
     id: 'demo-binary-fixture',
-    label: 'Demo binary fixture (test only)',
+    label: 'Legacy demo fixture alias (.sav)',
     magicBytes: [0x52, 0x46, 0x53, 0x41],
     extension: '.sav',
     endian: 'le',
@@ -39,7 +57,7 @@ const PROFILES: BinarySaveFormatProfile[] = [
       { id: 'gold', name: 'Gold', offset: 16, dataType: 'int32', min: 0, max: 999_999_999 },
       { id: 'hp', name: 'HP', offset: 20, dataType: 'float', min: 0, max: 9999 },
     ],
-    evidence: 'Fixture profile for unit tests — not a real game format.',
+    evidence: 'Alias for RFSA tests using .sav extension.',
     canWrite: false,
   },
 ];

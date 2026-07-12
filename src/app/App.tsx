@@ -18,6 +18,7 @@ import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode }
 import { Icon, type IconName } from './components/icons/index.js';
 import { solithBranding } from './assets/branding/index.js';
 import { BrandingArtwork } from './components/BrandingArtwork.js';
+import { OnboardingWizard } from './components/OnboardingWizard.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 
 class ContentErrorBoundary extends React.Component<
@@ -147,6 +148,20 @@ const App: React.FC = () => {
   const [libraryLaunchGameId, setLibraryLaunchGameId] = useState<string | null>(null);
   const [libraryLaunchDisplayName, setLibraryLaunchDisplayName] = useState<string>('');
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const settings = await (window as any).electronAPI?.getSettings?.();
+        if (settings && settings.onboardingCompleted !== true) {
+          setShowOnboarding(true);
+        }
+      } catch {
+        // ignore — browser mode
+      }
+    })();
+  }, []);
 
   const handleLibraryLaunch = (
     catalogGameId: string,
@@ -434,6 +449,10 @@ const App: React.FC = () => {
           onSelect={completeLibraryLaunch}
           onCancel={() => setPendingLibraryLaunch(null)}
         />
+      )}
+
+      {showOnboarding && (
+        <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
       )}
     </div>
   );

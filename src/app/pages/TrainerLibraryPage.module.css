@@ -96,9 +96,22 @@
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+  width: 100%;
+}
+
+.virtualScroll {
+  max-height: calc(100vh - 280px);
+  min-height: 420px;
+  overflow: auto;
+  margin-bottom: 0.5rem;
+}
+
+.tagline {
+  color: #9eb6dc !important;
+  font-size: 0.72rem !important;
+  line-height: 1.3 !important;
+  margin-top: 0.15rem !important;
+  margin-bottom: 0.25rem !important;
 }
 
 .card {
