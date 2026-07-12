@@ -1,14 +1,6 @@
-# Live Trainer Implementation — WeMod-Equivalent Auto-Scan Workflow
+# Live Trainer Implementation (archived)
 
-> **Superseded (checkpoint `806ba56`, 2026-07-09).** The components this document
-> describes — `useLiveTrainerWorkflow`, `LiveTrainer.tsx`, `PalworldTrainerPage.tsx`,
-> and `LiveTrainer.test.tsx` — were intentionally removed as obsolete. The manual
-> address-discovery workflow they implemented is now covered by
-> [`LiveWatchPanel`](src/app/components/LiveWatchPanel.tsx), invoked from the
-> generic [`GameSpecificCheatMenu`](src/app/components/GameSpecificCheatMenu.tsx)
-> rather than a Palworld-specific page. See `README.md` → "Trainer UI Migration"
-> for the current architecture. This document is kept for historical reference
-> only; do not treat it as a description of current behavior.
+> **ARCHIVED** — Superseded by `Docs/SOLITH_LIVE_TRAINER_PARITY.md` and the generic `GameSpecificCheatMenu` + `LiveWatchPanel` architecture. Brand-neutral; do not use as current behavior reference.
 
 ## Summary
 

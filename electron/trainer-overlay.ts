@@ -2,6 +2,7 @@ import { BrowserWindow, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { getOverlayLayoutPreset } from '../src/core/cheat-system/overlay-layout-presets.js';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -30,20 +31,27 @@ export function hideTrainerOverlay(): void {
   }
 }
 
-export function showTrainerOverlay(): void {
+export function showTrainerOverlay(gameId?: string | null): void {
+  const preset = getOverlayLayoutPreset(gameId);
+  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
+
   if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.setBounds({
+      width: preset.width,
+      height: preset.height,
+      x: screenWidth - preset.width - preset.marginRight,
+      y: preset.marginTop,
+    });
     overlayWindow.show();
     overlayWindow.focus();
     return;
   }
 
-  const { width } = screen.getPrimaryDisplay().workAreaSize;
-
   overlayWindow = new BrowserWindow({
-    width: 380,
-    height: 560,
-    x: width - 400,
-    y: 48,
+    width: preset.width,
+    height: preset.height,
+    x: screenWidth - preset.width - preset.marginRight,
+    y: preset.marginTop,
     frame: false,
     transparent: false,
     alwaysOnTop: true,
@@ -74,12 +82,12 @@ export function showTrainerOverlay(): void {
   });
 }
 
-export function toggleTrainerOverlay(): boolean {
+export function toggleTrainerOverlay(gameId?: string | null): boolean {
   if (isTrainerOverlayVisible()) {
     hideTrainerOverlay();
     return false;
   }
-  showTrainerOverlay();
+  showTrainerOverlay(gameId);
   return true;
 }
 

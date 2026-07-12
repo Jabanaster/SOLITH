@@ -24,12 +24,14 @@ describe('save format capabilities', () => {
     assert.equal(detectSaveFormatFromPath(path.join('saves', 'settings.ini')), 'ini');
     assert.equal(detectSaveFormatFromPath(path.join('saves', 'settings.cfg')), 'ini');
     assert.equal(detectSaveFormatFromPath(path.join('saves', 'settings.conf')), 'ini');
+    assert.equal(detectSaveFormatFromPath(path.join('saves', 'player.rfsa')), 'binary');
+    assert.equal(detectSaveFormatFromPath(path.join('saves', 'player.slth')), 'binary');
   });
 
   test('classifies malformed and unknown extensions without guessing', () => {
     assert.equal(detectSaveFormatFromPath(path.join('saves', 'player.json.tmp')), 'unsupported');
     assert.equal(detectSaveFormatFromPath(path.join('saves', 'player')), 'unknown');
-    assert.equal(normalizeDeclaredSaveFormat('binary'), 'unsupported');
+    assert.equal(normalizeDeclaredSaveFormat('binary'), 'binary');
   });
 
   test('reports explicit capabilities for recognized formats', () => {

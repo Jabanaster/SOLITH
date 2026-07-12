@@ -1,6 +1,7 @@
 import path from 'path';
+import { listBinarySaveProfiles } from './binary-formats/index.js';
 
-export type SaveFormatId = 'xml' | 'json' | 'ini' | 'unknown' | 'unsupported';
+export type SaveFormatId = 'xml' | 'json' | 'ini' | 'binary' | 'unknown' | 'unsupported';
 
 export type SaveFormatOperation =
   | 'save_field_read'
@@ -47,6 +48,15 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
     canProposeSaveField: true,
     canWriteSaveField: true,
   },
+  binary: {
+    id: 'binary',
+    label: 'Structured binary',
+    recognized: true,
+    canInspect: true,
+    canReadSaveField: true,
+    canProposeSaveField: true,
+    canWriteSaveField: true,
+  },
   unknown: {
     id: 'unknown',
     label: 'Unknown',
@@ -67,7 +77,13 @@ const CAPABILITIES: Record<SaveFormatId, SaveFormatCapability> = {
   },
 };
 
-const DECLARED_FORMATS = new Set<SaveFormatId>(['xml', 'json', 'ini']);
+const DECLARED_FORMATS = new Set<SaveFormatId>(['xml', 'json', 'ini', 'binary']);
+
+const BINARY_EXTENSIONS = new Set(
+  listBinarySaveProfiles()
+    .filter((p) => p.canWrite)
+    .map((p) => p.extension.toLowerCase()),
+);
 
 export class UnsupportedSaveFormatError extends Error {
   readonly code = 'unsupported_save_format';
@@ -102,6 +118,7 @@ export function detectSaveFormatFromPath(filePath: string): SaveFormatId {
   if (extension === '.xml') return 'xml';
   if (extension === '.json') return 'json';
   if (extension === '.ini' || extension === '.cfg' || extension === '.conf') return 'ini';
+  if (BINARY_EXTENSIONS.has(extension)) return 'binary';
   if (!extension) return 'unknown';
   return 'unsupported';
 }

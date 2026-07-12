@@ -276,7 +276,7 @@ const game = findGameByExecutable('Palworld-Win64-Shipping.exe')
 
 | Document | Purpose |
 |----------|---------|
-| `WEMOD_EQUIVALENT_TRAINER.md` | Palworld trainer architecture (4-feature breakdown) |
+| `SOLITH_LIVE_TRAINER_PARITY.md` | Live trainer architecture |
 | `ANTIVIRUS_SETUP.md` | Complete antivirus guide (Windows Defender, Bitdefender, etc.) |
 | `LIVE_TRAINER_IMPLEMENTATION.md` | Implementation details (auto-scan workflow, session caching) |
 | `MULTI_GAME_TRAINER_SUMMARY.md` | **This file** - full system overview |
@@ -412,7 +412,7 @@ powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
 ## 📞 Support & Documentation
 
 - **Setup Issues:** See `Docs/ANTIVIRUS_SETUP.md`
-- **Feature Docs:** See `Docs/WEMOD_EQUIVALENT_TRAINER.md`
+- **Feature Docs:** See `Docs/SOLITH_LIVE_TRAINER_PARITY.md`
 - **Implementation:** See `Docs/LIVE_TRAINER_IMPLEMENTATION.md`
 - **README:** See `README.md` (updated with quick start)
 

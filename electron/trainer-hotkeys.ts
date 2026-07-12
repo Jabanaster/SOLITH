@@ -1,20 +1,12 @@
 import { globalShortcut, BrowserWindow, ipcMain } from 'electron';
 import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
-import { toggleTrainerOverlay, hideTrainerOverlay } from './trainer-overlay.js';
-
-export type TrainerHotkeyAction =
-  | 'toggle_overlay'
-  | 'hide_overlay'
-  | `cheat_slot_${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
-
-const DEFAULT_HOTKEYS: Record<string, string> = {
-  toggle_overlay: 'Control+Shift+O',
-  hide_overlay: 'Control+Shift+\\',
-};
-
-for (let i = 1; i <= 12; i += 1) {
-  DEFAULT_HOTKEYS[`cheat_slot_${i}`] = `F${i}`;
-}
+import {
+  detectHotkeyConflicts,
+  getTrainerHotkeyBindings,
+  setTrainerHotkeyBindings,
+  type TrainerHotkeyAction,
+} from '../src/core/cheat-system/trainer-hotkey-bindings.js';
+import { hideTrainerOverlay, toggleTrainerOverlay } from './trainer-overlay.js';
 
 let registered = false;
 
@@ -30,7 +22,10 @@ export function registerTrainerHotkeys(): void {
   if (registered) return;
   if (!isTrainerCapabilityEnabled('v2HotkeysEnabled')) return;
 
-  const toggleOk = globalShortcut.register(DEFAULT_HOTKEYS.toggle_overlay, () => {
+  const bindings = getTrainerHotkeyBindings();
+  let allOk = true;
+
+  const toggleOk = globalShortcut.register(bindings.toggle_overlay, () => {
     if (!isTrainerCapabilityEnabled('v2OverlayEnabled')) {
       broadcastHotkey('toggle_overlay');
       return;
@@ -38,21 +33,23 @@ export function registerTrainerHotkeys(): void {
     const visible = toggleTrainerOverlay();
     broadcastHotkey(visible ? 'toggle_overlay' : 'hide_overlay');
   });
+  if (!toggleOk) allOk = false;
 
-  const hideOk = globalShortcut.register(DEFAULT_HOTKEYS.hide_overlay, () => {
+  const hideOk = globalShortcut.register(bindings.hide_overlay, () => {
     hideTrainerOverlay();
     broadcastHotkey('hide_overlay');
   });
+  if (!hideOk) allOk = false;
 
-  let cheatSlotsOk = true;
   for (let i = 1; i <= 12; i += 1) {
     const action = `cheat_slot_${i}` as TrainerHotkeyAction;
-    const key = DEFAULT_HOTKEYS[action];
+    const key = bindings[action];
+    if (!key) continue;
     const ok = globalShortcut.register(key, () => broadcastHotkey(action));
-    if (!ok) cheatSlotsOk = false;
+    if (!ok) allOk = false;
   }
 
-  if (!toggleOk || !hideOk || !cheatSlotsOk) {
+  if (!allOk) {
     // eslint-disable-next-line no-console
     console.warn('[trainer-hotkeys] Failed to register one or more global shortcuts');
   }
@@ -69,8 +66,25 @@ export function unregisterTrainerHotkeys(): void {
 export function registerTrainerHotkeyIpc(): void {
   ipcMain.handle('trainer-hotkeys-get-defaults', async () => ({
     success: true,
-    hotkeys: DEFAULT_HOTKEYS,
+    hotkeys: getTrainerHotkeyBindings(),
   }));
+
+  ipcMain.handle('trainer-hotkeys-get-bindings', async () => ({
+    success: true,
+    hotkeys: getTrainerHotkeyBindings(),
+    conflicts: detectHotkeyConflicts(getTrainerHotkeyBindings()),
+  }));
+
+  ipcMain.handle('trainer-hotkeys-set-bindings', async (_event, payload: unknown) => {
+    if (!payload || typeof payload !== 'object' || !('hotkeys' in payload)) {
+      return { success: false, error: 'invalid_payload' };
+    }
+    const hotkeys = (payload as { hotkeys: Record<string, string> }).hotkeys;
+    const merged = setTrainerHotkeyBindings(hotkeys);
+    const conflicts = detectHotkeyConflicts(merged);
+    refreshTrainerHotkeys();
+    return { success: true, hotkeys: merged, conflicts };
+  });
 
   ipcMain.handle('trainer-overlay-toggle', async () => {
     if (!isTrainerCapabilityEnabled('v2OverlayEnabled')) {

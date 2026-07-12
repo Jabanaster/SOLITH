@@ -1,0 +1,74 @@
+.panel {
+  margin-top: 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-subtle, #2a3344);
+  border-radius: 10px;
+  background: var(--surface-elevated, #121820);
+}
+
+.title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr minmax(140px, 220px);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.row label {
+  font-size: 0.9rem;
+}
+
+.row input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, #2a3344);
+  background: var(--surface-base, #0a0e16);
+  color: inherit;
+}
+
+.conflicts {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+.actions {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.saveBtn {
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  cursor: pointer;
+}
+
+.message {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}

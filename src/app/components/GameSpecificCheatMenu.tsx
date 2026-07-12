@@ -3,6 +3,7 @@ import styles from './GameSpecificCheatMenu.module.css';
 import { useGameCheatSession } from '../hooks/useGameCheatSession.js';
 import { LiveWatchPanel } from './LiveWatchPanel.js';
 import { FingerprintDriftDialog } from './FingerprintDriftDialog.js';
+import { DefinitionRatingPrompt } from './DefinitionRatingPrompt.js';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
 
 interface GameSpecificCheatMenuProps {
@@ -573,6 +574,15 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           warning={session.driftPrompt.warning}
           onProceed={() => session.resolveDriftPrompt(true)}
           onCancel={() => session.resolveDriftPrompt(false)}
+        />
+      )}
+
+      {session.ratingPrompt && (
+        <DefinitionRatingPrompt
+          gameName={game.name}
+          catalogGameId={game.gameId}
+          featureId={session.ratingPrompt.cheatId}
+          onClose={session.dismissRatingPrompt}
         />
       )}
     </div>

@@ -78,6 +78,7 @@ function resolveMemoryDataType(cheat: CheatDefinition): string | null {
 export function useGameCheatSession(game: GameConfig, userConfirmedOffline: boolean) {
   const [states, setStates] = useState<Record<string, CheatSessionState>>({});
   const [driftPrompt, setDriftPrompt] = useState<DriftPromptState | null>(null);
+  const [ratingPrompt, setRatingPrompt] = useState<{ cheatId: string } | null>(null);
   const driftResolverRef = useRef<((proceed: boolean) => void) | null>(null);
   const attachedRef = useRef(false);
   const frozenCheatIdRef = useRef<string | null>(null);
@@ -218,6 +219,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         }
 
         patchState(cheat.id, { liveValue: value });
+        setRatingPrompt({ cheatId: cheat.id });
         return { allowed: true, reason: `Wrote ${value}` };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
@@ -706,6 +708,8 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     getState,
     driftPrompt,
     resolveDriftPrompt,
+    ratingPrompt,
+    dismissRatingPrompt: () => setRatingPrompt(null),
     hotkeyCheats: cheatsForHotkeySlots(game),
     discover,
     narrow,

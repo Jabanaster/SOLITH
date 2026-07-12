@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { exportMemoryFeatureToYaml } from '../../core/definitions/export-definition.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
+import {
+  addWatchListBookmark,
+  listWatchListBookmarks,
+  removeWatchListBookmark,
+  type WatchListBookmark,
+} from '../live-memory/watch-list-bookmarks.js';
 
 interface ProcessEntry {
   pid: number;
@@ -80,7 +86,9 @@ const LiveMemoryTrainerPage: React.FC = () => {
 
   const [freezeValue, setFreezeValue] = useState('');
   const [freezeIntervalMs, setFreezeIntervalMs] = useState('200');
+  const [speedhackMultiplier, setSpeedhackMultiplier] = useState('1');
   const [freezeStatus, setFreezeStatus] = useState<FreezeStatusView | null>(null);
+  const [watchBookmarks, setWatchBookmarks] = useState<WatchListBookmark[]>([]);
 
   const [pointerScanDepth, setPointerScanDepth] = useState('3');
   const [pointerScanMaxOffset, setPointerScanMaxOffset] = useState('4096');
@@ -91,6 +99,31 @@ const LiveMemoryTrainerPage: React.FC = () => {
 
   const [savedControls, setSavedControls] = useState<SavedControl[]>([]);
   const [controlsChecked, setControlsChecked] = useState(false);
+
+  useEffect(() => {
+    setWatchBookmarks(listWatchListBookmarks());
+  }, []);
+
+  const refreshWatchBookmarks = useCallback(() => {
+    setWatchBookmarks(listWatchListBookmarks());
+  }, []);
+
+  const handleBookmarkCurrent = () => {
+    if (!address.trim()) return;
+    addWatchListBookmark({
+      label: `Scan @ ${address.trim()}`,
+      address: address.trim(),
+      dataType,
+    });
+    refreshWatchBookmarks();
+    setMessage('Address bookmarked in watch list.');
+  };
+
+  const handleUseBookmark = (bookmark: WatchListBookmark) => {
+    setAddress(bookmark.address);
+    setDataType(bookmark.dataType as (typeof DATA_TYPES)[number]);
+    setMessage(`Loaded bookmark: ${bookmark.label}`);
+  };
 
   useEffect(() => {
     if (!apiAvailable) {
@@ -304,11 +337,14 @@ const LiveMemoryTrainerPage: React.FC = () => {
     if (!address.trim() || freezeValue.trim() === '') return;
     setBusy(true);
     try {
+      const baseInterval = freezeIntervalMs.trim() ? Number(freezeIntervalMs) : 200;
+      const multiplier = Math.max(1, Math.min(8, Number(speedhackMultiplier) || 1));
+      const intervalMs = Math.max(50, Math.floor(baseInterval / multiplier));
       const result = await api.liveMemoryFreezeStart({
         address: address.trim(),
         dataType,
         value: Number(freezeValue),
-        intervalMs: freezeIntervalMs.trim() ? Number(freezeIntervalMs) : undefined,
+        intervalMs,
       });
       if (result?.success) {
         setMessage(`Freeze started on ${address.trim()}.`);
@@ -692,11 +728,50 @@ const LiveMemoryTrainerPage: React.FC = () => {
       )}
 
       {attached && (
+        <section className="v2-monitor-section" aria-label="Watch list bookmarks">
+          <h3>Watch List Bookmarks</h3>
+          <p className="v2-meta">
+            Save addresses you want to revisit during a session. Bookmarks are stored locally in this app only.
+          </p>
+          <div className="v2-controls-row">
+            <button className="btn-secondary" onClick={handleBookmarkCurrent} disabled={busy || !address.trim()}>
+              Bookmark current address
+            </button>
+          </div>
+          {watchBookmarks.length > 0 ? (
+            <ul className="v2-scan-results" aria-label="Saved bookmarks">
+              {watchBookmarks.map((b) => (
+                <li key={b.id}>
+                  <strong>{b.label}</strong> — <code>{b.address}</code> ({b.dataType}){' '}
+                  <button className="btn-secondary" onClick={() => handleUseBookmark(b)} disabled={busy}>
+                    Load
+                  </button>{' '}
+                  <button
+                    className="btn-secondary"
+                    onClick={() => {
+                      removeWatchListBookmark(b.id);
+                      refreshWatchBookmarks();
+                    }}
+                    disabled={busy}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="v2-meta">No bookmarks yet.</p>
+          )}
+        </section>
+      )}
+
+      {attached && (
         <section className="v2-monitor-section" aria-label="Freeze value">
           <h3>Freeze Value (Infinite Health / Infinite Ammo style toggle)</h3>
           <p className="v2-meta">
             Continuously re-writes a value on an interval. The online-session guard is rechecked every
             tick — if it fails at any point, the freeze stops itself rather than continuing to write.
+            Optional speedhack divides the freeze interval (scoped to this panel only).
           </p>
 
           <label htmlFor="lm-freeze-value">Value to hold at the address above</label>
@@ -715,6 +790,17 @@ const LiveMemoryTrainerPage: React.FC = () => {
               onChange={e => setFreezeIntervalMs(e.target.value)}
               disabled={!!freezeStatus?.active}
               title="Interval in milliseconds"
+            />
+            <label htmlFor="lm-speedhack">Speedhack ×</label>
+            <input
+              id="lm-speedhack"
+              type="number"
+              min={1}
+              max={8}
+              value={speedhackMultiplier}
+              onChange={e => setSpeedhackMultiplier(e.target.value)}
+              disabled={!!freezeStatus?.active}
+              title="Divides freeze interval (1–8)"
             />
             {!freezeStatus?.active ? (
               <button

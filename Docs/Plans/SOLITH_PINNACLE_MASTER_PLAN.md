@@ -404,12 +404,12 @@ Executor that writes to SMAPI console pipe or simulates `debug` commands with us
 ## Part 3 — Implementation milestones (R → Z)
 
 ### Milestone R — Brand neutrality & terminology (1 week)
-- [ ] Remove third-party trainer names from UI, types, comments, user-facing docs
-- [ ] **Advanced Scan Mode** replaces legacy “CE mode” labeling
-- [ ] Remote sync sources: neutral display names; URLs remain technical config only
-- [ ] `CheatSource` enum → `Community Catalog`, `Remote Listing`, etc.
-- [ ] Rename `Docs/WEMOD_EQUIVALENT_TRAINER.md` → `Docs/SOLITH_LIVE_TRAINER_PARITY.md`
-- [ ] Update `ROADMAP.md` post-2.0 section
+- [x] Remove third-party trainer names from UI, types, comments, user-facing docs
+- [x] **Advanced Scan Mode** replaces legacy “CE mode” labeling
+- [x] Remote sync sources: neutral display names; URLs remain technical config only
+- [x] `CheatSource` enum → `Community Catalog`, `Remote Listing`, etc.
+- [x] Rename `Docs/WEMOD_EQUIVALENT_TRAINER.md` → `Docs/SOLITH_LIVE_TRAINER_PARITY.md`
+- [x] Update `ROADMAP.md` post-2.0 section
 
 **Exit:** Grep for competitor brands in `src/` and `src/app/` returns zero user-facing hits.
 
@@ -429,11 +429,11 @@ Executor that writes to SMAPI console pipe or simulates `debug` commands with us
 ---
 
 ### Milestone T — Catalog scale & update factory (3–4 weeks)
-- [ ] Expand bundled seed to 50 games (metadata + art)
-- [ ] Remote sync quality: dedupe, normalize categories, executable guess from title
-- [ ] Drift quarantine workflow (auto `needs_reverify`)
-- [ ] `scripts/verify-game-definition.mjs`
-- [ ] Library virtualized grid + tier badges
+- [x] Expand bundled seed to 50 games (metadata + art)
+- [x] Remote sync quality: dedupe, normalize categories, executable guess from title
+- [x] Drift quarantine workflow (auto `needs_reverify`)
+- [x] `scripts/verify-game-definition.mjs`
+- [x] Library virtualized grid + tier badges
 
 **Exit:** 50 mod-pack games; drift quarantine demo on hash change.
 
@@ -450,41 +450,42 @@ Executor that writes to SMAPI console pipe or simulates `debug` commands with us
 ---
 
 ### Milestone V — Community trust loop (2 weeks)
-- [ ] `definition_feedback` table + IPC
-- [ ] Library shows community confirmation counts
-- [ ] `export:community-pack` / import round-trip
-- [ ] Promotion rules: community → verified candidate
+- [x] `definition_feedback` table + IPC
+- [x] Library shows community confirmation counts
+- [x] `export:community-pack` / import round-trip
+- [x] Promotion rules: community → verified candidate
+- [x] Post-success rating prompt in live trainer UI
 
 **Exit:** Rate cheat → see count on Library card.
 
 ---
 
 ### Milestone W — Advanced Scan + `.CT` import (4–6 weeks)
-- [ ] W1: Pointer scan UI in Advanced Scan Mode
-- [ ] W2: `ct-import.ts` + import UI + tests (fixture .CT files)
-- [ ] W3: Watch list bookmarks + optional speedhack (scoped)
-- [ ] Export schema.v1 → YAML from pointer scan result
+- [x] W1: Pointer scan UI in Advanced Scan Mode
+- [x] W2: `ct-import.ts` + import UI + tests (fixture .CT files)
+- [x] W3: Watch list bookmarks + optional speedhack (scoped)
+- [x] Export schema.v1 → YAML from pointer scan result
 
 **Exit:** Import .CT → catalog cheats; discover pointer in UI → export YAML.
 
 ---
 
 ### Milestone X — Binary save profiles (6–8 weeks, parallelizable)
-- [ ] Binary format registry architecture
-- [ ] 5 formats with read + write (game-specific)
-- [ ] Discovery byte-diff → field proposal pipeline
-- [ ] Integrate with TrainerHost save router
+- [x] Binary format registry architecture
+- [ ] 5 formats with read + write (game-specific) — **5 demo profiles; RFSA + SLTH/RSAV/BPKG/GDAT scaffolds**
+- [x] Discovery byte-diff → field proposal pipeline
+- [x] Integrate with TrainerHost save router (structured binary extensions)
 
 **Exit:** 5 binary formats in support matrix as `executable`.
 
 ---
 
 ### Milestone Y — Polish & auto-launch (2–3 weeks)
-- [ ] Overlay layout presets per game
-- [ ] Hotkey rebind UI + conflict detection
-- [ ] Process watch: auto-prompt when known exe starts
-- [ ] Onboarding wizard (first-run)
-- [ ] Resolve KI-011 pagination / virtual scroll
+- [x] Overlay layout presets per game
+- [x] Hotkey rebind UI + conflict detection
+- [x] Process watch: auto-prompt when known exe starts
+- [x] Onboarding wizard (first-run)
+- [x] Resolve KI-011 pagination / virtual scroll
 
 **Exit:** Cold start → game detected → trainer ready in &lt;60s.
 

@@ -14,6 +14,7 @@
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
 import { readJsonSaveField } from '../saves/json-save-field';
 import { readIniSaveField } from '../saves/ini-save-field';
+import { readBinarySaveField } from '../saves/binary-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 import fs from 'fs';
 
@@ -52,6 +53,13 @@ export async function readSaveField(params: unknown): Promise<ReadSaveFieldResul
   if (format === 'ini') {
     const result = readIniSaveField(filePath, field);
     if (!result.found) {
+      return { value: null, found: false };
+    }
+    return { value: String(result.value), found: true };
+  }
+  if (format === 'binary') {
+    const result = readBinarySaveField(filePath, field);
+    if (!result.success || result.value === undefined) {
       return { value: null, found: false };
     }
     return { value: String(result.value), found: true };

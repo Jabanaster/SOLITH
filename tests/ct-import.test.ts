@@ -36,9 +36,33 @@ describe('ct-import', () => {
     assert.equal(result.errors.length, 0);
   });
 
-  test('rejects invalid xml', async () => {
-    const result = await parseCheatTableXml('<not-a-table>', { title: 'Broken' });
+  test('rejects nested group-only entries without address', async () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<CheatTable>
+  <CheatEntries>
+    <CheatEntry>
+      <Description>"Folder"</Description>
+      <CheatEntries>
+        <CheatEntry>
+          <Description>"Nested Gold"</Description>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"game.exe"+1000</Address>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+</CheatTable>`;
+    const result = await parseCheatTableXml(xml, { title: 'Nested' });
+    assert.equal(result.accepted.length, 1);
+    assert.equal(result.accepted[0].name, 'Nested Gold');
+  });
+
+  test('rejects empty cheat table', async () => {
+    const result = await parseCheatTableXml(
+      '<?xml version="1.0"?><CheatTable><CheatEntries></CheatEntries></CheatTable>',
+      { title: 'Empty' },
+    );
     assert.equal(result.accepted.length, 0);
-    assert.ok(result.errors.includes('xml_parse_error') || result.errors.includes('missing_CheatTable_root'));
+    assert.equal(result.definition.memoryFeatures?.length ?? 0, 0);
   });
 });

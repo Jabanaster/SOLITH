@@ -30,7 +30,7 @@ schema.v1.yml → compile → SQLite payloadJson
 | **O+** | Catalog → live memory wiring | Accepted |
 | **P** | Save-field execution router from catalog | Accepted |
 | **Q** | F1–F12 cheat hotkeys, hybrid launch chooser, drift modal | Accepted |
-| **R–W (offline)** | Brand neutrality, CT import, quarantine, feedback, pointer scan UI | In progress on `master` |
+| **R–W (offline)** | Brand neutrality, CT import, quarantine, feedback, pointer scan UI, 50-game seed | In progress on `master` |
 
 ### Bundled schema.v1 definitions
 
@@ -49,9 +49,10 @@ See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap (
 
 **Can continue offline:**
 
-- Catalog seed executable enrichment (`scripts/generate-trainer-catalog-seed.mjs`)
-- Community pack export/import polish
-- Binary save profile research (architecture in place)
+- ~~Catalog seed executable enrichment~~ (dedupe + category normalize in seed generator — done)
+- ~~50 bundled community mod packs~~ (done — 7 verified + 43 community)
+- Binary save router wiring for structured formats (RFSA + 4 demo profiles)
+- Hotkey rebind UI + overlay layout presets per game
 
 ---
 

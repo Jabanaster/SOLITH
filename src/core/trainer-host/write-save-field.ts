@@ -17,6 +17,7 @@ import path from 'path';
 import { XmlAdapter, validateXmlSafety } from '../adapters/xml';
 import { readJsonSaveField, validateJsonSaveFieldProposal, writeJsonSaveField } from '../saves/json-save-field';
 import { readIniSaveField, validateIniSaveFieldProposal, writeIniSaveField } from '../saves/ini-save-field';
+import { readBinarySaveField, writeBinarySaveField } from '../saves/binary-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -82,6 +83,18 @@ export async function proposeWriteField(params: unknown): Promise<ProposeWriteRe
       preview: proposal.preview,
     };
   }
+  if (format === 'binary') {
+    const live = readBinarySaveField(filePath, field);
+    if (!live.success || live.value === undefined) throw new Error('field_not_found');
+    if (String(live.value) !== String(currentValue)) {
+      throw new Error(`value_mismatch: current=${live.value} expected=${currentValue}`);
+    }
+    return {
+      valid: true,
+      currentValue: String(live.value),
+      proposedValue: String((params as Record<string, string>).newValue),
+    };
+  }
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   const safety = validateXmlSafety(raw);
@@ -134,6 +147,20 @@ export async function executeWriteField(params: unknown): Promise<ExecuteWriteRe
   if (format === 'ini') {
     const result = writeIniSaveField(filePath, field, currentValue, newValue);
     return { written: true, verifiedValue: result.verifiedValue, backupPath: result.backupPath };
+  }
+  if (format === 'binary') {
+    const live = readBinarySaveField(filePath, field);
+    if (!live.success || live.value === undefined) throw new Error('field_not_found');
+    if (String(live.value) !== String(currentValue)) {
+      throw new Error(`value_changed_since_proposal: current=${live.value} expected=${currentValue}`);
+    }
+    const backupPath = filePath + '.trainer-backup';
+    fs.copyFileSync(filePath, backupPath);
+    const write = writeBinarySaveField(filePath, field, Number(newValue));
+    if (!write.success) throw new Error(write.error ?? 'binary_write_failed');
+    const verify = readBinarySaveField(filePath, field);
+    if (!verify.success || verify.value === undefined) throw new Error('verify_field_not_found');
+    return { written: true, verifiedValue: String(verify.value), backupPath };
   }
 
   const raw = fs.readFileSync(filePath, 'utf-8');
@@ -216,6 +243,11 @@ export async function rollbackWriteField(params: unknown): Promise<RollbackResul
     const verify = readIniSaveField(filePath, field);
     if (!verify.found || verify.value === null) throw new Error('verify_field_not_found_after_rollback');
     return { restored: true, verifiedValue: verify.value };
+  }
+  if (format === 'binary') {
+    const verify = readBinarySaveField(filePath, field);
+    if (!verify.success || verify.value === undefined) throw new Error('verify_field_not_found_after_rollback');
+    return { restored: true, verifiedValue: String(verify.value) };
   }
 
   // Validate restored XML file

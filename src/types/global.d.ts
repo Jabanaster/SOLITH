@@ -137,6 +137,20 @@ interface Window {
     trainerOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
     trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
+    trainerHotkeysGetBindings: () => Promise<{
+      success: boolean;
+      hotkeys?: Record<string, string>;
+      conflicts?: Array<{ accelerator: string; actions: string[] }>;
+      error?: string;
+    }>;
+    trainerHotkeysSetBindings: (payload: {
+      hotkeys: Record<string, string>;
+    }) => Promise<{
+      success: boolean;
+      hotkeys?: Record<string, string>;
+      conflicts?: Array<{ accelerator: string; actions: string[] }>;
+      error?: string;
+    }>;
     onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
 
     trainerCatalogSearch: (payload: {

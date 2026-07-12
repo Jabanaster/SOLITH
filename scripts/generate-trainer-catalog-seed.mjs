@@ -145,7 +145,29 @@ const BASE_GAMES = [
   { name: 'Crimson Desert', steamAppId: 3321460, executables: ['CrimsonDesert.exe'], categories: ['Action', 'Open World'] },
 ];
 
-const GENRES = ['Action', 'RPG', 'Strategy', 'Simulation', 'Horror', 'Indie', 'Sports', 'Racing', 'Shooter', 'Adventure'];
+const GENRES = ['Action', 'RPG', 'Strategy', 'Simulation', 'Horror', 'Indie', 'Sports', 'Racing', 'Shooter', 'Adventure', 'Fighting', 'Survival', 'Sandbox', 'Roguelike', 'Open World', 'Platformer', 'Puzzle'];
+const CANONICAL_GENRES = new Map(GENRES.map((g) => [g.toLowerCase(), g]));
+
+function normalizeCategories(categories) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of categories ?? []) {
+    const canonical = CANONICAL_GENRES.get(String(raw).trim().toLowerCase()) ?? String(raw).trim();
+    if (!canonical || seen.has(canonical.toLowerCase())) continue;
+    seen.add(canonical.toLowerCase());
+    out.push(canonical);
+  }
+  return out.length ? out : ['Action'];
+}
+
+function dedupeGames(games) {
+  const byKey = new Map();
+  for (const game of games) {
+    const key = game.steamAppId ? `steam:${game.steamAppId}` : `name:${game.name.toLowerCase()}`;
+    if (!byKey.has(key)) byKey.set(key, game);
+  }
+  return [...byKey.values()];
+}
 const PREFIXES = ['Legend of', 'Chronicles of', 'Tales of', 'Return to', 'Escape from', 'War for', 'Rise of', 'Fall of', 'Age of', 'Call of'];
 const NOUNS = ['Darkness', 'Empire', 'Kingdom', 'Shadows', 'Legends', 'Destiny', 'Revenge', 'Silence', 'Storm', 'Ashes', 'Blood', 'Steel', 'Fire', 'Ice', 'Void'];
 
@@ -163,8 +185,9 @@ function guessExecutables(name) {
 }
 
 function withExecutableGuesses(game) {
-  if (game.executables?.length) return game;
-  return { ...game, executables: guessExecutables(game.name) };
+  const categories = normalizeCategories(game.categories);
+  const base = game.executables?.length ? game : { ...game, executables: guessExecutables(game.name) };
+  return { ...base, categories };
 }
 
 function syntheticGames(targetCount) {
@@ -185,7 +208,7 @@ function syntheticGames(targetCount) {
   return games;
 }
 
-const games = syntheticGames(1000);
+const games = dedupeGames(syntheticGames(1000));
 const outPath = path.join(root, 'data', 'trainer-catalog-seed.json');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify({ version: 1, generatedAt: new Date().toISOString(), games }, null, 0));

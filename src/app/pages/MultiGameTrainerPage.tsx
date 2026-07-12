@@ -3,6 +3,7 @@ import styles from './MultiGameTrainerPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { GameCheatSelector } from '../components/GameCheatSelector.js';
 import { GameSpecificCheatMenu } from '../components/GameSpecificCheatMenu.js';
+import { HotkeyRebindPanel } from '../components/HotkeyRebindPanel.js';
 import { initializeCheatSystem, getGameConfig, registerGame } from '../../core/cheat-system/index.js';
 import { trainerSessionCache } from '../stores/trainerSessionCache.js';
 import type { GameConfig } from '../../core/cheat-system/types.js';
@@ -115,6 +116,7 @@ export default function MultiGameTrainerPage({ initialGameId }: { initialGameId?
               game={selectedGame}
               userConfirmedOffline={userConfirmedOffline}
             />
+            <HotkeyRebindPanel />
           </>
         )}
       </main>

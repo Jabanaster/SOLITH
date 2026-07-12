@@ -3,7 +3,12 @@ import type { CheatDefinition, GameConfig } from '../cheat-system/types.js';
 import { compileDefinitionToPayload } from '../definitions/compile-yaml.v1.js';
 import { solithDefinitionToModPack } from '../definitions/mod-pack-adapter.js';
 import type { MemoryDataType, MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.v1.js';
-import { steamCdnImages } from './types.js';
+import {
+  BUNDLED_COMMUNITY_GAMES,
+  communityGameId,
+  type BundledCommunityGame,
+} from './bundled-community-games.js';
+import { buildSearchableText, steamCdnImages } from './types.js';
 import {
   getCatalogEntry,
   getDefinitionPayload,
@@ -138,11 +143,66 @@ const STARDEW_DEFINITION: SolithDefinitionV1 = {
   },
 };
 
+function communityDefinitionFromGame(game: BundledCommunityGame): SolithDefinitionV1 {
+  const id = communityGameId(game);
+  const moduleName = game.executables[0] ?? `${id}.exe`;
+  const memoryFeatures: MemoryFeatureV1[] = [
+    {
+      id: 'infinite-health',
+      name: 'Infinite Health',
+      category: 'player',
+      type: 'scan_unknown',
+      dataType: 'int32',
+      defaultValue: 9999,
+      resolution: { moduleName },
+    },
+    {
+      id: 'infinite-stamina',
+      name: 'Infinite Stamina',
+      category: 'player',
+      type: 'scan_unknown',
+      dataType: 'int32',
+      defaultValue: 9999,
+      resolution: { moduleName },
+    },
+    {
+      id: 'set-currency',
+      name: 'Set Currency',
+      category: 'inventory',
+      type: 'scan_unknown',
+      dataType: 'int32',
+      defaultValue: 999999,
+      resolution: { moduleName },
+    },
+  ];
+
+  return {
+    schemaVersion: 1,
+    id,
+    title: game.name,
+    gameVersion: '*',
+    executableHashPrefixes: [],
+    author: 'bundled',
+    safety: {
+      requiresApproval: true,
+      requiresOfflineConfirm: true,
+      verificationStatus: 'community',
+    },
+    target: {
+      executables: game.executables,
+      arch: 'x64',
+    },
+    memoryFeatures,
+  };
+}
+
 function buildBundledDefinitions(): SolithDefinitionV1[] {
   const memoryGames = ALL_GAMES.filter(
     (game) => game.cheatDiscoveryType === 'memory-scan' || game.cheatDiscoveryType === 'hybrid',
   );
-  return [STARDEW_DEFINITION, ...memoryGames.map(memoryDefinitionFromGame)];
+  const curated = [STARDEW_DEFINITION, ...memoryGames.map(memoryDefinitionFromGame)];
+  const community = BUNDLED_COMMUNITY_GAMES.map(communityDefinitionFromGame);
+  return [...curated, ...community];
 }
 
 const BUNDLED_DEFINITIONS: SolithDefinitionV1[] = buildBundledDefinitions();
@@ -151,16 +211,23 @@ function cheatCountForDefinition(definition: SolithDefinitionV1): number {
   return (definition.memoryFeatures?.length ?? 0) + (definition.saveEditor?.saveFields.length ?? 0);
 }
 
-function syncCatalogEntryForDefinition(definition: SolithDefinitionV1, packId: string): void {
+function syncCatalogEntryForDefinition(
+  definition: SolithDefinitionV1,
+  packId: string,
+  meta?: Pick<BundledCommunityGame, 'steamAppId' | 'categories' | 'executables'>,
+): void {
   const catalogGameId = definition.id;
   const existing = getCatalogEntry(catalogGameId);
-  const images = existing?.steamAppId ? steamCdnImages(existing.steamAppId) : {};
+  const steamAppId = meta?.steamAppId ?? existing?.steamAppId;
+  const images = steamAppId ? steamCdnImages(steamAppId) : {};
+  const categories = meta?.categories ?? existing?.categories ?? ['Action'];
+  const executables = meta?.executables ?? definition.target.executables;
   upsertCatalogEntry({
     catalogGameId,
     displayName: definition.title,
-    steamAppId: existing?.steamAppId,
-    executables: definition.target.executables,
-    categories: existing?.categories ?? ['Action'],
+    steamAppId,
+    executables,
+    categories,
     ...images,
     headerUrl: existing?.headerUrl ?? images.headerUrl,
     coverUrl: existing?.coverUrl ?? images.coverUrl,
@@ -170,9 +237,20 @@ function syncCatalogEntryForDefinition(definition: SolithDefinitionV1, packId: s
     hasModPack: true,
     modPackId: packId,
     cheatCount: cheatCountForDefinition(definition),
-    searchableText: '',
+    searchableText: buildSearchableText({
+      displayName: definition.title,
+      executables,
+      categories,
+    }),
   });
 }
+
+const COMMUNITY_META_BY_ID = new Map(
+  BUNDLED_COMMUNITY_GAMES.map((g) => [
+    communityGameId(g),
+    { steamAppId: g.steamAppId, categories: g.categories, executables: g.executables },
+  ]),
+);
 
 /** Upsert schema.v1 payloads for all curated catalog games. */
 export function ensureBundledDefinitions(): number {
@@ -193,7 +271,7 @@ export function ensureBundledDefinitions(): number {
       'bundled',
       syncedAt,
     );
-    syncCatalogEntryForDefinition(definition, pack.packId);
+    syncCatalogEntryForDefinition(definition, pack.packId, COMMUNITY_META_BY_ID.get(definition.id));
     upserted += 1;
   }
 

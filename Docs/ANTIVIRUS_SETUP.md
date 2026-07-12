@@ -1,5 +1,7 @@
 # Antivirus Configuration Guide
 
+> **ARCHIVED supplement** — Neutral terminology. See `Docs/SOLITH_LIVE_TRAINER_PARITY.md` for current live-trainer architecture.
+
 ResourceForge uses native memory access (via the `memoryjs` module) to discover and modify game memory. This low-level access may trigger antivirus warnings from Windows Defender, Bitdefender, and other security software.
 
 **This is expected behavior** — antivirus software flags low-level memory operations as potentially suspicious because they're used by both legitimate tools and malware. This guide explains how to safely whitelist ResourceForge.

@@ -77,9 +77,23 @@ function hasRejectedScript(entry: Record<string, unknown>): string | null {
 function flattenCheatEntries(node: unknown, out: Record<string, unknown>[]): void {
   if (!node || typeof node !== 'object') return;
   const record = node as Record<string, unknown>;
+
+  if (record.CheatEntry && !record.VariableType && !record.Address && !record.Description) {
+    const children = record.CheatEntry;
+    const list = Array.isArray(children) ? children : [children];
+    for (const child of list) flattenCheatEntries(child, out);
+    return;
+  }
+
+  if (record.CheatEntries && !record.VariableType && !record.Address) {
+    flattenCheatEntries(record.CheatEntries, out);
+    return;
+  }
+
   if (record.Description || record.VariableType || record.Address) {
     out.push(record);
   }
+
   const children = record.CheatEntry;
   if (!children) return;
   const list = Array.isArray(children) ? children : [children];

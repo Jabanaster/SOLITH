@@ -132,6 +132,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerOverlayToggle: () => ipcRenderer.invoke('trainer-overlay-toggle'),
   trainerOverlayHide: () => ipcRenderer.invoke('trainer-overlay-hide'),
   trainerHotkeysGetDefaults: () => ipcRenderer.invoke('trainer-hotkeys-get-defaults'),
+  trainerHotkeysGetBindings: () => ipcRenderer.invoke('trainer-hotkeys-get-bindings'),
+  trainerHotkeysSetBindings: (payload: { hotkeys: Record<string, string> }) =>
+    ipcRenderer.invoke('trainer-hotkeys-set-bindings', payload),
   onTrainerHotkey: (callback: (payload: { action: string }) => void) => {
     const listener = (_event: unknown, payload: { action: string }) => callback(payload);
     ipcRenderer.on('trainer-hotkey', listener);

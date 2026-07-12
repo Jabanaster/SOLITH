@@ -5,7 +5,7 @@ export type ModPackSourceProvider =
   | 'mrantifun'
   | 'fling'
   | 'plitch'
-  | 'wemod'
+  | 'remote-listing'
   | 'fearless'
   | 'community'
   | 'user'

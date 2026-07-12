@@ -15,6 +15,7 @@
  */
 
 import { test, expect, _electron as electron, Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -194,5 +195,19 @@ test('a11y-07 — Tab key moves focus without renderer exceptions', async () => 
     // After tabbing through 10 elements, focus should be on something interactive (not 'body')
     // We allow 'body' only if there are genuinely no focusable elements — which should not happen
     expect(['button', 'input', 'a', 'select', 'textarea', '[tabindex]', 'body']).toContain(activeTag);
+  } finally { await cleanup(ctx); }
+});
+
+// ── a11y-08: axe-core scan on Trainer Library route ─────────────────────────
+
+test('a11y-08 — axe-core reports no critical violations on Trainer Library', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+  const ctx = await launchFresh('axe-trainer-library');
+  try {
+    await ctx!.win.locator('text=Trainer Library').first().click({ timeout: 10_000 }).catch(() => {});
+    await ctx!.win.waitForTimeout(500);
+    const results = await new AxeBuilder({ page: ctx!.win }).analyze();
+    const critical = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(critical, JSON.stringify(critical, null, 2)).toHaveLength(0);
   } finally { await cleanup(ctx); }
 });
