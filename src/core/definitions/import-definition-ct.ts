@@ -2,6 +2,8 @@ import type { TrainerCatalogEntry } from '../trainer-catalog/types.js';
 import { buildSearchableText } from '../trainer-catalog/types.js';
 import { upsertCatalogEntry, upsertDefinitionPayload } from '../trainer-catalog/store.js';
 import { parseCheatTableXml, type CtImportResult } from './ct-import.js';
+import { parseCheatTableMetadata } from './ct-metadata.js';
+import { analyzeCheatTableScripts, buildScriptResearchNotes } from '../script-research/ct-script-research.js';
 import { solithDefinitionToModPack } from './mod-pack-adapter.js';
 
 export interface ImportCtOutcome {
@@ -14,6 +16,9 @@ export interface ImportCtOutcome {
   rejectedCount: number;
   rejected: CtImportResult['rejected'];
   validationErrors: string[];
+  metadataImport?: boolean;
+  scriptOnlyCount?: number;
+  scriptAnalysisCount?: number;
 }
 
 export interface ImportCtFailure {
@@ -46,13 +51,86 @@ function catalogEntryFromImport(result: CtImportResult): TrainerCatalogEntry {
 
 export async function importDefinitionCt(xmlText: string, options: { title?: string } = {}): Promise<ImportCtOutcome | ImportCtFailure> {
   const parsed = await parseCheatTableXml(xmlText, options);
-  if (parsed.errors.length > 0 && parsed.accepted.length === 0) {
-    return { success: false, errors: parsed.errors, rejected: parsed.rejected };
+
+  if (parsed.accepted.length === 0) {
+    const metadata = await parseCheatTableMetadata(xmlText, {
+      title: options.title,
+      executables: options.title?.toLowerCase().includes('crimson') ? ['CrimsonDesert.exe'] : undefined,
+      pointerImportAccepted: parsed.accepted.length,
+      sourceNote:
+        'Metadata extracted from community Cheat Engine table. Auto Assembler entries are reference-only in Solith until pointer paths are verified.',
+    });
+
+    if (metadata.entries.length === 0) {
+      if (parsed.errors.length > 0) {
+        return { success: false, errors: parsed.errors, rejected: parsed.rejected };
+      }
+      return {
+        success: false,
+        errors: ['no_importable_ct_entries'],
+        rejected: parsed.rejected,
+      };
+    }
+
+    const { definition } = metadata;
+    const scriptReport = await analyzeCheatTableScripts(xmlText, {
+      title: definition.title,
+      executable: definition.target.executables[0],
+    });
+    const payloadJson = JSON.stringify(definition);
+    const modPack = solithDefinitionToModPack(definition);
+    modPack.notes = buildScriptResearchNotes(scriptReport);
+    const categories = [...new Set((definition.memoryFeatures ?? []).map((f) => f.category))];
+
+    upsertDefinitionPayload(
+      modPack.packId,
+      definition.id,
+      payloadJson,
+      definition.safety.verificationStatus,
+      'ct-import',
+      modPack.syncedAt,
+    );
+    upsertCatalogEntry({
+      catalogGameId: definition.id,
+      displayName: definition.title,
+      executables: definition.target.executables,
+      categories,
+      verificationStatus: definition.safety.verificationStatus,
+      sources: [{ provider: 'ct-import', url: 'local://imported-ct-metadata' }],
+      hasModPack: true,
+      modPackId: modPack.packId,
+      cheatCount: definition.memoryFeatures?.length ?? 0,
+      searchableText: buildSearchableText({
+        displayName: definition.title,
+        executables: definition.target.executables,
+        categories,
+      }),
+    });
+
+    return {
+      success: true,
+      catalogGameId: definition.id,
+      packId: modPack.packId,
+      cheatCount: modPack.cheats.length,
+      title: definition.title,
+      acceptedCount: 0,
+      rejectedCount: parsed.rejected.length,
+      rejected: parsed.rejected,
+      validationErrors: parsed.errors,
+      metadataImport: true,
+      scriptOnlyCount: metadata.scriptOnlyCount,
+      scriptAnalysisCount: scriptReport.analyzedScripts,
+    };
   }
 
+  const scriptReport = await analyzeCheatTableScripts(xmlText, {
+    title: options.title,
+    executable: parsed.definition.target.executables[0],
+  });
   const { definition } = parsed;
   const payloadJson = JSON.stringify(definition);
   const modPack = solithDefinitionToModPack(definition);
+  modPack.notes = buildScriptResearchNotes(scriptReport);
 
   upsertDefinitionPayload(
     modPack.packId,
@@ -74,5 +152,6 @@ export async function importDefinitionCt(xmlText: string, options: { title?: str
     rejectedCount: parsed.rejected.length,
     rejected: parsed.rejected,
     validationErrors: parsed.errors,
+    scriptAnalysisCount: scriptReport.analyzedScripts,
   };
 }

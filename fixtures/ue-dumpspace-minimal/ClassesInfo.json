@@ -1,0 +1,24 @@
+{
+  "updated_at": "1700000000000",
+  "version": 10201,
+  "data": [
+    {
+      "APalPlayerCharacter": [
+        { "__InheritInfo": ["APalCharacter"] },
+        { "__MDKClassSize": 4096 },
+        { "CurrentHP": ["float", 512, 4] },
+        { "MaxHP": ["float", 516, 4] },
+        { "CurrentStamina": ["float", 520, 4] },
+        { "Money": ["int32", 600, 4] }
+      ]
+    },
+    {
+      "APalCharacter": [
+        { "__InheritInfo": [] },
+        { "__MDKClassSize": 2048 },
+        { "AttackPower": ["float", 128, 4] },
+        { "DefensePower": ["float", 132, 4] }
+      ]
+    }
+  ]
+}

@@ -228,7 +228,51 @@ interface Window {
       rejectedCount?: number;
       rejected?: Array<{ name: string; reason: string }>;
       validationErrors?: string[];
+      metadataImport?: boolean;
+      scriptOnlyCount?: number;
+      scriptAnalysisCount?: number;
       errors?: string[];
+      error?: string;
+    }>;
+    trainerResearchPickExe: () => Promise<{ success: boolean; filePath?: string; error?: string }>;
+    trainerResearchAnalyzeExe: (payload: { filePath: string }) => Promise<{
+      success: boolean;
+      analysis?: import('../core/trainer-research/types.js').TrainerExeAnalysis;
+      error?: string;
+    }>;
+    trainerResearchPickDumpspaceFolder: () => Promise<{ success: boolean; folderPath?: string; error?: string }>;
+    trainerResearchImportDumpspace: (payload: { dumpspaceDir: string; title: string; executable: string }) => Promise<{
+      success: boolean;
+      catalogGameId?: string;
+      packId?: string;
+      cheatCount?: number;
+      title?: string;
+      classCount?: number;
+      structCount?: number;
+      offsetCount?: number;
+      notes?: string[];
+      errors?: string[];
+      error?: string;
+    }>;
+    trainerResearchPickCt: () => Promise<{
+      success: boolean;
+      filePath?: string;
+      xmlText?: string;
+      error?: string;
+    }>;
+    trainerResearchAnalyzeCtScripts: (payload: { xmlText: string; title?: string; executable?: string }) => Promise<{
+      success: boolean;
+      report?: import('../core/script-research/types.js').CtScriptResearchReport;
+      error?: string;
+    }>;
+    trainerResearchMergeUeScripts: (payload: {
+      dumpspaceDir: string;
+      xmlText: string;
+      title?: string;
+      executable?: string;
+    }) => Promise<{
+      success: boolean;
+      merged?: import('../core/script-research/types.js').MergedUeScriptHint[];
       error?: string;
     }>;
     trainerCatalogFeedbackRecord: (payload: {
@@ -284,6 +328,12 @@ interface Window {
         levelsSearched: number;
         scansPerformed: number;
       };
+      error?: string;
+    }>;
+    liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) => Promise<{
+      success: boolean;
+      found?: boolean;
+      address?: string;
       error?: string;
     }>;
     onCatalogProcessDetected?: (

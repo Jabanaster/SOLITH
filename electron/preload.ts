@@ -162,6 +162,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
   trainerCatalogImportCt: (payload: { xmlText: string; title?: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-ct', payload),
+  trainerResearchPickExe: () => ipcRenderer.invoke('trainer-research-pick-exe'),
+  trainerResearchAnalyzeExe: (payload: { filePath: string }) =>
+    ipcRenderer.invoke('trainer-research-analyze-exe', payload),
+  trainerResearchPickDumpspaceFolder: () => ipcRenderer.invoke('trainer-research-pick-dumpspace-folder'),
+  trainerResearchImportDumpspace: (payload: { dumpspaceDir: string; title: string; executable: string }) =>
+    ipcRenderer.invoke('trainer-research-import-dumpspace', payload),
+  trainerResearchPickCt: () => ipcRenderer.invoke('trainer-research-pick-ct'),
+  trainerResearchAnalyzeCtScripts: (payload: { xmlText: string; title?: string; executable?: string }) =>
+    ipcRenderer.invoke('trainer-research-analyze-ct-scripts', payload),
+  trainerResearchMergeUeScripts: (payload: {
+    dumpspaceDir: string;
+    xmlText: string;
+    title?: string;
+    executable?: string;
+  }) => ipcRenderer.invoke('trainer-research-merge-ue-scripts', payload),
   trainerCatalogFeedbackRecord: (payload: {
     catalogGameId: string;
     featureId: string;
@@ -180,6 +195,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogPendingQuarantine: () => ipcRenderer.invoke('trainer-catalog-pending-quarantine'),
   liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
+  liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
+    ipcRenderer.invoke('live-memory-scan-aob', payload),
   onCatalogProcessDetected: (callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void) => {
     const listener = (_event: unknown, payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => callback(payload);
     ipcRenderer.on('catalog-process-detected', listener);

@@ -46,6 +46,7 @@ import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
+import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
@@ -56,6 +57,7 @@ registerLiveMemoryIpc();
 registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();
+registerTrainerResearchIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);

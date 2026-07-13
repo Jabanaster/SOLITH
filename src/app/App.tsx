@@ -3,6 +3,7 @@ import GameLibrary from './routes/GameLibrary';
 import TrainerPage from './pages/TrainerPage';
 import SaveEditor from './pages/SaveEditor';
 import DiscoveryLab from './pages/DiscoveryLab';
+import ExternalTrainerResearchLab from './pages/ExternalTrainerResearchLab';
 import Recipes from './pages/Recipes';
 import Backups from './pages/Backups';
 import Journal from './pages/Journal';
@@ -50,7 +51,7 @@ class ContentErrorBoundary extends React.Component<
 }
 
 type View =
-  | 'library' | 'trainer' | 'saves' | 'data' | 'discovery'
+  | 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'trainer-research'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
   | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer' | 'trainer-library'
   | 'catalog-save-controls';
@@ -112,6 +113,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Utilities',
     items: [
       { id: 'discovery', label: 'Discovery Lab', icon: 'discovery' },
+      { id: 'trainer-research', label: 'Trainer Research Lab', icon: 'search' },
       { id: 'data', label: 'Data Editor', icon: 'database' },
       { id: 'recipes', label: 'Recipes', icon: 'apply' },
       { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
@@ -265,6 +267,8 @@ const App: React.FC = () => {
         return <SaveEditor gameId={selectedGame?.id ?? null} mode="data" />;
       case 'discovery':
         return <DiscoveryLab gameId={selectedGame?.id ?? null} />;
+      case 'trainer-research':
+        return <ExternalTrainerResearchLab />;
       case 'recipes':
         return <Recipes gameId={selectedGame?.id ?? null} />;
       case 'backups':

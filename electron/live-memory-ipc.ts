@@ -19,6 +19,7 @@ import {
   LiveMemoryResolveControlSchema,
   LiveMemoryResolveDefinitionFeatureSchema,
   LiveMemoryPointerScanSchema,
+  LiveMemoryScanAobSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
@@ -423,6 +424,20 @@ export function registerLiveMemoryIpc(): void {
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'pointer_scan_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-aob', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanAobSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const result = session.scanAobSignature(parsed.signature, parsed.moduleName);
+      if (!result) return { success: true, found: false };
+      return { success: true, found: true, address: result.address };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'aob_scan_failed') };
     }
   });
 }

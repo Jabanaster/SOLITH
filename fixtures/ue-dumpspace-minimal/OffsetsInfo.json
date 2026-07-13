@@ -1,0 +1,13 @@
+{
+  "updated_at": "1700000000000",
+  "version": 10201,
+  "credit": {
+    "dumper_used": "UEDumper",
+    "dumper_link": "https://github.com/Spuckwaffel/UEDumper"
+  },
+  "data": [
+    ["OFFSET_GNAMES", 12345678],
+    ["OFFSET_GOBJECTS", 23456789],
+    ["OFFSET_GWORLD", 34567890]
+  ]
+}

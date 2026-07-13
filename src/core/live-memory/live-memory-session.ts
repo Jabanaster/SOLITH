@@ -11,6 +11,7 @@ import {
 import type { ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
 import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
+import { scanAobInProcess } from './aob-resolver.js';
 import {
   fingerprintBlocksAttach,
   verifyDefinitionFingerprint,
@@ -347,6 +348,14 @@ export class LiveMemorySession {
   pointerScan(targetAddress: bigint, bounds?: PointerScanBounds) {
     if (!this.handle) throw new Error('No process attached.');
     return scanForPointerPath(this.driver, this.handle, targetAddress, bounds);
+  }
+
+  /** Read-only AOB scan in the attached process (Script Research Analyzer). */
+  scanAobSignature(signature: string, moduleName?: string): { address: string } | null {
+    if (!this.handle) throw new Error('No process attached.');
+    const match = scanAobInProcess(this.driver, this.handle, signature, { moduleName });
+    if (match == null) return null;
+    return { address: `0x${match.toString(16)}` };
   }
 
   /** Captures the current value and stages a proposed write. Does not write anything yet. */

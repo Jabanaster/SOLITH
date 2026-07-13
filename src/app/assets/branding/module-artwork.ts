@@ -7,6 +7,7 @@ export type ModuleViewId =
   | 'saves'
   | 'data'
   | 'discovery'
+  | 'trainer-research'
   | 'recipes'
   | 'backups'
   | 'journal'
@@ -33,6 +34,8 @@ export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtw
   library: 'trainerController',
   trainer: 'trainerController',
   backups: 'recoveryPhoenix',
+  discovery: 'hoodedProfile',
+  'trainer-research': 'hoodedProfile',
   'live-memory': 'trainerController',
   'multi-game-trainer': 'trainerController',
 };

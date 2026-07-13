@@ -399,6 +399,27 @@ export const LiveMemoryPointerScanSchema = z.object({
   maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
 });
 
+export const LiveMemoryScanAobSchema = z.object({
+  signature: z.string().min(3).max(512),
+  moduleName: z.string().min(1).max(260).optional(),
+});
+
+export const TrainerResearchAnalyzeExeSchema = z.object({
+  filePath: z.string().min(1).max(1024),
+});
+
+export const TrainerResearchImportDumpspaceSchema = z.object({
+  dumpspaceDir: z.string().min(1).max(1024),
+  title: z.string().min(1).max(200),
+  executable: z.string().min(1).max(260),
+});
+
+export const TrainerResearchAnalyzeCtSchema = z.object({
+  xmlText: z.string().min(1).max(8_000_000),
+  title: z.string().max(200).optional(),
+  executable: z.string().max(260).optional(),
+});
+
 export const DefinitionFeedbackSchema = z.object({
   catalogGameId: z.string().min(1).max(128),
   featureId: z.string().min(1).max(128),
