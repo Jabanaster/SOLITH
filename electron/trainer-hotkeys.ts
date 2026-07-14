@@ -2,6 +2,7 @@ import { globalShortcut, BrowserWindow, ipcMain } from 'electron';
 import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
 import {
   detectHotkeyConflicts,
+  detectOsHotkeyWarnings,
   getTrainerHotkeyBindings,
   setTrainerHotkeyBindings,
   type TrainerHotkeyAction,
@@ -69,11 +70,15 @@ export function registerTrainerHotkeyIpc(): void {
     hotkeys: getTrainerHotkeyBindings(),
   }));
 
-  ipcMain.handle('trainer-hotkeys-get-bindings', async () => ({
-    success: true,
-    hotkeys: getTrainerHotkeyBindings(),
-    conflicts: detectHotkeyConflicts(getTrainerHotkeyBindings()),
-  }));
+  ipcMain.handle('trainer-hotkeys-get-bindings', async () => {
+    const hotkeys = getTrainerHotkeyBindings();
+    return {
+      success: true,
+      hotkeys,
+      conflicts: detectHotkeyConflicts(hotkeys),
+      osWarnings: detectOsHotkeyWarnings(hotkeys),
+    };
+  });
 
   ipcMain.handle('trainer-hotkeys-set-bindings', async (_event, payload: unknown) => {
     if (!payload || typeof payload !== 'object' || !('hotkeys' in payload)) {
@@ -82,8 +87,9 @@ export function registerTrainerHotkeyIpc(): void {
     const hotkeys = (payload as { hotkeys: Record<string, string> }).hotkeys;
     const merged = setTrainerHotkeyBindings(hotkeys);
     const conflicts = detectHotkeyConflicts(merged);
+    const osWarnings = detectOsHotkeyWarnings(merged);
     refreshTrainerHotkeys();
-    return { success: true, hotkeys: merged, conflicts };
+    return { success: true, hotkeys: merged, conflicts, osWarnings };
   });
 
   ipcMain.handle('trainer-overlay-toggle', async () => {

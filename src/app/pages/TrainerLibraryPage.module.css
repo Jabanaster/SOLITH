@@ -202,6 +202,32 @@
   color: #cde0ff;
 }
 
+.installedBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(20, 80, 50, 0.85);
+  color: #b8f0c8;
+  border: 1px solid rgba(100, 200, 130, 0.45);
+}
+
+.staleBadge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(80, 50, 15, 0.9);
+  color: #f0d8a0;
+  border: 1px solid rgba(240, 180, 80, 0.4);
+}
+
 .cardBody {
   padding: 0.65rem 0.75rem 0.8rem;
 }

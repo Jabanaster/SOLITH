@@ -6,6 +6,7 @@ import { downloadTextFile } from '../utils/download-text-file.js';
 import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
+import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 
@@ -33,35 +34,58 @@ function tierHint(entry: TrainerCatalogEntry): string {
 function CatalogCard({
   entry,
   trust,
+  installed,
+  healthStatus,
   onLaunch,
   onExport,
   onThumbUp,
+  onRequestVerification,
+  onNotify,
 }: {
   entry: TrainerCatalogEntry;
   trust?: TrustMeta;
+  installed?: boolean;
+  healthStatus?: string;
   onLaunch: (entry: TrainerCatalogEntry) => void;
   onExport: (entry: TrainerCatalogEntry) => void;
   onThumbUp: (entry: TrainerCatalogEntry) => void;
+  onRequestVerification: (entry: TrainerCatalogEntry) => void;
+  onNotify: (entry: TrainerCatalogEntry) => void;
 }) {
   const tagline = getCatalogTagline(entry);
+  const coverUrl = resolveCatalogCoverUrl(entry);
   return (
     <article className={styles.card}>
       <div className={styles.coverWrap}>
-        {entry.coverUrl && entry.steamAppId && entry.steamAppId < 1_000_000 ? (
+        {coverUrl ? (
           <img
-            src={entry.coverUrl}
+            src={coverUrl}
             alt={`${entry.displayName} cover art`}
             loading="lazy"
             onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
+              const img = e.target as HTMLImageElement;
+              img.style.display = 'none';
+              const fallback = img.nextElementSibling;
+              if (fallback) (fallback as HTMLElement).style.display = 'flex';
             }}
           />
-        ) : (
-          <div className={styles.coverFallback}>{entry.displayName.charAt(0)}</div>
-        )}
+        ) : null}
+        <div className={styles.coverFallback} style={coverUrl ? { display: 'none' } : undefined}>
+          {entry.displayName.charAt(0)}
+        </div>
         <span className={styles.badge} title={tierHint(entry)}>
           {entry.verificationStatus}
         </span>
+        {installed && (
+          <span className={styles.installedBadge} title="Detected on this PC">
+            Installed
+          </span>
+        )}
+        {(healthStatus === 'stale' || healthStatus === 'quarantined') && (
+          <span className={styles.staleBadge} title="Executable drift or quarantine">
+            Stale
+          </span>
+        )}
       </div>
       <div className={styles.cardBody}>
         <h2>{entry.displayName}</h2>
@@ -69,13 +93,13 @@ function CatalogCard({
         <p>{entry.categories.slice(0, 2).join(' · ')}</p>
         <p className={styles.meta}>
           {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
-          {trust?.positive ? ` · ${trust.positive} confirmed` : ''}
+          {trust?.positive ? ` · ${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : ''}
           {trust?.quarantined ? ' · needs re-verify' : ''}
         </p>
         <p className={styles.meta}>{tierHint(entry)}</p>
         <div className={styles.cardActions}>
           <button type="button" className={styles.launchBtn} onClick={() => void onLaunch(entry)}>
-            {entry.hasModPack ? 'Load Trainer' : 'View'}
+            {entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
           {entry.hasModPack && (
             <>
@@ -83,8 +107,18 @@ function CatalogCard({
                 Export YAML
               </button>
               {entry.verificationStatus === 'community' && (
-                <button type="button" className={styles.secondaryBtn} onClick={() => void onThumbUp(entry)}>
-                  Confirm works
+                <>
+                  <button type="button" className={styles.secondaryBtn} onClick={() => void onThumbUp(entry)}>
+                    Confirm works
+                  </button>
+                  <button type="button" className={styles.secondaryBtn} onClick={() => void onRequestVerification(entry)}>
+                    Request verification
+                  </button>
+                </>
+              )}
+              {entry.verificationStatus === 'metadata-only' && (
+                <button type="button" className={styles.secondaryBtn} onClick={() => void onNotify(entry)}>
+                  Notify when verified
                 </button>
               )}
             </>
@@ -117,6 +151,10 @@ export default function TrainerLibraryPage({
   const [importing, setImporting] = useState(false);
   const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
   const [quarantineCount, setQuarantineCount] = useState(0);
+  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
+  const [healthMap, setHealthMap] = useState<Record<string, { status: string }>>({});
+  const [installedOnly, setInstalledOnly] = useState(false);
+  const [scanningInstalls, setScanningInstalls] = useState(false);
   const importYamlRef = useRef<HTMLInputElement>(null);
   const importCtRef = useRef<HTMLInputElement>(null);
   const queryRef = useRef(query);
@@ -172,8 +210,21 @@ export default function TrainerLibraryPage({
   }, [tierFilter, genreFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
 
   useEffect(() => {
-    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
-      setMessage(`Detected ${payload.displayName} (${payload.executable}) — open Trainer Library to load.`);
+    const api = window.electronAPI;
+    if (!api?.installDiscoveryList) return;
+    void api.installDiscoveryList().then((result) => {
+      if (result.success && result.catalogGameIds) {
+        setInstalledIds(new Set(result.catalogGameIds));
+      }
+    });
+    void api.trainerHealthList?.().then((result) => {
+      if (result.success && result.map) setHealthMap(result.map);
+    });
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.(() => {
+      // App-level toast handles process detection
     });
     return () => unsubscribe?.();
   }, []);
@@ -240,6 +291,32 @@ export default function TrainerLibraryPage({
 
   const clearGenres = () => setGenreFilters([]);
 
+  const handleScanInstalled = async () => {
+    const api = window.electronAPI;
+    if (!api?.installDiscoveryScan) return;
+    setScanningInstalls(true);
+    setMessage('');
+    try {
+      await api.trainerCatalogSeed?.();
+      const result = await api.installDiscoveryScan();
+      if (result.success) {
+        const list = await api.installDiscoveryList();
+        if (list.success && list.catalogGameIds) {
+          setInstalledIds(new Set(list.catalogGameIds));
+        }
+        const health = await api.trainerHealthCheck?.();
+        if (health?.success && health.map) setHealthMap(health.map);
+        setMessage(
+          `Scan complete — ${result.discovered ?? 0} installs found, ${result.matched ?? 0} matched to catalog.`,
+        );
+      } else {
+        setMessage(result.error ?? 'Install scan failed');
+      }
+    } finally {
+      setScanningInstalls(false);
+    }
+  };
+
   const handleSync = async () => {
     if (!window.electronAPI?.trainerCatalogSyncRemote) return;
     setSyncing(true);
@@ -300,6 +377,16 @@ export default function TrainerLibraryPage({
     }
   };
 
+  const handleNotifyWhenVerified = async (entry: TrainerCatalogEntry) => {
+    const result = await window.electronAPI?.catalogDemandNotify?.({
+      catalogGameId: entry.catalogGameId,
+      kind: 'notify',
+    });
+    if (result?.success) {
+      setMessage(`Notify recorded for ${entry.displayName} (${result.demand?.notifyCount ?? 1} local).`);
+    }
+  };
+
   const handleLaunch = async (entry: TrainerCatalogEntry) => {
     const loadResult = await window.electronAPI?.trainerCatalogLoadGame?.({
       catalogGameId: entry.catalogGameId,
@@ -346,14 +433,44 @@ export default function TrainerLibraryPage({
     }
   };
 
-  const visible = entries;
+  const handleRequestVerification = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogEvaluatePromotion) return;
+    const result = await api.trainerCatalogEvaluatePromotion({ catalogGameId: entry.catalogGameId });
+    if (!result.success) {
+      setMessage(result.error ?? 'Could not evaluate promotion eligibility.');
+      return;
+    }
+    const { eligible, reasons } = result.eligibility ?? { eligible: false, reasons: [] as string[] };
+    const trust = trustMeta[entry.catalogGameId];
+    if (eligible) {
+      setMessage(`${entry.displayName} meets offline promotion rules — L3 live certification still required before verified tier.`);
+      return;
+    }
+    const positive = trust?.positive ?? 0;
+    setMessage(
+      `${entry.displayName}: ${positive} confirmation${positive === 1 ? '' : 's'} · not yet eligible (${reasons.join(', ') || 'needs more evidence'})`,
+    );
+  };
+
+  const visible = (installedOnly
+    ? entries.filter((e) => installedIds.has(e.catalogGameId))
+    : entries
+  ).slice().sort((a, b) => {
+    const aInstalled = installedIds.has(a.catalogGameId) ? 1 : 0;
+    const bInstalled = installedIds.has(b.catalogGameId) ? 1 : 0;
+    if (aInstalled !== bInstalled) return bInstalled - aInstalled;
+    return a.displayName.localeCompare(b.displayName);
+  });
 
   const activeFilterSummary =
-    genreFilters.length > 0
-      ? `${genreFilters.join(', ')}${tierFilter !== 'all' ? ` · ${tierFilter}` : ''}`
-      : tierFilter !== 'all'
-        ? tierFilter
-        : null;
+    [
+      genreFilters.length > 0 ? genreFilters.join(', ') : null,
+      tierFilter !== 'all' ? tierFilter : null,
+      installedOnly ? 'installed' : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || null;
 
   return (
     <div className={styles.page}>
@@ -384,6 +501,9 @@ export default function TrainerLibraryPage({
                 if (file) void handleImportCt(file);
               }}
             />
+            <button type="button" className={styles.syncBtn} onClick={() => void handleScanInstalled()} disabled={scanningInstalls}>
+              {scanningInstalls ? 'Scanning…' : 'Scan installed games'}
+            </button>
             <button type="button" className={styles.syncBtn} onClick={() => importCtRef.current?.click()} disabled={importing}>
               {importing ? 'Importing…' : 'Import CT'}
             </button>
@@ -416,11 +536,22 @@ export default function TrainerLibraryPage({
               key={f}
               type="button"
               className={tierFilter === f ? styles.filterActive : styles.filterBtn}
-              onClick={() => setTierFilter(f)}
+              onClick={() => {
+                setTierFilter(f);
+                setInstalledOnly(false);
+              }}
             >
               {f === 'metadata-only' ? 'Metadata' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
+          <button
+            type="button"
+            className={installedOnly ? styles.filterActive : styles.filterBtn}
+            onClick={() => setInstalledOnly((v) => !v)}
+            aria-pressed={installedOnly}
+          >
+            Installed
+          </button>
         </div>
       </div>
 
@@ -469,9 +600,13 @@ export default function TrainerLibraryPage({
             <CatalogCard
               entry={entry}
               trust={trustMeta[entry.catalogGameId]}
+              installed={installedIds.has(entry.catalogGameId)}
+              healthStatus={healthMap[entry.catalogGameId]?.status}
               onLaunch={handleLaunch}
               onExport={handleExportYaml}
               onThumbUp={handleThumbUp}
+              onRequestVerification={handleRequestVerification}
+              onNotify={handleNotifyWhenVerified}
             />
           )}
         />

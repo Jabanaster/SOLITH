@@ -13,8 +13,9 @@ import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import TrainerLibraryPage from './pages/TrainerLibraryPage';
-import MultiGameTrainerPage from './pages/MultiGameTrainerPage';
+import TrainerDeckPage from './pages/TrainerDeckPage';
 import CatalogTrainerControlsPage from './pages/CatalogTrainerControlsPage';
+import { ProcessDetectToast } from './components/ProcessDetectToast.js';
 import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode } from './components/LibraryLaunchDialog.js';
 import { Icon, type IconName } from './components/icons/index.js';
 import { solithBranding } from './assets/branding/index.js';
@@ -53,8 +54,8 @@ class ContentErrorBoundary extends React.Component<
 type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'trainer-research'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls' | 'live-memory' | 'multi-game-trainer' | 'trainer-library'
-  | 'catalog-save-controls';
+  | 'session-monitor' | 'controls' | 'live-memory' | 'trainer-library'
+  | 'catalog-save-controls' | 'trainer-deck';
 
 type NavItem = {
   id: View;
@@ -98,25 +99,34 @@ const TRAINER_CATEGORIES: { id: string; label: string }[] = [
 const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Library',
-    items: [{ id: 'library', label: 'Game Library', icon: 'game' }],
-  },
-  {
-    title: 'Core Tools',
     items: [
-      { id: 'saves', label: 'Save Editor', icon: 'save' },
-      { id: 'backups', label: 'Backups', icon: 'backups' },
-      { id: 'journal', label: 'Journal', icon: 'log' },
-      { id: 'locations', label: 'Save Locations', icon: 'search' },
+      { id: 'library', label: 'Game Library', icon: 'game' },
+      { id: 'trainer-library', label: 'Trainer Library', icon: 'search' },
     ],
   },
   {
-    title: 'Utilities',
+    title: 'Recovery',
+    items: [
+      { id: 'backups', label: 'Backups', icon: 'backups' },
+      { id: 'locations', label: 'Save Locations', icon: 'search' },
+      { id: 'journal', label: 'Journal', icon: 'log' },
+    ],
+  },
+  {
+    title: 'Save Tools',
+    items: [
+      { id: 'saves', label: 'Save Editor', icon: 'save' },
+      { id: 'controls', label: 'Trainer Controls', icon: 'trainer', testId: 'nav-controls' },
+    ],
+  },
+  {
+    title: 'Specialized',
     items: [
       { id: 'discovery', label: 'Discovery Lab', icon: 'discovery' },
       { id: 'trainer-research', label: 'Trainer Research Lab', icon: 'search' },
       { id: 'data', label: 'Data Editor', icon: 'database' },
-      { id: 'recipes', label: 'Recipes', icon: 'apply' },
       { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
+      { id: 'recipes', label: 'Recipes', icon: 'apply' },
     ],
   },
   {
@@ -125,9 +135,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'session-monitor', label: 'Session Monitor', icon: 'activity' },
       { id: 'live-memory', label: 'Live Memory Trainer', icon: 'trainer' },
-      { id: 'multi-game-trainer', label: 'Multi-Game Cheats', icon: 'game', testId: 'nav-live-trainer' },
-      { id: 'trainer-library', label: 'Trainer Library', icon: 'search' },
-      { id: 'controls', label: 'Trainer Controls', icon: 'trainer', testId: 'nav-controls' },
     ],
   },
 ];
@@ -150,6 +157,15 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [libraryLaunchGameId, setLibraryLaunchGameId] = useState<string | null>(null);
   const [libraryLaunchDisplayName, setLibraryLaunchDisplayName] = useState<string>('');
+  const [deckCatalogGameId, setDeckCatalogGameId] = useState<string | null>(null);
+  const [deckDisplayName, setDeckDisplayName] = useState('');
+  const [deckDetectedPid, setDeckDetectedPid] = useState<number | null>(null);
+  const [processToast, setProcessToast] = useState<{
+    catalogGameId: string;
+    displayName: string;
+    pid: number;
+    executable: string;
+  } | null>(null);
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -169,40 +185,49 @@ const App: React.FC = () => {
   const handleLibraryLaunch = (
     catalogGameId: string,
     displayName: string,
-    capabilities?: {
+    _capabilities?: {
       memoryCheatCount?: number;
       saveControlCount?: number;
     },
   ) => {
-    const memoryCount = capabilities?.memoryCheatCount ?? 0;
-    const saveCount = capabilities?.saveControlCount ?? 0;
+    setDeckCatalogGameId(catalogGameId);
+    setDeckDisplayName(displayName);
+    setDeckDetectedPid(null);
+    setCurrentView('trainer-deck');
+  };
 
-    if (memoryCount > 0 && saveCount > 0) {
-      setPendingLibraryLaunch({
-        catalogGameId,
-        displayName,
-        memoryCheatCount: memoryCount,
-        saveControlCount: saveCount,
-      });
-      return;
-    }
+  const openDeckFromToast = () => {
+    if (!processToast) return;
+    setDeckCatalogGameId(processToast.catalogGameId);
+    setDeckDisplayName(processToast.displayName);
+    setDeckDetectedPid(processToast.pid);
+    setCurrentView('trainer-deck');
+    setProcessToast(null);
+  };
 
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+      setProcessToast(payload);
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  const openLiveTrainerFromDeck = (catalogGameId: string) => {
     setLibraryLaunchGameId(catalogGameId);
-    setLibraryLaunchDisplayName(displayName);
-
-    if (saveCount > 0 && memoryCount === 0) {
-      setCurrentView('catalog-save-controls');
-      return;
-    }
-
-    setCurrentView('multi-game-trainer');
+    setCurrentView('live-memory');
   };
 
   const completeLibraryLaunch = (mode: LibraryLaunchMode) => {
     if (!pendingLibraryLaunch) return;
     setLibraryLaunchGameId(pendingLibraryLaunch.catalogGameId);
     setLibraryLaunchDisplayName(pendingLibraryLaunch.displayName);
-    setCurrentView(mode === 'save-controls' ? 'catalog-save-controls' : 'multi-game-trainer');
+    if (mode === 'save-controls') {
+      setCurrentView('catalog-save-controls');
+    } else {
+      setDeckCatalogGameId(pendingLibraryLaunch.catalogGameId);
+      setDeckDisplayName(pendingLibraryLaunch.displayName);
+      setCurrentView('trainer-deck');
+    }
     setPendingLibraryLaunch(null);
   };
 
@@ -284,14 +309,24 @@ const App: React.FC = () => {
       case 'trainer-library':
         return <TrainerLibraryPage onLaunchGame={handleLibraryLaunch} />;
       case 'live-memory':
-        return <LiveMemoryTrainerPage />;
-      case 'multi-game-trainer':
-        return <MultiGameTrainerPage initialGameId={libraryLaunchGameId} />;
+        return <LiveMemoryTrainerPage initialCatalogGameId={libraryLaunchGameId} />;
       case 'catalog-save-controls':
         return libraryLaunchGameId ? (
           <CatalogTrainerControlsPage
             catalogGameId={libraryLaunchGameId}
             displayName={libraryLaunchDisplayName}
+          />
+        ) : (
+          <TrainerLibraryPage onLaunchGame={handleLibraryLaunch} />
+        );
+      case 'trainer-deck':
+        return deckCatalogGameId ? (
+          <TrainerDeckPage
+            catalogGameId={deckCatalogGameId}
+            displayName={deckDisplayName}
+            detectedPid={deckDetectedPid}
+            onBack={() => setCurrentView('trainer-library')}
+            onOpenLiveTrainer={openLiveTrainerFromDeck}
           />
         ) : (
           <TrainerLibraryPage onLaunchGame={handleLibraryLaunch} />
@@ -312,7 +347,7 @@ const App: React.FC = () => {
         <div className="sidebar-header">
           <div className="sidebar-header__brand">
             <div className="sidebar-header__mark" aria-hidden="true">
-              <img src={solithBranding.trainerController} alt="" />
+              <img src={solithBranding.solithEmblem} alt="" decoding="async" />
             </div>
             {!sidebarCollapsed && (
               <span className="sidebar-header__label">Solith</span>
@@ -361,7 +396,7 @@ const App: React.FC = () => {
                     {artwork ? (
                       <BrandingArtwork artwork={artwork} size="nav" />
                     ) : (
-                      <Icon name={item.icon} size={18} />
+                      <Icon name={item.icon} size={54} />
                     )}
                   </span>
                   <span className="nav-label">{item.label}</span>
@@ -427,7 +462,7 @@ const App: React.FC = () => {
           {loading ? (
             <div className="loading-state">
               <div className="loading-brand" aria-hidden="true">
-                <img src={solithBranding.trainerController} alt="" />
+                <img src={solithBranding.solithEmblem} alt="" />
               </div>
               <div className="loading-spinner" aria-hidden="true" />
               <span>Loading Solith…</span>
@@ -448,6 +483,15 @@ const App: React.FC = () => {
 
       {showOnboarding && (
         <OnboardingWizard onComplete={() => setShowOnboarding(false)} />
+      )}
+
+      {processToast && (
+        <ProcessDetectToast
+          displayName={processToast.displayName}
+          executable={processToast.executable}
+          onOpenDeck={openDeckFromToast}
+          onDismiss={() => setProcessToast(null)}
+        />
       )}
     </div>
   );

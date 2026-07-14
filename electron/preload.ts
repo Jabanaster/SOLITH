@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Saves & Discovery & Proposal operations
   detectSaveFiles: (gameId: string) => ipcRenderer.invoke('detect-save-files', gameId),
+  pickSaveFile: (gameId: string) => ipcRenderer.invoke('pick-save-file', gameId),
   parseSave: (gameId: string, filePath: string) => ipcRenderer.invoke('parse-save', gameId, filePath),
   compareSaves: (savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => 
     ipcRenderer.invoke('compare-saves', savePathA, savePathB, gameId, knownOldValue, knownNewValue),
@@ -162,21 +163,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
   trainerCatalogImportCt: (payload: { xmlText: string; title?: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-ct', payload),
-  trainerResearchPickExe: () => ipcRenderer.invoke('trainer-research-pick-exe'),
-  trainerResearchAnalyzeExe: (payload: { filePath: string }) =>
-    ipcRenderer.invoke('trainer-research-analyze-exe', payload),
-  trainerResearchPickDumpspaceFolder: () => ipcRenderer.invoke('trainer-research-pick-dumpspace-folder'),
-  trainerResearchImportDumpspace: (payload: { dumpspaceDir: string; title: string; executable: string }) =>
-    ipcRenderer.invoke('trainer-research-import-dumpspace', payload),
-  trainerResearchPickCt: () => ipcRenderer.invoke('trainer-research-pick-ct'),
-  trainerResearchAnalyzeCtScripts: (payload: { xmlText: string; title?: string; executable?: string }) =>
-    ipcRenderer.invoke('trainer-research-analyze-ct-scripts', payload),
-  trainerResearchMergeUeScripts: (payload: {
-    dumpspaceDir: string;
-    xmlText: string;
-    title?: string;
-    executable?: string;
-  }) => ipcRenderer.invoke('trainer-research-merge-ue-scripts', payload),
   trainerCatalogFeedbackRecord: (payload: {
     catalogGameId: string;
     featureId: string;
@@ -193,13 +179,61 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogExportDefinition: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-export-definition', payload),
   trainerCatalogPendingQuarantine: () => ipcRenderer.invoke('trainer-catalog-pending-quarantine'),
+  trainerResearchPickExe: () => ipcRenderer.invoke('trainer-research-pick-exe'),
+  trainerResearchAnalyzeExe: (payload: { filePath: string }) =>
+    ipcRenderer.invoke('trainer-research-analyze-exe', payload),
+  trainerResearchPickDumpspaceFolder: () => ipcRenderer.invoke('trainer-research-pick-dumpspace-folder'),
+  trainerResearchImportDumpspace: (payload: { dumpspaceDir: string; title: string; executable: string }) =>
+    ipcRenderer.invoke('trainer-research-import-dumpspace', payload),
+  trainerResearchPickCt: () => ipcRenderer.invoke('trainer-research-pick-ct'),
+  trainerResearchAnalyzeCtScripts: (payload: { xmlText: string; title?: string; executable?: string }) =>
+    ipcRenderer.invoke('trainer-research-analyze-ct-scripts', payload),
+  trainerResearchMergeUeScripts: (payload: {
+    dumpspaceDir: string;
+    xmlText: string;
+    title?: string;
+    executable?: string;
+  }) => ipcRenderer.invoke('trainer-research-merge-ue-scripts', payload),
   liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
+  inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) =>
+    ipcRenderer.invoke('in-process-propose-hook', payload),
+  inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) =>
+    ipcRenderer.invoke('in-process-confirm-hook', payload),
+  inProcessRollbackHook: () => ipcRenderer.invoke('in-process-rollback-hook'),
+  inProcessProposeInjectorLaunch: (payload: {
+    exePath: string;
+    userConfirmedOffline: true;
+    userApprovedAction: true;
+  }) => ipcRenderer.invoke('in-process-propose-injector-launch', payload),
+  inProcessConfirmInjectorLaunch: (payload: { proposalId: string; userApprovedAction: true }) =>
+    ipcRenderer.invoke('in-process-confirm-injector-launch', payload),
   onCatalogProcessDetected: (callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void) => {
     const listener = (_event: unknown, payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => callback(payload);
     ipcRenderer.on('catalog-process-detected', listener);
     return () => ipcRenderer.removeListener('catalog-process-detected', listener);
   },
+
+  installDiscoveryScan: (payload?: {
+    steamInstallPath?: string;
+    epicManifestsPath?: string;
+    offlineRootsOnly?: boolean;
+  }) => ipcRenderer.invoke('install-discovery-scan', payload ?? {}),
+  installDiscoveryList: () => ipcRenderer.invoke('install-discovery-list'),
+
+  trainerDeckGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-deck-get', payload),
+  trainerHealthCheck: (payload?: { catalogGameId?: string }) =>
+    ipcRenderer.invoke('trainer-health-check', payload ?? {}),
+  trainerHealthList: () => ipcRenderer.invoke('trainer-health-list'),
+  trainerCatalogCertifyL1: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-certify-l1', payload),
+  catalogDemandNotify: (payload: { catalogGameId: string; kind?: 'notify' | 'verification_request' }) =>
+    ipcRenderer.invoke('catalog-demand-notify', payload),
+  catalogDemandList: () => ipcRenderer.invoke('catalog-demand-list'),
+  installDiscoveryOpenPath: (payload: { catalogGameId: string; targetPath?: string }) =>
+    ipcRenderer.invoke('install-discovery-open-path', payload),
+  catalogProcessWatchActive: (payload: { active: boolean }) =>
+    ipcRenderer.invoke('catalog-process-watch-active', payload),
 });

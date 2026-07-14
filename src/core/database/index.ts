@@ -757,6 +757,41 @@ function applySchema(): void {
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_definition_feedback_game ON definition_feedback(catalogGameId, featureId)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_definition_update_queue_game ON definition_update_queue(catalogGameId)');
 
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS installed_games (
+      id TEXT PRIMARY KEY,
+      catalog_game_id TEXT,
+      platform TEXT NOT NULL,
+      install_path TEXT NOT NULL,
+      executable_path TEXT,
+      display_name TEXT,
+      steam_app_id INTEGER,
+      detected_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      UNIQUE(platform, install_path)
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_installed_games_catalog ON installed_games(catalog_game_id)');
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS trainer_health (
+      catalog_game_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      stale_reason TEXT,
+      executable_hash TEXT,
+      checked_at TEXT NOT NULL
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_demand (
+      catalog_game_id TEXT PRIMARY KEY,
+      notify_count INTEGER DEFAULT 0,
+      verification_requests INTEGER DEFAULT 0,
+      last_requested_at TEXT NOT NULL
+    )
+  `);
+
   // Indexes
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_games_path ON games(path)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_scans_gameId ON scans(gameId)');
@@ -800,7 +835,9 @@ function applySchema(): void {
     { key: 'v2FreeformMemoryEnabled', value: 'true' },
     { key: 'v2RemoteCatalogSyncEnabled', value: 'true' },
     { key: 'trainerRemoteSyncCompleted', value: 'false' },
-    { key: 'trainerCapabilitiesUnlocked', value: 'false' }
+    { key: 'trainerCapabilitiesUnlocked', value: 'false' },
+    { key: 'installDiscoveryEnabled', value: 'true' },
+    { key: 'installDiscoveryLastScan', value: '' }
   ];
   defaultSettings.forEach(s => {
     rawDb!.run('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', [s.key, s.value]);

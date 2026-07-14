@@ -1,0 +1,43 @@
+.toast {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1200;
+  max-width: 360px;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 200, 255, 0.35);
+  background: rgba(10, 18, 32, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.copy {
+  color: #e8f0ff;
+  font-size: 0.88rem;
+  margin-bottom: 0.65rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.primary,
+.secondary {
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.primary {
+  border: 1px solid rgba(100, 180, 255, 0.45);
+  background: rgba(40, 90, 160, 0.9);
+  color: #fff;
+}
+
+.secondary {
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  background: transparent;
+  color: #b8c8e6;
+}

@@ -20,6 +20,10 @@ import {
   LiveMemoryResolveDefinitionFeatureSchema,
   LiveMemoryPointerScanSchema,
   LiveMemoryScanAobSchema,
+  InProcessProposeHookSchema,
+  InProcessConfirmHookSchema,
+  InProcessProposeInjectorSchema,
+  InProcessConfirmInjectorSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
@@ -440,6 +444,110 @@ export function registerLiveMemoryIpc(): void {
       return { success: false, error: sanitize(error, 'aob_scan_failed') };
     }
   });
+
+  ipcMain.handle('in-process-propose-hook', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = InProcessProposeHookSchema.parse(payload);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+
+      const gate = await evaluateInProcessGateForSession(session, parsed.userApprovedAction);
+      if (!gate.allowed) return { success: false, error: gate.reason };
+
+      const { proposeHookInstall } = await import('../src/core/in-process-script/hook-engine.js');
+      const proposal = proposeHookInstall(parsed.plan);
+      return { success: true, proposal };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_propose_hook_failed') };
+    }
+  });
+
+  ipcMain.handle('in-process-confirm-hook', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = InProcessConfirmHookSchema.parse(payload);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+
+      const gate = await evaluateInProcessGateForSession(session, parsed.userApprovedAction);
+      if (!gate.allowed) return { success: false, error: gate.reason };
+
+      const guard = await session.recheckOnlineGuard();
+      if (!guard.allowed) return { success: false, guard, error: guard.reason };
+
+      const access = session.getMemoryAccess();
+      if (!access) return { success: false, error: 'not_attached' };
+
+      const { installHookFromProposal } = await import('../src/core/in-process-script/hook-engine.js');
+      const manifest = installHookFromProposal({
+        sessionKey: String(event.sender.id),
+        proposalId: parsed.proposalId,
+        driver: access.driver,
+        handle: access.handle,
+      });
+      return { success: true, manifest, guard };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_confirm_hook_failed') };
+    }
+  });
+
+  ipcMain.handle('in-process-rollback-hook', async (event) => {
+    try {
+      const session = requireSession(event);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+
+      const access = session.getMemoryAccess();
+      if (!access) return { success: false, error: 'not_attached' };
+
+      const { rollbackHook } = await import('../src/core/in-process-script/hook-engine.js');
+      const rolled = rollbackHook({
+        sessionKey: String(event.sender.id),
+        driver: access.driver,
+        handle: access.handle,
+      });
+      return { success: rolled };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_rollback_hook_failed') };
+    }
+  });
+
+  ipcMain.handle('in-process-propose-injector-launch', async (event, payload: unknown) => {
+    try {
+      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const parsed = InProcessProposeInjectorSchema.parse(payload);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+
+      const { getSettings } = await import('../src/core/settings/index.js');
+      const settings = getSettings();
+      const { evaluateInProcessGate } = await import('../src/core/in-process-script/guards.js');
+      const gate = evaluateInProcessGate({
+        featureEnabled: settings.inProcessScriptExecutionEnabled === true,
+        userConfirmedOffline: parsed.userConfirmedOffline,
+        userApprovedAction: parsed.userApprovedAction,
+        executableName: 'CrimsonDesert.exe',
+      });
+      if (!gate.allowed) return { success: false, error: gate.reason };
+
+      const { proposeInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
+      const proposal = proposeInjectorLaunch(parsed.exePath);
+      return { success: true, proposal };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_propose_injector_failed') };
+    }
+  });
+
+  ipcMain.handle('in-process-confirm-injector-launch', async (event, payload: unknown) => {
+    try {
+      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const parsed = InProcessConfirmInjectorSchema.parse(payload);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+
+      const { confirmInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
+      const result = await confirmInjectorLaunch(parsed.proposalId);
+      return { success: true, pid: result.pid };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_confirm_injector_failed') };
+    }
+  });
 }
 
 // ── Per-sender session ownership ─────────────────────────────────────────────
@@ -519,6 +627,27 @@ function serializeWriteResult(result: { success: boolean; manifest?: unknown; gu
 async function isFeatureEnabled(): Promise<boolean> {
   const mod = await import('../src/core/settings/unlock-trainer-capabilities.js');
   return mod.isTrainerCapabilityEnabled('v2LiveModeEnabled');
+}
+
+async function isInProcessEnabled(): Promise<boolean> {
+  const { getSettings } = await import('../src/core/settings/index.js');
+  const settings = getSettings();
+  return settings.inProcessScriptExecutionEnabled === true && (await isFeatureEnabled());
+}
+
+async function evaluateInProcessGateForSession(
+  session: LiveMemorySession,
+  userApprovedAction: boolean,
+): Promise<{ allowed: boolean; reason: string }> {
+  const { getSettings } = await import('../src/core/settings/index.js');
+  const settings = getSettings();
+  const { evaluateInProcessGate } = await import('../src/core/in-process-script/guards.js');
+  return evaluateInProcessGate({
+    featureEnabled: settings.inProcessScriptExecutionEnabled === true,
+    userConfirmedOffline: session.isOfflineConfirmed(),
+    userApprovedAction,
+    executableName: session.getAttachedExecutableName() ?? '',
+  });
 }
 
 function sanitize(error: unknown, fallback: string): string {

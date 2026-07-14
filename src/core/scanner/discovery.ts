@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { getGameById } from '../games/index';
+import { resolveDiscoveryContext } from './discovery-context.js';
 import { generateId } from '../../shared/ids';
 import { SAVE_FILE_EXTENSIONS } from '../../shared/constants';
 import db from '../database/index';
@@ -62,20 +62,20 @@ function cleanName(name: string): string {
  * Scan Windows candidate directories to auto-discover game save folders.
  */
 export async function discoverSaveLocations(gameId: string): Promise<DiscoveredSaveLocation[]> {
-  const game = getGameById(gameId);
-  if (!game) return [];
+  const ctx = resolveDiscoveryContext(gameId);
+  if (!ctx) return [];
 
   const discovered: DiscoveredSaveLocation[] = [];
   const roots = getSaveRoots();
-  const gameNameClean = cleanName(game.name);
-  const words = game.name.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const gameNameClean = cleanName(ctx.displayName);
+  const words = ctx.displayName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
 
   // Check game's own root as first location (GAME_ROOT / GAME_SUBDIRECTORY)
   try {
-    if (fs.existsSync(game.path)) {
+    if (ctx.installPath && fs.existsSync(ctx.installPath)) {
       const saveSubfolders = ['saves', 'save', 'savegame', 'savegames', 'savedata'];
       for (const folder of saveSubfolders) {
-        const fullPath = path.join(game.path, folder);
+        const fullPath = path.join(ctx.installPath!, folder);
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
           const canonical = path.resolve(fullPath).toLowerCase();
           discovered.push({

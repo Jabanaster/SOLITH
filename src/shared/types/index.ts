@@ -221,6 +221,14 @@ export interface Settings {
   trainerRemoteSyncCompleted?: boolean;
   /** V2 read-only session lifecycle monitor. Default: false. */
   v2SessionMonitorEnabled: boolean;
+  /** Scan Steam/Epic/GOG installs for Trainer Library badges. Default: true. */
+  installDiscoveryEnabled?: boolean;
+  installDiscoveryLastScan?: string;
+  /**
+   * Milestone M — In-Process Script Execution pilot (Crimson Desert only).
+   * Default: false. Requires offline confirm + per-action approval at IPC.
+   */
+  inProcessScriptExecutionEnabled?: boolean;
 }
 
 export interface AIConfig {

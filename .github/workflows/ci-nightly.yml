@@ -1,0 +1,22 @@
+name: CI Nightly
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  nightly:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:electron
+      - run: npm run build
+      - run: npx playwright install chromium
+      - run: npm run test:accessibility
+      - run: npx playwright test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts -g "sidebar collapse"

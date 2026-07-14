@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
@@ -46,6 +46,8 @@ import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
+import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
+import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
 
@@ -57,6 +59,8 @@ registerLiveMemoryIpc();
 registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();
+registerInstallDiscoveryIpc();
+registerTrainerDeckIpc();
 registerTrainerResearchIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
@@ -452,19 +456,63 @@ ipcMain.handle('detect-save-files', async (event, gameId: string) => {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
     
-    const editorModule = await import('../src/core/saves/editor.js');
     const settingsModule = await import('../src/core/settings/index.js');
     const externalScanEnabled = settingsModule.getSetting('externalSaveScanEnabled') === true;
     
+    const scannerModule = await import('../src/core/scanner/index.js');
+    const locationsModule = await import('../src/core/saves/locations.js');
     const gamesModule = await import('../src/core/games/index.js');
     const game = gamesModule.getGameById(parsed.gameId);
-    if (!game) return [];
-    
-    const scannerModule = await import('../src/core/scanner/index.js');
-    return scannerModule.findSaveFiles(game.path, externalScanEnabled);
+
+    const files = new Set<string>();
+    if (game?.path) {
+      for (const f of scannerModule.findSaveFiles(game.path, externalScanEnabled)) {
+        files.add(f);
+      }
+    }
+
+    const approved = locationsModule.getSaveLocations(parsed.gameId).filter(
+      (loc) => loc.approvalState === 'Approved',
+    );
+    for (const loc of approved) {
+      for (const f of scannerModule.findSaveFiles(loc.canonicalPath, true)) {
+        files.add(f);
+      }
+    }
+
+    return [...files];
   } catch (error) {
     console.error('detect-save-files error:', error);
     return [];
+  }
+});
+
+ipcMain.handle('pick-save-file', async (event, gameId: string) => {
+  try {
+    const parsed = DetectSaveFilesSchema.parse({ gameId });
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win ?? undefined, {
+      title: 'Select save or data file',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Save / data files', extensions: ['xml', 'json', 'sav', 'dat', 'ini', 'cfg', 'csv', 'txt', 'yml', 'yaml'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { success: false, canceled: true };
+    }
+    const filePath = result.filePaths[0];
+    const locationsModule = await import('../src/core/saves/locations.js');
+    const parentDir = path.dirname(filePath);
+    const locResult = locationsModule.addUserSelectedLocation(parsed.gameId, parentDir);
+    if (!locResult.success) {
+      return { success: false, error: locResult.error ?? 'Could not approve folder for this game.' };
+    }
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('pick-save-file error:', error);
+    return { success: false, error: String(error) };
   }
 });
 

@@ -10,7 +10,9 @@ export function getSettings(): Settings {
     'theme', 'safetyAcknowledged', 'externalSaveScanEnabled',
     'v2LiveModeEnabled', 'v2HotkeysEnabled', 'v2OverlayEnabled',
     'v2SessionMonitorEnabled', 'trainerCapabilitiesUnlocked',
-    'v2FreeformMemoryEnabled', 'v2RemoteCatalogSyncEnabled', 'trainerRemoteSyncCompleted'
+    'v2FreeformMemoryEnabled', 'v2RemoteCatalogSyncEnabled', 'trainerRemoteSyncCompleted',
+    'installDiscoveryEnabled', 'installDiscoveryLastScan',
+    'inProcessScriptExecutionEnabled',
   ];
   
   keys.forEach(key => {
@@ -25,7 +27,7 @@ export function getSettings(): Settings {
   });
   
   // Return defaults for missing settings
-  return {
+  const base: Settings = {
     onboardingCompleted: settings.onboardingCompleted ?? false,
     aiProvider: settings.aiProvider ?? 'None',
     aiEndpoint: settings.aiEndpoint ?? '',
@@ -44,8 +46,17 @@ export function getSettings(): Settings {
     trainerCapabilitiesUnlocked: settings.trainerCapabilitiesUnlocked ?? false,
     v2FreeformMemoryEnabled: settings.v2FreeformMemoryEnabled ?? true,
     v2RemoteCatalogSyncEnabled: settings.v2RemoteCatalogSyncEnabled ?? true,
-    trainerRemoteSyncCompleted: settings.trainerRemoteSyncCompleted ?? false
+    trainerRemoteSyncCompleted: settings.trainerRemoteSyncCompleted ?? false,
+    installDiscoveryEnabled: settings.installDiscoveryEnabled ?? true,
+    installDiscoveryLastScan: settings.installDiscoveryLastScan ?? '',
+    inProcessScriptExecutionEnabled: settings.inProcessScriptExecutionEnabled ?? false,
   };
+
+  if (process.env.NODE_ENV === 'test' || process.env.SOLITH_SKIP_ONBOARDING === '1') {
+    base.onboardingCompleted = true;
+  }
+
+  return base;
 }
 
 export function setSetting(key: keyof Settings, value: string | number | boolean): void {

@@ -25,6 +25,7 @@ interface Window {
     restoreBackup: (backupId: string) => Promise<any>;
     // Saves & Discovery
     detectSaveFiles: (gameId: string) => Promise<any[]>;
+    pickSaveFile: (gameId: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
     parseSave: (gameId: string, filePath: string) => Promise<any>;
     compareSaves: (a: string, b: string, gameId: string, old?: any, nw?: any) => Promise<any[] | { error: string }>;
     compareSavesReport: (a: string, b: string, gameId: string, old?: any, nw?: any) => Promise<{ results: any[]; report: any } | { error: string }>;
@@ -141,6 +142,7 @@ interface Window {
       success: boolean;
       hotkeys?: Record<string, string>;
       conflicts?: Array<{ accelerator: string; actions: string[] }>;
+      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
       error?: string;
     }>;
     trainerHotkeysSetBindings: (payload: {
@@ -149,6 +151,7 @@ interface Window {
       success: boolean;
       hotkeys?: Record<string, string>;
       conflicts?: Array<{ accelerator: string; actions: string[] }>;
+      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
       error?: string;
     }>;
     onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
@@ -336,8 +339,113 @@ interface Window {
       address?: string;
       error?: string;
     }>;
+    inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) => Promise<{
+      success: boolean;
+      proposal?: import('../core/in-process-script/types.js').HookInstallProposal;
+      error?: string;
+    }>;
+    inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) => Promise<{
+      success: boolean;
+      manifest?: import('../core/in-process-script/types.js').HookInstallManifest;
+      guard?: { allowed: boolean; reason: string };
+      error?: string;
+    }>;
+    inProcessRollbackHook: () => Promise<{ success: boolean; error?: string }>;
+    inProcessProposeInjectorLaunch: (payload: {
+      exePath: string;
+      userConfirmedOffline: true;
+      userApprovedAction: true;
+    }) => Promise<{
+      success: boolean;
+      proposal?: import('../core/in-process-script/types.js').InjectorLaunchProposal;
+      error?: string;
+    }>;
+    inProcessConfirmInjectorLaunch: (payload: { proposalId: string; userApprovedAction: true }) => Promise<{
+      success: boolean;
+      pid?: number;
+      error?: string;
+    }>;
     onCatalogProcessDetected?: (
       callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void,
     ) => (() => void) | undefined;
+
+    installDiscoveryScan: (payload?: {
+      steamInstallPath?: string;
+      epicManifestsPath?: string;
+      offlineRootsOnly?: boolean;
+    }) => Promise<{
+      success: boolean;
+      discovered?: number;
+      matched?: number;
+      platforms?: Record<string, number>;
+      scannedAt?: string;
+      installedCount?: number;
+      error?: string;
+    }>;
+    installDiscoveryList: () => Promise<{
+      success: boolean;
+      games?: Array<{
+        id: string;
+        catalogGameId?: string;
+        catalogDisplayName?: string;
+        platform: string;
+        installPath: string;
+        executablePath?: string;
+        displayName?: string;
+        steamAppId?: number;
+        detectedAt: string;
+        lastSeenAt: string;
+      }>;
+      catalogGameIds?: string[];
+      total?: number;
+      error?: string;
+    }>;
+
+    trainerDeckGet: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      entry?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry;
+      rows?: import('../core/trainer-deck/build-deck-rows.js').TrainerDeckRow[];
+      controls?: import('../core/trainer-host/trainer-control-schema.js').TrainerControl[];
+      capabilities?: import('../core/definitions/load-catalog-definition.js').CatalogDefinitionCapabilities;
+      health?: { catalogGameId: string; status: string; staleReason?: string };
+      installed?: { installPath?: string };
+      error?: string;
+    }>;
+    trainerHealthCheck: (payload?: { catalogGameId?: string }) => Promise<{
+      success: boolean;
+      map?: Record<string, { catalogGameId: string; status: string; staleReason?: string }>;
+      error?: string;
+    }>;
+    trainerHealthList: () => Promise<{
+      success: boolean;
+      map?: Record<string, { catalogGameId: string; status: string; staleReason?: string }>;
+      error?: string;
+    }>;
+    trainerCatalogCertifyL1: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      schemaValid?: boolean;
+      resolutionOk?: boolean;
+      backupPathOk?: boolean;
+      errors?: string[];
+      error?: string;
+    }>;
+    catalogDemandNotify: (payload: {
+      catalogGameId: string;
+      kind?: 'notify' | 'verification_request';
+    }) => Promise<{
+      success: boolean;
+      demand?: { catalogGameId: string; notifyCount: number; verificationRequests: number };
+      error?: string;
+    }>;
+    catalogDemandList: () => Promise<{ success: boolean; error?: string }>;
+    installDiscoveryOpenPath: (payload: {
+      catalogGameId: string;
+      targetPath?: string;
+    }) => Promise<{ success: boolean; error?: string }>;
+    catalogProcessWatchActive: (payload: { active: boolean }) => Promise<{
+      success: boolean;
+      intervalMs?: number;
+      error?: string;
+    }>;
   };
 }

@@ -152,6 +152,27 @@ export class LiveMemorySession {
     return this.target?.executableName ?? null;
   }
 
+  isOfflineConfirmed(): boolean {
+    return this.userConfirmedOffline;
+  }
+
+  async recheckOnlineGuard(): Promise<OnlineGuardResult> {
+    if (!this.target) {
+      return { allowed: false, reason: 'No process attached.' };
+    }
+    const evidence = await this.remoteConnectionObserver(this.target.pid);
+    return evaluateOnlineGuard({
+      userConfirmedOffline: this.userConfirmedOffline,
+      remoteConnections: evidence,
+      acceptedConnectionBaseline: this.acceptedConnectionBaseline,
+    });
+  }
+
+  getMemoryAccess(): { driver: MemoryDriver; handle: LiveProcessHandle } | null {
+    if (!this.handle) return null;
+    return { driver: this.driver, handle: this.handle };
+  }
+
   /** Catalog game id from the most recent attach, if supplied. */
   getCatalogGameId(): string | null {
     return this.catalogGameId;

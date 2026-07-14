@@ -1,0 +1,122 @@
+.page {
+  padding: 1rem 1.25rem 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.loading,
+.message,
+.certify,
+.empty {
+  color: #9eb6dc;
+  font-size: 0.9rem;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.healthStrip {
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.healthWorking {
+  background: rgba(30, 80, 50, 0.45);
+  border: 1px solid rgba(100, 200, 130, 0.35);
+  color: #c8f0d4;
+}
+
+.healthStale {
+  background: rgba(80, 50, 20, 0.45);
+  border: 1px solid rgba(240, 180, 80, 0.35);
+  color: #f0d8a0;
+}
+
+.healthUnknown {
+  background: rgba(40, 50, 70, 0.5);
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  color: #b8c8e6;
+}
+
+.healthReason {
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+.staleBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(240, 180, 80, 0.35);
+  background: rgba(60, 40, 15, 0.35);
+  color: #f0d8a0;
+  font-size: 0.85rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.primaryBtn {
+  border: 1px solid rgba(100, 180, 255, 0.45);
+  background: rgba(40, 90, 160, 0.9);
+  color: #fff;
+}
+
+.secondaryBtn {
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: rgba(18, 28, 45, 0.9);
+  color: #b8c8e6;
+}
+
+.section {
+  margin-bottom: 1.25rem;
+}
+
+.section h2 {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid rgba(120, 180, 255, 0.12);
+  color: #c8d8f0;
+}
+
+.table th {
+  color: #8fa3c7;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}

@@ -57,7 +57,7 @@ const DATA_TYPES = ['int32', 'uint32', 'float', 'double', 'int64', 'byte'] as co
 const COMPARISON_KINDS = ['exact', 'changed', 'unchanged', 'increased', 'decreased'] as const;
 const SCAN_RESULTS_DISPLAY_LIMIT = 200;
 
-const LiveMemoryTrainerPage: React.FC = () => {
+const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> = ({ initialCatalogGameId }) => {
   const api = (window as any).electronAPI;
   const apiAvailable = typeof window !== 'undefined' && !!api;
 
@@ -150,6 +150,25 @@ const LiveMemoryTrainerPage: React.FC = () => {
       setBusy(false);
     }
   }, [apiAvailable, api]);
+
+  useEffect(() => {
+    if (!initialCatalogGameId || !apiAvailable) return;
+    let cancelled = false;
+    void (async () => {
+      const result = await api.trainerCatalogLoadGame?.({ catalogGameId: initialCatalogGameId });
+      const exe = result?.config?.executable ?? result?.entry?.executables?.[0];
+      if (!cancelled && exe) {
+        setMessage(`Catalog game loaded — look for ${exe} in the process list.`);
+        const listResult = await api.liveMemoryListProcesses?.();
+        if (listResult?.success) setProcesses(listResult.processes ?? []);
+        const match = listResult?.processes?.find(
+          (p: ProcessEntry) => p.name.toLowerCase() === exe.toLowerCase(),
+        );
+        if (match) setSelectedPid(match.pid);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initialCatalogGameId, apiAvailable, api]);
 
   const handleAttach = async () => {
     if (!selectedPid) return;

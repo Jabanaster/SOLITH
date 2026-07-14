@@ -420,6 +420,39 @@ export const TrainerResearchAnalyzeCtSchema = z.object({
   executable: z.string().max(260).optional(),
 });
 
+export const InProcessProposeHookSchema = z.object({
+  plan: z.object({
+    cheatName: z.string().min(1).max(200),
+    executable: z.string().min(1).max(260),
+    moduleName: z.string().min(1).max(260),
+    aobSignature: z.string().min(3).max(512),
+    symbol: z.string().max(128).optional(),
+    patchByteCount: z.number().int().positive().max(64),
+    executablePlan: z.boolean(),
+    status: z.enum(['ready', 'plan_only', 'missing_aob']),
+    presetId: z.enum(['crimson-fast-friendship']).optional(),
+    warnings: z.array(z.string()),
+    notes: z.array(z.string()),
+  }),
+  userApprovedAction: z.literal(true),
+});
+
+export const InProcessConfirmHookSchema = z.object({
+  proposalId: z.string().uuid(),
+  userApprovedAction: z.literal(true),
+});
+
+export const InProcessProposeInjectorSchema = z.object({
+  exePath: z.string().min(1).max(1024),
+  userConfirmedOffline: z.literal(true),
+  userApprovedAction: z.literal(true),
+});
+
+export const InProcessConfirmInjectorSchema = z.object({
+  proposalId: z.string().uuid(),
+  userApprovedAction: z.literal(true),
+});
+
 export const DefinitionFeedbackSchema = z.object({
   catalogGameId: z.string().min(1).max(128),
   featureId: z.string().min(1).max(128),

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './app/App';
 import TrainerOverlayPage from './app/pages/TrainerOverlayPage';
 import './app/styles/index.css';
+import './app/styles/trainer-control-panel.css';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);

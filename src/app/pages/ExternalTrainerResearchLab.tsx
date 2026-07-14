@@ -9,6 +9,13 @@ import {
 import { UEDUMPER_REFERENCE } from '../../core/ue-research/types.js';
 import { SCRIPT_RESEARCH_CHARTER } from '../../core/script-research/types.js';
 import type { AaScriptAnalysis, CtScriptResearchReport, MergedUeScriptHint } from '../../core/script-research/types.js';
+import { IN_PROCESS_SCRIPT_MILESTONE } from '../../core/in-process-script/charter.js';
+import { planHookFromScriptAnalysis } from '../../core/in-process-script/aa-hook-planner.js';
+import type {
+  HookInstallManifest,
+  HookInstallProposal,
+  InjectorLaunchProposal,
+} from '../../core/in-process-script/types.js';
 
 interface ProcessEntry {
   pid: number;
@@ -62,12 +69,18 @@ const ExternalTrainerResearchLab: React.FC = () => {
   const [selectedScriptName, setSelectedScriptName] = useState('');
   const [aobScanAddress, setAobScanAddress] = useState('');
   const [mergedHints, setMergedHints] = useState<MergedUeScriptHint[]>([]);
+  const [inProcessEnabled, setInProcessEnabled] = useState(false);
+  const [inProcessApproved, setInProcessApproved] = useState(false);
+  const [hookProposal, setHookProposal] = useState<HookInstallProposal | null>(null);
+  const [hookManifest, setHookManifest] = useState<HookInstallManifest | null>(null);
+  const [injectorProposal, setInjectorProposal] = useState<InjectorLaunchProposal | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
         const settings = await api?.getSettings?.();
         setFeatureEnabled(settings?.v2FreeformMemoryEnabled !== false && settings?.v2LiveModeEnabled !== false);
+        setInProcessEnabled(settings?.inProcessScriptExecutionEnabled === true);
       } catch {
         setFeatureEnabled(true);
       }
@@ -235,6 +248,116 @@ const ExternalTrainerResearchLab: React.FC = () => {
     if (!ctReport) return undefined;
     return ctReport.scripts.find((s) => s.cheatName === selectedScriptName) ?? ctReport.scripts[0];
   }, [ctReport, selectedScriptName]);
+
+  const selectedHookPlan = useMemo(() => {
+    if (!selectedScript || !ctReport) return null;
+    return planHookFromScriptAnalysis(selectedScript, ctReport.executable);
+  }, [selectedScript, ctReport]);
+
+  const enableInProcessPilot = async () => {
+    if (!api?.setSetting) return;
+    await api.setSetting('inProcessScriptExecutionEnabled', true);
+    setInProcessEnabled(true);
+    setMessage(
+      'In-process script execution enabled (Crimson Desert pilot). Requires offline confirm + per-action approval.',
+    );
+  };
+
+  const proposeHookInstall = async () => {
+    if (!api?.inProcessProposeHook || !selectedHookPlan || !inProcessApproved) return;
+    setBusy(true);
+    try {
+      const result = await api.inProcessProposeHook({
+        plan: selectedHookPlan,
+        userApprovedAction: true,
+      });
+      if (result.success && result.proposal) {
+        setHookProposal(result.proposal);
+        setMessage(`Hook proposal staged for ${selectedHookPlan.cheatName}. Confirm to patch process memory.`);
+      } else {
+        setMessage(result.error ?? 'Hook proposal failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmHookInstall = async () => {
+    if (!api?.inProcessConfirmHook || !hookProposal || !inProcessApproved) return;
+    setBusy(true);
+    try {
+      const result = await api.inProcessConfirmHook({
+        proposalId: hookProposal.proposalId,
+        userApprovedAction: true,
+      });
+      if (result.success && result.manifest) {
+        setHookManifest(result.manifest);
+        setHookProposal(null);
+        setMessage(`Hook installed at ${result.manifest.hookSite} (code cave ${result.manifest.caveAddress}).`);
+      } else {
+        setMessage(result.error ?? result.guard?.reason ?? 'Hook install failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rollbackHookInstall = async () => {
+    if (!api?.inProcessRollbackHook) return;
+    setBusy(true);
+    try {
+      const result = await api.inProcessRollbackHook();
+      if (result.success) {
+        setHookManifest(null);
+        setMessage('Hook rolled back — original bytes restored.');
+      } else {
+        setMessage(result.error ?? 'Rollback failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const proposeInjectorFromTrainerPath = async () => {
+    if (!api?.inProcessProposeInjectorLaunch || !trainerPath || !inProcessApproved) return;
+    setBusy(true);
+    try {
+      const result = await api.inProcessProposeInjectorLaunch({
+        exePath: trainerPath,
+        userConfirmedOffline: true,
+        userApprovedAction: true,
+      });
+      if (result.success && result.proposal) {
+        setInjectorProposal(result.proposal);
+        setMessage(`Injector launch proposal for ${result.proposal.fileName}. Confirm to spawn externally.`);
+      } else {
+        setMessage(result.error ?? 'Injector proposal failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmInjectorLaunch = async () => {
+    if (!api?.inProcessConfirmInjectorLaunch || !injectorProposal || !inProcessApproved) return;
+    setBusy(true);
+    try {
+      const result = await api.inProcessConfirmInjectorLaunch({
+        proposalId: injectorProposal.proposalId,
+        userApprovedAction: true,
+      });
+      if (result.success) {
+        setInjectorProposal(null);
+        setMessage(
+          `Trainer launched (pid ${result.pid ?? 'unknown'}). Solith did not inject — attach to CrimsonDesert.exe separately.`,
+        );
+      } else {
+        setMessage(result.error ?? 'Injector launch failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const pickTrainerExe = async () => {
     if (!api?.trainerResearchPickExe) return;
@@ -594,6 +717,89 @@ const ExternalTrainerResearchLab: React.FC = () => {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="glass" style={{ padding: '20px', marginBottom: '20px', border: '1px solid #ff525255' }}>
+        <h3 style={{ color: '#ff5252', marginTop: 0 }}>In-Process Script Execution (Crimson Desert pilot)</h3>
+        <p style={{ color: '#8892b0', fontSize: '13px', marginTop: 0 }}>
+          Milestone M: AA hook presets, code-cave install, and external trainer launch — gated by{' '}
+          <code>inProcessScriptExecutionEnabled</code>, offline confirm, and per-action approval.
+        </p>
+        <ul style={{ color: '#8892b0', fontSize: '12px', paddingLeft: '18px' }}>
+          {IN_PROCESS_SCRIPT_MILESTONE.safety.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        {!inProcessEnabled ? (
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void enableInProcessPilot()}>
+            Enable in-process pilot (settings)
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <label style={{ color: '#e0e0e0', fontSize: '13px' }}>
+              <input
+                type="checkbox"
+                checked={inProcessApproved}
+                onChange={(e) => setInProcessApproved(e.target.checked)}
+              />{' '}
+              I approve in-process hook / injector actions for this session (CrimsonDesert.exe pilot only)
+            </label>
+            {selectedHookPlan?.status === 'ready' && (
+              <div style={{ fontSize: '12px', color: '#e0e0e0' }}>
+                Executable preset: <code>{selectedHookPlan.presetId}</code> — {selectedHookPlan.cheatName}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={!attached || !inProcessApproved || busy}
+                    onClick={() => void proposeHookInstall()}
+                  >
+                    Propose hook install
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!hookProposal || !inProcessApproved || busy}
+                    onClick={() => void confirmHookInstall()}
+                  >
+                    Confirm hook install
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={!hookManifest || busy}
+                    onClick={() => void rollbackHookInstall()}
+                  >
+                    Rollback hook
+                  </button>
+                </div>
+              </div>
+            )}
+            {trainerPath && (
+              <div style={{ fontSize: '12px', color: '#e0e0e0' }}>
+                External trainer: <code>{trainerPath}</code>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={!inProcessApproved || busy}
+                    onClick={() => void proposeInjectorFromTrainerPath()}
+                  >
+                    Propose trainer launch
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!injectorProposal || !inProcessApproved || busy}
+                    onClick={() => void confirmInjectorLaunch()}
+                  >
+                    Confirm trainer launch
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -207,8 +207,8 @@ button, input, select, textarea {
 
 /* ─── Sidebar ───────────────────────────────────────────── */
 .sidebar {
-  width: 240px;
-  min-width: 240px;
+  width: 320px;
+  min-width: 320px;
   background: var(--sidebar-surface);
   border-right: 1px solid var(--border);
   backdrop-filter: blur(12px);
@@ -225,62 +225,74 @@ button, input, select, textarea {
 }
 
 .sidebar--collapsed {
-  width: 56px;
-  min-width: 56px;
+  width: 72px;
+  min-width: 72px;
 }
 
 .sidebar-header {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(79, 184, 217, 0.12);
   flex-shrink: 0;
-  min-height: 44px;
+  min-height: 60px;
+  height: 60px;
+  box-sizing: border-box;
 }
 
 .sidebar--collapsed .sidebar-header {
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 6px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  height: auto;
+  min-height: 88px;
 }
 
 .sidebar-header__brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 11px;
   min-width: 0;
+  flex: 1;
 }
 
 .sidebar--collapsed .sidebar-header__brand {
+  flex: 0;
   justify-content: center;
 }
 
 .sidebar-header__mark {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(79, 184, 217, 0.22);
-  overflow: hidden;
-  background: rgba(8, 12, 22, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: none;
+  overflow: visible;
+  background: transparent;
 }
 
 .sidebar-header__mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.9;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  object-position: center;
+  opacity: 1;
 }
 
 .sidebar-header__label {
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  line-height: 20px;
   white-space: nowrap;
 }
 
@@ -288,9 +300,10 @@ button, input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
+  margin-left: auto;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -300,10 +313,19 @@ button, input, select, textarea {
   flex-shrink: 0;
 }
 
+.sidebar--collapsed .sidebar-collapse-btn {
+  margin-left: 0;
+}
+
 .sidebar-collapse-btn:hover {
   color: var(--cyan);
   border-color: rgba(79, 184, 217, 0.22);
   background: rgba(79, 184, 217, 0.08);
+}
+
+.sidebar-collapse-btn:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
 }
 
 .sidebar-collapse-icon {
@@ -451,23 +473,23 @@ button, input, select, textarea {
 
 .nav-section h3 {
   color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.2px;
   padding: 0 6px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
 .nav-section button {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 9px 10px;
+  padding: 12px 10px;
   margin-bottom: 2px;
   background: transparent;
   border: 1px solid transparent;
@@ -483,8 +505,8 @@ button, input, select, textarea {
 }
 
 .nav-section button svg {
-  width: 18px;
-  height: 18px;
+  width: 54px;
+  height: 54px;
   flex-shrink: 0;
   opacity: 0.8;
 }
@@ -521,7 +543,17 @@ button, input, select, textarea {
   flex-shrink: 0;
   width: 100%;
   border-bottom: 1px solid var(--border-accent);
-  background: #080c16;
+  background: #050b18;
+  overflow: hidden;
+}
+
+.solith-top-banner__full {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: cover;
+  object-position: center;
 }
 
 .solith-top-banner__canvas {
@@ -760,6 +792,7 @@ button, input, select, textarea {
   padding: 24px;
   overflow-y: auto;
   padding-bottom: 24px;
+  background: rgba(4, 7, 14, 0.72);
 }
 
 /* ─── Glass Card ────────────────────────────────────────── */
@@ -986,17 +1019,17 @@ button, input, select, textarea {
 }
 
 .empty-state-icon-slot {
-  width: 56px;
-  height: 56px;
+  width: 84px;
+  height: 84px;
   margin: 0 auto 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-accent);
-  background: rgba(8, 12, 22, 0.75);
+  border: none;
+  background: transparent;
   border-radius: 12px;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(79, 184, 217, 0.12);
+  overflow: visible;
+  box-shadow: none;
 }
 
 .empty-state-artwork {
@@ -1028,20 +1061,21 @@ button, input, select, textarea {
 }
 
 .branding-artwork--nav {
-  width: 18px;
-  height: 18px;
-  opacity: 0.8;
+  width: 66px;
+  height: 66px;
+  opacity: 0.88;
 }
 
 .nav-section button.active .branding-artwork--nav {
   opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.35));
 }
 
 .branding-artwork--section {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  opacity: 0.75;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  opacity: 0.92;
 }
 
 .branding-artwork--header {
@@ -1070,14 +1104,14 @@ button, input, select, textarea {
 }
 
 .page-module-header__icon {
-  width: 40px;
-  height: 40px;
+  width: 84px;
+  height: 84px;
   flex-shrink: 0;
   border-radius: 10px;
-  border: 1px solid var(--border-accent);
-  background: rgba(8, 12, 22, 0.82);
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(79, 184, 217, 0.1);
+  border: none;
+  background: transparent;
+  overflow: visible;
+  box-shadow: none;
 }
 
 .page-module-header__title {
@@ -1098,20 +1132,21 @@ button, input, select, textarea {
 }
 
 .nav-icon-slot {
-  width: 26px;
-  height: 26px;
+  width: 78px;
+  height: 78px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid transparent;
-  overflow: hidden;
+  overflow: visible;
+  background: transparent;
 }
 
 .nav-section button .nav-icon-slot--artwork {
-  border-color: rgba(79, 184, 217, 0.12);
-  background: rgba(8, 12, 22, 0.65);
+  border-color: transparent;
+  background: transparent;
 }
 
 .empty-state h3 {
