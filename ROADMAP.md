@@ -45,7 +45,7 @@ In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by defaul
 | **AD** | Stale / version health engine | **Done** |
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
-| **AG** | Adoption polish + smoke alignment | **Planned** |
+| **AG** | Adoption polish + smoke alignment | **Done** — packaged-smoke `parseSave(gameId, path)` + banner selector |
 
 ### Shell polish / evidence (2026-07)
 
@@ -85,7 +85,7 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 - ~~Hotkey OS-reserved shortcut warnings~~ — done
 - ~~CI split (fast PR vs nightly E2E)~~ — `.github/workflows/ci-fast.yml` + `ci-nightly.yml`
 - ~~UI hierarchy doc~~ — `Docs/SOLITH_UI_HIERARCHY.md`
-- Adoption **AG** — smoke alignment + packaged-smoke title/`parseSave` drift waivers
+- Adoption **AG** — packaged-smoke parseSave `(gameId, path)` + raster banner locator (**done** on `cursor/ag-packaged-smoke-alignment`)
 
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.

@@ -279,8 +279,8 @@ test('trainer-e2e 01–25 — full Trainer UX workflow', async () => {
 
     // ── Test 20: Applied file contains 9999 ──────────────────────────────────
     const parsedAfterApply = await win.evaluate(
-      (fp: string) => (window as any).electronAPI.parseSave(fp),
-      workspaceFile
+      ([gid, fp]: [string, string]) => (window as any).electronAPI.parseSave(gid, fp),
+      [gameId, workspaceFile] as [string, string]
     );
     const goldAfter = parsedAfterApply?.values?.find((v: any) => v.path === 'player.gold');
     expect(Number(goldAfter?.value), 'gold is 9999 after apply').toBe(9999);

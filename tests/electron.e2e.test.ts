@@ -175,8 +175,8 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
     // ── Step 3: parse-save before apply (confirm gold = 150) ────────────────
     ipcChannelsUsed.push('parse-save');
     const parseBefore = await win.evaluate(
-      async (fp: string) => (window as any).electronAPI.parseSave(fp),
-      workspaceFile
+      async ([gid, fp]: [string, string]) => (window as any).electronAPI.parseSave(gid, fp),
+      [gameId, workspaceFile] as [string, string]
     );
     if (!parseBefore) throw new Error('parseSave returned null before apply');
     const goldBefore = parseBefore.values?.find((v: any) => v.path === 'player.gold');
@@ -210,8 +210,8 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
 
     // ── Step 6: parse-save after apply (confirm gold = 9999) ────────────────
     const parseAfterApply = await win.evaluate(
-      async (fp: string) => (window as any).electronAPI.parseSave(fp),
-      workspaceFile
+      async ([gid, fp]: [string, string]) => (window as any).electronAPI.parseSave(gid, fp),
+      [gameId, workspaceFile] as [string, string]
     );
     const goldAfterApply = parseAfterApply?.values?.find((v: any) => v.path === 'player.gold');
     if (Number(goldAfterApply?.value) !== 9999)
@@ -238,8 +238,8 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
 
     // ── Step 9: parse-save after restore (confirm gold = 150) ───────────────
     const parseAfterRestore = await win.evaluate(
-      async (fp: string) => (window as any).electronAPI.parseSave(fp),
-      workspaceFile
+      async ([gid, fp]: [string, string]) => (window as any).electronAPI.parseSave(gid, fp),
+      [gameId, workspaceFile] as [string, string]
     );
     const goldAfterRestore = parseAfterRestore?.values?.find((v: any) => v.path === 'player.gold');
     if (Number(goldAfterRestore?.value) !== 150)

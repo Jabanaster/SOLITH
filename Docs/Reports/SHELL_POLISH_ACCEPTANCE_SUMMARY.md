@@ -26,11 +26,11 @@
 - L3/L4 certification with in-game evidence (Milestone U live)
 - Commercial binary `canWrite` promotion (Milestone X)
 - Managed runtime (Milestone Z)
-- Adoption **AG** polish (packaged-smoke title/`parseSave` alignment)
+- Adoption **AG** polish (packaged-smoke title/`parseSave` alignment) — fixed on AG branch after this tag
 
 ## Known waivers
 
-- Packaged-smoke points that expect window title `ResourceForge` while product displays `Solith` — document as product rename; fix under AG.
+- Packaged-smoke: product title is `Solith`; AG fixed `parseSave` arity and banner locator after `v2.1-shell-polish`.
 - `git clone --local` on Windows may fail commit-graph links; `npm ci` on clean tree is the accepted reproducibility substitute when documented.
 
 ## Related artifacts

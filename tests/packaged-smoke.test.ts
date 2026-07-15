@@ -220,11 +220,12 @@ test('point 13 — IPC parseSave() parses the JSON fixture correctly', async () 
   );
 
   const result = await win.evaluate(
-    async (fp: string) => (window as any).electronAPI.parseSave(fp),
-    tempFixture
+    async ([gid, fp]: [string, string]) => (window as any).electronAPI.parseSave(gid, fp),
+    [parseGameId, tempFixture] as [string, string]
   );
 
   expect(result, 'parseSave must return a result').toBeTruthy();
+  expect(result?.error, `parseSave error: ${result?.error}`).toBeUndefined();
   const goldField = result?.values?.find((v: any) => v.path === 'player.gold');
   expect(Number(goldField?.value)).toBe(150);
 });
@@ -249,7 +250,8 @@ test('point 15 — app exits cleanly (close() resolves without timeout)', async 
 // ── Points 16-20: Trainer UX survived packaging ───────────────────────────────
 
 test('point 16 — unified sidebar navigation renders in packaged app', async () => {
-  await expect(win.locator('.solith-top-banner__title')).toBeVisible();
+  await expect(win.locator('.solith-top-banner')).toBeVisible();
+  await expect(win.locator('.solith-top-banner__full')).toBeVisible();
   await expect(win.locator('button', { hasText: 'Game Library' })).toBeVisible();
   await expect(win.locator('button', { hasText: 'Save Editor' })).toBeVisible();
   await expect(win.locator('button', { hasText: 'Compatibility' })).toBeVisible();
