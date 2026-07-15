@@ -4,6 +4,12 @@
   margin: 0 auto;
 }
 
+.pageDragOver {
+  outline: 2px dashed rgba(100, 200, 130, 0.45);
+  outline-offset: -4px;
+  background: rgba(20, 60, 40, 0.08);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -213,6 +219,20 @@
   background: rgba(20, 80, 50, 0.85);
   color: #b8f0c8;
   border: 1px solid rgba(100, 200, 130, 0.45);
+}
+
+.runningBadge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(15, 70, 55, 0.9);
+  color: #7ef0c0;
+  border: 1px solid rgba(60, 220, 160, 0.55);
+  box-shadow: 0 0 8px rgba(60, 220, 160, 0.25);
 }
 
 .staleBadge {

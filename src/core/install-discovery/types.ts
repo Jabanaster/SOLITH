@@ -21,7 +21,12 @@ export interface InstallDiscoveryOptions {
   steamInstallPath?: string;
   /** Override Epic manifests directory. Tests only. */
   epicManifestsPath?: string;
-  /** Skip live registry reads (fixture-only scan). */
+  /**
+   * Path to a GOG fixture JSON array (tests only):
+   * `[{ "path": "<install>", "exe": "Game.exe", "gameName": "Title" }, ...]`
+   */
+  gogFixturePath?: string;
+  /** Skip live registry / live Epic-default paths (fixture-only scan). */
   offlineRootsOnly?: boolean;
 }
 

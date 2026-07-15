@@ -9,6 +9,17 @@ import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
+type SortMode = 'installed-first' | 'a-z';
+
+function dirnameFromPath(filePath: string): string {
+  const i = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+  return i >= 0 ? filePath.slice(0, i) : filePath;
+}
+
+function basenameNoExe(filePath: string): string {
+  const base = filePath.slice(Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1);
+  return base.replace(/\.exe$/i, '');
+}
 
 interface SearchResponse {
   success: boolean;
@@ -35,6 +46,7 @@ function CatalogCard({
   entry,
   trust,
   installed,
+  running,
   healthStatus,
   onLaunch,
   onExport,
@@ -45,6 +57,7 @@ function CatalogCard({
   entry: TrainerCatalogEntry;
   trust?: TrustMeta;
   installed?: boolean;
+  running?: boolean;
   healthStatus?: string;
   onLaunch: (entry: TrainerCatalogEntry) => void;
   onExport: (entry: TrainerCatalogEntry) => void;
@@ -79,6 +92,11 @@ function CatalogCard({
         {installed && (
           <span className={styles.installedBadge} title="Detected on this PC">
             Installed
+          </span>
+        )}
+        {running && (
+          <span className={styles.runningBadge} title="Process detected on this PC">
+            Running
           </span>
         )}
         {(healthStatus === 'stale' || healthStatus === 'quarantined') && (
@@ -152,8 +170,13 @@ export default function TrainerLibraryPage({
   const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
   const [quarantineCount, setQuarantineCount] = useState(0);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [healthMap, setHealthMap] = useState<Record<string, { status: string }>>({});
   const [installedOnly, setInstalledOnly] = useState(false);
+  const [runningOnly, setRunningOnly] = useState(false);
+  const [needsReverifyOnly, setNeedsReverifyOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('installed-first');
+  const [dragOver, setDragOver] = useState(false);
   const [scanningInstalls, setScanningInstalls] = useState(false);
   const importYamlRef = useRef<HTMLInputElement>(null);
   const importCtRef = useRef<HTMLInputElement>(null);
@@ -223,10 +246,23 @@ export default function TrainerLibraryPage({
   }, []);
 
   useEffect(() => {
-    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.(() => {
-      // App-level toast handles process detection
+    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+      setRunningIds((prev) => {
+        const next = new Set(prev);
+        next.add(payload.catalogGameId);
+        return next;
+      });
     });
     return () => unsubscribe?.();
+  }, []);
+
+  const refreshInstalledList = useCallback(async () => {
+    const api = window.electronAPI;
+    if (!api?.installDiscoveryList) return;
+    const list = await api.installDiscoveryList();
+    if (list.success && list.catalogGameIds) {
+      setInstalledIds(new Set(list.catalogGameIds));
+    }
   }, []);
 
   useEffect(() => {
@@ -433,6 +469,68 @@ export default function TrainerLibraryPage({
     }
   };
 
+  const entryNeedsReverify = useCallback(
+    (catalogGameId: string) => {
+      const health = healthMap[catalogGameId]?.status;
+      if (health === 'stale' || health === 'quarantined') return true;
+      if (trustMeta[catalogGameId]?.quarantined) return true;
+      return false;
+    },
+    [healthMap, trustMeta],
+  );
+
+  const handleDropExe = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!/\.exe$/i.test(file.name)) {
+      setMessage('Only .exe files can be dropped to add a game.');
+      return;
+    }
+    const filePath = (file as File & { path?: string }).path;
+    if (!filePath) {
+      setMessage('Drop-to-add requires the Electron desktop app (file path unavailable in browser).');
+      return;
+    }
+    const api = window.electronAPI;
+    if (!api?.addGame) {
+      setMessage('addGame is not available in this environment.');
+      return;
+    }
+    const installDir = dirnameFromPath(filePath);
+    const gameName = basenameNoExe(filePath) || file.name.replace(/\.exe$/i, '');
+    setMessage('');
+    try {
+      const result = await api.addGame({ name: gameName, path: installDir });
+      if (result?.success) {
+        if (api.installDiscoveryScan) {
+          await api.installDiscoveryScan();
+        }
+        await refreshInstalledList();
+        setMessage(`Added "${gameName}" from ${installDir}.`);
+      } else {
+        setMessage(result?.error ?? 'Failed to add game from dropped executable.');
+      }
+    } catch {
+      setMessage('Failed to add game from dropped executable.');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOver(false);
+  };
+
   const handleRequestVerification = async (entry: TrainerCatalogEntry) => {
     const api = window.electronAPI;
     if (!api?.trainerCatalogEvaluatePromotion) return;
@@ -453,27 +551,49 @@ export default function TrainerLibraryPage({
     );
   };
 
-  const visible = (installedOnly
-    ? entries.filter((e) => installedIds.has(e.catalogGameId))
-    : entries
-  ).slice().sort((a, b) => {
-    const aInstalled = installedIds.has(a.catalogGameId) ? 1 : 0;
-    const bInstalled = installedIds.has(b.catalogGameId) ? 1 : 0;
-    if (aInstalled !== bInstalled) return bInstalled - aInstalled;
-    return a.displayName.localeCompare(b.displayName);
-  });
+  const visible = entries
+    .filter((e) => {
+      if (installedOnly && !installedIds.has(e.catalogGameId)) return false;
+      if (runningOnly && !runningIds.has(e.catalogGameId)) return false;
+      if (needsReverifyOnly && !entryNeedsReverify(e.catalogGameId)) return false;
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      if (sortMode === 'a-z') {
+        return a.displayName.localeCompare(b.displayName);
+      }
+      const aInstalled = installedIds.has(a.catalogGameId) ? 1 : 0;
+      const bInstalled = installedIds.has(b.catalogGameId) ? 1 : 0;
+      if (aInstalled !== bInstalled) return bInstalled - aInstalled;
+      return a.displayName.localeCompare(b.displayName);
+    });
 
   const activeFilterSummary =
     [
       genreFilters.length > 0 ? genreFilters.join(', ') : null,
       tierFilter !== 'all' ? tierFilter : null,
       installedOnly ? 'installed' : null,
+      runningOnly ? 'running' : null,
+      needsReverifyOnly ? 'needs re-verify' : null,
+      sortMode === 'a-z' ? 'A–Z' : null,
     ]
       .filter(Boolean)
       .join(' · ') || null;
 
+  const resetLibraryFilters = () => {
+    setInstalledOnly(false);
+    setRunningOnly(false);
+    setNeedsReverifyOnly(false);
+  };
+
   return (
-    <div className={styles.page}>
+    <div
+      className={`${styles.page}${dragOver ? ` ${styles.pageDragOver}` : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => void handleDropExe(e)}
+    >
       <PageModuleHeader
         artwork="trainerController"
         className={styles.header}
@@ -538,7 +658,7 @@ export default function TrainerLibraryPage({
               className={tierFilter === f ? styles.filterActive : styles.filterBtn}
               onClick={() => {
                 setTierFilter(f);
-                setInstalledOnly(false);
+                resetLibraryFilters();
               }}
             >
               {f === 'metadata-only' ? 'Metadata' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -551,6 +671,44 @@ export default function TrainerLibraryPage({
             aria-pressed={installedOnly}
           >
             Installed
+          </button>
+          <button
+            type="button"
+            className={runningOnly ? styles.filterActive : styles.filterBtn}
+            onClick={() => setRunningOnly((v) => !v)}
+            aria-pressed={runningOnly}
+          >
+            Running
+          </button>
+          <button
+            type="button"
+            className={needsReverifyOnly ? styles.filterActive : styles.filterBtn}
+            onClick={() => setNeedsReverifyOnly((v) => !v)}
+            aria-pressed={needsReverifyOnly}
+          >
+            Needs re-verify
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Sort</span>
+        <div className={styles.filters}>
+          <button
+            type="button"
+            className={sortMode === 'installed-first' ? styles.filterActive : styles.filterBtn}
+            onClick={() => setSortMode('installed-first')}
+            aria-pressed={sortMode === 'installed-first'}
+          >
+            Installed first
+          </button>
+          <button
+            type="button"
+            className={sortMode === 'a-z' ? styles.filterActive : styles.filterBtn}
+            onClick={() => setSortMode('a-z')}
+            aria-pressed={sortMode === 'a-z'}
+          >
+            A–Z
           </button>
         </div>
       </div>
@@ -601,6 +759,7 @@ export default function TrainerLibraryPage({
               entry={entry}
               trust={trustMeta[entry.catalogGameId]}
               installed={installedIds.has(entry.catalogGameId)}
+              running={runningIds.has(entry.catalogGameId)}
               healthStatus={healthMap[entry.catalogGameId]?.status}
               onLaunch={handleLaunch}
               onExport={handleExportYaml}

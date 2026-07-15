@@ -1,6 +1,7 @@
 # Fresh-clone verification — 2026-07-15
 
-**Status:** PASS on `master` @ `620e76d` · **Not release-tagged** (await explicit **TAG IT** for `v2.1-shell-polish`)
+**Status:** PASS · tags cut: `v2.1-shell-polish` @ `0928d29`, `v2.2-wemod-adoption` @ `6ddefb8`  
+**Original gate commit:** `620e76d` (pre-tag evidence path)
 
 ## Context
 

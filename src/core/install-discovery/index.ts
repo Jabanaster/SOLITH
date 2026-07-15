@@ -11,8 +11,18 @@ import type { InstallDiscoveryOptions, InstallDiscoveryScanResult, InstalledGame
 
 export function discoverRawInstalls(options: InstallDiscoveryOptions = {}) {
   const steam = scanSteamInstalls(options);
-  const epic = options.offlineRootsOnly ? [] : scanEpicInstalls(options);
-  const gog = options.offlineRootsOnly ? [] : scanGogInstalls();
+  // Epic: allow fixture manifests even when offlineRootsOnly is set.
+  const epic =
+    options.offlineRootsOnly && !options.epicManifestsPath
+      ? []
+      : scanEpicInstalls(options);
+  // GOG: allow fixture JSON even when offlineRootsOnly is set; skip live registry otherwise.
+  const gog =
+    options.gogFixturePath
+      ? scanGogInstalls(options)
+      : options.offlineRootsOnly
+        ? []
+        : scanGogInstalls(options);
   return [...steam, ...epic, ...gog];
 }
 

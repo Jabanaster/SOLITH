@@ -4,11 +4,12 @@
 
 Product UI: **Solith** · package `resourceforge@2.0.0`
 
-* Remote `master` @ `a9483f6` (shell polish / save UX / live-memory harden)
+* Remote `master` @ `6ddefb8` (AG WeMod adoption polish)
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
-* Evidence-pack branch (proposal + Terraria stub): `cursor/release-evidence-proposal-and-terraria-fixture`
-* Candidate tag (not cut): `v2.1-shell-polish` — only after clean-tree fresh-clone gates + **TAG IT**
+* Shell polish tag: `v2.1-shell-polish` → `0928d29`
+* Adoption tag: `v2.2-wemod-adoption` → `6ddefb8` (pushed)
+* Active offline sweep branch: `cursor/offline-sweep-after-v2-2`
 
 ### Accepted capability stack
 
@@ -33,19 +34,19 @@ In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by defaul
 | **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
 | **S** | Connection baselines + restart-stable pointers | **Blocked** — live sessions |
 | **T** | 50 bundled + 1000 catalog seed | **Done** |
-| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — L3/L4 runs blocked on live sessions |
+| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — offline L0/L1 + catalog-id path; L2–L4 live-blocked |
 | **V** | Feedback, promotion, rating prompt | **Done** |
 | **W** | CT import, pointer scan, watch-list, speedhack | **Done** |
 | **X** | Binary save router + research stubs | **Partial** — demo profiles + stub fixture; commercial `canWrite` blocked |
 | **Y** | Overlay presets, hotkey rebind, onboarding | **Done** |
 | **Z** | Managed runtime (.NET/Mono) | **Not started** |
 | **AA** | Install discovery (Steam/Epic/GOG) | **Done** |
-| **AB** | Library installed/running badges | **Done** (installed badge + filter; running via toast) |
+| **AB** | Library installed/running badges + filters/sort/drag-exe | **Done** (offline sweep) |
 | **AC** | Per-game Trainer Deck | **Done** |
 | **AD** | Stale / version health engine | **Done** |
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
-| **AG** | Adoption polish + smoke alignment | **Done** — smoke 22/22, matrix, overlay bounds + tests |
+| **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
 
 ### Shell polish / evidence (2026-07)
 
@@ -60,7 +61,8 @@ In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by defaul
 | Research Lab (L) | `cdd8c51` / tag `v1-milestone-l-research-lab-accepted` |
 | In-process pilot (M) | `97326d7` / tag `v1-milestone-m-in-process-pilot-accepted` |
 | Save UX + live-memory/catalog harden | `a9483f6` |
-| Evidence pack proposal + Terraria stub | branch commit (pending merge) |
+| Shell polish acceptance | tag `v2.1-shell-polish` → `0928d29` |
+| AG smoke + matrix + overlay bounds | `6ddefb8` / tag `v2.2-wemod-adoption` |
 
 ### Bundled schema.v1 definitions
 
@@ -79,13 +81,16 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 
 - ~~Banner/background asset masters (1920×420 / 1920×1080)~~ — done (`npm run prepare:branding`)
 - ~~Onboarding auto-skip in test env (E2E reliability)~~ — done (`NODE_ENV=test` / `SOLITH_SKIP_ONBOARDING`)
-- Fresh-clone / `v2.1-shell-polish` evidence pack — **PASS** at `620e76d` (`Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-15.md`); await **PUSH IT** then **TAG IT**
+- ~~Fresh-clone / `v2.1-shell-polish` evidence pack~~ — PASS (`Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-15.md`); tag cut
 - ~~Steam AppID → executable lookup table in seed generator~~ — done
 - ~~Community → verified promotion UI in Trainer Library~~ — done
 - ~~Hotkey OS-reserved shortcut warnings~~ — done
 - ~~CI split (fast PR vs nightly E2E)~~ — `.github/workflows/ci-fast.yml` + `ci-nightly.yml`
 - ~~UI hierarchy doc~~ — `Docs/SOLITH_UI_HIERARCHY.md`
-- Adoption **AG** — packaged-smoke parseSave `(gameId, path)` + raster banner locator (**done** on `cursor/ag-packaged-smoke-alignment`)
+- ~~Adoption AG~~ — packaged-smoke + matrix + tag `v2.2-wemod-adoption`
+- Library AB polish (running badge, filters, sort, drag `.exe`) — on `cursor/offline-sweep-after-v2-2`
+- Certification docs + `certify-cheat --catalog-game-id` — on offline sweep branch
+- Shared live-watch confidence helper + Epic/GOG discovery fixtures — on offline sweep branch
 
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.

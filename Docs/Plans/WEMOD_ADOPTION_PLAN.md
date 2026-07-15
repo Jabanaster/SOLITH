@@ -1,8 +1,8 @@
 # WeMod Adoption Plan — Solith / ResourceForge
 
-**Status:** AA–AF **shipped** on `master` (Milestone M commit); **AG planned**  
+**Status:** AA–AG **shipped** · tag `v2.2-wemod-adoption` @ `6ddefb8`  
 **Product:** Solith 2.0+ (`resourceforge@2.0.0`)  
-**Baseline:** `master` @ `a9483f6` · L/M tagged · Research Lab + In-process pilot locked  
+**Baseline:** `master` @ `6ddefb8` · L/M tagged · `v2.1-shell-polish` + `v2.2-wemod-adoption`  
 **Date:** 2026-07-15 (status refresh)  
 
 ---

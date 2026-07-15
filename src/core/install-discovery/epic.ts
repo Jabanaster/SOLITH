@@ -26,7 +26,8 @@ export function scanEpicInstalls(options: InstallDiscoveryOptions = {}): RawInst
 
   for (const file of files) {
     try {
-      const raw = JSON.parse(fs.readFileSync(path.join(manifestsDir, file), 'utf8')) as EpicManifestItem;
+      const text = fs.readFileSync(path.join(manifestsDir, file), 'utf8').replace(/^\uFEFF/, '');
+      const raw = JSON.parse(text) as EpicManifestItem;
       const installPath = raw.InstallLocation?.trim();
       if (!installPath || !fs.existsSync(installPath)) continue;
 

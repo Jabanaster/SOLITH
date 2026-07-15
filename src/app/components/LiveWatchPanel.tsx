@@ -1,57 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styles from './LiveWatchPanel.module.css';
 import type { ScanCandidate } from '../hooks/useGameCheatSession.js';
+import { computeWatchConfidence } from '../../core/live-memory/watch-confidence.js';
 
 interface WatchRow extends ScanCandidate {
   changedCount: number;
   justChanged: boolean;
-}
-
-interface Confidence {
-  score: number;
-  reasons: string[];
-}
-
-/**
- * Scores a candidate using only signals already collected by the poll loop —
- * no event tagging or UI-value matching yet (those are real future upgrades,
- * not built here). A real stat changes sometimes but not every single tick
- * (that's a frame counter/timer) and not never (that's static or the wrong
- * field entirely) — the sweet spot in between is the strongest signal this
- * panel can compute today.
- */
-function computeConfidence(row: WatchRow, totalPolls: number): Confidence {
-  if (totalPolls === 0) return { score: 0, reasons: ['Not enough data yet'] };
-
-  const changeRatio = row.changedCount / totalPolls;
-  const reasons: string[] = [];
-  let score = 50;
-
-  if (row.changedCount === 0) {
-    score -= 35;
-    reasons.push('Never changed — likely static, MaxHealth-style, or the wrong field');
-  } else if (changeRatio > 0.85) {
-    score -= 25;
-    reasons.push('Changes almost every tick — likely a timer, frame counter, or animation value');
-  } else if (changeRatio >= 0.05 && changeRatio <= 0.6) {
-    score += 30;
-    reasons.push('Changes intermittently — consistent with a real stat responding to actions');
-  } else {
-    score += 10;
-    reasons.push('Changes occasionally');
-  }
-
-  if (row.dataType === 'float' || row.dataType === 'double') {
-    score += 5;
-    reasons.push('Stored as a decimal type, typical for bars/percentages');
-  }
-
-  if (row.value < 0) {
-    score -= 20;
-    reasons.push('Currently negative — unusual for a health/stamina-style stat');
-  }
-
-  return { score: Math.max(0, Math.min(100, score)), reasons };
 }
 
 interface LiveWatchPanelProps {
@@ -142,7 +96,7 @@ export const LiveWatchPanel: React.FC<LiveWatchPanelProps> = ({
     return () => clearTimeout(timeout);
   }, [rows]);
 
-  const scored = rows.map((row) => ({ row, confidence: computeConfidence(row, totalPolls) }));
+  const scored = rows.map((row) => ({ row, confidence: computeWatchConfidence(row, totalPolls) }));
   const sorted = [...scored].sort((a, b) => b.confidence.score - a.confidence.score);
 
   return (

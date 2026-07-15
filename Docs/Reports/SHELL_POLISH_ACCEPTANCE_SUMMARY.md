@@ -1,4 +1,7 @@
-# Shell polish acceptance summary — `v2.1-shell-polish` candidate
+# Shell polish acceptance summary — `v2.1-shell-polish`
+
+**Tag:** `v2.1-shell-polish` → `0928d29` (annotated, pushed)  
+**Follow-on adoption tag:** `v2.2-wemod-adoption` → `6ddefb8`
 
 **Status:** Evidence for tag candidate — **gates PASS** at `620e76d`; artifacts on `master` tip including this summary · **do not tag** until user says **TAG IT**  
 **Date:** 2026-07-15  
