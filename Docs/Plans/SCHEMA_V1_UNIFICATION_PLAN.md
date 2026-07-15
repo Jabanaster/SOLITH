@@ -1,11 +1,11 @@
 # Schema.v1 Unification Plan — Control Catalog Consolidation
 
-**Status:** Draft for review (analysis only — no consolidation code)  
-**Scope:** Consolidate competing control catalogs so `schema.v1` is the single authoritative capability contract  
-**Mode:** Phased migration — no big-bang cutover  
+**Status:** Draft for Phase 0→1 review — **no consolidation code until you sign off**  
+**Stability prerequisite:** green `master` @ offline-sweep merge (`ac43ec6`+) with CI Fast **656/656**
 
 ```
-STOP: await user approval before writing consolidation code
+STOP: await user approval of this blueprint (esp. IPC / data constraints) before writing consolidation code
+NEXT_BRANCH: create a NEW branch from green master for Phase 0→1 (do not reuse offline-sweep)
 ```
 
 ---
@@ -124,10 +124,46 @@ Each phase ends with **user approval** before the next.
 
 ---
 
-## 9. Stop gate
+## 9. Phase 0→1 blueprint review checklist (IPC + data constraints)
+
+Review these before approving implementation. Phase 1 is **additive only** (derive capability badges; no SoT deletion).
+
+### Must not introduce (IPC)
+
+| Risk | Mitigation in Phase 0→1 |
+|------|-------------------------|
+| New execute / write channels | **Forbidden** in Phase 1 — derive/read only |
+| Widening `liveMemory*` or `trainerCatalog*` invoke surface with new execute verbs | Prefer extending existing **load/capability** responses |
+| Returning executable controls for metadata-only seed games | Capabilities must default `none` / `scan-required`, never claim execute |
+| Injection enablement via catalog IPC | Injection lane stays `forbidden` / `pilot-gated`; no new inject channels |
+| Dual authority (UI trusts badges, IPC still executes via ALL_GAMES) | Phase 1 badges are advisory; Phase 2+ enforcement only after inventory |
+
+### Must not drop (data constraints)
+
+| Constraint | Preserve |
+|------------|----------|
+| Stardew Milestone J field paths (4 save controls) | Identical paths after any Stardew definition preference |
+| `safetyStatus: requires_approval` on save writes | Unchanged |
+| Online guard + offline confirm for live writes | Unchanged |
+| Catalog seed 1000+ searchable metadata rows | Index remains; no mass delete |
+| Certification levels / quarantine / promotion records | Preserve store tables and payload hashes |
+| `inProcessScriptExecutionEnabled` default OFF + `CrimsonDesert.exe` only | Charter untouched |
+
+### Phase 0 deliverable (docs only)
+
+Consumer inventory: every import of `ALL_GAMES`, `live-control-catalog`, `loadGameProfile`, and every IPC handler that returns controls/capabilities — with ID map (`gameId` ↔ `catalogGameId` ↔ executable).
+
+### Phase 1 deliverable (code, after sign-off)
+
+Additive `catalogDefinitionCapabilities` (or sibling) + optional Library badges; behavior of write/execute paths unchanged; tests for Stardew (save), one memory title (scan-required), one metadata-only seed game.
+
+---
+
+## 10. Stop gate
 
 ```
-STOP: await user approval before writing consolidation code
+STOP: await user approval of this blueprint (IPC + data checklist above) before writing consolidation code
+NEXT_BRANCH: new branch from green master for Phase 0→1 (not offline-sweep)
 ```
 
 Approve Phase 0→1 (or a named subset) explicitly before any implementation PR.

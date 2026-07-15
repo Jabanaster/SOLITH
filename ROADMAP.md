@@ -4,12 +4,22 @@
 
 Product UI: **Solith** · package `resourceforge@2.0.0`
 
-* Remote `master` @ `6ddefb8` (AG WeMod adoption polish)
+* Remote **`master` @ `ac43ec6`** — offline sweep + CI/honesty stabilization **merged** (2026-07-15)
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
-* Adoption tag: `v2.2-wemod-adoption` → `6ddefb8` (pushed)
-* Active offline sweep branch: `cursor/offline-sweep-after-v2-2`
+* Adoption tag: `v2.2-wemod-adoption` → `6ddefb8` (tag tip; master tip is ahead at `ac43ec6`)
+* Merged branch (landing complete): `cursor/offline-sweep-after-v2-2`
+
+### Stability lock (do not open catalog consolidation until green)
+
+| Gate | Status |
+|------|--------|
+| Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
+| Local `npm test` | **656/656 PASS** (verified on merge tip) |
+| CI Fast on `master` | Target **656/656** — CI portability fix for install-discovery fixtures + `build:electron` pretest in workflow |
+| Catalog unification / schema.v1 SoT | **Not started** — Phase 0→1 awaiting blueprint review |
+| Separate concerns | Consolidation MUST use a **new branch** from green `master` |
 
 ### Accepted capability stack
 
@@ -24,12 +34,14 @@ Trainer Research Lab → PE / memory diff / Script Analyzer / Dumpspace (Milesto
 In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by default)
 ```
 
+Honest live-memory stance (README): bundled memory features are **L0 `scan_unknown` / Discovery-required**, not verified pointer packs.
+
 ### Milestone map (recent)
 
 | Milestone | Theme | Status |
 |-----------|--------|--------|
 | **L** | Research Lab — PE, memory diff, script analyzer, Dumpspace | **Accepted** (tag + remote) |
-| **M** | In-process pilot — Crimson Desert hooks / trainer spawn | **Accepted** (tag + remote) |
+| **M** | In-process pilot — Crimson Desert hooks / trainer spawn | **Accepted** (tag + remote); user charter + default OFF |
 | **M–Q** *(legacy lettering)* | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
 | **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
 | **S** | Connection baselines + restart-stable pointers | **Blocked** — live sessions |
@@ -41,12 +53,13 @@ In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by defaul
 | **Y** | Overlay presets, hotkey rebind, onboarding | **Done** |
 | **Z** | Managed runtime (.NET/Mono) | **Not started** |
 | **AA** | Install discovery (Steam/Epic/GOG) | **Done** |
-| **AB** | Library installed/running badges + filters/sort/drag-exe | **Done** (offline sweep) |
+| **AB** | Library installed/running badges + filters/sort/drag-exe | **Done** (on `master`) |
 | **AC** | Per-game Trainer Deck | **Done** |
 | **AD** | Stale / version health engine | **Done** |
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
 | **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
+| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Planned** — review `Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md` |
 
 ### Shell polish / evidence (2026-07)
 
@@ -63,6 +76,7 @@ In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by defaul
 | Save UX + live-memory/catalog harden | `a9483f6` |
 | Shell polish acceptance | tag `v2.1-shell-polish` → `0928d29` |
 | AG smoke + matrix + overlay bounds | `6ddefb8` / tag `v2.2-wemod-adoption` |
+| Offline sweep + CI/honesty lock | `20739f5` + `ac43ec6` → **`master`** |
 
 ### Bundled schema.v1 definitions
 
@@ -77,21 +91,15 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 4. Commercial binary save writes without sandbox fixtures (Terraria `.plr` wave 1)
 5. Managed-runtime live memory spike (Milestone Z)
 
-### Can continue offline
+### Can continue offline (post-merge)
 
-- ~~Banner/background asset masters (1920×420 / 1920×1080)~~ — done (`npm run prepare:branding`)
-- ~~Onboarding auto-skip in test env (E2E reliability)~~ — done (`NODE_ENV=test` / `SOLITH_SKIP_ONBOARDING`)
-- ~~Fresh-clone / `v2.1-shell-polish` evidence pack~~ — PASS (`Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-15.md`); tag cut
-- ~~Steam AppID → executable lookup table in seed generator~~ — done
-- ~~Community → verified promotion UI in Trainer Library~~ — done
-- ~~Hotkey OS-reserved shortcut warnings~~ — done
-- ~~CI split (fast PR vs nightly E2E)~~ — `.github/workflows/ci-fast.yml` + `ci-nightly.yml`
-- ~~UI hierarchy doc~~ — `Docs/SOLITH_UI_HIERARCHY.md`
-- ~~Adoption AG~~ — packaged-smoke + matrix + tag `v2.2-wemod-adoption`
-- Library AB polish (running badge, filters, sort, drag `.exe`) — on `cursor/offline-sweep-after-v2-2`
-- Certification docs + `certify-cheat --catalog-game-id` — on offline sweep branch
-- Shared live-watch confidence helper + Epic/GOG discovery fixtures — on offline sweep branch
+- ~~Offline sweep AB / cert docs / watch-confidence / Epic/GOG fixtures~~ — **on master**
+- ~~Catalog search test isolation (`:memory:`) + CI fresh-clone `656/656`~~ — **on master**
+- ~~README L0 honesty + in-process user charter~~ — **on master**
+- **Next (separate branch only):** schema.v1 unification Phase 0 inventory → Phase 1 additive capability derivation — **after** blueprint review sign-off
+- Live S / U L2+ still require game sessions
 
+See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** for catalog SoT unification (review before Phase 0→1).  
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
 

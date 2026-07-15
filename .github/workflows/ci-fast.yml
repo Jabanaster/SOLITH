@@ -17,6 +17,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      - name: Build electron host bundle (required by trainer-host e2e in npm test)
+        run: npm run build:electron
       - name: Run tests
         run: npm test | Tee-Object -FilePath npm-test.log
       - name: Verify fresh-clone report counts

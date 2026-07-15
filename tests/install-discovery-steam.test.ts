@@ -1,5 +1,6 @@
-import { describe, test } from 'node:test';
+import { before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseVdf, vdfStringValue } from '../src/core/install-discovery/vdf.ts';
@@ -7,6 +8,7 @@ import { scanSteamInstalls } from '../src/core/install-discovery/steam.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STEAM_FIXTURE_ROOT = path.join(__dirname, 'fixtures', 'steam-root');
+const STARDEW_DIR = path.join(STEAM_FIXTURE_ROOT, 'steamapps', 'common', 'Stardew Valley');
 
 describe('install-discovery vdf', () => {
   test('parses appmanifest appid and installdir', () => {
@@ -23,6 +25,28 @@ describe('install-discovery vdf', () => {
 });
 
 describe('install-discovery steam scan', () => {
+  before(() => {
+    // Install tree is not fully committed (*.exe gitignored) — materialize for CI.
+    fs.mkdirSync(STARDEW_DIR, { recursive: true });
+    fs.writeFileSync(path.join(STARDEW_DIR, 'Stardew Valley.exe'), '');
+    // Keep libraryfolders.vdf portable: only reference this fixture root.
+    const vdfPath = STEAM_FIXTURE_ROOT.replace(/\\/g, '\\\\');
+    fs.writeFileSync(
+      path.join(STEAM_FIXTURE_ROOT, 'steamapps', 'libraryfolders.vdf'),
+      `"libraryfolders"
+{
+	"folders"
+	{
+		"0"
+		{
+			"path"		"${vdfPath}"
+		}
+	}
+}
+`,
+    );
+  });
+
   test('discovers Stardew Valley from fixture manifests', () => {
     const games = scanSteamInstalls({ steamInstallPath: STEAM_FIXTURE_ROOT });
     assert.equal(games.length, 1);

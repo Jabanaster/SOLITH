@@ -1,15 +1,34 @@
-import { describe, test } from 'node:test';
+import { before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanEpicInstalls } from '../src/core/install-discovery/epic.ts';
 import { scanGogInstalls } from '../src/core/install-discovery/gog.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const EPIC_GAME = path.join(__dirname, 'fixtures', 'epic-game');
 const EPIC_MANIFESTS = path.join(__dirname, 'fixtures', 'epic-manifests');
+const GOG_GAME = path.join(__dirname, 'fixtures', 'gog-game');
 const GOG_FIXTURE = path.join(__dirname, 'fixtures', 'gog-games.json');
 
 describe('install-discovery epic scan', () => {
+  before(() => {
+    fs.mkdirSync(EPIC_GAME, { recursive: true });
+    fs.mkdirSync(EPIC_MANIFESTS, { recursive: true });
+    fs.writeFileSync(path.join(EPIC_GAME, 'Hades2.bin'), '');
+    // Absolute InstallLocation must exist on the runner (never hardcode a machine path).
+    fs.writeFileSync(
+      path.join(EPIC_MANIFESTS, 'Hades2.item'),
+      JSON.stringify({
+        DisplayName: 'Hades II',
+        InstallLocation: EPIC_GAME,
+        LaunchExecutable: 'Hades2.bin',
+        AppName: 'Hades2',
+      }),
+    );
+  });
+
   test('discovers game from fixture .item manifests', () => {
     const games = scanEpicInstalls({ epicManifestsPath: EPIC_MANIFESTS });
     assert.equal(games.length, 1);
@@ -26,6 +45,21 @@ describe('install-discovery epic scan', () => {
 });
 
 describe('install-discovery gog scan', () => {
+  before(() => {
+    fs.mkdirSync(GOG_GAME, { recursive: true });
+    fs.writeFileSync(path.join(GOG_GAME, 'DemoGame.bin'), '');
+    fs.writeFileSync(
+      GOG_FIXTURE,
+      JSON.stringify([
+        {
+          path: GOG_GAME,
+          exe: 'DemoGame.bin',
+          gameName: 'GOG Demo Game',
+        },
+      ]),
+    );
+  });
+
   test('discovers game from fixture JSON', () => {
     const games = scanGogInstalls({ gogFixturePath: GOG_FIXTURE });
     assert.equal(games.length, 1);
