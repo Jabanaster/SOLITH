@@ -6,30 +6,30 @@ ResourceForge is strictly designed for single-player, offline games or applicati
 
 ---
 
-## 🎮 Multi-Game Live Trainer & Cheat Hub
+## Multi-Game Live Trainer & Cheat Hub
 
-ResourceForge includes a **one-click live trainer** with pre-curated cheats for 7 popular games. Toggling a cheat drives a real scan → narrow → confirm → write workflow against live process memory (no stubs) for the six memory-scan titles; Stardew Valley's console-command cheats are catalogued but not yet executed automatically.
+ResourceForge includes a **discovery-first live trainer** for curated titles plus a **save-field editor** for Stardew Valley. Memory cheats are **not** shipped as verified pointer packs. Bundled live features are typically **L0 `scan_unknown`**: you must discover (scan → narrow → confirm) addresses each session; addresses are session-local unless separately restart-verified (L3+), which is not claimed here.
 
-| Game | Cheats defined | Discovery | Wired to real memory I/O |
-|------|-----------------|-----------|---------------------------|
-| **Palworld** | 26 | Memory scan | ✅ |
-| **Undisputed** | 11 | Memory scan | ✅ |
-| **Atomfall** | 10 | Memory scan | ✅ |
-| **Avowed** | 10 | Memory scan | ✅ |
-| **Dredge** | 10 | Memory scan | ✅ |
-| **Stardew Valley** | 9 | Save fields + console catalog | ✅ Save editor (money, stamina, XP, max stamina) · ⏳ Console executor not built |
-| **Crimson Desert** | 8 | Memory scan | ✅ |
+| Game | Cheat defs (approx.) | Backend | Certification / honesty |
+|------|----------------------|---------|-------------------------|
+| **Palworld** | 26 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
+| **Undisputed** | 11 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
+| **Atomfall** | 10 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
+| **Avowed** | 10 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
+| **Dredge** | 10 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
+| **Stardew Valley** | 9 catalogued · 4 executable save fields | Save editor | Accepted save-field controls (money, stamina, XP, max stamina). Console-command catalog is **not** auto-executed |
+| **Crimson Desert** | 8+ (CT metadata) | Live memory (+ optional in-process pilot) | Memory path: **L0** Discovery. In-process hooks: **OFF by default**, `CrimsonDesert.exe` only — see [IN_PROCESS_PILOT_SAFETY_CHARTER.md](Docs/IN_PROCESS_PILOT_SAFETY_CHARTER.md) |
 
-### **Features:**
-✅ **One-click cheat toggles** organized by category, with per-game Steam artwork  
-✅ **Real, per-cheat memory discovery** — no shared/global scan state; each cheat scans and narrows independently  
-✅ **Freeze value** (infinite health/stamina toggle — continuous re-write at 200ms)  
-✅ **Online-session guard** (fails-closed if game has active network connections)  
-✅ **Session-local caching** (discovered addresses cached for the session)  
-✅ **F1–F12 trainer hotkeys** for armed cheats during a live session (gated live-memory mode)  
-✅ **In-game overlay** sync for active cheat state (gated live-memory mode)  
+### Features (accurate scope)
 
-### **Quick Start:**
+- Per-cheat **Discovery** workflow (scan → narrow → confirm → write) for memory titles — not pre-wired verified pointers  
+- Freeze value (continuous rewrite while armed) after a successful discovery  
+- Online-session guard (fail-closed without offline confirmation + connection evidence)  
+- Session-local address cache (not restart-stable unless L3-certified elsewhere)  
+- F1–F12 hotkeys / overlay when live-memory mode is enabled in settings  
+- Stardew Valley **save-field** writes via TrainerHost with approval / backup  
+
+### Quick Start:
 
 1. **Setup antivirus whitelist** (prevents false positives):
    ```powershell

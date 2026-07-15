@@ -19,8 +19,9 @@ registersymbol(INJECT_FAST_FRIENDSHIP)
 `;
 
 describe('in-process script execution milestone', () => {
-  test('charter limits pilot to CrimsonDesert.exe', () => {
+  test('charter limits pilot to CrimsonDesert.exe and defaults OFF', () => {
     assert.deepEqual(IN_PROCESS_SCRIPT_MILESTONE.pilotExecutables, ['CrimsonDesert.exe']);
+    assert.equal(IN_PROCESS_SCRIPT_MILESTONE.defaultFeatureEnabled, false);
   });
 
   test('gate blocks when feature disabled or wrong executable', () => {

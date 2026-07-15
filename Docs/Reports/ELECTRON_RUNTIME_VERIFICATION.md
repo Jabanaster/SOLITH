@@ -7,31 +7,32 @@
 
 ### tsup Configuration
 - Entry: `electron/main.ts` → `dist-electron/main.js` (ESM, Node 22 target)
-- Entry: `electron/preload.ts` → `dist-electron/preload.js` (ESM, Node 22 target)
+- Entry: `electron/preload.ts` → `dist-electron/preload.cjs` (CommonJS for Electron sandbox preload)
 - Externals: `electron`, `better-sqlite3`
 - All relative imports bundled inline — no bare relative imports at runtime
 - `__dirname`/`__filename`/`require` shims injected via banner
 
 ### Output Verifier (scripts/verify-electron-output.mjs)
-Checks performed (18 total):
+Checks performed (19 total):
 1. main.js exists
-2. preload.js exists
+2. preload.cjs exists
 3. main.js has no .ts imports
-4. preload.js has no .ts imports
+4. preload.cjs has no .ts imports
 5. main.js has no bare relative imports
-6. preload.js has no bare relative imports
+6. preload.cjs has no bare relative imports
 7. main.js does not import from .gemini
-8. preload.js does not import from .gemini
+8. preload.cjs does not import from .gemini
 9. main.js does not import a test runner
-10. preload.js uses contextBridge
-11. preload.js uses exposeInMainWorld
+10. preload uses contextBridge
+11. preload uses exposeInMainWorld
 12. main.js has nodeIntegration: false
 13. main.js has contextIsolation: true
 14. main.js has single-instance lock
 15. main.js > 10 KB
 16. main.js < 5 MB
-17. preload.js > 100 bytes
-18. preload.js < 100 KB
+17. preload.cjs > 100 bytes
+18. preload.cjs < 100 KB
+19. (additional bundle sanity as implemented in verifier)
 
 ### Verification Status
 Runs automatically as part of `npm run build:electron`. Build fails if any check fails.

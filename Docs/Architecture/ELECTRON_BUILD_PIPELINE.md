@@ -17,8 +17,10 @@ The original approach used `tsc` (TypeScript compiler) followed by a custom ESM 
 ## Current Setup
 
 ### Entries
-- `electron/main.ts` → `dist-electron/main.js`
-- `electron/preload.ts` → `dist-electron/preload.js`
+- `electron/main.ts` → `dist-electron/main.js` (ESM)
+- `electron/preload.ts` → `dist-electron/preload.cjs` (CommonJS — required for Electron `sandbox` / contextIsolation preload)
+
+Electron `BrowserWindow` preload path must resolve to **`preload.cjs`**, not `preload.js`.
 
 ### Externals
 - `electron` — provided by the Electron runtime
@@ -38,11 +40,11 @@ const __dirname = dirname(__filename);
 
 ### Output verification
 `scripts/verify-electron-output.mjs` runs automatically after every `build:electron` invocation. It checks:
-- Both output files exist
+- Both output files exist (`main.js`, `preload.cjs`)
 - No `.ts` imports in output
 - No bare relative imports
 - No test runner used as main
-- `contextBridge` and `exposeInMainWorld` present in preload
+- `contextBridge` and `exposeInMainWorld` present in preload (`preload.cjs`)
 - `nodeIntegration: false` and `contextIsolation: true` in main
 - Single-instance lock present
 - Bundle size sanity (main > 10 KB, < 5 MB; preload > 100 bytes, < 100 KB)

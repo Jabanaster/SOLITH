@@ -1,4 +1,4 @@
-# ResourceForge Agent Skill File
+﻿# ResourceForge Agent Skill File
 
 ## Identity
 
@@ -8,7 +8,7 @@ ResourceForge is a local-only, offline-only, single-player trainer/save-editor a
 
 Project root:
 ```
-G:\GAME TRAINER
+G:\ACTIVE_PROJECTS\ResourceForge
 ```
 
 Repository:
@@ -42,7 +42,7 @@ If you cannot reread this file, stop and report:
 ```
 STATUS=BLOCKED
 REASON=Could not reread AGENTS.md
-NEXT_SAFE_COMMAND=Get-Content "G:\GAME TRAINER\AGENTS.md" -First 120
+NEXT_SAFE_COMMAND=Get-Content "G:\ACTIVE_PROJECTS\ResourceForge\AGENTS.md" -First 120
 ```
 
 ---
@@ -60,7 +60,7 @@ Has it been about 5 minutes or more since LAST_SKILL_REREAD_TIME?
 
 If yes, reread:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 Get-Content "AGENTS.md" -First 200
 ```
 Then continue. If no, continue.
@@ -129,7 +129,7 @@ STOP=<YES/NO>
 For command tasks, use:
 ```
 RUN:
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 <command>
 
 PASTE:
@@ -173,7 +173,7 @@ Bad:
 {
   "name": "read_file",
   "arguments": {
-    "path": "G:\\GAME TRAINER\\AGENTS.md"
+    "path": "G:\\ACTIVE_PROJECTS\\ResourceForge\\AGENTS.md"
   }
 }
 ```
@@ -233,18 +233,18 @@ The target shell for this project is Windows PowerShell 5.1 or newer.
 
 Preferred shell command format:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 <command>
 ```
 
 If a command fails because the active shell is not PowerShell, explicitly invoke PowerShell:
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\GAME TRAINER'; <command>"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\ACTIVE_PROJECTS\ResourceForge'; <command>"
 ```
 
 For reading this file specifically, use:
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content 'G:\GAME TRAINER\AGENTS.md' -First 200"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content 'G:\ACTIVE_PROJECTS\ResourceForge\AGENTS.md' -First 200"
 ```
 
 Do not translate PowerShell commands into Git Bash, WSL, Linux shell, or cmd.exe syntax unless the user explicitly asks.
@@ -253,7 +253,7 @@ If shell ambiguity prevents safe execution, stop and report:
 ```
 STATUS=BLOCKED
 REASON=Shell ambiguity prevents safe command execution
-NEXT_SAFE_COMMAND=powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\GAME TRAINER'; git status --short"
+NEXT_SAFE_COMMAND=powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\ACTIVE_PROJECTS\ResourceForge'; git status --short"
 ```
 
 ---
@@ -262,14 +262,14 @@ NEXT_SAFE_COMMAND=powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:
 
 Before any Git, npm, node, test, build, or file command, run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 ```
 
 Never run project commands from `C:\WINDOWS\system32`.
 
 If you notice the shell is there, immediately correct with:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 ```
 
 ---
@@ -277,7 +277,7 @@ cd "G:\GAME TRAINER"
 ## Source of Truth Hierarchy
 
 1. Real command output from the repository.
-2. Files currently in `G:\GAME TRAINER`.
+2. Files currently in `G:\ACTIVE_PROJECTS\ResourceForge`.
 3. Current `AGENTS.md`.
 4. User's latest explicit instruction.
 5. Prior summaries only if they do not conflict with current repo state.
@@ -384,7 +384,7 @@ symlinks or junctions used to escape approved folders
 
 For project files, all write operations must stay inside:
 ```
-G:\GAME TRAINER
+G:\ACTIVE_PROJECTS\ResourceForge
 ```
 
 For real game save files, default mode is **read-only** unless the user explicitly authorizes a specific write operation.
@@ -429,13 +429,22 @@ v2OverlayEnabled (always-on-top trainer overlay window)
 memory_write backend in trainer-control-schema
 ```
 
-**Still forbidden (non-negotiable):**
+**Still forbidden on the mainstream live-memory path (non-negotiable):**
 ```
-DLL injection / code injection / kernel drivers
+DLL injection / code injection / kernel drivers (except quarantined in-process pilot below)
 anti-cheat bypass / stealth / debugger attachment for bypass
 packet capture
 online or multiplayer targeting (online guard remains fail-closed)
 scraping or auto-installing third-party trainer binaries (remote listing sites, etc.)
+```
+
+**Quarantined exception (Milestone M in-process pilot — OFF by default):**
+```
+inProcessScriptExecutionEnabled defaults false
+pilot executable only: CrimsonDesert.exe
+opt-in hooks / code-cave / injector helpers under charter gates
+user-facing charter: Docs/IN_PROCESS_PILOT_SAFETY_CHARTER.md
+never expand to other executables without explicit user authorization
 ```
 
 **Milestone N (USER AUTHORIZED) adds:**
@@ -618,7 +627,7 @@ Do not create commits, tags, branches, or merges from detached HEAD unless the u
 
 Before any new work, run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 
 git branch --show-current
 git status --short
@@ -647,7 +656,7 @@ SAFE_TO_CONTINUE=<YES or NO>
 
 For a release evidence pass, run in order:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 
 npx tsc --noEmit
 npm run test:game-profile
@@ -666,8 +675,8 @@ Do not claim a gate passed unless output proves it.
 
 Expected known-good results:
 ```
-test:game-profile    PASS 28/28
-test:trainer-schema  PASS 34/34
+test:game-profile    PASS 49/49
+test:trainer-schema  PASS 36/36
 test:trainer-host    PASS 60/60
 test:milestone-e     PASS 15/15
 test:milestone-j     PASS 5/5
@@ -716,7 +725,7 @@ Do not create a release unless the user explicitly says: `RELEASE IT`
 
 Before any commit, tag, push, merge, or release, reread this file and run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 git status --short
 git diff --stat
 git log --oneline --decorate -5
@@ -734,7 +743,7 @@ A zero-byte junk file can be proposed for deletion, but still requires approval.
 
 After deletion, run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\ResourceForge"
 git status --short
 ```
 
@@ -811,7 +820,7 @@ If context conflicts, stop and report:
 STATUS=BLOCKED
 REASON=Conflicting or stale context detected
 CURRENT_KNOWN_LOCK=c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
-NEXT_SAFE_COMMAND=cd "G:\GAME TRAINER"; git status --short; git rev-parse HEAD
+NEXT_SAFE_COMMAND=cd "G:\ACTIVE_PROJECTS\ResourceForge"; git status --short; git rev-parse HEAD
 ```
 
 ---

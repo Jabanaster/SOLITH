@@ -1,12 +1,19 @@
-import { before, describe, test } from 'node:test';
+/**
+ * Catalog search filter unit tests — isolated from shared project data/resourceforge.db.
+ * Uses resetForTesting() (:memory: sql.js) so Action+community LIMIT queries only see seeded rows.
+ */
+import { after as afterAll, before as beforeAll, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initDatabase } from '../src/core/database/index.ts';
-import { upsertCatalogEntry } from '../src/core/trainer-catalog/store.ts';
-import { searchCatalog } from '../src/core/trainer-catalog/store.ts';
+import { resetForTesting } from '../src/core/database/index.ts';
+import { upsertCatalogEntry, searchCatalog } from '../src/core/trainer-catalog/store.ts';
 import type { TrainerCatalogEntry } from '../src/core/trainer-catalog/types.ts';
 import { buildSearchableText } from '../src/core/trainer-catalog/types.ts';
 
-function entry(id: string, categories: string[], status: TrainerCatalogEntry['verificationStatus']): TrainerCatalogEntry {
+function entry(
+  id: string,
+  categories: string[],
+  status: TrainerCatalogEntry['verificationStatus'],
+): TrainerCatalogEntry {
   return {
     catalogGameId: id,
     displayName: id.replace(/-/g, ' '),
@@ -20,17 +27,25 @@ function entry(id: string, categories: string[], status: TrainerCatalogEntry['ve
   };
 }
 
+function seedSearchFixture(): void {
+  for (const row of [
+    entry('elden-ring', ['RPG', 'Action'], 'metadata-only'),
+    entry('street-fighter', ['Fighting', 'Action'], 'community'),
+    entry('factorio-factory', ['Simulation', 'Strategy'], 'verified'),
+  ]) {
+    row.searchableText = buildSearchableText(row);
+    upsertCatalogEntry(row);
+  }
+}
+
 describe('trainer catalog search filters', () => {
-  before(async () => {
-    await initDatabase();
-    for (const row of [
-      entry('elden-ring', ['RPG', 'Action'], 'metadata-only'),
-      entry('street-fighter', ['Fighting', 'Action'], 'community'),
-      entry('factorio-factory', ['Simulation', 'Strategy'], 'verified'),
-    ]) {
-      row.searchableText = buildSearchableText(row);
-      upsertCatalogEntry(row);
-    }
+  beforeAll(async () => {
+    await resetForTesting(); // fresh :memory: schema — no shared disk pollution
+    seedSearchFixture();
+  });
+
+  afterAll(async () => {
+    await resetForTesting(); // tear down singleton so later suites start clean
   });
 
   test('filters by single genre', () => {
@@ -51,6 +66,7 @@ describe('trainer catalog search filters', () => {
       categories: ['Action'],
       verificationStatus: 'community',
     });
+    assert.equal(result.total, 1);
     assert.ok(result.entries.some((e) => e.catalogGameId === 'street-fighter'));
     assert.ok(result.entries.every((e) => e.verificationStatus === 'community'));
     assert.ok(

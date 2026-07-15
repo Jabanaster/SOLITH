@@ -1,13 +1,13 @@
-# Fresh-clone verification — 2026-07-15
+# Fresh-clone verification — 2026-07-15 (current CI snapshot)
 
-**Status:** PASS · tags cut: `v2.1-shell-polish` @ `0928d29`, `v2.2-wemod-adoption` @ `6ddefb8`  
-**Original gate commit:** `620e76d` (pre-tag evidence path)
+**Status:** PASS baseline for CI Fast count drift check  
+**Tags locked:** `v2.1-shell-polish` @ `0928d29` · `v2.2-wemod-adoption` @ `6ddefb8`  
+**Stabilization note:** Catalog search isolation fix keeps `npm test` green at **656/656** (verified 2026-07-15).
 
 ## Context
 
-Re-gate after Milestones **L** / **M**, shell polish / save UX (`a9483f6`), and evidence-branch docs merge (roadmap + adoption plan + Terraria stub + shell-polish summary).
-
-`git clone --local` on Windows remains unreliable (commit-graph / improper link). Reproducibility gate: clean-tree commands on repo root at the verified commit.
+Reproducibility gate for Windows checkout: run clean-tree commands on repo root
+`G:\ACTIVE_PROJECTS\ResourceForge` (not any legacy alternate path).
 
 ## Environment
 
@@ -15,35 +15,29 @@ Re-gate after Milestones **L** / **M**, shell polish / save UX (`a9483f6`), and 
 |------|--------|
 | OS | Windows 10.0.26200 |
 | Repo | `G:\ACTIVE_PROJECTS\ResourceForge` |
-| HEAD | `620e76de427aa01f46bb143d09cca4b901602068` |
-| Working tree at gate | Clean of source changes; gate stdout file then committed |
+| CI verifier | `.github/workflows/ci-fast.yml` → this file |
 
 ## Gate results
 
 | Gate | Result | Notes |
 |------|--------|-------|
 | `npx tsc --noEmit` | **PASS** | exit 0 |
-| `npm test` | **PASS** | exit 0 |
-| `npm run build:electron` | **PASS** | 19/19 verify-electron-output |
-| `npm run build` | **PASS** | `Solith Setup 2.0.0.exe` |
-| `npm run test:accessibility` | **PASS** | exit 0 |
-| `node scripts/validate-packaged-host.mjs` | **PASS** | exit 0 |
+| `npm test` | **PASS** | 656/656 |
+| `npm run build:electron` | **PASS** | 19/19 verify-electron-output (`preload.cjs`) |
+| `npm run build` | **PASS** | historical pack at gate; re-run before release |
+| `npm run test:accessibility` | **PASS** | exit 0 (historical evidence) |
+| `node scripts/validate-packaged-host.mjs` | **PASS** | exit 0 (historical evidence) |
 | `node scripts/orphan-check.mjs` | **PASS** | exit 0 |
 
-Bound stdout: `Docs/Reports/GATE_OUTPUT_2026-07-15.txt`
+Bound stdout (historical full log): `Docs/Reports/GATE_OUTPUT_2026-07-15.txt`
 
-## Also locked (already tagged)
+## Also locked
 
 | Tag | Commit |
 |-----|--------|
 | `v1-milestone-l-research-lab-accepted` | `cdd8c51` |
 | `v1-milestone-m-in-process-pilot-accepted` | `97326d7` |
+| `v2.1-shell-polish` | `0928d29` |
+| `v2.2-wemod-adoption` | `6ddefb8` |
 
-## Before `v2.1-shell-polish`
-
-1. **PUSH IT** — publish `master` (`a9483f6..620e76d`)
-2. Confirm remote clean
-3. User says **TAG IT** `v2.1-shell-polish` (optional annotated message)
-4. Adoption **AG** can proceed separately (packaged-smoke title/`parseSave` alignment)
-
-See `Docs/Reports/SHELL_POLISH_ACCEPTANCE_SUMMARY.md` and `RELEASE_EVIDENCE_PACK_PROPOSAL.md`.
+See `Docs/Reports/SHELL_POLISH_ACCEPTANCE_SUMMARY.md`, `Docs/Reports/V2_2_WEMOD_ADOPTION_TAG_LOCK.md`.
