@@ -319,16 +319,16 @@ node scripts/trainer-health-report.mjs
 
 ### Phase AG — Polish & parity pass (offline)
 
-**Status:** **PLANNED** (next adoption bite)
+**Status:** **DONE** (packaged-smoke 22/22; adoption matrix; overlay bounds table + unit test)
 
 **Theme:** Close remaining WeMod UX gaps.
 
 **Deliverables**
 
-- [ ] Overlay bounds: validate top 7 bundled titles @ 1080p + 3440×1440 (ultrawide table in docs)
-- [ ] Packaged-smoke fixes: point 03 title `Solith`, point 13 `parseSave` — align tests to product rename
-- [ ] `Docs/Plans/WEMOD_ADOPTION_MATRIX.md` — one-page adopt/adapt/reject (summary of this plan)
-- [ ] Release tag candidate: `v2.2-wemod-adoption` after fresh-clone gate + **TAG IT**
+- [x] Overlay bounds: validate top 7 bundled titles @ 1080p + 3440×1440 (`Docs/Reports/OVERLAY_BOUNDS_BUNDLED_TITLES.md`, `tests/overlay-layout-presets.test.ts`)
+- [x] Packaged-smoke fixes: point 03 title `Solith`, point 13 `parseSave(gameId, path)`, banner locator
+- [x] `Docs/Plans/WEMOD_ADOPTION_MATRIX.md` — one-page adopt/adapt/reject
+- [ ] Release tag candidate: `v2.2-wemod-adoption` after fresh-clone gate + **TAG IT** (user-gated)
 
 ---
 
