@@ -4,8 +4,11 @@
 
 Product UI: **Solith** · package `resourceforge@2.0.0`
 
-* Branch: `master` @ `56b8487` (pushed)
-* Latest milestone work: **R–Y offline pinnacle** + shell polish (banner, sidebar, icons, a11y)
+* Remote `master` @ `a9483f6` (shell polish / save UX / live-memory harden)
+* Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
+* In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
+* Evidence-pack branch (proposal + Terraria stub): `cursor/release-evidence-proposal-and-terraria-fixture`
+* Candidate tag (not cut): `v2.1-shell-polish` — only after clean-tree fresh-clone gates + **TAG IT**
 
 ### Accepted capability stack
 
@@ -14,21 +17,26 @@ schema.v1.yml → compile → SQLite payloadJson
          ↑ export                    ↓ lazy load
    Discovery Lab              Trainer Library
                                     ├─ memoryFeatures → LiveMemorySession
+                                    ├─ Trainer Deck / install discovery / health
                                     └─ saveEditor.saveFields → TrainerHost (catalog save controls)
+Trainer Research Lab → PE / memory diff / Script Analyzer / Dumpspace (Milestone L)
+In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by default)
 ```
 
 ### Milestone map (recent)
 
 | Milestone | Theme | Status |
 |-----------|--------|--------|
-| **M–Q** | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
+| **L** | Research Lab — PE, memory diff, script analyzer, Dumpspace | **Accepted** (tag + remote) |
+| **M** | In-process pilot — Crimson Desert hooks / trainer spawn | **Accepted** (tag + remote) |
+| **M–Q** *(legacy lettering)* | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
 | **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
 | **S** | Connection baselines + restart-stable pointers | **Blocked** — live sessions |
 | **T** | 50 bundled + 1000 catalog seed | **Done** |
 | **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — L3/L4 runs blocked on live sessions |
 | **V** | Feedback, promotion, rating prompt | **Done** |
 | **W** | CT import, pointer scan, watch-list, speedhack | **Done** |
-| **X** | Binary save router + research stubs | **Partial** — demo profiles + read-only research; commercial `canWrite` blocked on fixtures |
+| **X** | Binary save router + research stubs | **Partial** — demo profiles + stub fixture; commercial `canWrite` blocked |
 | **Y** | Overlay presets, hotkey rebind, onboarding | **Done** |
 | **Z** | Managed runtime (.NET/Mono) | **Not started** |
 | **AA** | Install discovery (Steam/Epic/GOG) | **Done** |
@@ -39,16 +47,20 @@ schema.v1.yml → compile → SQLite payloadJson
 | **AF** | Local demand + repair pipeline | **Done** |
 | **AG** | Adoption polish + smoke alignment | **Planned** |
 
-### Shell polish (2026-07-12, pushed)
+### Shell polish / evidence (2026-07)
 
-| Item | Commit |
-|------|--------|
+| Item | Commit / artifact |
+|------|-------------------|
 | Layered HTML banner + sharper background | `405dcc6` |
 | Compact sidebar header (no duplicate slogan) | `b21856b` |
 | Sidebar icon mapping + nav readability | `c56711b` |
 | A11y axe gate + contrast fixes | `0a655d3` |
 | Catalog seed 1000 entries | `e25b896` |
 | Binary save research stubs (read-only) | `56b8487` |
+| Research Lab (L) | `cdd8c51` / tag `v1-milestone-l-research-lab-accepted` |
+| In-process pilot (M) | `97326d7` / tag `v1-milestone-m-in-process-pilot-accepted` |
+| Save UX + live-memory/catalog harden | `a9483f6` |
+| Evidence pack proposal + Terraria stub | branch commit (pending merge) |
 
 ### Bundled schema.v1 definitions
 
@@ -67,12 +79,13 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 
 - ~~Banner/background asset masters (1920×420 / 1920×1080)~~ — done (`npm run prepare:branding`)
 - ~~Onboarding auto-skip in test env (E2E reliability)~~ — done (`NODE_ENV=test` / `SOLITH_SKIP_ONBOARDING`)
-- Fresh-clone verification evidence pack — **`Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-12.md`** (commit + tag pending)
+- Fresh-clone / `v2.1-shell-polish` evidence pack — re-gate at `a9483f6(+)`; proposal on evidence branch; **TAG IT** only after clean trees
 - ~~Steam AppID → executable lookup table in seed generator~~ — done
 - ~~Community → verified promotion UI in Trainer Library~~ — done
 - ~~Hotkey OS-reserved shortcut warnings~~ — done
 - ~~CI split (fast PR vs nightly E2E)~~ — `.github/workflows/ci-fast.yml` + `ci-nightly.yml`
 - ~~UI hierarchy doc~~ — `Docs/SOLITH_UI_HIERARCHY.md`
+- Adoption **AG** — smoke alignment + packaged-smoke title/`parseSave` drift waivers
 
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
