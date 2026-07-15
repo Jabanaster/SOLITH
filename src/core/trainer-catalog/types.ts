@@ -72,6 +72,11 @@ export interface TrainerCatalogEntry {
   modPackId?: string;
   cheatCount: number;
   searchableText: string;
+  /**
+   * Optional Phase 1 schema.v1 capability lanes (advisory).
+   * Filled by search/load IPC when a definition payload exists — not a second SoT.
+   */
+  capabilities?: import('../definitions/load-catalog-definition.js').CatalogDefinitionCapabilities | null;
 }
 
 export interface TrainerCatalogSearchResult {

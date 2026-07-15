@@ -63,6 +63,21 @@ export default function CatalogTrainerControlsPage({
 
   return (
     <>
+      {capabilities && (
+        <p className="catalog-controls-caps" role="note">
+          schema.v1 lanes (advisory): save=
+          <strong>{capabilities.saveEdit}</strong>
+          {', '}
+          live=
+          <strong>{capabilities.liveMemory}</strong>
+          {', '}
+          injection=
+          <strong>{capabilities.injection}</strong>
+          {capabilities.liveMemory === 'scan-required'
+            ? ' — live features require Discovery (L0 scan_unknown), not verified pointers.'
+            : ''}
+        </p>
+      )}
       {capabilities?.saveFormat === 'json' && (
         <p className="catalog-controls-format-note" role="note">
           JSON save format: edits use the JSON save-field router. Approve a concrete save file path before writing;

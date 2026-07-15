@@ -73,7 +73,7 @@ describe('definition-to-trainer-controls', () => {
     assert.equal(resolved.saveField?.filePath, 'C:/real/save.xml');
   });
 
-  test('catalogDefinitionCapabilities counts memory vs save features', () => {
+  test('catalogDefinitionCapabilities counts memory vs save features and lanes', () => {
     const definition = discoveryResultToDefinition({
       gameId: 'demo',
       gameName: 'Demo',
@@ -95,6 +95,9 @@ describe('definition-to-trainer-controls', () => {
     const caps = catalogDefinitionCapabilities(definition);
     assert.equal(caps.saveControlCount, 1);
     assert.equal(caps.memoryCheatCount, 1);
+    assert.equal(caps.saveEdit, 'executable');
+    assert.equal(caps.liveMemory, 'executable');
+    assert.equal(caps.injection, 'forbidden');
     assert.ok(caps.saveDirectoryHint?.includes('C:'));
   });
 });

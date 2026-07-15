@@ -7,6 +7,7 @@ import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
+import { describeCapabilityLanes } from '../../core/definitions/load-catalog-definition.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
@@ -114,6 +115,39 @@ function CatalogCard({
           {trust?.positive ? ` · ${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : ''}
           {trust?.quarantined ? ' · needs re-verify' : ''}
         </p>
+        {entry.capabilities ? (
+          <p className={styles.capabilityRow} title={describeCapabilityLanes(entry.capabilities)}>
+            {entry.capabilities.saveEdit !== 'none' && (
+              <span className={styles.capBadge} data-lane="save">
+                Save
+              </span>
+            )}
+            {entry.capabilities.liveMemory === 'scan-required' && (
+              <span className={styles.capBadge} data-lane="live-scan">
+                Live · Discovery
+              </span>
+            )}
+            {entry.capabilities.liveMemory === 'executable' && (
+              <span className={styles.capBadge} data-lane="live-exec">
+                Live · Resolved
+              </span>
+            )}
+            {entry.capabilities.injection === 'pilot-gated' && (
+              <span className={styles.capBadge} data-lane="inject">
+                Injection pilot
+              </span>
+            )}
+            {entry.capabilities.saveEdit === 'none' &&
+              entry.capabilities.liveMemory === 'none' &&
+              entry.capabilities.injection === 'forbidden' && (
+                <span className={styles.capBadge} data-lane="meta">
+                  Metadata
+                </span>
+              )}
+          </p>
+        ) : (
+          <p className={styles.meta}>No schema.v1 definition — metadata only</p>
+        )}
         <p className={styles.meta}>{tierHint(entry)}</p>
         <div className={styles.cardActions}>
           <button type="button" className={styles.launchBtn} onClick={() => void onLaunch(entry)}>
@@ -433,7 +467,11 @@ export default function TrainerLibraryPage({
         : loadResult?.error ?? 'Failed to load game');
       return;
     }
-    onLaunchGame?.(entry.catalogGameId, entry.displayName, loadResult.capabilities);
+    onLaunchGame?.(
+      entry.catalogGameId,
+      entry.displayName,
+      loadResult.capabilities ?? undefined,
+    );
   };
 
   const handleExportYaml = async (entry: TrainerCatalogEntry) => {

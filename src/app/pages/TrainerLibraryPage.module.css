@@ -268,6 +268,48 @@
   margin-top: 0.35rem !important;
 }
 
+.capabilityRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-top: 0.4rem !important;
+}
+
+.capBadge {
+  display: inline-block;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(140, 170, 210, 0.35);
+  color: #c8d7ef;
+  background: rgba(24, 40, 64, 0.85);
+}
+
+.capBadge[data-lane='save'] {
+  border-color: rgba(90, 180, 140, 0.45);
+  color: #b6f0d0;
+}
+
+.capBadge[data-lane='live-scan'] {
+  border-color: rgba(220, 180, 90, 0.45);
+  color: #f5dfb0;
+}
+
+.capBadge[data-lane='live-exec'] {
+  border-color: rgba(100, 190, 255, 0.5);
+  color: #b8e0ff;
+}
+
+.capBadge[data-lane='inject'] {
+  border-color: rgba(220, 120, 100, 0.5);
+  color: #f0c0b4;
+}
+
+.capBadge[data-lane='meta'] {
+  opacity: 0.85;
+}
+
 .launchBtn {
   margin-top: 0.55rem;
   width: 100%;

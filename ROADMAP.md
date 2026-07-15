@@ -4,7 +4,7 @@
 
 Product UI: **Solith** · package `resourceforge@2.0.0`
 
-* Remote **`master` @ `ac43ec6`** — offline sweep + CI/honesty stabilization **merged** (2026-07-15)
+* Remote **`master` @ `dd6225a`** — CI Fast green + roadmap lock (2026-07-15); offline sweep merged earlier at `ac43ec6`
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -18,8 +18,8 @@ Product UI: **Solith** · package `resourceforge@2.0.0`
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
 | Local `npm test` | **656/656 PASS** (verified on merge tip) |
 | CI Fast on `master` | **GREEN** @ `b049577` — [run 29439968186](https://github.com/Jabanaster/ResourceForge/actions/runs/29439968186) · `npm test` **656/656** + fresh-clone verify |
-| Catalog unification / schema.v1 SoT | **Not started** — Phase 0→1 awaiting blueprint review |
-| Separate concerns | Consolidation MUST use a **new branch** from green `master` |
+| Catalog unification / schema.v1 SoT | **Phase 0→1 in progress** on `cursor/schema-v1-phase0-1-capabilities` (additive lanes + UI; no execute IPC) |
+| Separate concerns | Phase 2+ only after explicit approval; do not reuse offline-sweep branch |
 
 ### Accepted capability stack
 
@@ -59,7 +59,7 @@ Honest live-memory stance (README): bundled memory features are **L0 `scan_unkno
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
 | **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
-| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Planned** — review `Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md` |
+| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Phase 0→1** — advisory lanes + Library badges; Phase 2 blocked |
 
 ### Shell polish / evidence (2026-07)
 
@@ -96,10 +96,11 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 - ~~Offline sweep AB / cert docs / watch-confidence / Epic/GOG fixtures~~ — **on master**
 - ~~Catalog search test isolation (`:memory:`) + CI fresh-clone `656/656`~~ — **on master**
 - ~~README L0 honesty + in-process user charter~~ — **on master**
-- **Next (separate branch only):** schema.v1 unification Phase 0 inventory → Phase 1 additive capability derivation — **after** blueprint review sign-off
+- ~~schema.v1 Phase 0→1 (capability derivation + Library badges)~~ — branch `cursor/schema-v1-phase0-1-capabilities`
+- **Stop:** Phase 2 dual-read / execute IPC enforcement — await explicit approval
 - Live S / U L2+ still require game sessions
 
-See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** for catalog SoT unification (review before Phase 0→1).  
+See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.  
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
 

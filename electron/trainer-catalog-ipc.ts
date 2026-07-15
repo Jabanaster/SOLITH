@@ -71,7 +71,15 @@ export function registerTrainerCatalogIpc(): void {
         categories: parsed.categories,
         verificationStatus: parsed.verificationStatus,
       });
-      return { success: true, ...result };
+      // Phase 1: attach schema.v1 capability lanes (read-only derivation; no execute change).
+      const entries = result.entries.map((entry) => {
+        const definition = loadCatalogDefinition(entry.catalogGameId);
+        return {
+          ...entry,
+          capabilities: definition ? catalogDefinitionCapabilities(definition) : null,
+        };
+      });
+      return { success: true, ...result, entries };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

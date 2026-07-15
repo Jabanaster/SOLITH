@@ -1,11 +1,12 @@
 # Schema.v1 Unification Plan — Control Catalog Consolidation
 
-**Status:** Draft for Phase 0→1 review — **no consolidation code until you sign off**  
-**Stability prerequisite:** green `master` @ offline-sweep merge (`ac43ec6`+) with CI Fast **656/656**
+**Status:** Phase 0→1 **implemented** on `cursor/schema-v1-phase0-1-capabilities` (base `dd6225a`+)  
+**Stability prerequisite:** green `master` with CI Fast **656/656** (`dd6225a` docs lock)
 
 ```
-STOP: await user approval of this blueprint (esp. IPC / data constraints) before writing consolidation code
-NEXT_BRANCH: create a NEW branch from green master for Phase 0→1 (do not reuse offline-sweep)
+DONE: Phase 0 inventory + Phase 1 additive capability lanes / Library badges
+STOP: await user approval before Phase 2 (dual-read / execute IPC enforcement)
+NEXT: Phase 2 ONLY after explicit approval — do not touch live-memory / TrainerHost execute paths yet
 ```
 
 ---
@@ -44,11 +45,11 @@ ResourceForge currently has **five parallel “what can this game do?” sources
 | **Live Memory** | `memoryFeatures` RPM/WPM | Yes when resolvable + gates; L0 `scan_unknown` = discovery required |
 | **Injection** | Code-cave / AA / injector | Declared / pilot-gated only — never mainstream silent enable (`in-process-script` charter) |
 
-Conceptual shape (do not implement until approved):
+Implemented in `catalogDefinitionCapabilities()` (`load-catalog-definition.ts`):
 
 ```ts
 capabilities: {
-  saveEdit: 'none' | 'metadata' | 'executable';
+  saveEdit: 'none' | 'metadata' | 'executable',
   liveMemory: 'none' | 'scan-required' | 'executable',
   injection: 'forbidden' | 'reference-only' | 'pilot-gated',
 }
@@ -81,9 +82,9 @@ capabilities: {
 
 | Phase | Work | Gate |
 |-------|------|------|
-| **0** | Inventory ID maps + consumers (docs only) | Plan approval |
-| **1** | Additive capability derivation / badges | Tests green; behavior unchanged |
-| **2** | Dual-read: definition preferred, legacy fallback | Fallback metrics + tests |
+| **0** | Inventory ID maps + consumers (docs only) | **Done** — `SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md` |
+| **1** | Additive capability derivation / badges | **Done** on branch — tests green; execute paths unchanged |
+| **2** | Dual-read: definition preferred, legacy fallback | **Blocked** until user approval |
 | **3** | Authoring cutover; seed definition-first | New cheats only via schema.v1 |
 | **4** | Remove authority from legacy catalogs | Explicit delete approval |
 | **5** | Hard IPC enforcement + CI orphan on legacy SoT imports | Release gate |
@@ -162,8 +163,7 @@ Additive `catalogDefinitionCapabilities` (or sibling) + optional Library badges;
 ## 10. Stop gate
 
 ```
-STOP: await user approval of this blueprint (IPC + data checklist above) before writing consolidation code
-NEXT_BRANCH: new branch from green master for Phase 0→1 (not offline-sweep)
+PHASE_0_1=DONE (advisory capabilities + UI badges; no execute IPC)
+STOP: do not start Phase 2 dual-read / execute enforcement without explicit user approval
+REF: Docs/Plans/SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md
 ```
-
-Approve Phase 0→1 (or a named subset) explicitly before any implementation PR.
