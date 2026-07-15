@@ -1,0 +1,1223 @@
+﻿===== TSC =====
+CMD: npx tsc --noEmit
+START: 2026-07-15T08:19:53.0615622-07:00
+EXIT: 0
+ELAPSED_MS: 11105
+
+===== NPM_TEST =====
+CMD: npm test
+START: 2026-07-15T08:20:04.1728835-07:00
+
+> resourceforge@2.0.0 test
+> tsx --test tests/core.test.ts tests/parsers.test.ts tests/save-format.test.ts tests/json-save-field.test.ts tests/ini-save-field.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-binding.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/v2-lifecycle.test.ts tests/command-runner.test.ts tests/v2-lifecycle-wiri...
+
+Γû╢ binary-field-proposal
+  Γ£ö proposes high-confidence gold field at offset 16 (0.6846ms)
+Γ£ö binary-field-proposal (1.1836ms)
+Γû╢ RFSA binary format
+  Γ£ö default buffer validates and reads fields (0.5369ms)
+  Γ£ö writeRfsaFields updates checksum (0.1079ms)
+  Γ£ö binary-save-field read/write round-trip on temp file (3.2348ms)
+Γ£ö RFSA binary format (4.4127ms)
+Γû╢ binary save format registry
+  Γ£ö lists five writable demo binary profiles (0.502ms)
+  Γ£ö detects slth profile by magic (0.1493ms)
+  Γ£ö detects rfsa profile by extension and magic (0.0837ms)
+  Γ£ö detects legacy demo fixture on .sav (0.0875ms)
+Γ£ö binary save format registry (1.4779ms)
+Γû╢ binary save research profiles
+  Γ£ö detects Terraria .plr by extension (0.5839ms)
+  Γ£ö reads version from sandbox Terraria fixture (0.3939ms)
+  Γ£ö detects Hollow Knight user.dat by filename (0.0991ms)
+Γ£ö binary save research profiles (1.7501ms)
+Γ£ö bundled definitions include 50 mod-pack games (7 curated + 43 community) (0.7895ms)
+Γ£ö every bundled definition validates against schema.v1 (5.1819ms)
+Γ£ö stardew ships save-field controls only (0.1709ms)
+Γ£ö memory games ship pinned scan_unknown features (0.0917ms)
+Γ£ö community bundled games are community tier with scan_unknown features (0.102ms)
+Γû╢ catalog definition export
+  Γ£ö round-trips CT import ΓåÆ YAML export ΓåÆ compile (27.1613ms)
+Γ£ö catalog definition export (179.7282ms)
+Γû╢ catalog-demand
+  Γ£ö increments notify count (2.2244ms)
+  Γ£ö lists sorted by demand (1.2826ms)
+Γ£ö catalog-demand (165.7174ms)
+Γ£ö parseCheatHotkeySlot maps F-keys to zero-based slots (0.583ms)
+Γ£ö cheatsForHotkeySlots prefers pinned cheats (3.3489ms)
+Γû╢ cheat-toggle-store ΓÇö persistence
+  Γ£ö set then get round-trips enabled, confirmedAddress, and dataType (6.0203ms)
+  Γ£ö set with enabled:false and null address/dataType persists nulls, not the string "null" (0.9476ms)
+  Γ£ö omitting confirmedAddress/dataType defaults to null rather than throwing (0.8344ms)
+  Γ£ö re-setting the same gameId/cheatId updates in place (upsert), not a duplicate row (0.7124ms)
+  Γ£ö state is scoped by gameId ΓÇö same cheatId under a different game does not collide (0.9437ms)
+  Γ£ö getPersistedCheatStates only returns rows for the requested gameId (1.0534ms)
+  Γ£ö clear removes only the targeted (gameId, cheatId) row, leaving sibling cheats intact (2.2614ms)
+  Γ£ö clear does not affect the same cheatId under a different gameId (0.891ms)
+  Γ£ö clear on a never-set (gameId, cheatId) pair is a safe no-op (0.3673ms)
+  Γ£ö getPersistedCheatStates for an unknown gameId returns an empty array, not an error (0.1913ms)
+Γ£ö cheat-toggle-store ΓÇö persistence (175.1619ms)
+Γû╢ cheat-toggle IPC validation schemas
+  Γ£ö CheatToggleGetAllSchema accepts a valid gameId (1.0108ms)
+  Γ£ö CheatToggleGetAllSchema rejects an empty gameId (0.5099ms)
+  Γ£ö CheatToggleGetAllSchema rejects a missing gameId (0.1671ms)
+  Γ£ö CheatToggleSetSchema accepts a full valid payload (0.4873ms)
+  Γ£ö CheatToggleSetSchema accepts a minimal payload (address/dataType omitted) (0.0949ms)
+  Γ£ö CheatToggleSetSchema rejects a malformed address (not decimal or 0x-hex) (0.2156ms)
+  Γ£ö CheatToggleSetSchema rejects an invalid dataType (0.1536ms)
+  Γ£ö CheatToggleSetSchema rejects a non-boolean enabled (0.1115ms)
+  Γ£ö CheatToggleClearSchema accepts a valid gameId/cheatId pair (0.1719ms)
+  Γ£ö CheatToggleClearSchema rejects a missing cheatId (0.1228ms)
+Γ£ö cheat-toggle IPC validation schemas (3.2637ms)
+Γû╢ trainer migration checkpoint ΓÇö no dangling references to deleted files
+  Γ£ö scan covers a non-trivial number of source files (sanity check on the scan itself) (0.1083ms)
+  Γ£ö no src/ or electron/ file references LiveTrainer component (36.0533ms)
+  Γ£ö no src/ or electron/ file references PalworldCheatMenu (34.5767ms)
+  Γ£ö no src/ or electron/ file references PalworldTrainerPage (56.1039ms)
+  Γ£ö no src/ or electron/ file references useFreezeValue (39.4424ms)
+  Γ£ö no src/ or electron/ file references useLiveTrainerWorkflow (47.0305ms)
+  Γ£ö deleted migration files do not exist on disk (0.3651ms)
+Γ£ö trainer migration checkpoint ΓÇö no dangling references to deleted files (214.0122ms)
+Γû╢ command-runner
+  Γ£ö CR-01: abort signals child exactly once (2.0266ms)
+  Γ£ö CR-02: timeout signals child exactly once (20.3954ms)
+  Γ£ö CR-03: abort clears timeout so only one kill occurs (31.5213ms)
+  Γ£ö CR-04: abort listener removed after close settles promise (0.7856ms)
+  Γ£ö CR-05: close after abort does not double-settle (0.4511ms)
+  Γ£ö CR-06: error after abort does not double-settle (0.3679ms)
+  Γ£ö CR-07: abort after normal close is ignored (0.2584ms)
+  Γ£ö CR-08: oversized stdout rejects with output_size_exceeded (0.3048ms)
+  Γ£ö CR-09: oversized stderr is bounded and does not reject (0.3735ms)
+  Γ£ö CR-10: spawn error event rejects the promise (0.8099ms)
+  Γ£ö CR-11: stubborn child cannot keep promise pending forever (26.7372ms)
+  Γ£ö CR-12: spawn is always called with shell: false (0.4868ms)
+  Γ£ö CR-13: cmd and args are separate values in spawn call (0.9354ms)
+  Γ£ö CR-14: executable name reaches child via env var, not PowerShell source (0.4679ms)
+Γ£ö command-runner (88.3358ms)
+Γû╢ ResourceForge Core Modules Tests
+  Γ£ö 1. Scanner & Save Detection Checks (3.1669ms)
+  Γ£ö 2. Custom Parsers Tests (23.37ms)
+  Γ£ö 3. Binary Save Safe Analysis Checks (2.7088ms)
+  Γ£ö 4. Value Classification and Confidence Scoring (0.4686ms)
+  Γ£ö 5. Recipe Safety & Staleness Verification (12.8785ms)
+Γ£ö ResourceForge Core Modules Tests (43.4204ms)
+Γû╢ ct-import
+  Γ£ö parses memory entries and rejects script cheats (5.5417ms)
+  Γ£ö rejects nested group-only entries without address (0.5498ms)
+  Γ£ö rejects empty cheat table (0.2509ms)
+Γ£ö ct-import (6.9905ms)
+Γû╢ compile-yaml.v1
+  Γ£ö round-trips exported discovery YAML through compiler (13.7282ms)
+  Γ£ö compileYamlToPayload rejects invalid YAML (0.6833ms)
+  Γ£ö compileYamlToPayload rejects inject type (2.2802ms)
+  Γ£ö solithDefinitionToModPack adapts memory and save fields (2.7667ms)
+Γ£ö compile-yaml.v1 (20.2624ms)
+Γû╢ discovery export
+  Γ£ö maps discovery candidate to save field (0.5873ms)
+  Γ£ö builds save-editor definition (2.8695ms)
+  Γ£ö infers APPDATA directory hint (0.1785ms)
+Γ£ö discovery export (4.4072ms)
+Γû╢ memory export
+  Γ£ö exports scan_first when only session address is known (0.2209ms)
+Γ£ö memory export (0.3305ms)
+Γû╢ yaml export
+  Γ£ö discovery yaml bundle contains schema and save field path (0.6007ms)
+  Γ£ö memory yaml includes session address review comment (0.2651ms)
+  Γ£ö serializeDefinitionToYaml validates after export (0.2587ms)
+Γ£ö yaml export (1.2958ms)
+Γû╢ SolithDefinitionV1 schema
+  Γ£ö parses a valid definition (3.5035ms)
+  Γ£ö rejects inject-like feature types (0.7111ms)
+  Γ£ö maps boolean memory data type to byte live value (0.0844ms)
+Γ£ö SolithDefinitionV1 schema (5.027ms)
+Γû╢ verifyDefinitionFingerprint
+  Γ£ö prefix match passes (0.1836ms)
+  Γ£ö prefix mismatch warns (0.1441ms)
+  Γ£ö full target hash mismatch (0.0597ms)
+  Γ£ö skips when no constraints (0.0717ms)
+Γ£ö verifyDefinitionFingerprint (0.6082ms)
+Γû╢ modPackToSolithDefinition
+  Γ£ö adapts mod pack cheats and fingerprint prefixes (0.7814ms)
+Γ£ö modPackToSolithDefinition (0.89ms)
+Γû╢ definition-to-trainer-controls
+  Γ£ö maps saveEditor fields to save_field TrainerControls (0.8091ms)
+  Γ£ö skips hex-only save fields without searchKey (0.1551ms)
+  Γ£ö resolveCatalogControlFilePath substitutes user-selected save path (0.2819ms)
+  Γ£ö catalogDefinitionCapabilities counts memory vs save features (0.2175ms)
+Γ£ö definition-to-trainer-controls (2.2203ms)
+Γû╢ deleteGame ΓÇö IPC Regression Tests
+  Γ£ö 1. valid deletion returns true (5.4727ms)
+  Γ£ö 2. deleted game is no longer found (1.332ms)
+  Γ£ö 3. deleting a non-existent ID returns false (0.2938ms)
+  Γ£ö 4. Zod schema rejects malformed game ID (not UUID) (1.6977ms)
+  Γ£ö 5. Zod schema rejects empty string (0.2377ms)
+  Γ£ö 6. Zod schema accepts the demo game literal ID (0.2226ms)
+  Γ£ö 7. Zod schema accepts a valid UUID (2.0038ms)
+  Γ£ö 8. demo game deletion sets demoGameDeleted flag in settings (0.9804ms)
+Γ£ö deleteGame ΓÇö IPC Regression Tests (83.0184ms)
+Γû╢ ResourceForge Save Discovery, Locations, and Discovery Engine Tests
+  Γ£ö 1. Save Location Suggestions and Approvals (14.5225ms)
+  Γ£ö 2. Path Approval Containment Checks (8.8662ms)
+  Γ£ö 3. Discovery Engine Diffing & Confidence Scoring (13.273ms)
+  Γ£ö 4. Known-Value Guided Matches & Repeated Session Boost (2.7903ms)
+  Γ£ö 4b. Discovery comparison ignores unchanged files and orders ties deterministically (1.2395ms)
+  Γ£ö 4c. Discovery handles binary differences as advisory results only (0.7927ms)
+  Γ£ö 4d. Discovery rejects oversized existing files without parsing (5.7639ms)
+  Γ£ö 4e. Discovery report captures hash evidence without leaking full paths (8.4012ms)
+  Γ£ö 4f. Discovery report serialization is deterministic for stable inputs (1.1335ms)
+  Γ£ö 4g. Advisory comparison returns report metadata for save diff tooling (2.3667ms)
+  Γ£ö 5. End-to-End Save Edit & Restore Workflow (94.2486ms)
+Γ£ö ResourceForge Save Discovery, Locations, and Discovery Engine Tests (227.1494ms)
+Γû╢ Discovery Suite ΓÇö Consecutive-Run Isolation Regression
+  Γ£ö Consecutive run: no recipe conflict from a prior run (10.2011ms)
+Γ£ö Discovery Suite ΓÇö Consecutive-Run Isolation Regression (32.0552ms)
+Γû╢ drill-core-settings ΓÇö valid edits
+  Γ£ö dc-valid-01 ΓÇö 100.0 ΓåÆ 75.0 preserves decimal style and all other bytes (3.3868ms)
+  Γ£ö dc-valid-02 ΓÇö 100 ΓåÆ 75 preserves integer style (0.2462ms)
+  Γ£ö dc-valid-03 ΓÇö boundary 0 accepted (0.2424ms)
+  Γ£ö dc-valid-04 ΓÇö boundary 100 accepted (no semantic change) (0.1607ms)
+  Γ£ö dc-valid-05 ΓÇö UTF-8 content outside target is preserved (0.2732ms)
+  Γ£ö dc-valid-06 ΓÇö single-line formatting preserved (no newlines introduced) (0.2015ms)
+Γ£ö drill-core-settings ΓÇö valid edits (6.9667ms)
+Γû╢ drill-core-settings ΓÇö invalid edits rejected
+  Γ£ö dc-invalid-01 ΓÇö missing key (0.3274ms)
+  Γ£ö dc-invalid-02 ΓÇö duplicate key is ambiguous (0.3823ms)
+  Γ£ö dc-invalid-03 ΓÇö nested-only key rejected (not top-level) (0.1529ms)
+  Γ£ö dc-invalid-04 ΓÇö wrong types rejected (0.3624ms)
+  Γ£ö dc-invalid-05 ΓÇö fractional proposal rejected (0.1285ms)
+  Γ£ö dc-invalid-06 ΓÇö negative proposal rejected (0.1242ms)
+  Γ£ö dc-invalid-07 ΓÇö above-range proposal rejected (0.0919ms)
+  Γ£ö dc-invalid-08 ΓÇö malformed JSON rejected (0.1575ms)
+  Γ£ö dc-invalid-09 ΓÇö trailing data rejected (0.4284ms)
+  Γ£ö dc-invalid-10 ΓÇö unexpected BOM rejected (0.0862ms)
+  Γ£ö dc-invalid-11 ΓÇö stale value rejected (0.0992ms)
+  Γ£ö dc-invalid-12 ΓÇö adapter rejects wrong target path (2.9471ms)
+  Γ£ö dc-invalid-13 ΓÇö adapter does not support non-settings filenames (0.1002ms)
+Γ£ö drill-core-settings ΓÇö invalid edits rejected (6.0495ms)
+Γû╢ drill-core-settings ΓÇö byte/value preservation
+  Γ£ö dc-pres-01 ΓÇö unrelated bytes before/after token are identical (0.1601ms)
+  Γ£ö dc-pres-02 ΓÇö only one region changes, length delta matches token delta (0.3922ms)
+Γ£ö drill-core-settings ΓÇö byte/value preservation (0.6384ms)
+Γû╢ drill-core-settings ΓÇö production apply/restore engine
+  Γ£ö dc-engine-01 ΓÇö narrow adapter is selected for settings.json (0.3493ms)
+  Γ£ö dc-engine-02 ΓÇö Master Volume slider recipe validates and persists (5.9277ms)
+  Γ£ö dc-engine-03 ΓÇö full proposal ΓåÆ backup ΓåÆ apply ΓåÆ validate ΓåÆ restore (65.4772ms)
+Γ£ö drill-core-settings ΓÇö production apply/restore engine (231.1861ms)
+Atomic write failed: Error: Temporary file validation failed: SyntaxError: Expected property name or '}' in JSON at position 2 (line 1 column 3)
+    at atomicWrite (G:\ACTIVE_PROJECTS\ResourceForge\src\core\safety\atomic-write.ts:119:13)
+    at async TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\failure-injection.test.ts:177:17)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 5d069d8b-6bba-45ca-975e-7427fb1db3be (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_a.json
+[Crash Recovery] Case A: Current target matches original hash. Original was not replaced.
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 05174c97-23dc-47bb-9d9c-6671ced7e489 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_b.json
+[Crash Recovery] Case B: Current target matches expected final hash and is valid.
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation 593c74ca-1bb7-4ed0-aaa1-15f461260f67 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_d.json
+[Crash Recovery] Case D: Ambiguous target state (proposal missing or expected final hash uncomputable).
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation a42325af-e5e2-454d-a596-ca36b3aff714 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
+[Crash Recovery] Case E: Backup record not found in database.
+Γû╢ ResourceForge Failure Injection & Security Invariant Tests
+  Γ£ö 1. Invalid IPC Payloads Validation (3.6375ms)
+  Γ£ö 2. Recipe Validation, Safety Filters & Malicious Payload Rejection (7.1926ms)
+  Γ£ö 3. Recipe Conflict Detection (1.6705ms)
+  Γ£ö 4. Temporary Write & Validation Failures (26.883ms)
+  Γ£ö 5. Atomic Replacement Failures (Windows Edge Case Simulation) (21.4154ms)
+  Γ£ö 6. Crash Recovery Case A (Target matches original hash) (16.165ms)
+  Γ£ö 7. Crash Recovery Case B (Target matches expected final hash) (15.5053ms)
+  Γ£ö 8. Crash Recovery Case D (Ambiguous state: proposal missing) (63.2757ms)
+  Γ£ö 9. Crash Recovery Case E (Backup is invalid or missing) (4.1134ms)
+  Γ£ö 10. Scan Cancellation Support (4.7312ms)
+Γ£ö ResourceForge Failure Injection & Security Invariant Tests (362.8207ms)
+Γ£ö bundled game profile catalog is valid and deterministic (2.0651ms)
+Γ£ö catalog validation rejects remote or non-local references (0.1582ms)
+Γ£ö game profile exchange review classifies supported, preview-only, and blocked entries (6.1588ms)
+Γ£ö support matrix generation is deterministic (9.3746ms)
+Γ£ö supported profile appears with correct evidence (0.7313ms)
+Γ£ö blocked profile appears with blocked reasons (0.5937ms)
+Γ£ö preview-only and read-only profiles do not claim executable support (0.7027ms)
+Γ£ö imported pending-review profile does not claim support (0.6775ms)
+Γ£ö report wording stays local and has no network dependency (0.5229ms)
+Γû╢ validateGameProfile ├óΓé¼ΓÇ¥ structure validation
+  Γ£ö returns no errors for a valid minimal profile (0.7336ms)
+  Γ£ö rejects missing profileVersion (0.0958ms)
+  Γ£ö rejects missing gameId (0.0717ms)
+  Γ£ö rejects invalid saveFormat (0.0591ms)
+  Γ£ö rejects non-array controls (0.05ms)
+  Γ£ö rejects duplicate control ids (0.0579ms)
+  Γ£ö requires saveField for executable save_field controls (0.0557ms)
+  Γ£ö allows save_field controls without saveField if disabled (0.0645ms)
+  Γ£ö allows executable memory_write backends in live trainer profiles (0.0634ms)
+  Γ£ö rejects executable save_field profile paths with traversal or raw absolute paths (0.2788ms)
+Γ£ö validateGameProfile ├óΓé¼ΓÇ¥ structure validation (2.0795ms)
+Γû╢ validateProfileAuthoringWorkflow ├óΓé¼ΓÇ¥ fixture-backed reports
+  Γ£ö generates a valid XML profile authoring report (0.5924ms)
+  Γ£ö generates a valid JSON profile report with format-level write support (0.2647ms)
+  Γ£ö rejects invalid memory backends and future controls (0.2455ms)
+  Γ£ö rejects invalid save-field paths and unknown runtime bindings (5.0438ms)
+  Γ£ö rejects missing fixture evidence without leaking full paths (0.1451ms)
+Γ£ö validateProfileAuthoringWorkflow ├óΓé¼ΓÇ¥ fixture-backed reports (6.4111ms)
+Γû╢ loadStardewProfile ├óΓé¼ΓÇ¥ Stardew Valley profile
+  Γ£ö loads without errors (0.4844ms)
+  Γ£ö has correct gameId (0.2832ms)
+  Γ£ö has displayName Stardew Valley (0.2546ms)
+  Γ£ö has saveFormat xml (0.2501ms)
+  Γ£ö includes only the 4 accepted executable controls (0.2748ms)
+  Γ£ö includes Money control with correct field path (0.2817ms)
+  Γ£ö includes Stamina control with correct field path (0.2857ms)
+  Γ£ö includes Farming XP control with correct field path (0.2655ms)
+  Γ£ö does not include Health as a shipped control (0.2645ms)
+  Γ£ö does not include God Mode as a shipped control (0.2899ms)
+  Γ£ö does not include Aim Assist as a shipped control (0.2828ms)
+Γ£ö loadStardewProfile ├óΓé¼ΓÇ¥ Stardew Valley profile (3.4052ms)
+Γû╢ shipped game profiles ├óΓé¼ΓÇ¥ hygiene gates
+  Γ£ö reject shipped profile text containing C:\Users paths (0.3986ms)
+  Γ£ö reject shipped profile saveField paths with user-specific absolute paths (0.339ms)
+  Γ£ö reject shipped profile memory_write controls (0.3135ms)
+  Γ£ö reject shipped profile online or multiplayer cheat-style controls (0.3485ms)
+  Γ£ö loads and validates the cleaned Stardew profile (0.3904ms)
+Γ£ö shipped game profiles ├óΓé¼ΓÇ¥ hygiene gates (1.8889ms)
+Γû╢ loadTrainerControls ├óΓé¼ΓÇ¥ profile to TrainerControl conversion
+  Γ£ö converts all Stardew controls to TrainerControl format (0.3445ms)
+  Γ£ö preserves control id, label, description (0.2975ms)
+  Γ£ö converts constraints to min/max/step (0.3153ms)
+  Γ£ö converts saveField correctly (0.2786ms)
+  Γ£ö only 4 controls are executable (Money, Stamina, Farming XP, Max Stamina) (0.2924ms)
+  Γ£ö all executable controls require approval (0.2891ms)
+  Γ£ö shipped Stardew profile contains no memory_write controls (0.2711ms)
+  Γ£ö unsupported and non-save_field backends are never executable (0.2914ms)
+  Γ£ö disabled save_field controls are not executable (0.2947ms)
+Γ£ö loadTrainerControls ├óΓé¼ΓÇ¥ profile to TrainerControl conversion (2.8356ms)
+Γû╢ catalog taglines
+  Γ£ö returns curated copy for bundled games (0.4835ms)
+  Γ£ö synthetic catalog rows without steam id use category fallback (0.1115ms)
+Γ£ö catalog taglines (1.0988ms)
+Γû╢ in-process script execution milestone
+  Γ£ö charter limits pilot to CrimsonDesert.exe (0.8584ms)
+  Γ£ö gate blocks when feature disabled or wrong executable (0.1421ms)
+  Γ£ö plans executable friendship hook preset from AA analysis (0.9426ms)
+  Γ£ö stages hook and injector proposals (1.9267ms)
+  Γ£ö builds friendship shellcode and 14-byte jump patch (0.1741ms)
+Γ£ö in-process script execution milestone (4.7056ms)
+Γû╢ ini save-field writes
+  Γ£ö setup fixture (1.865ms)
+  Γ£ö writes section.key values while preserving comments (6.5361ms)
+  Γ£ö rejects value mismatch during proposal validation (0.623ms)
+Γ£ö ini save-field writes (10.4875ms)
+Γû╢ install-discovery catalog match
+  Γ£ö matches by steamAppId (1.6023ms)
+  Γ£ö matches by executable basename when app id unknown (0.0893ms)
+Γ£ö install-discovery catalog match (2.1047ms)
+Γû╢ install-discovery vdf
+  Γ£ö parses appmanifest appid and installdir (0.4093ms)
+Γ£ö install-discovery vdf (0.792ms)
+Γû╢ install-discovery steam scan
+  Γ£ö discovers Stardew Valley from fixture manifests (1.3985ms)
+Γ£ö install-discovery steam scan (1.4572ms)
+Γû╢ json save-field writes
+  Γ£ö setup fixture (1.7499ms)
+  Γ£ö writes numeric and boolean scalars with backup (8.81ms)
+  Γ£ö rejects type-changing proposals (0.5133ms)
+Γ£ö json save-field writes (12.5064ms)
+Γû╢ aob-resolver
+  Γ£ö parseAobSignature handles wildcards (1.2622ms)
+  Γ£ö findAobInBuffer finds first match (0.2152ms)
+  Γ£ö scanAobInProcess searches module-overlapping regions (0.3133ms)
+  Γ£ö scanAobInProcess returns null on miss (0.116ms)
+Γ£ö aob-resolver (3.4071ms)
+Γû╢ feature-resolver
+  Γ£ö resolves static pointer path (1.0233ms)
+  Γ£ö resolves AOB then caches for second call (0.7517ms)
+  Γ£ö falls back to pointer path when AOB misses (0.1ms)
+  Γ£ö scan_unknown features cannot be resolved upfront (0.2148ms)
+Γ£ö feature-resolver (2.8629ms)
+Γ£ö getConnectionBaseline returns 0 (strict default) for an unreviewed executable (0.5812ms)
+Γ£ö getConnectionBaseline returns the reviewed baseline for Stardew Valley (0.1331ms)
+Γ£ö getConnectionBaseline matches case-insensitively (0.0831ms)
+Γ£ö listReviewedConnectionBaselines includes evidence for every entry (0.3647ms)
+Γ£ö listControlsForGame returns the Atomfall ammo control for the exact executable name (0.5553ms)
+Γ£ö listControlsForGame matches case-insensitively (0.0813ms)
+Γ£ö listControlsForGame returns an empty array for a game with no saved controls (0.3502ms)
+Γ£ö getControl returns the control by id (0.0927ms)
+Γ£ö getControl returns undefined for an unknown id (0.0536ms)
+Γ£ö every catalog entry has non-empty evidence and a valid pointer path (0.0675ms)
+Γû╢ LiveMemorySession
+  Γ£ö attach fails without user confirmation, process is never opened (0.8763ms)
+  Γ£ö attach fails when remote connections are present (0.1233ms)
+  Γ£ö attach succeeds with confirmation and clean evidence (0.118ms)
+  Γ£ö propose then confirm writes the new value and produces a manifest (1.8968ms)
+  Γ£ö confirmWrite is blocked and does not write if guard flips online between propose and confirm (0.2626ms)
+  Γ£ö confirmWrite is blocked if the OS executable name no longer matches the attached target (0.3853ms)
+  Γ£ö rollback restores the value captured before the write (0.4442ms)
+  Γ£ö detach closes the process handle and clears pending proposals (0.3007ms)
+  Γ£ö confirmWrite on unknown proposal id fails without touching memory (0.1992ms)
+Γ£ö LiveMemorySession (5.6569ms)
+Γû╢ LiveMemorySession freeze
+  Γ£ö startFreeze fails when no process is attached (0.4056ms)
+  Γ£ö startFreeze fails if a freeze is already active on this session (11.7059ms)
+  Γ£ö freeze writes immediately on the first tick and schedules the next one (0.5017ms)
+  Γ£ö freeze re-writes the value on each subsequent scheduled tick (0.4527ms)
+  Γ£ö freeze stops itself when the online guard blocks mid-freeze, without writing that tick (0.3313ms)
+  Γ£ö stopFreeze halts scheduling and reports user_stopped (0.3221ms)
+  Γ£ö stopFreeze is a safe no-op when no freeze is active (0.0733ms)
+  Γ£ö detach stops an active freeze with stopReason "detached" (0.3797ms)
+Γ£ö LiveMemorySession freeze (14.5019ms)
+Γû╢ LiveMemorySession catalog controls
+  Γ£ö getAttachedExecutableName returns null before attach, and the target name after (0.1087ms)
+  Γ£ö resolveControl resolves a catalog control's pointer path to a live, readable address (0.2925ms)
+  Γ£ö resolveControl throws when not attached (0.169ms)
+  Γ£ö attach blocks on executable fingerprint mismatch until drift acknowledged (0.1934ms)
+  Γ£ö resolveMemoryFeature uses session cache cleared on detach (0.2263ms)
+Γ£ö LiveMemorySession catalog controls (1.092ms)
+Γ£ö scanFirst finds a value at an aligned offset within a single writable region (0.8526ms)
+Γ£ö scanFirst finds matches across multiple regions (0.4442ms)
+Γ£ö scanFirst excludes non-writable regions entirely (0.0699ms)
+Γ£ö scanFirst only counts occurrences aligned to the value size, not raw byte matches (0.0722ms)
+Γ£ö scanFirst skips a region larger than maxRegionBytes (0.0607ms)
+Γ£ö scanFirst stops and reports truncated when maxTotalBytes is exceeded (0.0695ms)
+Γ£ö scanFirst stops and reports truncated when maxMatches is reached (0.0736ms)
+Γ£ö scanFirst skips a region that becomes unreadable without aborting the whole scan (0.1033ms)
+Γ£ö scanNext (exact): keeps only addresses whose current value matches the target (0.171ms)
+Γ£ö scanNext (changed): keeps addresses whose value differs from the prior scan (0.1099ms)
+Γ£ö scanNext (unchanged): keeps addresses whose value matches the prior scan (0.0532ms)
+Γ£ö scanNext (increased / decreased): direction-based narrowing, e.g. health went down (0.0497ms)
+Γ£ö scanNext drops addresses that fail to read instead of throwing (0.0599ms)
+Γû╢ evaluateOnlineGuard
+  Γ£ö blocks when user has not confirmed offline play, even with clean evidence (1.2732ms)
+  Γ£ö allows when user confirmed offline and no remote connections observed (0.0774ms)
+  Γ£ö blocks when remote connections are present, overriding user confirmation (0.0825ms)
+  Γ£ö fails closed when evidence is unavailable, even with user confirmation (0.0952ms)
+  Γ£ö fails closed on permission_denied evidence (0.0555ms)
+  Γ£ö fails closed on error evidence (0.0782ms)
+  Γ£ö omitting acceptedConnectionBaseline behaves identically to today's strict policy (no regression) (0.08ms)
+  Γ£ö a count at the declared baseline is allowed (0.14ms)
+  Γ£ö a count under the declared baseline is allowed (0.118ms)
+  Γ£ö a count above the declared baseline still blocks (0.1636ms)
+  Γ£ö unavailable evidence still fails closed regardless of baseline (0.1084ms)
+  Γ£ö missing user confirmation still blocks regardless of baseline (0.0934ms)
+  Γ£ö baseline of 0 behaves exactly like the default (any connection blocks) (0.0696ms)
+Γ£ö evaluateOnlineGuard (3.3837ms)
+Γ£ö finds a direct (depth 1) module -> heap pointer path, and resolvePointerPath reconstructs the target (1.282ms)
+Γ£ö finds a two-level (depth 2) pointer chain through an intermediate heap object (0.3443ms)
+Γ£ö does not find a path when maxDepth is too shallow to reach the module (0.7595ms)
+Γ£ö does not find a path when the real offset exceeds maxOffsetPerLevel (0.4043ms)
+Γ£ö a pointer stored in a region larger than maxRegionBytes is not found (region skipped) (0.1358ms)
+Γ£ö resolvePointerPath throws a clear error when the module is not loaded (0.3414ms)
+Γ£ö resolvePointerPath re-resolves correctly against a moved module base (simulating ASLR across a restart) (0.1315ms)
+Γ£ö parsePowerShellConnections: empty output means zero connections, available (0.4517ms)
+Γ£ö parsePowerShellConnections: whitespace-only output means zero connections, available (0.0615ms)
+Γ£ö parsePowerShellConnections: single connection (ConvertTo-Json emits a bare object, not an array) (0.0468ms)
+Γ£ö parsePowerShellConnections: multiple connections, this is the real Stardew Valley evidence shape (0.0492ms)
+Γ£ö parsePowerShellConnections: loopback remote addresses are excluded from the count (0.0527ms)
+Γ£ö parsePowerShellConnections: malformed JSON fails closed as an error, not a crash (0.0834ms)
+Γ£ö parsePowerShellConnections: entries missing RemoteAddress are skipped, not counted (0.0507ms)
+Γ£ö observeRemoteConnections: rejects a non-positive-integer pid before touching the OS (1.0975ms)
+Γ£ö observeRemoteConnections: rejects a non-integer pid before touching the OS (0.0968ms)
+Γ£ö observeRemoteConnections: rejects pid=0 before touching the OS (0.1058ms)
+Γû╢ LiveWatchPanel confidence heuristic
+  Γ£ö rewards intermittent changes typical of real stats (0.5105ms)
+  Γ£ö penalizes never-changing candidates (0.1088ms)
+Γ£ö LiveWatchPanel confidence heuristic (1.3019ms)
+Γû╢ sidebar module artwork mapping
+  Γ£ö custom nav artwork matches the current nav grouping (0.744ms)
+  Γ£ö section artwork matches the current sidebar sections (0.08ms)
+Γ£ö sidebar module artwork mapping (1.3483ms)
+Parse error: Save file is too large to parse safely (8388609 bytes > 8388608 bytes; limit 8.0 MiB).
+Γû╢ ResourceForge Parser Adapters Expansion & Safety Tests
+  Γ£ö 1. JSON Adapter Features & Safety (2.6448ms)
+  Γ£ö 2. INI / CFG Adapter Duplicate Keys (1.5313ms)
+  Γ£ö 3. XML Adapter Security & XXE Blocks (1.1746ms)
+  Γ£ö 4. CSV/TSV Dialects & Stable Row Selectors (0.8345ms)
+  Γ£ö 5. Lua-like Table Static Parser Check (0.8436ms)
+  Γ£ö 6. Binary Safe Read-Only Adapter Check (2.8029ms)
+  Γ£ö 7. Sparse extensionless binary with integrity-like trailer remains read-only (54.7702ms)
+  Γ£ö 8. parseSaveFile rejects oversized JSON before full parse with sanitized error (12.2876ms)
+  Γ£ö 9. parseSaveFile rejects oversized XML before full parse with sanitized error (8.0135ms)
+  Γ£ö 10. parseSaveFile rejects oversized binary before base64 encoding with sanitized error (8.7297ms)
+  Γ£ö 11. parseSaveFile still parses normal JSON, XML, and binary saves (4.4087ms)
+Γ£ö ResourceForge Parser Adapters Expansion & Safety Tests (152.6411ms)
+Γ£ö intake-01 ΓÇö JSON fixture: success, ACCEPTED, hash chain verified (16.4112ms)
+Γ£ö intake-02 ΓÇö INI fixture: ACCEPTED (10.1109ms)
+Γ£ö intake-03 ΓÇö XML fixture: ACCEPTED (10.8503ms)
+Γ£ö intake-04 ΓÇö CSV fixture: ACCEPTED (11.6707ms)
+Γ£ö intake-05 ΓÇö text fixture (.txt): ACCEPTED (11.5447ms)
+Γ£ö intake-06 ΓÇö binary fixture (.bin): REJECTED, intake still succeeds (11.0171ms)
+Γ£ö intake-07 ΓÇö missing source file: returns error (1.1594ms)
+Γ£ö intake-08 ΓÇö workspace copy survives source deletion (12.4728ms)
+Γ£ö intake-09 ΓÇö pilotId is unique across two intakes (22.5953ms)
+Γ£ö intake-10 ΓÇö confirmations round-trip through manifest and Zod schema (11.4719ms)
+Γ£ö intake-11 ΓÇö high cloud-sync risk requires disabled sync before pilot readiness (7.4502ms)
+Γ£ö intake-12 ΓÇö pilot readiness accepts copied local text formats and rejects binary formats (11.492ms)
+Γ£ö pilot-report-01 ΓÇö safe offline pilot report is ready and read-only (14.8363ms)
+Γ£ö pilot-report-02 ΓÇö unsupported pilot format is rejected in report (9.3229ms)
+Γ£ö pilot-report-03 ΓÇö online and multiplayer classifications are rejected (9.8907ms)
+Γ£ö pilot-report-04 ΓÇö cloud-sync risk and missing sample evidence block readiness (20.858ms)
+Γû╢ Game-Running Detection
+  Γ£ö 1. Return false when no executable names registered (0.5159ms)
+  Γ£ö 2. Return false when executable not found in process list (5008.6336ms)
+  Γ£ö 3. Return string evidence on error (safe fallback) (5006.962ms)
+  Γ£ö 4. Check is read-only (no side effects) (10019.3111ms)
+Γ£ö Game-Running Detection (20036.0264ms)
+Γû╢ Compatibility Profiles
+  Γ£ö 1. Create profile with required fields (77.9554ms)
+  Γ£ö 2. Retrieve profile by ID (35.8272ms)
+  Γ£ö 3. Get profile for a game (25.5713ms)
+  Γ£ö 4. Update profile (immutable ΓÇö creates new version) (21.715ms)
+  Γ£ö 5. Fingerprint computation is deterministic (0.5119ms)
+  Γ£ö 6. Drift detection: executable hash change (0.2307ms)
+  Γ£ö 7. Drift detection: save structure change (0.1362ms)
+  Γ£ö 8. Drift detection: no drift when fingerprints match (0.136ms)
+  Γ£ö 9. Profile validation records status and drift (17.5603ms)
+  Γ£ö 10. Profile validation fails on drift (13.5064ms)
+  Γ£ö 11. Check profile drift directly (12.2025ms)
+  Γ£ö 13. Existing profile without source fields loads with safe defaults (13.739ms)
+  Γ£ö 14. New profile can include full source citation (15.2951ms)
+  Γ£ö 15. Invalid sourceConfidence value is rejected (13.429ms)
+  Γ£ö 16. sourceUrls must be an array (10.6651ms)
+  Γ£ö 17. updateProfile can add source citation to an existing profile (13.0458ms)
+  Γ£ö 12. Delete profile cascades to validations (13.9267ms)
+Γ£ö Compatibility Profiles (286.9837ms)
+Γ£ö release artifact paths follow package productName (Solith 2.0.0) (19.2356ms)
+Γ£ö release artifact listing finds Solith setup artifacts (11.2177ms)
+Γ£ö release checksum helper returns sha256 for generated artifacts (5.6648ms)
+Apply failed, initiating rollback: Error: File "save_lock.json" is currently locked by another operation.
+    at applyProposal (G:\ACTIVE_PROJECTS\ResourceForge\src\core\saves\editor.ts:240:13)
+    at async TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:104:19)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+Restore failed: Error: File "save_lock.json" is currently locked by another operation.
+    at restoreBackup (G:\ACTIVE_PROJECTS\ResourceForge\src\core\backups\index.ts:252:13)
+    at applyProposal (G:\ACTIVE_PROJECTS\ResourceForge\src\core\saves\editor.ts:275:30)
+    at async TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:104:19)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+[Crash Recovery] Found 1 interrupted operations.
+[Crash Recovery] Recovering operation dc37954f-e0f3-4a5d-b77a-212b43bb79e9 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-safety-1784128809826-4quxnjl7855\game\save_crash.json
+[Crash Recovery] Case C: Target is invalid/missing, but verified backup exists. Restoring...
+[Crash Recovery] Restoration successful. Marking operation as RESTORED.
+Restore failed: Error: Backup file not found: C:\Users\chase\AppData\Local\Temp\resourceforge-safety-1784128809826-4quxnjl7855\game\backups\6531b8ab-0d2a-4a70-9c46-507b24475e8c.json
+    at restoreBackup (G:\ACTIVE_PROJECTS\ResourceForge\src\core\backups\index.ts:257:13)
+    at TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:254:22)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+Restore failed: Error: Backup integrity check failed for 8620934b-e7a4-416e-aef4-753a955df9b4: hash mismatch
+    at restoreBackup (G:\ACTIVE_PROJECTS\ResourceForge\src\core\backups\index.ts:263:13)
+    at TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:270:22)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+Restore failed: Error: Backup ownership check failed for e85e4a63-6569-4d51-9548-1d068fa44431
+    at restoreBackup (G:\ACTIVE_PROJECTS\ResourceForge\src\core\backups\index.ts:232:13)
+    at TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:287:24)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+Restore failed: Error: Backup ownership check failed for a737d9ee-eca4-4082-ae26-85e06f8d1fe8
+    at restoreBackup (G:\ACTIVE_PROJECTS\ResourceForge\src\core\backups\index.ts:232:13)
+    at TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:315:24)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
+Γû╢ ResourceForge Safety & Lifecycle Hardening Tests
+  Γ£ö 1. Path Containment and Safety Validation (6.96ms)
+  Γ£ö 2. Exclusive Write Locking (58.9704ms)
+  Γ£ö 3. Stale Value Verification (Concurrent Mod Protection) (6.6644ms)
+  Γ£ö 4. Atomic Write Integrity & Hash Validation Mismatch (25.5863ms)
+  Γ£ö 5. Interrupted Run (Crash Recovery) (47.6924ms)
+  Γ£ö 6. Backup restore succeeds through locked atomic replacement (79.3674ms)
+  Γ£ö 7. Backup restore fails cleanly when physical backup is missing (25.8068ms)
+  Γ£ö 8. Backup restore fails cleanly on hash mismatch and preserves current target (23.9734ms)
+  Γ£ö 9. Backup restore rejects target outside the approved game root (15.1641ms)
+  Γ£ö 10. Backup restore rejects symlink target escape when practical (35.7818ms)
+Γ£ö ResourceForge Safety & Lifecycle Hardening Tests (412.0832ms)
+Γû╢ save format capabilities
+  Γ£ö recognizes supported declared formats (0.6419ms)
+  Γ£ö detects known safe formats from extensions (0.2081ms)
+  Γ£ö classifies malformed and unknown extensions without guessing (0.1427ms)
+  Γ£ö reports explicit capabilities for recognized formats (0.1191ms)
+  Γ£ö throws typed unsupported-format errors for unknown extension write operations (0.4637ms)
+  Γ£ö allows XML save-field operations (0.1543ms)
+  Γ£ö allows JSON save-field operations including write execution (0.103ms)
+  Γ£ö allows INI save-field operations including write execution (0.1132ms)
+  Γ£ö runtime save-location binding requires approved roots (0.3129ms)
+  Γ£ö runtime save-location binding rejects traversal and unregistered files (0.2562ms)
+Γ£ö save format capabilities (3.3661ms)
+Γû╢ settings onboarding in test env
+  Γ£ö NODE_ENV=test forces onboardingCompleted true (3.7949ms)
+  Γ£ö SOLITH_SKIP_ONBOARDING=1 forces onboardingCompleted true (0.9084ms)
+Γ£ö settings onboarding in test env (63.5536ms)
+Γ£ô Single quotes round-trip correctly via parameter binding
+Γ£ô SQL injection attempt safely handled by parameter binding
+Γ£ô Special characters preserve correctly through parameter binding
+Γ£ô Unicode characters preserved through parameter binding
+Γ£ô Whitespace and newlines preserved through parameter binding
+Γ£ô Update with hostile values works correctly
+Γ£ô Delete with parameter binding and injection string works
+Γ£ô Query with parameter binding retrieves rows correctly
+Γ£ô Validation with parameter binding handles complex JSON
+Γ£ô Complete create-retrieve-update-retrieve cycle successful
+Γû╢ SQL Parameter Binding ΓÇö Hostile Value Tests
+  Γ£ö 1. Parameter binding with single quotes in gameName (6.679ms)
+  Γ£ö 2. Parameter binding with SQL-like injection strings in gameName (1.2759ms)
+  Γ£ö 3. Parameter binding with double quotes and special chars (1.9301ms)
+  Γ£ö 4. Parameter binding with Unicode characters (1.3558ms)
+  Γ£ö 5. Parameter binding with newlines and whitespace (1.7216ms)
+  Γ£ö 6. Update with parameter binding and hostile values (2.1235ms)
+  Γ£ö 7. Delete with parameter binding (2.2098ms)
+  Γ£ö 8. Query with parameter binding (getProfilesForGame) (1.8085ms)
+  Γ£ö 9. Validation with parameter binding (2.2152ms)
+  Γ£ö 10. Complete round-trip verification (2.2449ms)
+Γ£ö SQL Parameter Binding ΓÇö Hostile Value Tests (112.0101ms)
+Γû╢ trainer catalog IPC validation
+  Γ£ö DefinitionFeedbackSchema accepts valid rating (1.7245ms)
+  Γ£ö DefinitionFeedbackSchema rejects invalid rating (0.7253ms)
+  Γ£ö ImportCtSchema accepts xml payload (0.2877ms)
+  Γ£ö ImportCtSchema rejects empty xml (0.2538ms)
+  Γ£ö LiveMemoryPointerScanSchema requires hex address (0.5362ms)
+Γ£ö trainer catalog IPC validation (4.3396ms)
+Γû╢ trainer catalog search schema
+  Γ£ö accepts genre and verification filters (2.0779ms)
+Γ£ö trainer catalog search schema (2.1812ms)
+Γû╢ trainer-catalog offline ΓÇö feedback
+  Γ£ö records and summarizes positive/negative ratings (9.441ms)
+Γ£ö trainer-catalog offline ΓÇö feedback (77.7318ms)
+Γû╢ trainer-catalog offline ΓÇö quarantine
+  Γ£ö queues drift and downgrades verified definition to community (8.5399ms)
+Γ£ö trainer-catalog offline ΓÇö quarantine (8.7293ms)
+Γû╢ trainer-catalog offline ΓÇö promotion
+  Γ£ö blocks promotion without enough community feedback (1.3362ms)
+  Γ£ö promotes community definition when feedback and certification pass (2.0754ms)
+  Γ£ö blocks promotion when certification level is below L3 (1.2202ms)
+Γ£ö trainer-catalog offline ΓÇö promotion (4.8802ms)
+Γû╢ trainer catalog search filters
+  Γ£ö filters by single genre (4.733ms)
+  Γ£ö filters by multiple genres (OR) (0.6575ms)
+  Γ£ö combines genre and verification filters (3.4133ms)
+Γ£ö trainer catalog search filters (72.5615ms)
+Γû╢ trainer catalog HTML parsers
+  Γ£ö parses XenForo-style community forum trainer thread titles (0.8489ms)
+  Γ£ö parses remote trainer index links (3.3592ms)
+  Γ£ö parses remote game catalog links (0.2421ms)
+Γ£ö trainer catalog HTML parsers (6.4015ms)
+Γû╢ remote trainer import
+  Γ£ö builds community mod pack definitions without pointer paths (2.6235ms)
+  Γ£ö maps remote trainer to searchable catalog entry (0.2797ms)
+  Γ£ö uses curated FLiNG option lists for bundled games (0.2951ms)
+Γ£ö remote trainer import (3.4112ms)
+Γû╢ FLiNG trainer option parser
+  Γ£ö parses option hotkeys and names from trainer detail HTML (0.9069ms)
+Γ£ö FLiNG trainer option parser (1.0515ms)
+Γû╢ seed catalog entries
+  Γ£ö creates metadata-only steam catalog rows (0.2371ms)
+Γ£ö seed catalog entries (0.3454ms)
+Γû╢ validateControl ΓÇö required fields
+  Γ£ö returns no errors for a fully valid save_field control (0.9196ms)
+  Γ£ö returns error when id is missing (0.154ms)
+  Γ£ö returns error when label is missing (0.0994ms)
+  Γ£ö returns error for invalid controlType (0.0815ms)
+  Γ£ö returns error for invalid backend (0.0787ms)
+  Γ£ö returns error when save_field control missing saveField (0.0783ms)
+  Γ£ö returns no errors for memory_write control without saveField (0.0679ms)
+  Γ£ö returns no errors for disabled save_field control without saveField (0.075ms)
+Γ£ö validateControl ΓÇö required fields (2.3046ms)
+Γû╢ isControlExecutable ΓÇö execution eligibility
+  Γ£ö returns true for save_field + requires_approval (Money control) (0.1902ms)
+  Γ£ö returns true for save_field + supported (1.0092ms)
+  Γ£ö returns true for memory_write backend when requires_approval (1.9914ms)
+  Γ£ö returns false for memory_write with future_feature status (0.1776ms)
+  Γ£ö returns false for save_field + disabled (Resources) (0.7864ms)
+  Γ£ö returns false for save_field + future_feature (0.1213ms)
+  Γ£ö returns false for unsupported backend (0.1138ms)
+  Γ£ö returns false for memory_observation backend regardless of status (0.1552ms)
+Γ£ö isControlExecutable ΓÇö execution eligibility (4.967ms)
+Γû╢ requiresApproval
+  Γ£ö returns true for Money control (requires_approval) (0.1174ms)
+  Γ£ö returns false for a supported control (no approval gate) (0.0619ms)
+  Γ£ö returns false for a disabled control (0.038ms)
+  Γ£ö returns false for a future_feature control (0.039ms)
+Γ£ö requiresApproval (0.3448ms)
+Γû╢ BACKEND_LABELS
+  Γ£ö has a label for every backend type (0.0922ms)
+  Γ£ö renders safe_field as "Save Field" (0.0382ms)
+  Γ£ö renders memory_write as "Memory Write" (0.0685ms)
+Γ£ö BACKEND_LABELS (0.3201ms)
+Γû╢ SAFETY_STATUS_LABELS
+  Γ£ö has a label for every safety status (0.137ms)
+  Γ£ö renders requires_approval as "Requires Approval" (0.0575ms)
+  Γ£ö renders future_feature as "Future Feature" (0.0418ms)
+Γ£ö SAFETY_STATUS_LABELS (0.3205ms)
+Γû╢ buildControls ΓÇö TrainerControlPanel fixture set
+  Γ£ö includes only the 4 accepted shipped V1 controls (0.2232ms)
+  Γ£ö Money control is executable and requires approval (0.0778ms)
+  Γ£ö Stamina control is executable and requires approval (0.0767ms)
+  Γ£ö Farming XP control is executable and requires approval (0.0721ms)
+  Γ£ö Max Stamina control is executable and requires approval (0.0742ms)
+  Γ£ö all non-save_field controls are not executable (0.0904ms)
+  Γ£ö ships no memory_write controls (0.0759ms)
+  Γ£ö all controls pass schema validation (0.0946ms)
+  Γ£ö disabled controls are not executable (0.0544ms)
+  Γ£ö ships no future_feature controls (0.0571ms)
+Γ£ö buildControls ΓÇö TrainerControlPanel fixture set (1.083ms)
+Γû╢ trainer-deck rows
+  Γ£ö builds memory and save rows (0.6456ms)
+Γ£ö trainer-deck rows (1.3572ms)
+Γû╢ trainer-health
+  Γ£ö unknown when no installed executable (2.107ms)
+  Γ£ö offline certify passes valid definition (2.7059ms)
+Γ£ö trainer-health (63.9074ms)
+Γû╢ TrainerHost E2E (production spawn)
+  Γ£ö read-only: spawn ΓåÆ handshake ΓåÆ readSaveField ΓåÆ unknown method ΓåÆ shutdown ΓåÆ PID gone (312.5185ms)
+  Γ£ö write workflow: spawn ΓåÆ propose ΓåÆ execute ΓåÆ verify read ΓåÆ rollback ΓåÆ verify read ΓåÆ shutdown ΓåÆ PID gone (264.0881ms)
+  Γ£ö propose rejects invalid path (file does not exist) (112.7154ms)
+  Γ£ö execute rejects invalid XML content (101.7777ms)
+Γ£ö TrainerHost E2E (production spawn) (791.8084ms)
+Γû╢ startHostRuntime ΓÇö handshake
+  Γ£ö sends handshake immediately on start (1.3767ms)
+  Γ£ö advertises all write capabilities (0.1815ms)
+Γ£ö startHostRuntime ΓÇö handshake (2.3779ms)
+Γû╢ startHostRuntime ΓÇö unknown method
+  Γ£ö returns error envelope for unknown method (0.5339ms)
+Γ£ö startHostRuntime ΓÇö unknown method (0.967ms)
+Γû╢ startHostRuntime ΓÇö shutdown
+  Γ£ö replies and calls exit(0) on shutdown request (0.2089ms)
+Γ£ö startHostRuntime ΓÇö shutdown (0.3758ms)
+Γû╢ startHostRuntime ΓÇö parent loss
+  Γ£ö exits on stdin end (0.1572ms)
+  Γ£ö exits on stdin close (0.1039ms)
+Γ£ö startHostRuntime ΓÇö parent loss (0.4916ms)
+Γû╢ startHostRuntime ΓÇö readSaveField dispatch
+  Γ£ö dispatches readSaveField and returns result (93.5249ms)
+  Γ£ö returns error for invalid params (67.6458ms)
+Γ£ö startHostRuntime ΓÇö readSaveField dispatch (161.5114ms)
+Γû╢ createTrainerHostSupervisor ΓÇö start / handshake
+  Γ£ö returns running=false before start (0.6242ms)
+  Γ£ö resolves success after receiving handshake (1.8051ms)
+  Γ£ö returns already_running when called twice (0.5791ms)
+Γ£ö createTrainerHostSupervisor ΓÇö start / handshake (3.6756ms)
+Γû╢ createTrainerHostSupervisor ΓÇö stop
+  Γ£ö sends shutdown and clears running state (0.7291ms)
+Γ£ö createTrainerHostSupervisor ΓÇö stop (0.8448ms)
+Γû╢ createTrainerHostSupervisor ΓÇö approved-path gate
+  Γ£ö rejects readField when path is not approved (0.6681ms)
+Γ£ö createTrainerHostSupervisor ΓÇö approved-path gate (0.7482ms)
+Γû╢ createTrainerHostSupervisor ΓÇö rollback backup ownership gate
+  Γ£ö rejects rollback when backupPath was not created for the approved target (61.4507ms)
+  Γ£ö rejects rollback when owned backup belongs to a different target (12.3801ms)
+  Γ£ö allows rollback for an owned backup created for the same target (11.9606ms)
+Γ£ö createTrainerHostSupervisor ΓÇö rollback backup ownership gate (86.0796ms)
+Γû╢ createTrainerHostSupervisor ΓÇö verifyExitOrKill
+  Γ£ö kills a still-running child (0.7506ms)
+  Γ£ö is a no-op when child is not running (0.222ms)
+Γ£ö createTrainerHostSupervisor ΓÇö verifyExitOrKill (1.0756ms)
+Γû╢ encodeRequest / encodeResponse / encodeError
+  Γ£ö produces newline-terminated JSON (0.6644ms)
+  Γ£ö round-trips request with params (0.5748ms)
+  Γ£ö round-trips response (0.1545ms)
+  Γ£ö round-trips error (0.1332ms)
+  Γ£ö omits params key when params is undefined (0.1274ms)
+Γ£ö encodeRequest / encodeResponse / encodeError (2.3888ms)
+Γû╢ type guards
+  Γ£ö isRpcRequest identifies requests (0.1988ms)
+  Γ£ö isRpcResponse identifies ok responses (0.1008ms)
+  Γ£ö isRpcError identifies error responses (0.0898ms)
+Γ£ö type guards (0.5435ms)
+Γû╢ LineFramer
+  Γ£ö emits message when a complete line arrives in one chunk (0.2229ms)
+  Γ£ö buffers partial line and emits on subsequent chunk (0.1309ms)
+  Γ£ö emits multiple messages from one chunk (0.0905ms)
+  Γ£ö emits first message and buffers remainder when chunk has partial second line (0.0757ms)
+  Γ£ö skips empty lines (0.0914ms)
+  Γ£ö accepts string input (0.1003ms)
+  Γ£ö throws RpcFrameError on malformed JSON (0.4205ms)
+  Γ£ö RpcFrameError contains the offending raw line (0.1099ms)
+  Γ£ö retains buffered bytes after a throw (0.067ms)
+Γ£ö LineFramer (1.5413ms)
+Γû╢ readSaveField
+  Γ£ö reads a known field from the XML fixture (4.1745ms)
+  Γ£ö reads a top-level string field (1.0453ms)
+  Γ£ö reads a nested numeric field as string (1.185ms)
+  Γ£ö returns found=false for a missing field path (0.8883ms)
+  Γ£ö returns found=false for a nonexistent file (0.1406ms)
+  Γ£ö throws on invalid params (missing filePath) (0.6343ms)
+  Γ£ö throws on invalid params (missing field) (0.1734ms)
+  Γ£ö throws on invalid params (null) (0.1049ms)
+  Γ£ö throws xml_safety error on DOCTYPE with SYSTEM reference (2.3127ms)
+  Γ£ö throws a user-safe unsupported-format error for non-XML save-field reads (4.2965ms)
+  Γ£ö reads a simple field from JSON saves (5.8144ms)
+  Γ£ö returns found=false for missing JSON fields (8.496ms)
+  Γ£ö throws a safe malformed JSON error without full path leakage (4.6481ms)
+  Γ£ö rejects oversized JSON before parse with sanitized error (12.4429ms)
+  Γ£ö reads simple section.key values from INI saves (3.6481ms)
+  Γ£ö returns found=false for missing INI fields (5.3352ms)
+  Γ£ö throws a safe malformed INI error without full path leakage (4.029ms)
+Γ£ö readSaveField (60.6202ms)
+Γû╢ proposeWriteField
+  Γ£ö returns valid:true when file + field + currentValue are correct (4.4805ms)
+  Γ£ö throws file_not_found for non-existent path (0.4543ms)
+  Γ£ö throws value_mismatch when currentValue is wrong (1.3599ms)
+  Γ£ö throws field_not_found for non-existent field path (1.6009ms)
+  Γ£ö throws invalid_params when params are missing required keys (0.1618ms)
+  Γ£ö throws xml_safety on DOCTYPE content (5.955ms)
+  Γ£ö throws a user-safe unsupported-format error for non-XML proposals (3.451ms)
+  Γ£ö allows JSON read-only proposal validation with preview (5.2236ms)
+  Γ£ö rejects JSON proposal type changes for numeric fields (10.6473ms)
+  Γ£ö rejects JSON proposal paths that traverse arrays (5.2589ms)
+  Γ£ö rejects missing JSON proposal fields (8.1848ms)
+  Γ£ö allows INI proposal preview without enabling write execution (5.5318ms)
+Γ£ö proposeWriteField (61.4522ms)
+Γû╢ executeWriteField
+  Γ£ö writes new value, returns written:true + verifiedValue + backupPath (28.8649ms)
+  Γ£ö backup contains the original value (0.5913ms)
+  Γ£ö throws value_changed_since_proposal if currentValue no longer matches (1.0993ms)
+  Γ£ö throws file_not_found for missing file (0.1662ms)
+  Γ£ö throws invalid_params for missing newValue (0.1076ms)
+  Γ£ö writes JSON scalar fields with backup and verification (11.1102ms)
+  Γ£ö rolls back JSON writes from verified backup (10.4218ms)
+  Γ£ö writes INI fields with backup, verification, and rollback (13.1835ms)
+Γ£ö executeWriteField (68.1667ms)
+Γû╢ rollbackWriteField
+  Γ£ö restores original value, returns restored:true + verifiedValue (3.6102ms)
+  Γ£ö file contains original value after rollback (0.2956ms)
+  Γ£ö throws backup_not_found when backup is missing (1.9707ms)
+  Γ£ö throws backup_path_invalid for an arbitrary backup path (0.1872ms)
+  Γ£ö throws invalid_params when field is missing (0.1034ms)
+Γ£ö rollbackWriteField (17.5662ms)
+Γû╢ trainer-hotkey-bindings
+  Γ£ö defaults include overlay and F1ΓÇôF12 cheat slots (67.2689ms)
+  Γ£ö setTrainerHotkeyBindings merges and detects conflicts (2.8598ms)
+  Γ£ö detectOsHotkeyWarnings flags Alt+Tab and Alt+F4 (0.2133ms)
+Γ£ö trainer-hotkey-bindings (71.1302ms)
+Γû╢ deriveCardState ΓÇö Trainer UX state machine
+  Γ£ö 1. READY when no transient, game closed, item ready (0.9497ms)
+  Γ£ö 2. GAME_RUNNING when game is open and item is otherwise ready (0.1088ms)
+  Γ£ö 3. BLOCKED when item risk is Blocked (0.0871ms)
+  Γ£ö 4. BLOCKED when status is "blocked" (case-insensitive) (0.1055ms)
+  Γ£ö 5. BLOCKED when status is "BLOCKED" (upper) (0.2072ms)
+  Γ£ö 6. NEEDS_RESCAN when status is "needs rescan" (0.0987ms)
+  Γ£ö 7. NEEDS_RESCAN is not affected by game running (status wins) (0.0686ms)
+  Γ£ö 8. BROKEN when status is "broken" (0.067ms)
+  Γ£ö 9. APPLYING transient takes precedence over READY (0.1024ms)
+  Γ£ö 10. APPLIED transient takes precedence over BLOCKED item risk (0.1263ms)
+  Γ£ö 11. RESTORED transient preserved (0.0748ms)
+  Γ£ö 12. FAILED transient preserved even when game running (0.0739ms)
+  Γ£ö 15. BLOCKED status beats GAME_RUNNING (0.054ms)
+  Γ£ö 16. BROKEN status beats GAME_RUNNING (0.2439ms)
+  Γ£ö 17. Caution risk with Ready status yields READY (0.1012ms)
+  Γ£ö 18. Risky risk with Ready status yields READY (0.1023ms)
+Γ£ö deriveCardState ΓÇö Trainer UX state machine (3.5405ms)
+Γû╢ STATE_CONFIG ΓÇö all active states defined
+  Γ£ö 19. All active TrainerCardState values are in STATE_CONFIG (0.2086ms)
+  Γ£ö 20. Every STATE_CONFIG entry has a non-empty label (0.0882ms)
+  Γ£ö 21. Every STATE_CONFIG entry has a color (0.1456ms)
+  Γ£ö 22. READY has empty explanation (no warning needed) (0.0698ms)
+  Γ£ö 23. All warning states have non-empty explanation (0.1296ms)
+Γ£ö STATE_CONFIG ΓÇö all active states defined (0.7782ms)
+Γû╢ TrainerItem ΓÇö shape and field constraints
+  Γ£ö 24. makeItem produces valid TrainerItem (0.1184ms)
+  Γ£ö 25. inputType toggle maps to boolean control (0.0556ms)
+  Γ£ö 26. inputType slider requires min and max (0.0794ms)
+  Γ£ö 27. inputType dropdown requires options array (0.0861ms)
+  Γ£ö 28. Items with no path can still be valid (0.0566ms)
+  Γ£ö 29. Item with missing confidence still derives correct state (0.0459ms)
+Γ£ö TrainerItem ΓÇö shape and field constraints (0.5597ms)
+Γû╢ Compatibility profile level taxonomy
+  Γ£ö 30. Six valid compatibility levels defined (0.0777ms)
+  Γ£ö 31. VERIFIED is the highest tier (0.0355ms)
+  Γ£ö 32. BLOCKED is the lowest tier (0.0277ms)
+  Γ£ö 33. BLOCKED_PENDING_USER_DATA is not a valid profile level (is a dashboard note) (0.0336ms)
+Γ£ö Compatibility profile level taxonomy (0.2401ms)
+Γû╢ Save edit risk messaging
+  Γ£ö 34. labels exist for read-only, preview-only, executable, and blocked states (0.1403ms)
+  Γ£ö 35. JSON and INI are executable save-field formats (0.072ms)
+  Γ£ö 36. executable copy keeps approval, backup, and rollback language (0.1472ms)
+  Γ£ö 37. blocked copy covers unsupported formats and unsafe paths (1.8984ms)
+  Γ£ö 38. risk messaging does not reintroduce misleading safe edit wording or unsafe domains (0.1058ms)
+  Γ£ö 39. preview-only cfg/config copy does not claim backup or rollback execution (0.1388ms)
+  Γ£ö 40. blocked copy does not claim rollback availability (0.081ms)
+  Γ£ö 41. reliability messages are user-safe and do not claim file changes after blocked writes (0.0978ms)
+  Γ£ö 42. displayed error detail strips full filesystem paths (0.1952ms)
+  Γ£ö 43. local-only safety copy is short, scoped, and does not imply prohibited support (0.0738ms)
+Γ£ö Save edit risk messaging (3.164ms)
+Γû╢ lifecycle-wiring
+  Γ£ö LW-01: successful start records sender as owner (0.8089ms)
+  Γ£ö LW-02: failed start does not change ownership (0.1246ms)
+  Γ£ö LW-03: owner stop clears ownership (0.1298ms)
+  Γ£ö LW-04: owning webContents destruction stops monitoring (0.2337ms)
+  Γ£ö LW-05: unrelated webContents destruction does not stop monitoring (0.1363ms)
+  Γ£ö LW-06: window close stops monitoring (0.1366ms)
+  Γ£ö LW-07: app before-quit stops monitoring (0.0981ms)
+  Γ£ö LW-08: feature disable stops active monitoring (0.0815ms)
+  Γ£ö LW-09: feature disable while stopped is harmless (0.1003ms)
+  Γ£ö LW-10: multiple shutdown signals are idempotent (0.2619ms)
+  Γ£ö LW-11: createLifecycleWiring registers exactly one app listener (0.1237ms)
+  Γ£ö LW-12: wireWindow is idempotent per window object (0.1739ms)
+  Γ£ö LW-13: dispose removes before-quit listener (0.1123ms)
+  Γ£ö LW-13b: dispose is idempotent (safe to call twice) (0.1745ms)
+  Γ£ö LW-13c: after dispose, app before-quit no longer stops the monitor (0.1142ms)
+  Γ£ö LW-14: ownership cleared after app quit (0.0812ms)
+  Γ£ö LW-15: same renderer can stop and restart, retaining ownership (0.1075ms)
+  Γ£ö LW-16: unrelated renderer cannot hijack an owned session (0.098ms)
+  Γ£ö LW-17: stale wc destruction cannot stop a newer owner (0.0981ms)
+  Γ£ö LW-18: cleanup calls monitor.stop() with a reason (0.0783ms)
+  Γ£ö LW-19: invalid sender is rejected without touching monitor (0.162ms)
+  Γ£ö LW-20: disabled feature flag rejects start (0.0922ms)
+Γ£ö lifecycle-wiring (4.6668ms)
+Γû╢ evaluator
+  Γ£ö T01 ΓÇö feature disabled returns disabled state (feature flag off handled by caller) (0.7286ms)
+  Γ£ö T02 ΓÇö game not running (0.1103ms)
+  Γ£ö T03 ΓÇö game appears (0.1176ms)
+  Γ£ö T04 ΓÇö process identity includes pid and start time (0.0786ms)
+  Γ£ö T05 ΓÇö PID reuse is detected (0.1199ms)
+  Γ£ö T06 ΓÇö external marker appears (0.1578ms)
+  Γ£ö T07 ΓÇö local listener appears (0.1413ms)
+  Γ£ö T08 ΓÇö both sides of a local connection appear (0.1357ms)
+  Γ£ö T09 ΓÇö external session becomes strongly observed (3 signals) (0.1662ms)
+  Γ£ö T10 ΓÇö listener disappears while marker still present (0.3122ms)
+  Γ£ö T11 ΓÇö connection pair disappears (0.1302ms)
+  Γ£ö T12 ΓÇö marker disappears along with endpoints (0.1526ms)
+  Γ£ö T13 ΓÇö game remains running after session evidence disappears (0.1434ms)
+  Γ£ö T14 ΓÇö state becomes session_ended_game_running (0.1129ms)
+  Γ£ö T15 ΓÇö game exits after session ends (0.0577ms)
+  Γ£ö T16 ΓÇö game exits while session evidence is present (0.0518ms)
+  Γ£ö T17 ΓÇö marker remains but process is gone (0.044ms)
+  Γ£ö T18 ΓÇö stale marker is reported (0.0343ms)
+  Γ£ö T19 ΓÇö permission-denied process observation returns game_not_running (0.1998ms)
+  Γ£ö T20 ΓÇö endpoint observer unavailable still works (0.0793ms)
+  Γ£ö T21 ΓÇö observer error on process does not crash evaluator (0.1195ms)
+Γ£ö evaluator (4.4259ms)
+Γû╢ timeline
+  Γ£ö T22 ΓÇö poll cancellation ΓÇö timeline starts empty (1.5212ms)
+  Γ£ö T23 ΓÇö duplicate polling loops prevented ΓÇö timeline records transitions (0.1928ms)
+  Γ£ö T24 ΓÇö monitoring stop cleanup ΓÇö clear resets timeline (0.0942ms)
+  Γ£ö T25 ΓÇö timeline retention bound ΓÇö oldest entries dropped (0.1062ms)
+  Γ£ö T26 ΓÇö diagnostic sanitization ΓÇö export contains no secrets (0.1231ms)
+  Γ£ö T27 ΓÇö no external files are modified by timeline operations (0.9078ms)
+  Γ£ö T28 ΓÇö existing V1 functionality unaffected by V2 types import (0.0859ms)
+Γ£ö timeline (3.2118ms)
+Γû╢ session-monitor service
+  Γ£ö T-SM1 ΓÇö default state is idle (0.2973ms)
+  Γ£ö T-SM2 ΓÇö start requires executableName (0.2447ms)
+  Γ£ö T-SM3 ΓÇö start succeeds with valid config (79.7135ms)
+  Γ£ö T-SM4 ΓÇö second start while running returns error (34.9721ms)
+  Γ£ö T-SM5 ΓÇö stop transitions to stopped state (36.9063ms)
+  Γ£ö T-SM6 ΓÇö clearTimeline resets entry count (21.8675ms)
+  Γ£ö T-SM7 ΓÇö exportDiagnostics returns sanitized structure (0.2387ms)
+Γ£ö session-monitor service (174.5372ms)
+Γû╢ lifecycle integration (mock evidence)
+  Γ£ö T-INT1 ΓÇö full AΓåÆBΓåÆCΓåÆDΓåÆE lifecycle via evaluator (0.1534ms)
+  Γ£ö T-INT2 ΓÇö session_ended_game_running message is correct (0.036ms)
+  Γ£ö T-INT3 ΓÇö verify timeline and state transitions recorded (0.0664ms)
+Γ£ö lifecycle integration (mock evidence) (0.3095ms)
+Γû╢ session-monitor: basic lifecycle (injected observers)
+  Γ£ö T-CONC1 ΓÇö second start while running is rejected (0.2855ms)
+  Γ£ö T-CONC2 ΓÇö stop sets isRunning=false and state=stopped immediately (0.2566ms)
+  Γ£ö T-CONC3 ΓÇö start initialises state to game_not_running (0.1267ms)
+Γ£ö session-monitor: basic lifecycle (injected observers) (0.7569ms)
+Γû╢ session-monitor: immediate restart while old poll is unresolved
+  Γ£ö T-RST1 ΓÇö new generation fires initial poll before old deferred resolves (13.0894ms)
+  Γ£ö T-RST2 ΓÇö old generation result cannot overwrite new generation state (0.3814ms)
+  Γ£ö T-RST3 ΓÇö pollInFlight is false after stop so new gen can start immediately (0.346ms)
+Γ£ö session-monitor: immediate restart while old poll is unresolved (13.9243ms)
+Γû╢ session-monitor: abort signal and child-process cancellation
+  Γ£ö T-ABORT1 ΓÇö stop() aborts the AbortSignal before awaited observers return (0.5056ms)
+  Γ£ö T-ABORT2 ΓÇö abort signal fires on stop() even when poll is awaiting allSettled (1.3678ms)
+  Γ£ö T-ABORT3 ΓÇö renderer destruction (stop) cancels active work (0.318ms)
+  Γ£ö T-ABORT4 ΓÇö app shutdown (stop) cancels active work (0.238ms)
+Γ£ö session-monitor: abort signal and child-process cancellation (2.5421ms)
+Γû╢ session-monitor: partial observer failures (allSettled)
+  Γ£ö T-PART1 ΓÇö only process observer rejects: endpoint evidence is preserved (0.3884ms)
+  Γ£ö T-PART2 ΓÇö only endpoint observer rejects: process evidence is preserved (0.2301ms)
+  Γ£ö T-PART3 ΓÇö both observers reject: normalized error state, no crash (0.2072ms)
+  Γ£ö T-PART4 ΓÇö observer timeout (late rejection): result discarded cleanly (0.2168ms)
+Γ£ö session-monitor: partial observer failures (allSettled) (1.1181ms)
+Γû╢ session-monitor: recursive scheduling (exactly one poll per generation)
+  Γ£ö T-SCHED1 ΓÇö next poll is scheduled after current poll completes (0.3629ms)
+  Γ£ö T-SCHED2 ΓÇö no overlapping polls: second tick is dropped while first is in-flight (0.2625ms)
+  Γ£ö T-SCHED3 ΓÇö stop cancels the pending next-poll timer (0.2375ms)
+  Γ£ö T-SCHED4 ΓÇö stale generation poll from scheduler does not update state (0.2144ms)
+Γ£ö session-monitor: recursive scheduling (exactly one poll per generation) (1.1659ms)
+Γû╢ V2 safe support workflow copy
+  Γ£ö README explains local/offline catalog, advisory diff, and evidence-based support matrix (1.044ms)
+  Γ£ö UI copy keeps advisory and blocked guarantees explicit (2.493ms)
+  Γ£ö Backups page avoids rendering raw full target path text in table rows (0.3875ms)
+  Γ£ö copy does not imply forbidden online or memory/process capabilities (1.2642ms)
+Γ£ö V2 safe support workflow copy (5.9612ms)
+Γä╣ tests 651
+Γä╣ suites 108
+Γä╣ pass 651
+Γä╣ fail 0
+Γä╣ cancelled 0
+Γä╣ skipped 0
+Γä╣ todo 0
+Γä╣ duration_ms 23689.692
+EXIT: 0
+ELAPSED_MS: 24705
+
+===== BUILD_ELECTRON =====
+CMD: npm run build:electron
+START: 2026-07-15T08:20:28.8792131-07:00
+
+> resourceforge@2.0.0 build:electron
+> tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
+
+CLI Building entry: {"main":"electron/main.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"host-entry":"src/core/trainer-host/host-entry.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"preload":"electron/preload.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: G:\ACTIVE_PROJECTS\ResourceForge\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\ACTIVE_PROJECTS\ResourceForge\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\ACTIVE_PROJECTS\ResourceForge\tsup.config.ts
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+CJS Build start
+CJS dist-electron\preload.cjs     12.85 KB
+CJS dist-electron\preload.cjs.map 21.29 KB
+CJS ΓÜí∩╕Å Build success in 92ms
+ESM dist-electron\host-entry.js     48.52 KB
+ESM dist-electron\host-entry.js.map 117.40 KB
+ESM ΓÜí∩╕Å Build success in 96ms
+ESM dist-electron\main.js     627.31 KB
+ESM dist-electron\main.js.map 1.19 MB
+ESM ΓÜí∩╕Å Build success in 1004ms
+
+≡ƒöì ResourceForge ΓÇö Electron Output Verifier
+
+ΓöÇΓöÇ Required files
+  Γ£à PASS [1] main.js exists
+  Γ£à PASS [2] preload.cjs exists
+  Γ£à PASS [3] host-entry.js exists (TrainerHost child process)
+
+ΓöÇΓöÇ No TypeScript leakage
+  Γ£à PASS [4] main.js contains no .ts imports
+  Γ£à PASS [5] preload.cjs contains no .ts imports
+
+ΓöÇΓöÇ No bare relative imports
+  Γ£à PASS [6] main.js has no bare relative imports
+  Γ£à PASS [7] preload.cjs has no bare relative imports
+
+ΓöÇΓöÇ No development-only paths
+  Γ£à PASS [8] main.js does not import from .gemini
+  Γ£à PASS [9] preload.cjs does not import from .gemini
+  Γ£à PASS [10] main.js does not import a test runner
+
+ΓöÇΓöÇ Security checks
+  Γ£à PASS [11] preload.js uses contextBridge
+  Γ£à PASS [12] preload.js uses exposeInMainWorld
+  Γ£à PASS [13] main.js has nodeIntegration: false
+  Γ£à PASS [14] main.js has contextIsolation: true
+  Γ£à PASS [15] main.js has single-instance lock
+
+ΓöÇΓöÇ Bundle sanity
+  Γ£à PASS [16] main.js > 10 KB (not empty/stub)
+  Γ£à PASS [17] main.js < 5 MB (not bloated)
+  Γ£à PASS [18] preload.cjs > 100 bytes (not empty)
+  Γ£à PASS [19] preload.cjs < 100 KB (not bloated)
+
+ΓöÇΓöÇ Summary: 19/19 checks passed
+
+Γ£à All 19 checks passed. Electron output is verified.
+
+EXIT: 0
+ELAPSED_MS: 4688
+
+===== BUILD =====
+CMD: npm run build
+START: 2026-07-15T08:20:33.5675217-07:00
+
+> resourceforge@2.0.0 build
+> npm run build:vite && npm run build:electron && electron-builder
+
+
+> resourceforge@2.0.0 build:vite
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2K
+transforming...Γ£ô 210 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/dist/index.html                                         1.81 kB Γöé gzip:   0.87 kB
+dist-electron/dist/assets/solith-emblem-CybOwWVW.png                 22.74 kB
+dist-electron/dist/assets/solith-save-tools-uOTIm7Ov.png             36.26 kB
+dist-electron/dist/assets/solith-banner-backdrop-DUMtCwtG.png        36.66 kB
+dist-electron/dist/assets/solith-trainer-controller-C0BPEzmP.png     43.37 kB
+dist-electron/dist/assets/IBMPlexSans-Regular-BiEB_oxT.woff2         63.02 kB
+dist-electron/dist/assets/IBMPlexSans-Medium-BQLKo0ot.woff2          66.74 kB
+dist-electron/dist/assets/IBMPlexSans-SemiBold-KfaJl9PC.woff2        67.06 kB
+dist-electron/dist/assets/JetBrainsMono-Regular-BQaDgvhP.woff2       92.16 kB
+dist-electron/dist/assets/JetBrainsMono-Medium-3S3k2nMz.woff2        93.82 kB
+dist-electron/dist/assets/solith-hooded-profile-CyJXjR5c.png        165.05 kB
+dist-electron/dist/assets/solith-recovery-phoenix-DGo0ygNN.png      191.33 kB
+dist-electron/dist/assets/solith-advanced-dragon-DR4E-jk2.png       192.80 kB
+dist-electron/dist/assets/solith-landscape-background-Bfi_Lisi.png  291.15 kB
+dist-electron/dist/assets/solith-shell-background-BthADcp-.png      366.49 kB
+dist-electron/dist/assets/main-X_2l_7lO.css                          71.21 kB Γöé gzip:  14.07 kB
+dist-electron/dist/assets/main-CVMrfxfF.js                          553.79 kB Γöé gzip: 153.10 kB
+
+Γ£ô built in 2.30s
+
+> resourceforge@2.0.0 build:electron
+> tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
+
+CLI Building entry: {"main":"electron/main.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"host-entry":"src/core/trainer-host/host-entry.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Building entry: {"preload":"electron/preload.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: G:\ACTIVE_PROJECTS\ResourceForge\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\ACTIVE_PROJECTS\ResourceForge\tsup.config.ts
+CLI tsup v8.5.1
+CLI Using tsup config: G:\ACTIVE_PROJECTS\ResourceForge\tsup.config.ts
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+ESM Build start
+CLI Target: node22
+CJS Build start
+CJS dist-electron\preload.cjs     12.85 KB
+CJS dist-electron\preload.cjs.map 21.29 KB
+CJS ΓÜí∩╕Å Build success in 25ms
+ESM dist-electron\host-entry.js     48.52 KB
+ESM dist-electron\host-entry.js.map 117.40 KB
+ESM ΓÜí∩╕Å Build success in 37ms
+ESM dist-electron\main.js     627.31 KB
+ESM dist-electron\main.js.map 1.19 MB
+ESM ΓÜí∩╕Å Build success in 193ms
+
+≡ƒöì ResourceForge ΓÇö Electron Output Verifier
+
+ΓöÇΓöÇ Required files
+  Γ£à PASS [1] main.js exists
+  Γ£à PASS [2] preload.cjs exists
+  Γ£à PASS [3] host-entry.js exists (TrainerHost child process)
+
+ΓöÇΓöÇ No TypeScript leakage
+  Γ£à PASS [4] main.js contains no .ts imports
+  Γ£à PASS [5] preload.cjs contains no .ts imports
+
+ΓöÇΓöÇ No bare relative imports
+  Γ£à PASS [6] main.js has no bare relative imports
+  Γ£à PASS [7] preload.cjs has no bare relative imports
+
+ΓöÇΓöÇ No development-only paths
+  Γ£à PASS [8] main.js does not import from .gemini
+  Γ£à PASS [9] preload.cjs does not import from .gemini
+  Γ£à PASS [10] main.js does not import a test runner
+
+ΓöÇΓöÇ Security checks
+  Γ£à PASS [11] preload.js uses contextBridge
+  Γ£à PASS [12] preload.js uses exposeInMainWorld
+  Γ£à PASS [13] main.js has nodeIntegration: false
+  Γ£à PASS [14] main.js has contextIsolation: true
+  Γ£à PASS [15] main.js has single-instance lock
+
+ΓöÇΓöÇ Bundle sanity
+  Γ£à PASS [16] main.js > 10 KB (not empty/stub)
+  Γ£à PASS [17] main.js < 5 MB (not bloated)
+  Γ£à PASS [18] preload.cjs > 100 bytes (not empty)
+  Γ£à PASS [19] preload.cjs < 100 KB (not bloated)
+
+ΓöÇΓöÇ Summary: 19/19 checks passed
+
+Γ£à All 19 checks passed. Electron output is verified.
+
+  ΓÇó electron-builder  version=26.15.3 os=10.0.26200
+  ΓÇó loaded configuration  file=package.json ("build" field)
+  ΓÇó executing @electron/rebuild  electronVersion=42.4.1 arch=x64 buildFromSource=false workspaceRoot=G:\ACTIVE_PROJECTS\ResourceForge projectDir=./ appDir=./
+  ΓÇó installing native dependencies  arch=x64
+  ΓÇó preparing       moduleName=better-sqlite3 arch=x64
+  ΓÇó finished        moduleName=better-sqlite3 arch=x64
+  ΓÇó preparing       moduleName=vendor/memoryjs-3.5.1-patched arch=x64
+  ΓÇó finished        moduleName=vendor/memoryjs-3.5.1-patched arch=x64
+  ΓÇó completed installing native dependencies
+  ΓÇó packaging       platform=win32 arch=x64 electron=42.4.1 appOutDir=dist\win-unpacked
+  ΓÇó downloaded      label=electron progress=100%
+  ΓÇó downloaded electron zip extracted successfully  output=G:\ACTIVE_PROJECTS\ResourceForge\dist\win-unpacked
+  ΓÇó searching for node modules  pm=npm searchDir=G:\ACTIVE_PROJECTS\ResourceForge
+  ΓÇó duplicate dependency references  dependencies=["@types/react@19.2.17","once@1.4.0","once@1.4.0","pump@3.0.4","string_decoder@1.1.1","end-of-stream@1.4.5"]
+  ΓÇó updating asar integrity executable resource  executablePath=dist\win-unpacked\Solith.exe
+  ΓÇó signing with signtool.exe  path=dist\win-unpacked\Solith.exe
+  ΓÇó building        target=nsis file=dist\Solith Setup 2.0.0.exe archs=x64 oneClick=true perMachine=false
+  ΓÇó signing with signtool.exe  path=dist\win-unpacked\resources\elevate.exe
+  ΓÇó signing with signtool.exe  path=dist\Solith Setup 2.0.0.__uninstaller.exe
+  ΓÇó signing with signtool.exe  path=dist\Solith Setup 2.0.0.exe
+  ΓÇó building block map  blockMapFile=dist\Solith Setup 2.0.0.exe.blockmap
+EXIT: 0
+ELAPSED_MS: 96736
+
+===== SUMMARY =====
+HEAD=620e76de427aa01f46bb143d09cca4b901602068
+TSC=0 NPM_TEST=0 BUILD_ELECTRON=0 BUILD=0
+===== A11Y =====
+
+> resourceforge@2.0.0 test:accessibility
+> playwright test tests/accessibility.e2e.test.ts --config playwright.e2e.config.ts
+
+
+Running 8 tests using 1 worker
+
+(node:19704) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 tests\accessibility.e2e.test.ts:77:1 ΓÇ║ a11y-01 ΓÇö all <img> elements have non-empty alt or role="presentation" (16.4s)
+  ok 2 tests\accessibility.e2e.test.ts:99:1 ΓÇ║ a11y-02 ΓÇö all <button> elements have accessible names (3.7s)
+  ok 3 tests\accessibility.e2e.test.ts:120:1 ΓÇ║ a11y-03 ΓÇö sidebar collapse button has aria-expanded attribute (2.9s)
+  ok 4 tests\accessibility.e2e.test.ts:134:1 ΓÇ║ a11y-04 ΓÇö at least one landmark region is present (3.0s)
+  ok 5 tests\accessibility.e2e.test.ts:148:1 ΓÇ║ a11y-05 ΓÇö zero renderer errors on initial page load (4.3s)
+  ok 6 tests\accessibility.e2e.test.ts:166:1 ΓÇ║ a11y-06 ΓÇö all visible <input> elements have associated labels or aria-label (3.0s)
+  ok 7 tests\accessibility.e2e.test.ts:197:1 ΓÇ║ a11y-07 ΓÇö Tab key moves focus without renderer exceptions (3.6s)
+  ok 8 tests\accessibility.e2e.test.ts:224:1 ΓÇ║ a11y-08 ΓÇö axe-core reports no critical violations on Trainer Library (4.1s)
+
+  8 passed (41.4s)
+EXIT=0 ELAPSED=43925
+===== VALIDATE_PACKAGED_HOST =====
+Using host-entry: G:\ACTIVE_PROJECTS\ResourceForge\dist\win-unpacked\resources\app.asar.unpacked\dist-electron\host-entry.js
+
+≡ƒöì Packaged TrainerHost ΓÇö Write Workflow Validation
+
+  Γ£à PASS  [1] handshake ok
+  Γ£à PASS  [2] protocolVersion=1
+  Γ£à PASS  [3] capabilities include proposeWriteField
+  Γ£à PASS  [4] capabilities include executeWriteField
+  Γ£à PASS  [5] capabilities include rollbackWriteField
+  Γ£à PASS  [6] propose ok
+  Γ£à PASS  [7] propose.valid=true
+  Γ£à PASS  [8] propose did not mutate file
+  Γ£à PASS  [9] execute ok
+  Γ£à PASS  [10] execute.written=true
+  Γ£à PASS  [11] execute.verifiedValue=12345
+  Γ£à PASS  [12] backupPath returned
+  Γ£à PASS  [13] backup file exists on disk
+  Γ£à PASS  [14] backup contains original value
+  Γ£à PASS  [15] read after write ok
+  Γ£à PASS  [16] read returns new value
+  Γ£à PASS  [17] rollback ok
+  Γ£à PASS  [18] rollback.restored=true
+  Γ£à PASS  [19] rollback.verifiedValue=5000
+  Γ£à PASS  [20] read after rollback ok
+  Γ£à PASS  [21] read returns original value
+  Γ£à PASS  [22] unknown method rejected
+  Γ£à PASS  [23] shutdown ack
+EXIT=0
+===== ORPHAN =====
+Spawned PID: 29328
+Before shutdown ΓÇö alive: true
+Process closed with code: 0
+PASS: PID 29328 is gone ΓÇö no orphan
+EXIT=0
+===== GIT_STATUS =====
+?? Docs/Reports/GATE_OUTPUT_2026-07-15.txt
+SUMMARY A11Y=0 HOST=0 ORPHAN=0

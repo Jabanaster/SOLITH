@@ -79,7 +79,7 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 
 - ~~Banner/background asset masters (1920×420 / 1920×1080)~~ — done (`npm run prepare:branding`)
 - ~~Onboarding auto-skip in test env (E2E reliability)~~ — done (`NODE_ENV=test` / `SOLITH_SKIP_ONBOARDING`)
-- Fresh-clone / `v2.1-shell-polish` evidence pack — re-gate at `a9483f6(+)`; proposal on evidence branch; **TAG IT** only after clean trees
+- Fresh-clone / `v2.1-shell-polish` evidence pack — **PASS** at `620e76d` (`Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-15.md`); await **PUSH IT** then **TAG IT**
 - ~~Steam AppID → executable lookup table in seed generator~~ — done
 - ~~Community → verified promotion UI in Trainer Library~~ — done
 - ~~Hotkey OS-reserved shortcut warnings~~ — done
