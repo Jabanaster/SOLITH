@@ -17,7 +17,7 @@ Product UI: **Solith** · package `resourceforge@2.0.0`
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
 | Local `npm test` | **656/656 PASS** (verified on merge tip) |
-| CI Fast on `master` | Target **656/656** — CI portability fix for install-discovery fixtures + `build:electron` pretest in workflow |
+| CI Fast on `master` | **GREEN** @ `b049577` — [run 29439968186](https://github.com/Jabanaster/ResourceForge/actions/runs/29439968186) · `npm test` **656/656** + fresh-clone verify |
 | Catalog unification / schema.v1 SoT | **Not started** — Phase 0→1 awaiting blueprint review |
 | Separate concerns | Consolidation MUST use a **new branch** from green `master` |
 
