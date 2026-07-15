@@ -45,7 +45,7 @@ In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by defaul
 | **AD** | Stale / version health engine | **Done** |
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
-| **AG** | Adoption polish + smoke alignment | **Done** — packaged-smoke `parseSave(gameId, path)` + banner selector |
+| **AG** | Adoption polish + smoke alignment | **Done** — smoke 22/22, matrix, overlay bounds + tests |
 
 ### Shell polish / evidence (2026-07)
 
