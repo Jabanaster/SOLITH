@@ -1,0 +1,30 @@
+ResourceForge / Solith — gate output 2026-07-12 (offline batch)
+HEAD (committed): 56b8487364e0b8c8d66542971d4f253cd84f712f
+Working tree: dirty (batch WIP — see FRESH_CLONE_VERIFICATION_2026-07-12.md)
+
+── npm ci ──
+PASS (444 packages audited)
+
+── npx tsc --noEmit ──
+PASS (no errors)
+
+── npm test ──
+PASS 633/633 suites 99 duration ~21s
+
+── npm run build:electron ──
+PASS 19/19 verify-electron-output checks
+
+── npm run build ──
+PASS (vite + electron-builder; Solith Setup 2.0.0.exe)
+
+── npm run test:packaged-smoke ──
+PARTIAL 20/22 passed
+  FAIL point 03 — window title expects ResourceForge; product title is Solith (pre-existing)
+  FAIL point 13 — parseSave IPC null (pre-existing)
+  PASS point 17 — sidebar collapse (onboarding no longer intercepts)
+
+── node scripts/validate-packaged-host.mjs ──
+(see command output in verification report)
+
+── node scripts/orphan-check.mjs ──
+(see command output in verification report)

@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { executablesForSteamAppId } from './steam-executable-lookup.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -189,8 +190,10 @@ function guessExecutables(name) {
 
 function withExecutableGuesses(game) {
   const categories = normalizeCategories(game.categories);
-  const base = game.executables?.length ? game : { ...game, executables: guessExecutables(game.name) };
-  return { ...base, categories };
+  const lookup = game.steamAppId ? executablesForSteamAppId(game.steamAppId) : null;
+  const executables =
+    game.executables?.length ? game.executables : lookup ?? guessExecutables(game.name);
+  return { ...game, categories, executables };
 }
 
 function syntheticGames(targetCount) {

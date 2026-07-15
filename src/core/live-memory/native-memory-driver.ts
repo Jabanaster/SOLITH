@@ -240,6 +240,20 @@ export const nativeMemoryDriver: MemoryDriver = {
     }
   },
 
+  getProcessExecutableName(handle: LiveProcessHandle): string | null {
+    try {
+      validateHandle(handle, 'getProcessExecutableName');
+
+      const mem = loadMemoryjs();
+      const process = mem.getProcesses().find((entry) => entry.th32ProcessID === handle.pid);
+      return process ? String(process.szExeFile) : null;
+    } catch (err) {
+      throw new Error(
+        `getProcessExecutableName(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  },
+
   getRegions(handle: LiveProcessHandle): MemoryRegion[] {
     try {
       validateHandle(handle, 'getRegions');

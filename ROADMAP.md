@@ -4,9 +4,8 @@
 
 Product UI: **Solith** · package `resourceforge@2.0.0`
 
-* Branch: `master`
-* Latest milestone work: **M–Q** (live trainer parity, schema.v1 definitions, catalog routing, hotkeys)
-* Post-2.0 offline pinnacle batch: CT import, drift quarantine, community feedback/promotion, pointer-scan UI, catalog export
+* Branch: `master` @ `56b8487` (pushed)
+* Latest milestone work: **R–Y offline pinnacle** + shell polish (banner, sidebar, icons, a11y)
 
 ### Accepted capability stack
 
@@ -22,37 +21,61 @@ schema.v1.yml → compile → SQLite payloadJson
 
 | Milestone | Theme | Status |
 |-----------|--------|--------|
-| **M** | Live trainer parity — overlay, hotkeys, memory_write unlock | Accepted |
-| **N** | Trainer Library — 1000+ metadata seed, remote sync, Steam art | Accepted |
-| **O.1** | schema.v1 guard, fingerprint, AOB resolver | Accepted |
-| **O.2** | YAML export + Solith module branding | Accepted |
-| **O.3** | YAML compiler + catalog import | Accepted |
-| **O+** | Catalog → live memory wiring | Accepted |
-| **P** | Save-field execution router from catalog | Accepted |
-| **Q** | F1–F12 cheat hotkeys, hybrid launch chooser, drift modal | Accepted |
-| **R–W (offline)** | Brand neutrality, CT import, quarantine, feedback, pointer scan UI, 50-game seed | In progress on `master` |
+| **M–Q** | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
+| **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
+| **S** | Connection baselines + restart-stable pointers | **Blocked** — live sessions |
+| **T** | 50 bundled + 1000 catalog seed | **Done** |
+| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — L3/L4 runs blocked on live sessions |
+| **V** | Feedback, promotion, rating prompt | **Done** |
+| **W** | CT import, pointer scan, watch-list, speedhack | **Done** |
+| **X** | Binary save router + research stubs | **Partial** — demo profiles + read-only research; commercial `canWrite` blocked on fixtures |
+| **Y** | Overlay presets, hotkey rebind, onboarding | **Done** |
+| **Z** | Managed runtime (.NET/Mono) | **Not started** |
+| **AA** | Install discovery (Steam/Epic/GOG) | **Done** |
+| **AB** | Library installed/running badges | **Done** (installed badge + filter; running via toast) |
+| **AC** | Per-game Trainer Deck | **Done** |
+| **AD** | Stale / version health engine | **Done** |
+| **AE** | Process-detect quick attach | **Done** |
+| **AF** | Local demand + repair pipeline | **Done** |
+| **AG** | Adoption polish + smoke alignment | **Planned** |
+
+### Shell polish (2026-07-12, pushed)
+
+| Item | Commit |
+|------|--------|
+| Layered HTML banner + sharper background | `405dcc6` |
+| Compact sidebar header (no duplicate slogan) | `b21856b` |
+| Sidebar icon mapping + nav readability | `c56711b` |
+| A11y axe gate + contrast fixes | `0a655d3` |
+| Catalog seed 1000 entries | `e25b896` |
+| Binary save research stubs (read-only) | `56b8487` |
 
 ### Bundled schema.v1 definitions
 
 All seven curated games (`games.ts`) ship as `schema.v1` payloads via `bundled-definition-seed.ts`:
 Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats as `scan_unknown` features).
 
-### Next suggested work
+### Blocked on live sessions (do not fake)
 
-See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap (offline-first section at top).
+1. Connection baselines — Avowed, Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
+2. Restart-verify pointer paths for bundled memory games (`verify-pointer-path.mjs` live mode)
+3. L2–L4 certification runs with in-game evidence (`certify-cheat.mjs` L3+)
+4. Commercial binary save writes without sandbox fixtures (Terraria `.plr` wave 1)
+5. Managed-runtime live memory spike (Milestone Z)
 
-**Requires live game sessions (do not fake):**
+### Can continue offline
 
-1. Measure connection baselines for Avowed, Dredge, Crimson Desert (KI-017)
-2. Restart verifier + pointer registry (15 cheats, then scale)
-3. L3 certification runs on bundled cheats with in-game evidence
+- ~~Banner/background asset masters (1920×420 / 1920×1080)~~ — done (`npm run prepare:branding`)
+- ~~Onboarding auto-skip in test env (E2E reliability)~~ — done (`NODE_ENV=test` / `SOLITH_SKIP_ONBOARDING`)
+- Fresh-clone verification evidence pack — **`Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-12.md`** (commit + tag pending)
+- ~~Steam AppID → executable lookup table in seed generator~~ — done
+- ~~Community → verified promotion UI in Trainer Library~~ — done
+- ~~Hotkey OS-reserved shortcut warnings~~ — done
+- ~~CI split (fast PR vs nightly E2E)~~ — `.github/workflows/ci-fast.yml` + `ci-nightly.yml`
+- ~~UI hierarchy doc~~ — `Docs/SOLITH_UI_HIERARCHY.md`
 
-**Can continue offline:**
-
-- ~~Catalog seed executable enrichment~~ (dedupe + category normalize in seed generator — done)
-- ~~50 bundled community mod packs~~ (done — 7 verified + 43 community)
-- Binary save router wiring for structured formats (RFSA + 4 demo profiles)
-- Hotkey rebind UI + overlay layout presets per game
+See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
+See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
 
 ---
 

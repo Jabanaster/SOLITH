@@ -3,27 +3,34 @@ import assert from 'node:assert/strict';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from '../src/app/assets/branding/module-artwork.ts';
 
 describe('sidebar module artwork mapping', () => {
-  test('custom nav artwork only on semantically matched items', () => {
+  test('custom nav artwork matches the current nav grouping', () => {
     assert.deepEqual(NAV_MODULE_ARTWORK, {
       library: 'trainerController',
+      'trainer-library': 'trainerController',
       trainer: 'trainerController',
+      saves: 'saveTools',
+      controls: 'saveTools',
       backups: 'recoveryPhoenix',
-      'live-memory': 'trainerController',
-      'multi-game-trainer': 'trainerController',
+      journal: 'recoveryPhoenix',
+      locations: 'recoveryPhoenix',
+      discovery: 'hoodedProfile',
+      'trainer-research': 'hoodedProfile',
+      data: 'hoodedProfile',
+      compatibility: 'hoodedProfile',
+      recipes: 'hoodedProfile',
+      'session-monitor': 'advancedDragon',
+      'live-memory': 'advancedDragon',
+      'catalog-save-controls': 'saveTools',
     });
   });
 
-  test('hooded profile is not used in sidebar nav', () => {
-    const values = Object.values(NAV_MODULE_ARTWORK);
-    assert.ok(!values.includes('hoodedProfile'));
-  });
-
-  test('section artwork uses smaller grouping icons only', () => {
+  test('section artwork matches the current sidebar sections', () => {
     assert.deepEqual(SECTION_ARTWORK, {
       Library: 'trainerController',
-      'Core Tools': 'recoveryPhoenix',
+      Recovery: 'recoveryPhoenix',
+      'Save Tools': 'saveTools',
+      Specialized: 'hoodedProfile',
       Advanced: 'advancedDragon',
     });
-    assert.ok(!('Utilities' in SECTION_ARTWORK));
   });
 });

@@ -4,6 +4,7 @@ import db from '../database/index';
 import { generateId } from '../../shared/ids';
 import { getCanonicalPath, validatePathSafety } from '../safety/path-safety';
 import { getGameById } from '../games/index';
+import { getCatalogEntry } from '../trainer-catalog/store.js';
 
 export interface SaveLocation {
   id: string;
@@ -73,10 +74,13 @@ export function revokeSaveLocation(locationId: string): boolean {
   return stmt.run(locationId).changes !== 0;
 }
 
+function isKnownGameScope(gameId: string): boolean {
+  return Boolean(getGameById(gameId) || getCatalogEntry(gameId));
+}
+
 export function addUserSelectedLocation(gameId: string, rawPath: string): { success: boolean; location?: SaveLocation; error?: string } {
-  const game = getGameById(gameId);
-  if (!game) {
-    return { success: false, error: 'Game not found' };
+  if (!isKnownGameScope(gameId)) {
+    return { success: false, error: 'Game not found — register it in Game Library or pick an installed catalog title.' };
   }
 
   const canonical = getCanonicalPath(rawPath);
@@ -142,8 +146,7 @@ export function addUserSelectedLocation(gameId: string, rawPath: string): { succ
  */
 export function isPathApproved(filePath: string, gameId: string): boolean {
   try {
-    const game = getGameById(gameId);
-    if (!game) return false;
+    if (!isKnownGameScope(gameId)) return false;
 
     const canonicalTarget = getCanonicalPath(filePath);
     
@@ -151,10 +154,13 @@ export function isPathApproved(filePath: string, gameId: string): boolean {
     const safety = validatePathSafety(canonicalTarget);
     if (!safety.safe) return false;
 
-    // Check 1: Contained inside game root directory
-    const canonicalGamePath = getCanonicalPath(game.path);
-    if (canonicalTarget.startsWith(canonicalGamePath + path.sep) || canonicalTarget === canonicalGamePath) {
-      return true;
+    const game = getGameById(gameId);
+    // Check 1: Contained inside registered game install directory
+    if (game?.path) {
+      const canonicalGamePath = getCanonicalPath(game.path);
+      if (canonicalTarget.startsWith(canonicalGamePath + path.sep) || canonicalTarget === canonicalGamePath) {
+        return true;
+      }
     }
 
     // Check 2: Contained inside any Approved save location for this game

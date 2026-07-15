@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { GameScopePicker } from '../components/GameScopePicker.js';
 
 interface SaveLocationsProps {
   gameId: string | null;
@@ -19,29 +20,33 @@ interface SaveLocation {
   detectionEvidence: string;
 }
 
-const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
+const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId: initialGameId }) => {
+  const [scopeGameId, setScopeGameId] = useState<string | null>(initialGameId);
+  const [scopeGameName, setScopeGameName] = useState('');
   const [locations, setLocations] = useState<SaveLocation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [userPath, setUserPath] = useState('');
   const [addingLocation, setAddingLocation] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
-    if (gameId) {
-      loadLocations();
-    }
-  }, [gameId]);
+    if (initialGameId) setScopeGameId(initialGameId);
+  }, [initialGameId]);
 
-  const loadLocations = async () => {
+  const loadLocations = useCallback(async () => {
     if (!window.electronAPI) {
-      console.error('[SaveLocations] window.electronAPI unavailable — must run inside Electron');
       setLoading(false);
       return;
     }
-    if (!gameId) { setLoading(false); return; }
+    if (!scopeGameId) {
+      setLocations([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const result = await window.electronAPI.getSaveLocations(gameId);
+      const result = await window.electronAPI.getSaveLocations(scopeGameId);
       setLocations(result || []);
     } catch (e) {
       console.error('Failed to load save locations:', e);
@@ -49,18 +54,23 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopeGameId]);
+
+  useEffect(() => {
+    void loadLocations();
+  }, [loadLocations]);
 
   const handleScan = async () => {
-    if (!gameId || !window.electronAPI) return;
+    if (!scopeGameId || !window.electronAPI) return;
     setScanning(true);
+    setStatusMessage('');
     try {
-      const result = await window.electronAPI.discoverSaveLocations(gameId);
-      alert(`Scan completed. Discovered ${result.length} potential save folder(s).`);
+      const result = await window.electronAPI.discoverSaveLocations(scopeGameId);
+      setStatusMessage(`Scan complete — discovered ${result.length} potential save folder(s). Review and approve below.`);
       await loadLocations();
     } catch (e) {
       console.error('Failed to discover locations:', e);
-      alert('An error occurred during scanning.');
+      setStatusMessage('An error occurred during scanning.');
     } finally {
       setScanning(false);
     }
@@ -73,17 +83,17 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
       if (res.success) {
         await loadLocations();
       } else {
-        alert(`Failed to approve: ${res.error || 'Unknown error'}`);
+        setStatusMessage(`Failed to approve: ${res.error || 'Unknown error'}`);
       }
     } catch (e) {
       console.error('Approval error:', e);
-      alert('An error occurred during approval.');
+      setStatusMessage('An error occurred during approval.');
     }
   };
 
   const handleRevoke = async (id: string) => {
     if (!window.electronAPI) return;
-    if (!confirm('Are you sure you want to revoke access? Solith will block all scans and edits to this location immediately.')) {
+    if (!confirm('Revoke access? Solith will block scans and edits to this location immediately.')) {
       return;
     }
     try {
@@ -91,29 +101,30 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
       if (res.success) {
         await loadLocations();
       } else {
-        alert(`Failed to revoke: ${res.error || 'Unknown error'}`);
+        setStatusMessage(`Failed to revoke: ${res.error || 'Unknown error'}`);
       }
     } catch (e) {
       console.error('Revocation error:', e);
-      alert('An error occurred.');
+      setStatusMessage('An error occurred.');
     }
   };
 
   const handleAddUserPath = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!gameId || !userPath.trim() || !window.electronAPI) return;
+    if (!scopeGameId || !userPath.trim() || !window.electronAPI) return;
     setAddingLocation(true);
     try {
-      const result = await window.electronAPI.addUserSelectedLocation(gameId, userPath.trim());
+      const result = await window.electronAPI.addUserSelectedLocation(scopeGameId, userPath.trim());
       if (result.success) {
         setUserPath('');
+        setStatusMessage('Custom save folder added and approved.');
         await loadLocations();
       } else {
-        alert(`Failed to add path: ${result.error || 'Path validation failed'}`);
+        setStatusMessage(`Failed to add path: ${result.error || 'Path validation failed'}`);
       }
     } catch (e) {
       console.error('Add user location error:', e);
-      alert('An error occurred while adding the path.');
+      setStatusMessage('An error occurred while adding the path.');
     } finally {
       setAddingLocation(false);
     }
@@ -137,136 +148,106 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId }) => {
   };
 
   return (
-    <div className="save-locations-container">
+    <div className="save-locations-container content-panel">
       <PageModuleHeader
-        artwork="hoodedProfile"
+        artwork="recoveryPhoenix"
         title="Save Locations"
-        description="To security-harden Solith, accessing or modifying folders outside the registered game directory requires explicit user approval."
+        description="Discover, approve, and manage folders where Solith may read or write save files."
         actions={
           <button
-            onClick={handleScan}
-            disabled={scanning}
+            type="button"
+            onClick={() => void handleScan()}
+            disabled={scanning || !scopeGameId}
             className="btn-primary"
-            style={{ background: '#64ffda', color: '#0d0d12' }}
           >
-            {scanning ? '🔍 Scanning folders...' : '🔍 Scan for Saves'}
+            {scanning ? 'Scanning…' : 'Scan for saves'}
           </button>
         }
       />
 
-      <div className="glass" style={{ padding: '20px', marginBottom: '24px', border: '1px solid #2d3a5c', borderRadius: '8px' }}>
-        <h3 style={{ marginTop: 0, marginBottom: '12px', color: '#64ffda' }}>Add Custom Location</h3>
-        <form onSubmit={handleAddUserPath} style={{ display: 'flex', gap: '12px' }}>
+      <GameScopePicker
+        value={scopeGameId}
+        onChange={(id, name) => {
+          setScopeGameId(id);
+          setScopeGameName(name);
+        }}
+        label="Game scope"
+        hint="Pick a registered or installed catalog game before scanning."
+      />
+
+      {scopeGameId && scopeGameName && (
+        <p className="tcp-summary-meta">Active scope: <strong>{scopeGameName}</strong></p>
+      )}
+
+      {statusMessage && <p className="tcp-host-message" role="status">{statusMessage}</p>}
+
+      <div className="glass save-locations-add-panel">
+        <h3>Add custom folder</h3>
+        <form onSubmit={handleAddUserPath} className="save-locations-add-form">
           <input
             type="text"
-            placeholder="e.g. C:\Users\YourUser\AppData\Local\MyGame\Saves"
+            placeholder="e.g. %APPDATA%\StardewValley\Saves"
             value={userPath}
             onChange={(e) => setUserPath(e.target.value)}
-            disabled={addingLocation}
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              borderRadius: '4px',
-              border: '1px solid #2d3a5c',
-              background: '#0d0d12',
-              color: '#ffffff',
-              fontSize: '13px'
-            }}
+            disabled={addingLocation || !scopeGameId}
           />
-          <button
-            type="submit"
-            disabled={addingLocation || !userPath.trim()}
-            className="btn-primary"
-            style={{ padding: '10px 20px', cursor: 'pointer' }}
-          >
-            {addingLocation ? 'Adding...' : '➕ Add & Approve'}
+          <button type="submit" disabled={addingLocation || !userPath.trim() || !scopeGameId} className="btn-primary">
+            {addingLocation ? 'Adding…' : 'Add & approve'}
           </button>
         </form>
       </div>
 
-      {loading ? (
+      {!scopeGameId ? (
         <div className="empty-state glass">
-          <p>Loading save locations...</p>
+          <p>Select a game above to scan for save folders or add a custom path.</p>
+        </div>
+      ) : loading ? (
+        <div className="empty-state glass">
+          <p>Loading save locations…</p>
         </div>
       ) : locations.length === 0 ? (
         <div className="empty-state glass">
-          <h3>No save locations found</h3>
-          <p>Click "Scan for Saves" to automatically search common Windows folders, or manually paste a path above.</p>
+          <h3>No save locations yet</h3>
+          <p>Run <strong>Scan for saves</strong> to search common Windows folders, or paste a path above.</p>
         </div>
       ) : (
-        <div className="table-wrapper glass" style={{ border: '1px solid #2d3a5c', borderRadius: '8px', overflow: 'hidden' }}>
-          <table className="fields-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="table-wrapper glass save-locations-table">
+          <table className="fields-table">
             <thead>
-              <tr style={{ background: 'rgba(22, 33, 62, 0.95)', borderBottom: '1px solid #2d3a5c', color: '#64ffda', fontSize: '13px' }}>
-                <th style={{ padding: '12px 16px' }}>Type & Source</th>
-                <th style={{ padding: '12px 16px' }}>Folder Path</th>
-                <th style={{ padding: '12px 16px' }}>Confidence & Evidence</th>
-                <th style={{ padding: '12px 16px' }}>Status</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>Type & source</th>
+                <th>Folder path</th>
+                <th>Confidence</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {locations.map(loc => {
+              {locations.map((loc) => {
                 const statusColor = getStatusColor(loc.approvalState);
                 return (
-                  <tr key={loc.id} style={{ borderBottom: '1px solid rgba(45, 58, 92, 0.4)', fontSize: '13px' }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 600, color: '#e0e0e0' }}>{loc.locationType}</div>
-                      <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{loc.discoverySource}</div>
+                  <tr key={loc.id}>
+                    <td>
+                      <div className="loc-type">{loc.locationType}</div>
+                      <div className="loc-source">{loc.discoverySource}</div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ color: '#00d4ff', wordBreak: 'break-all' }}>{loc.canonicalPath}</div>
+                    <td className="loc-path">{loc.canonicalPath}</td>
+                    <td>
+                      <div>{loc.confidence}%</div>
+                      <div className="loc-evidence">{loc.detectionEvidence}</div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 600 }}>{loc.confidence}% Confidence</div>
-                      <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{loc.detectionEvidence}</div>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        backgroundColor: statusColor + '20',
-                        color: statusColor,
-                        border: `1px solid ${statusColor}`
-                      }}>
+                    <td>
+                      <span className="loc-status-pill" style={{ color: statusColor, borderColor: statusColor }}>
                         {loc.approvalState}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <td>
                       {loc.approvalState === 'Approved' ? (
-                        <button
-                          onClick={() => handleRevoke(loc.id)}
-                          className="btn-secondary"
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            borderRadius: '4px',
-                            background: 'rgba(255, 51, 51, 0.1)',
-                            border: '1px solid #ff3333',
-                            color: '#ff3333',
-                            cursor: 'pointer'
-                          }}
-                        >
+                        <button type="button" onClick={() => void handleRevoke(loc.id)} className="btn-secondary btn-danger-outline">
                           Revoke
                         </button>
                       ) : (
-                        <button
-                          onClick={() => handleApprove(loc.id)}
-                          className="btn-primary"
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            borderRadius: '4px',
-                            background: '#00ff66',
-                            border: 'none',
-                            color: '#0d0d12',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
+                        <button type="button" onClick={() => void handleApprove(loc.id)} className="btn-primary btn-sm">
                           Approve
                         </button>
                       )}

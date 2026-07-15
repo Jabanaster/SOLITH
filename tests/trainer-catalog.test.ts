@@ -4,10 +4,12 @@ import {
   parseTrainerListHtml,
   parseRemoteTrainerIndexHtml,
   parseRemoteGameCatalogHtml,
+  parseFlingTrainerOptionsHtml,
 } from '../src/core/trainer-catalog/sync/parse-html.js';
 import { remoteTrainerToModPack, remoteTrainerToCatalogEntry } from '../src/core/trainer-catalog/sync/remote-sync.js';
 import { seedRecordToEntry } from '../src/core/trainer-catalog/seed.js';
 import { buildSearchableText, validateModPack } from '../src/core/trainer-catalog/types.js';
+import { FLING_TRAINER_PAGES } from '../src/core/cheat-system/trainer-reference.js';
 
 describe('trainer catalog HTML parsers', () => {
   it('parses XenForo-style community forum trainer thread titles', () => {
@@ -51,6 +53,34 @@ describe('remote trainer import', () => {
     assert.equal(entry.verificationStatus, 'community');
     assert.ok(entry.searchableText.includes('dredge'));
     assert.equal(entry.sources[0].provider, 'fling');
+  });
+
+  it('uses curated FLiNG option lists for bundled games', () => {
+    const trainer = { title: 'Palworld Trainer', gameName: 'Palworld', sourceUrl: 'https://example.test/palworld' };
+    const pack = remoteTrainerToModPack(trainer, 'fling');
+    assert.equal(pack.cheats.length, FLING_TRAINER_PAGES.palworld.optionCount);
+    assert.ok(pack.cheats.some((c) => c.name.includes('God Mode')));
+    assert.equal(pack.connectionBaseline, 4);
+  });
+});
+
+describe('FLiNG trainer option parser', () => {
+  it('parses option hotkeys and names from trainer detail HTML', () => {
+    const html = `
+      48 Options · Game Version: v1.0+ · Last Updated: 2026.07.10
+      Note: Single player mode only.
+      ###### Options
+      Num 1 – God Mode/Ignore Hits Num 2 – Lock Health Num 3 – Infinite Shield
+      Ctrl+Num 9 – Freeze Daytime Ctrl+Num 0 – Time Pass Speed
+      Shift+F1 – Edit Max Health Shift+F2 – Edit Max Shield
+      ### Download
+    `;
+    const parsed = parseFlingTrainerOptionsHtml(html);
+    assert.equal(parsed.optionCount, 48);
+    assert.equal(parsed.soloOnly, true);
+    assert.ok(parsed.options.length >= 6);
+    assert.ok(parsed.options.some((o) => o.name === 'God Mode/Ignore Hits'));
+    assert.ok(parsed.options.some((o) => o.hotkey === 'Shift+F1'));
   });
 });
 

@@ -80,6 +80,7 @@ export class FakeMemoryDriver implements MemoryDriver {
   private regions: FakeRegion[] = [];
   private unreadableRegions: { baseAddress: bigint; size: number; writable: boolean }[] = [];
   private modules: MemoryModule[] = [];
+  private processNames = new Map<number, string>();
   private opened = false;
   public closeCallCount = 0;
 
@@ -117,8 +118,16 @@ export class FakeMemoryDriver implements MemoryDriver {
     this.modules.push({ name, baseAddress, size });
   }
 
+  setProcessExecutableName(pid: number, name: string): void {
+    this.processNames.set(pid, name);
+  }
+
   getModules(_handle: LiveProcessHandle): MemoryModule[] {
     return [...this.modules];
+  }
+
+  getProcessExecutableName(handle: LiveProcessHandle): string | null {
+    return this.processNames.get(handle.pid) ?? null;
   }
 
   readPointer(_handle: LiveProcessHandle, address: bigint): bigint {

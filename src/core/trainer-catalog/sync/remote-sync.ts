@@ -7,6 +7,7 @@ import {
   parseRemoteGameCatalogHtml,
 } from './parse-html.js';
 import type { TrainerSyncSourceConfig } from '../types.js';
+import { getFlingReference } from '../../cheat-system/trainer-reference.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'Solith-TrainerCatalog/1.0 (+local definitions sync; no binary download)';
@@ -82,12 +83,24 @@ export function remoteTrainerToModPack(
 ): ModPack {
   const catalogGameId = slugifyGameId(trainer.gameName);
   const now = new Date().toISOString();
+  const curated = provider === 'fling' ? getFlingReference(catalogGameId) : undefined;
   const commonCheats = [
     { id: 'health', name: 'Unlimited Health', description: 'Freeze health value', category: 'Player', valueType: 'float', requiresDiscovery: true, verified: false },
     { id: 'ammo', name: 'Unlimited Ammo', description: 'Freeze ammo count', category: 'Weapons', valueType: 'int32', requiresDiscovery: true, verified: false },
     { id: 'money', name: 'Set Money', description: 'Currency / resources', category: 'Currency', valueType: 'int32', requiresDiscovery: true, verified: false },
     { id: 'speed', name: 'Super Speed', description: 'Movement speed multiplier', category: 'Player', valueType: 'float', requiresDiscovery: true, verified: false },
   ];
+  const cheats = curated
+    ? curated.options.map((option, index) => ({
+        id: `ref-${index + 1}-${option.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
+        name: option.name,
+        description: `Community trainer reference (${option.hotkey})`,
+        category: 'Player',
+        valueType: 'float' as const,
+        requiresDiscovery: true,
+        verified: false,
+      }))
+    : commonCheats;
 
   return {
     packId: `${provider}-${catalogGameId}`,
@@ -95,20 +108,21 @@ export function remoteTrainerToModPack(
     gameName: trainer.gameName,
     source: {
       provider,
-      url: trainer.sourceUrl,
+      url: curated?.url ?? trainer.sourceUrl,
       trainerTitle: trainer.title,
       lastSyncedAt: now,
     },
     verificationStatus: 'community',
-    versions: [{ versionLabel: '*', executables: [guessExecutable(trainer.gameName)] }],
-    cheats: commonCheats,
-    connectionBaseline: 6,
+    versions: [{ versionLabel: curated?.versionLabel ?? '*', executables: [guessExecutable(trainer.gameName)] }],
+    cheats,
+    connectionBaseline: curated?.soloOnly ? 4 : 6,
     platform: 'unknown',
     syncedAt: now,
     notes: [
       `Imported trainer listing from ${provider}. Pointer paths are not verified — use Advanced Scan Mode or memory scan.`,
       'Definitions only; no third-party trainer executable was downloaded.',
-    ],
+      curated ? `${curated.optionCount} public options from curated FLiNG reference (${curated.lastChecked}).` : '',
+    ].filter(Boolean),
   };
 }
 

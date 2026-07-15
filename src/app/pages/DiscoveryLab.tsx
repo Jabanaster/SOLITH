@@ -263,7 +263,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
   return (
     <div className="discovery-lab-container">
       <PageModuleHeader
-        artwork="advancedDragon"
+        artwork="hoodedProfile"
         title="Discovery Lab"
         description="Find offsets by comparing save state transitions. Discovery remains advisory and does not by itself grant executable write support."
       />

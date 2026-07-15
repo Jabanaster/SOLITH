@@ -123,9 +123,9 @@ test('point 02 — app launches and first window appears', async () => {
 });
 
 // ── Point 3: window title ─────────────────────────────────────────────────────
-test('point 03 — window title contains ResourceForge', async () => {
+test('point 03 — window title contains Solith', async () => {
   const title = await win.title();
-  expect(title).toMatch(/ResourceForge/i);
+  expect(title).toMatch(/Solith/i);
 });
 
 // ── Point 4: domcontentloaded ─────────────────────────────────────────────────

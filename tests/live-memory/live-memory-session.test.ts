@@ -16,7 +16,12 @@ const ONLINE_EVIDENCE: RemoteConnectionEvidence = {
   observedAt: '2026-07-05T00:00:01.000Z',
 };
 
-function makeSession(driver: FakeMemoryDriver, evidenceSequence: RemoteConnectionEvidence[]) {
+function makeSession(
+  driver: FakeMemoryDriver,
+  evidenceSequence: RemoteConnectionEvidence[],
+  executableName = 'demo.exe',
+) {
+  driver.setProcessExecutableName(1234, executableName);
   const session = new LiveMemorySession(driver);
   let call = 0;
   session._injectRemoteConnectionObserver(async () => {
@@ -92,6 +97,21 @@ describe('LiveMemorySession', () => {
     assert.equal(driver.getValue(0x1000n), 100, 'value must remain unchanged when guard blocks at write time');
   });
 
+  test('confirmWrite is blocked if the OS executable name no longer matches the attached target', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    driver.setProcessExecutableName(1234, 'other.exe');
+
+    const result = await session.confirmWrite(proposal.proposalId);
+
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /identity mismatch/i);
+    assert.equal(driver.getValue(0x1000n), 100);
+  });
+
   test('rollback restores the value captured before the write', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
     const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
@@ -108,7 +128,7 @@ describe('LiveMemorySession', () => {
 
   test('detach closes the process handle and clears pending proposals', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
-    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    const session = makeSession(driver, [CLEAN_EVIDENCE], 'game.exe');
     await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
 
     session.detach();

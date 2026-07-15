@@ -13,7 +13,7 @@
  * Milestone H refactor: controls are now loaded from src/core/game-profiles/profiles/stardew-valley.json
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type {
   TrainerControl,
@@ -72,6 +72,35 @@ interface ControlState {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function categoryGroupLabel(category: string): string {
+  const c = category.toUpperCase();
+  if (c.includes('CURRENCY') || c.includes('RESOURCE') || c.includes('MONEY')) return 'Resources';
+  if (c.includes('STAMINA') || c.includes('HEALTH') || c.includes('STAT')) return 'Player Stats';
+  if (c.includes('SKILL') || c.includes('XP')) return 'Skills';
+  return category.replace(/_/g, ' ');
+}
+
+function groupControls(controls: TrainerControl[]): Array<{ title: string; items: TrainerControl[] }> {
+  const map = new Map<string, TrainerControl[]>();
+  for (const control of controls) {
+    const title = categoryGroupLabel(control.category);
+    const list = map.get(title) ?? [];
+    list.push(control);
+    map.set(title, list);
+  }
+  const order = ['Resources', 'Player Stats', 'Skills'];
+  return [...map.entries()]
+    .sort((a, b) => {
+      const ai = order.indexOf(a[0]);
+      const bi = order.indexOf(b[0]);
+      if (ai === -1 && bi === -1) return a[0].localeCompare(b[0]);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    })
+    .map(([title, items]) => ({ title, items }));
+}
+
 function safetyStatusColor(status: ControlSafetyStatus): string {
   switch (status) {
     case 'supported':          return 'safe';
@@ -102,6 +131,7 @@ const ControlRow: React.FC<ControlRowProps> = ({
   control, state, inputValue, onInputChange,
   onPropose, onApprove, onCancelProposal, onRollback,
 }) => {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const executable = isControlExecutable(control);
   const needsApproval = requiresApproval(control);
   const riskCopy = executable ? SAVE_EDIT_RISK_COPY.executable : SAVE_EDIT_RISK_COPY.blocked;
@@ -118,27 +148,25 @@ const ControlRow: React.FC<ControlRowProps> = ({
 
   return (
     <div
-      className={`trainer-control-row backend-${control.backend.replace(/_/g, '-')} phase-${state.phase}`}
+      className="trainer-control-card"
       data-testid={`control-${control.id}`}
       aria-label={`${control.label} — ${statusLabel}`}
     >
       <div className="tcr-header">
-        <div className="tcr-meta">
-          <span className="tcr-category">{control.category}</span>
-          <span className={`tcr-status-badge status-${statusColor}`}
-                data-testid={`status-${control.id}`}>
-            {statusLabel}
-          </span>
-          <span className={`tcr-status-badge status-${executable ? 'caution' : 'muted'}`}
-                data-testid={`edit-state-${control.id}`}>
-            {riskCopy.label}
-          </span>
-          <span className="tcr-backend" data-testid={`backend-${control.id}`}>
-            {backendLabel}
-          </span>
-        </div>
         <h4 className="tcr-label">{control.label}</h4>
         <p className="tcr-description">{control.description}</p>
+        <div className="tcr-badges">
+          <span className="tcr-status-badge status-info">Save-backed</span>
+          {executable && needsApproval && (
+            <span className="tcr-status-badge status-caution">Approval required</span>
+          )}
+          {(state.phase === 'applied' && state.backupPath) && (
+            <span className="tcr-status-badge status-safe">Rollback available</span>
+          )}
+          <span className={`tcr-status-badge status-${statusColor}`} data-testid={`status-${control.id}`}>
+            {statusLabel}
+          </span>
+        </div>
       </div>
 
       {state.message && (
@@ -147,10 +175,6 @@ const ControlRow: React.FC<ControlRowProps> = ({
           {state.message}
         </p>
       )}
-
-      <p className="tcr-message tcr-info" data-testid={`edit-state-message-${control.id}`}>
-        {riskCopy.label}: {riskCopy.detail}
-      </p>
 
       {state.currentValue !== undefined && (
         <div className="tcr-current-row">
@@ -164,28 +188,16 @@ const ControlRow: React.FC<ControlRowProps> = ({
       {/* Awaiting approval: show diff + approve/cancel */}
       {state.phase === 'awaiting_approval' && (
         <div className="tcr-proposal-box" data-testid={`proposal-${control.id}`}>
-          <p className="tcr-proposal-label">Executable save-field write (XML, JSON, or INI) — review proposal, approve explicitly, then write with a verified backup:</p>
           <div className="tcr-diff">
             <span className="diff-old">{state.currentValue ?? '?'}</span>
             <span className="diff-arrow">→</span>
             <span className="diff-new">{state.proposedNewValue}</span>
           </div>
-          <p className="tcr-message tcr-info" data-testid={`backup-before-write-${control.id}`}>
-            Backup is created before write; rollback becomes available only after this supported write succeeds.
-          </p>
           <div className="tcr-proposal-actions">
-            <button
-              className="tcr-btn tcr-btn-approve"
-              onClick={onApprove}
-              data-testid={`approve-btn-${control.id}`}
-            >
+            <button className="tcr-btn tcr-btn-approve" onClick={onApprove} data-testid={`approve-btn-${control.id}`}>
               Approve & Write
             </button>
-            <button
-              className="tcr-btn tcr-btn-cancel"
-              onClick={onCancelProposal}
-              data-testid={`cancel-btn-${control.id}`}
-            >
+            <button className="tcr-btn tcr-btn-cancel" onClick={onCancelProposal} data-testid={`cancel-btn-${control.id}`}>
               Cancel
             </button>
           </div>
@@ -195,21 +207,12 @@ const ControlRow: React.FC<ControlRowProps> = ({
       {/* Rollback available after successful write */}
       {state.phase === 'applied' && state.backupPath && (
         <div className="tcr-rollback-row" data-testid={`rollback-area-${control.id}`}>
-          <p className="tcr-message tcr-info" data-testid={`rollback-message-${control.id}`}>
-            Rollback available from the verified backup created before this write.
-          </p>
-          <button
-            className="tcr-btn tcr-btn-rollback"
-            onClick={onRollback}
-            disabled={isBusy}
-            data-testid={`rollback-btn-${control.id}`}
-          >
-            Rollback
+          <button className="tcr-btn tcr-btn-rollback" onClick={onRollback} disabled={isBusy} data-testid={`rollback-btn-${control.id}`}>
+            Restore
           </button>
         </div>
       )}
 
-      {/* Input + propose button for executable controls in idle/applied/rolled_back state */}
       {executable && ['idle', 'applied', 'rolled_back', 'error'].includes(state.phase) && (
         <div className="tcr-input-row" onClick={e => e.stopPropagation()}>
           {control.controlType === 'number_input' && (
@@ -219,7 +222,7 @@ const ControlRow: React.FC<ControlRowProps> = ({
               value={inputValue}
               min={control.min}
               max={control.max}
-              placeholder="New value…"
+              placeholder="Enter new value"
               disabled={isBusy}
               onChange={e => onInputChange(e.target.value)}
               data-testid={`input-${control.id}`}
@@ -246,15 +249,28 @@ const ControlRow: React.FC<ControlRowProps> = ({
           >
             {needsApproval ? (isBusy ? '…' : 'Propose') : (isBusy ? '…' : 'Apply')}
           </button>
+          <button type="button" className="tcr-btn tcr-btn-details" onClick={() => setDetailsOpen((v) => !v)}>
+            Details
+          </button>
         </div>
       )}
 
-      {/* Non-executable: show reason */}
       {!executable && (
         <div className="tcr-disabled-note" data-testid={`disabled-note-${control.id}`}>
           {control.safetyStatus === 'future_feature'
             ? 'Not yet implemented — planned for a future milestone.'
-            : 'Blocked: this control is currently disabled and cannot execute writes.'}
+            : 'Blocked: this control cannot execute writes in the current build.'}
+        </div>
+      )}
+
+      {detailsOpen && (
+        <div className="tcr-details-panel" data-testid={`details-${control.id}`}>
+          <dl>
+            <dt>Write method</dt><dd>{backendLabel}</dd>
+            <dt>Edit state</dt><dd>{riskCopy.label} — {riskCopy.detail}</dd>
+            <dt>Workflow</dt><dd>Backup before write; rollback after successful supported write</dd>
+            <dt>Formats</dt><dd>XML, JSON, INI (save-backed)</dd>
+          </dl>
         </div>
       )}
     </div>
@@ -472,6 +488,9 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({
     }
   }, [electronAPI, controlStates, setControlState, resolveControl]);
 
+  const grouped = useMemo(() => groupControls(controls), [controls]);
+  const writableCount = controls.filter(isControlExecutable).length;
+
   if (!electronAPI) {
     return (
       <div className="trainer-control-panel trainer-no-api">
@@ -484,16 +503,33 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({
   }
 
   return (
-    <div className="trainer-control-panel" data-testid="trainer-control-panel">
+    <div className="trainer-control-panel content-panel" data-testid="trainer-control-panel">
       <PageModuleHeader
-        artwork="trainerController"
+        artwork="saveTools"
         title={panelTitle ?? 'Trainer Controls'}
-        description={
-          controlsProp
-            ? 'Save-backed controls from an imported catalog definition. Pick your save file, then propose, approve, and rollback.'
-            : 'Save-backed trainer controls loaded from verified game profiles. Propose, approve, and rollback with explicit confirmation.'
+        description="Save-backed trainer controls loaded from verified game profiles."
+        actions={
+          <div className="save-editor-toolbar">
+            {!hostRunning ? (
+              <button className="tcr-btn tcr-btn-host" onClick={handleStartHost} disabled={hostBusy} data-testid="start-host-btn">
+                {hostBusy ? 'Starting…' : 'Start Host'}
+              </button>
+            ) : (
+              <button className="tcr-btn tcr-btn-host-stop" onClick={handleStopHost} disabled={hostBusy} data-testid="stop-host-btn">
+                {hostBusy ? 'Stopping…' : 'Stop Host'}
+              </button>
+            )}
+          </div>
         }
       />
+
+      <div className="tcp-summary-strip glass" data-testid="trainer-summary-strip">
+        <span><strong>Profile</strong> {controlsProp ? 'Catalog' : 'Stardew Valley'}</span>
+        <span><strong>Fields</strong> {controls.length}</span>
+        <span><strong>Writable</strong> {writableCount}</span>
+        <span><strong>Backup</strong> Ready</span>
+        <span><strong>TrainerHost</strong> {hostRunning ? 'Running' : 'Stopped'}</span>
+      </div>
       {saveDirectoryHint && onSaveFilePathChange && (
         <div className="tcp-save-file-bar" data-testid="catalog-save-file-bar">
           <label htmlFor="catalog-save-file-path">
@@ -520,21 +556,6 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({
         <span className="tcp-local-only-copy" data-testid="trainer-local-only-copy">
           {LOCAL_ONLY_SAFETY_MESSAGE}
         </span>
-        <span className={`tcp-host-status ${hostRunning ? 'host-running' : 'host-stopped'}`}
-              data-testid="host-status">
-          TrainerHost: {hostRunning ? 'Running' : 'Stopped'}
-        </span>
-        {!hostRunning ? (
-          <button className="tcr-btn tcr-btn-host" onClick={handleStartHost} disabled={hostBusy}
-                  data-testid="start-host-btn">
-            {hostBusy ? 'Starting…' : 'Start Host'}
-          </button>
-        ) : (
-          <button className="tcr-btn tcr-btn-host-stop" onClick={handleStopHost} disabled={hostBusy}
-                  data-testid="stop-host-btn">
-            {hostBusy ? 'Stopping…' : 'Stop Host'}
-          </button>
-        )}
         {hostMessage && (
           <span className="tcp-host-message" data-testid="host-message">
             {hostMessage}
@@ -542,35 +563,40 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({
         )}
       </div>
 
-      <div className="tcp-controls-list" data-testid="controls-list">
-        {controls.map(control => {
-          const cs = controlStates[control.id];
-          const executable = isControlExecutable(control);
-          return (
-            <div key={control.id} className="tcp-control-wrapper">
-              {executable && cs.phase === 'idle' && cs.currentValue === undefined && hostRunning && (
-                <button
-                  className="tcr-btn tcr-btn-read"
-                  onClick={() => handleReadCurrent(control)}
-                  data-testid={`read-btn-${control.id}`}
-                >
-                  Read Current
-                </button>
-              )}
-              <ControlRow
-                control={control}
-                state={cs}
-                inputValue={inputValues[control.id] ?? ''}
-                onInputChange={v => setInputValues(prev => ({ ...prev, [control.id]: v }))}
-                onPropose={() => handlePropose(control, inputValues[control.id] ?? '')}
-                onApprove={() => handleApprove(control)}
-                onCancelProposal={() => handleCancelProposal(control)}
-                onRollback={() => handleRollback(control)}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {grouped.map((section) => (
+        <section key={section.title} className="tcp-category-section" aria-label={section.title}>
+          <h3 className="tcp-category-title">{section.title}</h3>
+          <div className="tcp-controls-list" data-testid="controls-list">
+            {section.items.map((control) => {
+              const cs = controlStates[control.id];
+              const executable = isControlExecutable(control);
+              return (
+                <div key={control.id} className="tcp-control-wrapper">
+                  {executable && cs.phase === 'idle' && cs.currentValue === undefined && hostRunning && (
+                    <button
+                      className="tcr-btn tcr-btn-read"
+                      onClick={() => handleReadCurrent(control)}
+                      data-testid={`read-btn-${control.id}`}
+                    >
+                      Read current
+                    </button>
+                  )}
+                  <ControlRow
+                    control={control}
+                    state={cs}
+                    inputValue={inputValues[control.id] ?? ''}
+                    onInputChange={v => setInputValues(prev => ({ ...prev, [control.id]: v }))}
+                    onPropose={() => handlePropose(control, inputValues[control.id] ?? '')}
+                    onApprove={() => handleApprove(control)}
+                    onCancelProposal={() => handleCancelProposal(control)}
+                    onRollback={() => handleRollback(control)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 };

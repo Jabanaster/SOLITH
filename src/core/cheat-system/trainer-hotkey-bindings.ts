@@ -52,3 +52,43 @@ export function detectHotkeyConflicts(
     .filter(([, actions]) => actions.length > 1)
     .map(([accelerator, actions]) => ({ accelerator, actions }));
 }
+
+/** Common OS / desktop shortcuts that may not reach the trainer reliably. */
+export const OS_RESERVED_ACCELERATORS = new Set([
+  'Alt+Tab',
+  'Alt+F4',
+  'Control+Alt+Delete',
+  'Control+Shift+Escape',
+  'Meta+L',
+  'Meta+D',
+  'Meta+Tab',
+  'Super+L',
+  'Super+D',
+  'F11',
+  'PrintScreen',
+]);
+
+export function detectOsHotkeyWarnings(
+  bindings: Record<string, string>,
+): Array<{ accelerator: string; action: string; reason: string }> {
+  const warnings: Array<{ accelerator: string; action: string; reason: string }> = [];
+  for (const [action, accel] of Object.entries(bindings)) {
+    if (!accel?.trim()) continue;
+    const normalized = accel.replace(/CommandOrControl/g, 'Control').replace(/Super/g, 'Meta');
+    if (OS_RESERVED_ACCELERATORS.has(normalized)) {
+      warnings.push({
+        accelerator: accel,
+        action,
+        reason: 'May be captured by the OS or desktop shell before Solith receives it',
+      });
+    }
+    if (/^Alt\+/i.test(normalized) && !normalized.startsWith('Alt+Shift')) {
+      warnings.push({
+        accelerator: accel,
+        action,
+        reason: 'Alt combinations often activate window menus on Windows',
+      });
+    }
+  }
+  return warnings;
+}

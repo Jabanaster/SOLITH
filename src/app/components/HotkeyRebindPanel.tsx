@@ -12,6 +12,7 @@ for (let i = 1; i <= 12; i += 1) {
 export const HotkeyRebindPanel: React.FC = () => {
   const [bindings, setBindings] = useState<Record<string, string>>({});
   const [conflicts, setConflicts] = useState<Array<{ accelerator: string; actions: string[] }>>([]);
+  const [osWarnings, setOsWarnings] = useState<Array<{ accelerator: string; action: string; reason: string }>>([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -25,6 +26,7 @@ export const HotkeyRebindPanel: React.FC = () => {
     const result = await api.trainerHotkeysGetBindings();
     if (result?.hotkeys) setBindings(result.hotkeys);
     if (result?.conflicts) setConflicts(result.conflicts);
+    if (result?.osWarnings) setOsWarnings(result.osWarnings);
   }, []);
 
   useEffect(() => {
@@ -45,7 +47,14 @@ export const HotkeyRebindPanel: React.FC = () => {
       if (result?.success) {
         setBindings(result.hotkeys ?? bindings);
         setConflicts(result.conflicts ?? []);
-        setMessage(result.conflicts?.length ? 'Saved with conflicts — resolve duplicate keys.' : 'Hotkeys saved.');
+        setOsWarnings(result.osWarnings ?? []);
+        setMessage(
+          result.conflicts?.length
+            ? 'Saved with conflicts — resolve duplicate keys.'
+            : result.osWarnings?.length
+              ? 'Saved — review OS shortcut warnings below.'
+              : 'Hotkeys saved.',
+        );
       } else {
         setMessage(result?.error ?? 'Failed to save hotkeys.');
       }
@@ -85,6 +94,15 @@ export const HotkeyRebindPanel: React.FC = () => {
           {conflicts.map((c) => (
             <li key={c.accelerator}>
               Conflict: <code>{c.accelerator}</code> used by {c.actions.join(', ')}
+            </li>
+          ))}
+        </ul>
+      )}
+      {osWarnings.length > 0 && (
+        <ul className={styles.conflicts} role="status">
+          {osWarnings.map((w) => (
+            <li key={`${w.action}-${w.accelerator}`}>
+              OS note: <code>{w.accelerator}</code> ({SLOT_LABELS[w.action] ?? w.action}) — {w.reason}
             </li>
           ))}
         </ul>

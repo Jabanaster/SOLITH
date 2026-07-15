@@ -87,3 +87,43 @@ export function parseRemoteGameCatalogHtml(html: string): ParsedRemoteTrainer[] 
   }
   return results;
 }
+
+export interface ParsedFlingTrainerPage {
+  optionCount?: number;
+  versionLabel?: string;
+  soloOnly: boolean;
+  options: { hotkey: string; name: string }[];
+}
+
+const FLING_OPTION_SEGMENT_RE =
+  /((?:Num|Ctrl\+Num|Alt\+Num|Shift\+F\d+|Alt\+Insert|Alt\+Delete)(?:\s*[\d.+*/–-]+)?)\s*[–-]\s*([^]+?)(?=\s*(?:Num|Ctrl\+Num|Alt\+Num|Shift\+F\d+|Alt\+Insert|Alt\+Delete)\s*[\d.+*/–-]?\s*[–-]|Edit Player Stats|###\s+Download|$)/gi;
+
+/** Parse FLiNG trainer detail pages for public option names and hotkeys (metadata only). */
+export function parseFlingTrainerOptionsHtml(html: string): ParsedFlingTrainerPage {
+  const optionCountMatch = html.match(/(\d+)\s+Options/i);
+  const versionMatch = html.match(/Game Version:\s*([^<]+)/i);
+  const soloOnly = /single player(?:\s+mode)? only/i.test(html);
+  const blockMatch = html.match(/Options\s+([\s\S]*?)(?:###\s+Download|Insert)/i);
+  const block = blockMatch?.[1] ?? html;
+  const options: { hotkey: string; name: string }[] = [];
+  const seen = new Set<string>();
+
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(FLING_OPTION_SEGMENT_RE.source, 'gi');
+  while ((match = regex.exec(block)) !== null) {
+    const hotkey = match[1].replace(/\s+/g, ' ').trim();
+    const name = match[2].replace(/\s+/g, ' ').trim();
+    if (!name || name.length < 2) continue;
+    const key = `${hotkey}::${name}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    options.push({ hotkey, name });
+  }
+
+  return {
+    optionCount: optionCountMatch ? Number(optionCountMatch[1]) : undefined,
+    versionLabel: versionMatch?.[1]?.replace(/\s+/g, ' ').trim(),
+    soloOnly,
+    options,
+  };
+}

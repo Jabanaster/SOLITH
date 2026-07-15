@@ -19,6 +19,15 @@ Solith demo formats (`RFSA`, `SLTH`, `RSAV`, `BPKG`, `GDAT`) are internal test p
 3. Entry in `Docs/Certification/<game>/save-field.md`
 4. TrainerHost integration test with approved path binding
 
+### Wave 1 priority (one format per milestone)
+
+| Order | Profile | Fixture | Status |
+|-------|---------|---------|--------|
+| 1 | `terraria-plr-v1` | `demo-game/saves/terraria/player-fixture-v279.plr` | **read verified** (version @0); write still blocked |
+| 2 | `hollow-knight-userdat-v1` | — | read-only until decrypt research |
+| 3 | `factorio-zip-v1` | — | zip slot JSON research |
+| 4 | `subnautica-json-slot-v1` | — | slot folder JSON |
+
 ## Related code
 
 - `src/core/saves/binary-formats/research-profiles.ts` — detection stubs (read-only)

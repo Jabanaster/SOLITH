@@ -18,6 +18,7 @@
  *   perf-10  createProposalForEdit IPC — proposal dialog preparation (3 runs) < 250ms each
  *   perf-11  applyProposal IPC — atomic write + backup (3 runs) < 500ms each
  *   perf-12  restoreBackup IPC — restore from backup (3 runs) < 500ms each
+ *   perf-13  trainerCatalogSearch IPC — 1000-entry seed filter (5 runs) < 300ms each
  *
  * Fixture context:
  *   save_file:   JSON, {"player":{"hp":100,"gold":150,"godMode":false}}  ~46 bytes
@@ -44,6 +45,7 @@ const NAV_TARGET_MS         = 2_000;
 const MODE_SWITCH_TARGET_MS = 500;
 const OP_TARGET_MS          = 500;
 const PROPOSAL_TARGET_MS    = 250;
+const CATALOG_SEARCH_TARGET_MS = 300;
 
 const FIXTURE_CONTENT = JSON.stringify({ player: { hp: 100, gold: 150, godMode: false } });
 
@@ -449,4 +451,31 @@ test('perf-12 — restoreBackup IPC — standalone verification (3 runs) < 500ms
   const slowest = Math.max(...times);
   console.log(`perf-12 restore_standalone_ms = [${times.join(',')}], median=${med}, slowest=${slowest} (runs=${N}, fixture=${fixtureSize}B)`);
   expect(med, `median ${med}ms (target < ${OP_TARGET_MS}ms)`).toBeLessThan(OP_TARGET_MS);
+});
+
+// ── perf-13: trainerCatalogSearch — 1000-entry bundled seed ─────────────────
+test('perf-13 — trainerCatalogSearch IPC — catalog filter (5 runs) < 300ms each', async () => {
+  if (!fs.existsSync(MAIN_BUNDLE)) { test.skip(true, 'Bundle not built'); return; }
+
+  const seedRes = await win.evaluate(() => (window as any).electronAPI.trainerCatalogSeed());
+  expect(seedRes?.success, 'catalog seed loaded').toBe(true);
+  expect((seedRes?.total ?? 0) >= 1000, `seed total ${seedRes?.total}`).toBe(true);
+
+  const N = 5;
+  const times: number[] = [];
+
+  for (let i = 0; i < N; i++) {
+    const t0 = Date.now();
+    const searchRes = await win.evaluate(() =>
+      (window as any).electronAPI.trainerCatalogSearch({ query: 'sim', limit: 50, offset: 0 }),
+    );
+    times.push(Date.now() - t0);
+    expect(searchRes?.success, 'catalog search succeeded').toBe(true);
+    expect(Array.isArray(searchRes?.entries)).toBe(true);
+  }
+
+  const med = median(times);
+  const slowest = Math.max(...times);
+  console.log(`perf-13 catalog_search_ms = [${times.join(',')}], median=${med}, slowest=${slowest} (runs=${N})`);
+  expect(med, `median ${med}ms (target < ${CATALOG_SEARCH_TARGET_MS}ms)`).toBeLessThan(CATALOG_SEARCH_TARGET_MS);
 });

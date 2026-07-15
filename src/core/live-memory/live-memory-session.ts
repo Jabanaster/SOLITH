@@ -173,6 +173,23 @@ export class LiveMemorySession {
     return { driver: this.driver, handle: this.handle };
   }
 
+  private verifyAttachedProcessIdentity(): string | null {
+    if (!this.handle || !this.target) {
+      return 'No process attached.';
+    }
+
+    const actualExecutableName = this.driver.getProcessExecutableName(this.handle);
+    if (!actualExecutableName) {
+      return `Unable to verify executable name for PID ${this.handle.pid}.`;
+    }
+
+    if (actualExecutableName.toLowerCase() !== this.target.executableName.toLowerCase()) {
+      return `Attached process identity mismatch: expected ${this.target.executableName}, found ${actualExecutableName}.`;
+    }
+
+    return null;
+  }
+
   /** Catalog game id from the most recent attach, if supplied. */
   getCatalogGameId(): string | null {
     return this.catalogGameId;
@@ -415,6 +432,11 @@ export class LiveMemorySession {
       return { success: false, guard, error: 'Blocked by online-session guard at write time.' };
     }
 
+    const identityError = this.verifyAttachedProcessIdentity();
+    if (identityError) {
+      return { success: false, guard, error: identityError };
+    }
+
     try {
       this.driver.writeMemory(this.handle, proposal.target.address, proposal.target.dataType, proposal.requestedValue);
     } catch (err) {
@@ -444,6 +466,11 @@ export class LiveMemorySession {
 
     if (!guard.allowed) {
       return { success: false, guard, error: 'Blocked by online-session guard at rollback time.' };
+    }
+
+    const identityError = this.verifyAttachedProcessIdentity();
+    if (identityError) {
+      return { success: false, guard, error: identityError };
     }
 
     try {
@@ -495,6 +522,12 @@ export class LiveMemorySession {
 
       if (!guard.allowed) {
         this.stopFreezeInternal('guard_blocked');
+        return;
+      }
+
+      const identityError = this.verifyAttachedProcessIdentity();
+      if (identityError) {
+        this.stopFreezeInternal('identity_mismatch');
         return;
       }
 

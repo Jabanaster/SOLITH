@@ -180,21 +180,28 @@ const SessionMonitorPage: React.FC = () => {
 
   if (featureEnabled === false) {
     return (
-      <div className="v2-monitor-page">
-        <div className="v2-monitor-header">
-          <h2>Session Lifecycle Monitor <span className="v2-badge">V2 Preview</span></h2>
-          <p className="v2-safety-notice">Read-only session monitoring · No game modifications are performed</p>
-        </div>
-        <div className="v2-monitor-disabled">
-          <p><strong>This feature is disabled.</strong></p>
-          <p>
-            To enable it, set <code>v2SessionMonitorEnabled</code> to <code>true</code> in
-            Solith settings. It is disabled by default.
-          </p>
-          <p className="v2-safety-notice">
-            When enabled, this panel observes publicly available system metadata (process list,
-            local TCP connections, configured session-marker files). It takes no actions and
-            does not modify any file or process.
+      <div className="v2-monitor-page content-panel">
+        <PageModuleHeader
+          artwork="advancedDragon"
+          title={<>Session Lifecycle Monitor <span className="v2-badge">V2 Preview</span></>}
+          description="Read-only session monitoring · No game modifications are performed"
+        />
+        <div className="v2-monitor-disabled glass">
+          <p><strong>Session Monitor is disabled.</strong></p>
+          <p>Enable it below to observe game process lifecycle and external trainer sessions (read-only).</p>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={async () => {
+              await (window as any).electronAPI?.setSetting?.('v2SessionMonitorEnabled', true);
+              setFeatureEnabled(true);
+              setMessage('Session Monitor enabled. Configure a game executable and start monitoring.');
+            }}
+          >
+            Enable Session Monitor
+          </button>
+          <p className="v2-safety-notice" style={{ marginTop: 16 }}>
+            Observes process list and optional session-marker files only. No memory access or game modifications.
           </p>
         </div>
       </div>

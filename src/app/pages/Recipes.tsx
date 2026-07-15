@@ -92,7 +92,7 @@ const Recipes: React.FC<RecipesProps> = ({ gameId }) => {
   return (
     <div className="recipes-container">
       <PageModuleHeader
-        artwork="advancedDragon"
+        artwork="hoodedProfile"
         title="Trainer Recipes"
         description="Manage your saved trainer configurations. These recipes represent offsets and targets discovered in your game files."
       />

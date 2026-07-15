@@ -52,6 +52,8 @@ export interface SolithDefinitionV1 {
   };
   /** Per-game reviewed connection baseline for the online-session guard. */
   connectionBaseline?: number;
+  /** Aggregate pack certification (max achieved across features). */
+  certificationLevel?: CertificationLevel;
   memoryFeatures?: MemoryFeatureV1[];
   saveEditor?: SaveEditorV1;
 }
@@ -153,6 +155,7 @@ export const SolithDefinitionV1Schema = z.object({
     arch: z.enum(['x86', 'x64']),
   }),
   connectionBaseline: z.number().int().nonnegative().max(64).optional(),
+  certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
   memoryFeatures: z.array(MemoryFeatureV1Schema).max(500).optional(),
   saveEditor: SaveEditorV1Schema.optional(),
 });

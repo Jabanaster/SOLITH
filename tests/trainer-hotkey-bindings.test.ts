@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_TRAINER_HOTKEYS,
   detectHotkeyConflicts,
+  detectOsHotkeyWarnings,
   getTrainerHotkeyBindings,
   setTrainerHotkeyBindings,
 } from '../src/core/cheat-system/trainer-hotkey-bindings.ts';
@@ -24,5 +25,10 @@ describe('trainer-hotkey-bindings', () => {
     const conflicts = detectHotkeyConflicts(merged);
     assert.ok(conflicts.some((c) => c.accelerator === 'F5'));
     setTrainerHotkeyBindings(DEFAULT_TRAINER_HOTKEYS);
+  });
+
+  test('detectOsHotkeyWarnings flags Alt+Tab and Alt+F4', () => {
+    const warnings = detectOsHotkeyWarnings({ toggle_overlay: 'Alt+Tab', cheat_slot_1: 'Alt+F4' });
+    assert.ok(warnings.length >= 2);
   });
 });

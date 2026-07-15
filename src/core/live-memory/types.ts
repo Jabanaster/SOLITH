@@ -85,6 +85,8 @@ export interface MemoryDriver {
   readMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType): number;
   writeMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType, value: number): void;
   closeProcess(handle: LiveProcessHandle): void;
+  /** Resolve the current executable name for a live attached process handle. */
+  getProcessExecutableName(handle: LiveProcessHandle): string | null;
   /** Enumerate committed memory regions for scanning. Bounded/filtered by the caller, not here. */
   getRegions(handle: LiveProcessHandle): MemoryRegion[];
   /** Bulk-read raw bytes for scanning. Throws if the read fails (e.g. region unmapped mid-scan). */
@@ -198,7 +200,7 @@ export interface FreezeTarget {
   value: number;
 }
 
-export type FreezeStopReason = 'user_stopped' | 'guard_blocked' | 'write_failed' | 'detached';
+export type FreezeStopReason = 'user_stopped' | 'guard_blocked' | 'identity_mismatch' | 'write_failed' | 'detached';
 
 export interface FreezeStatus {
   active: boolean;

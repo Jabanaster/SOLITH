@@ -54,6 +54,7 @@
     "test:performance": "playwright test tests/performance.e2e.test.ts --config playwright.e2e.config.ts",
     "test:pilot-intake": "tsx --test tests/pilot-intake.test.ts",
     "verify:electron-output": "node scripts/verify-electron-output.mjs",
+    "verify:fresh-clone-verification": "node scripts/verify-fresh-clone-verification.mjs",
     "verify:release-artifacts": "node scripts/verify-release-artifacts.mjs",
     "checksums:release": "node scripts/generate-release-checksums.mjs",
     "dist": "electron-builder",

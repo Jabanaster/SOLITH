@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
+import { GameScopePicker } from '../components/GameScopePicker.js';
 import { SAVE_EDIT_RISK_COPY } from '../save-edit-risk-labels.js';
 import {
   LOCAL_ONLY_SAFETY_MESSAGE,
@@ -57,38 +58,48 @@ function isElevatedRisk(risk: string): boolean {
 
 const SAVE_EDIT_RISK_ORDER = ['read_only', 'preview_only', 'executable', 'blocked'] as const;
 
-const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
+const SaveEditor: React.FC<SaveEditorProps> = ({ gameId: initialGameId, mode = 'save' }) => {
+  const [scopeGameId, setScopeGameId] = useState<string | null>(initialGameId);
   const [saveFiles, setSaveFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState('');
   const [fields, setFields] = useState<SaveField[]>([]);
   const [suggestions, setSuggestions] = useState<DataSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const [editingField, setEditingField] = useState<SaveField | DataSuggestion | null>(null);
   const [newValue, setNewValue] = useState('');
   const [applying, setApplying] = useState(false);
   const [filterText, setFilterText] = useState('');
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   useEffect(() => {
-    if (gameId) {
-      loadSaveFiles();
+    if (initialGameId) setScopeGameId(initialGameId);
+  }, [initialGameId]);
+
+  useEffect(() => {
+    if (scopeGameId) {
+      void loadSaveFiles();
       setFields([]);
       setSuggestions([]);
       setSelectedFile('');
+    } else {
+      setSaveFiles([]);
     }
-  }, [gameId, mode]);
+  }, [scopeGameId, mode]);
 
   const loadSaveFiles = async () => {
-    if (!window.electronAPI) {
-      console.error('[SaveEditor] window.electronAPI unavailable — must run inside Electron');
-      return;
-    }
-    if (!gameId) return;
+    if (!window.electronAPI) return;
+    if (!scopeGameId) return;
     setLoading(true);
     try {
-      const files = await window.electronAPI.detectSaveFiles(gameId);
-      // Filter out files based on mode: saves normally ends with .sav/.dat/.json, data typically is .json/.ini/.csv/etc.
-      // But for ease, list all readable save files.
+      const files = await window.electronAPI.detectSaveFiles(scopeGameId);
       setSaveFiles(files || []);
+      if (!files?.length) {
+        setStatusMessage('No save files found yet — scan save locations or browse for a file.');
+      } else {
+        setStatusMessage('');
+      }
     } catch (e) {
       console.error('Failed to load save files:', e);
     } finally {
@@ -96,8 +107,38 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
     }
   };
 
+  const handleScanLocations = async () => {
+    if (!scopeGameId || !window.electronAPI) return;
+    setScanning(true);
+    try {
+      const discovered = await window.electronAPI.discoverSaveLocations(scopeGameId);
+      for (const loc of discovered) {
+        if (loc.approvalState === 'Awaiting Approval' || loc.approvalState === 'Suggested') {
+          await window.electronAPI.approveSaveLocation(loc.id);
+        }
+      }
+      setStatusMessage(`Scanned ${discovered.length} folder(s) — reloading files…`);
+      await loadSaveFiles();
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleBrowseFile = async () => {
+    if (!scopeGameId || !window.electronAPI?.pickSaveFile) return;
+    const result = await window.electronAPI.pickSaveFile(scopeGameId);
+    if (result.canceled) return;
+    if (!result.success || !result.filePath) {
+      setStatusMessage(result.error ?? 'Could not open file picker.');
+      return;
+    }
+    setSaveFiles((prev) => (prev.includes(result.filePath!) ? prev : [...prev, result.filePath!]));
+    setSelectedFile(result.filePath);
+    await handleFileChange({ target: { value: result.filePath } } as React.ChangeEvent<HTMLSelectElement>);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!window.electronAPI || !gameId) return;
+    if (!window.electronAPI || !scopeGameId) return;
     const filePath = e.target.value;
     setSelectedFile(filePath);
     if (!filePath) {
@@ -108,13 +149,13 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
 
     setLoading(true);
     try {
-      const res = await window.electronAPI.parseSave(gameId, filePath);
+      const res = await window.electronAPI.parseSave(scopeGameId, filePath);
       if (res && !res.error) {
         setFields(res.values || []);
         
         // Fetch suggestions if in data mode
         if (mode === 'data') {
-          const sug = await window.electronAPI.suggestDataEdits(gameId, filePath);
+          const sug = await window.electronAPI.suggestDataEdits(scopeGameId, filePath);
           setSuggestions(Array.isArray(sug) ? sug : []);
         } else {
           setSuggestions([]);
@@ -137,7 +178,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
   };
 
   const handleApplyEdit = async () => {
-    if (!editingField || !gameId || !selectedFile || !window.electronAPI) return;
+    if (!editingField || !scopeGameId || !selectedFile || !window.electronAPI) return;
     setApplying(true);
     try {
       const pathStr = editingField.path;
@@ -150,7 +191,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
       else if (type === 'boolean') parsedNewVal = newValue === 'true';
 
       // 1. Create Proposal
-      const proposal = await window.electronAPI.createProposalForEdit(gameId, selectedFile, pathStr, oldValue, parsedNewVal);
+      const proposal = await window.electronAPI.createProposalForEdit(scopeGameId, selectedFile, pathStr, oldValue, parsedNewVal);
       if (!proposal) {
         alert('Failed to generate edit proposal');
         return;
@@ -179,49 +220,81 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId, mode = 'save' }) => {
     f.path.toLowerCase().includes(filterText.toLowerCase()) ||
     String(f.value).toLowerCase().includes(filterText.toLowerCase())
   );
-  const isDemoGame = gameId === DEMO_GAME_ID;
+  const isDemoGame = scopeGameId === DEMO_GAME_ID;
 
   return (
-    <div className="save-editor-container">
+    <div className="save-editor-container content-panel">
       <PageModuleHeader
-        artwork={mode === 'save' ? 'trainerController' : 'advancedDragon'}
+        artwork={mode === 'save' ? 'saveTools' : 'hoodedProfile'}
         title={mode === 'save' ? 'Save Editor' : 'Data Editor'}
         description={
           mode === 'save'
-            ? 'Inspect local save values and review supported save-field edits before any write.'
-            : 'Review local data-file suggestions before any supported write path is used.'
+            ? 'Inspect local save values and apply supported save-field edits with backup and rollback.'
+            : 'Review data-file suggestions before any supported write path is used.'
+        }
+        actions={
+          <div className="save-editor-toolbar">
+            <button type="button" className="btn-secondary" onClick={() => void loadSaveFiles()} disabled={!scopeGameId || loading}>
+              Refresh files
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => void handleScanLocations()} disabled={!scopeGameId || scanning}>
+              {scanning ? 'Scanning…' : 'Scan save folders'}
+            </button>
+            <button type="button" className="btn-primary" onClick={() => void handleBrowseFile()} disabled={!scopeGameId}>
+              Browse file…
+            </button>
+          </div>
         }
       />
-      <p className="description" style={{ marginTop: '-12px', marginBottom: '20px' }} data-testid="local-only-safety-copy">
-        {LOCAL_ONLY_SAFETY_MESSAGE} Unsupported and preview-only formats remain blocked from write execution.
-      </p>
 
-      <div className="file-selector-panel glass" data-testid="save-edit-risk-legend">
-        <label>Save edit states:</label>
-        <div className="risk-state-legend">
-          {SAVE_EDIT_RISK_ORDER.map(state => {
-            const copy = SAVE_EDIT_RISK_COPY[state];
-            return (
-              <div key={state} className={`badge risk-state-${state.replace(/_/g, '-')}`}>
-                <strong>{copy.label}</strong>
-                <span>{copy.summary}</span>
-              </div>
-            );
-          })}
-        </div>
+      <GameScopePicker
+        value={scopeGameId}
+        onChange={(id) => setScopeGameId(id)}
+        label="Target game"
+        hint="Required before scanning or opening save/data files."
+      />
+
+      {statusMessage && <p className="tcp-host-message" role="status">{statusMessage}</p>}
+
+      <div className="tcp-summary-strip glass">
+        <span><strong>Mode</strong> {mode === 'data' ? 'Data suggestions' : 'Save fields'}</span>
+        <span><strong>Files</strong> {saveFiles.length}</span>
+        <span><strong>Local only</strong> Yes</span>
+        <button type="button" className="tcp-details-toggle" onClick={() => setDetailsExpanded((v) => !v)}>
+          {detailsExpanded ? 'Hide safety details' : 'Safety details'}
+        </button>
       </div>
 
-      <div className="file-selector-panel glass">
-        <label>Select target file:</label>
-        <div className={`badge ${isDemoGame ? 'risk-caution' : 'risk-safe'}`}>
-          {isDemoGame ? 'Demo fixture edit' : 'Registered game edit'}
+      {detailsExpanded && (
+        <div className="file-selector-panel glass" data-testid="save-edit-risk-legend">
+          <p className="description">{LOCAL_ONLY_SAFETY_MESSAGE}</p>
+          <div className="risk-state-legend">
+            {SAVE_EDIT_RISK_ORDER.map((state) => {
+              const copy = SAVE_EDIT_RISK_COPY[state];
+              return (
+                <div key={state} className={`badge risk-state-${state.replace(/_/g, '-')}`}>
+                  <strong>{copy.label}</strong>
+                  <span>{copy.summary}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        {loading && saveFiles.length === 0 ? (
-          <select disabled><option>Loading detected files...</option></select>
+      )}
+
+      <div className="file-selector-panel glass">
+        <label htmlFor="save-file-select">Select target file</label>
+        <div className={`badge ${isDemoGame ? 'risk-caution' : 'risk-safe'}`}>
+          {isDemoGame ? 'Demo fixture edit' : 'Registered scope'}
+        </div>
+        {!scopeGameId ? (
+          <select id="save-file-select" disabled><option>Choose a game first</option></select>
+        ) : loading && saveFiles.length === 0 ? (
+          <select id="save-file-select" disabled><option>Loading detected files…</option></select>
         ) : (
-          <select value={selectedFile} onChange={handleFileChange}>
-            <option value="">-- Choose file --</option>
-            {saveFiles.map(file => (
+          <select id="save-file-select" value={selectedFile} onChange={handleFileChange}>
+            <option value="">— Choose file —</option>
+            {saveFiles.map((file) => (
               <option key={file} value={file}>{file.replace(/\\/g, '/').split('/').pop()} ({file})</option>
             ))}
           </select>
