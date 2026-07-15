@@ -1,8 +1,8 @@
 # Shell polish acceptance summary — `v2.1-shell-polish` candidate
 
-**Status:** Evidence for tag candidate — **do not tag** until fresh-clone gates pass on a clean tree and user says **TAG IT**  
+**Status:** Evidence for tag candidate — **gates PASS** at `620e76d`; artifacts on `master` tip including this summary · **do not tag** until user says **TAG IT**  
 **Date:** 2026-07-15  
-**Remote `master` basis:** `a9483f6` (+ evidence-branch merge when authorized)
+**Remote `master` tip (local):** evidence commits atop `a9483f6`
 
 ---
 
