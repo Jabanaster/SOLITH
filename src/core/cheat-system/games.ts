@@ -3,6 +3,12 @@
  * mod documentation, and official references. Every entry here is a
  * concrete CheatDefinition (no placeholders) — counts grow as more titles
  * get verified, not by padding this file with stubs.
+ *
+ * @deprecated Phase 3 authoring cutover — do NOT add new titles or executable
+ * cheat definitions here as the capability source of truth. Author a schema.v1
+ * YAML/JSON definition (seeded via bundled-definition-seed / catalog import)
+ * instead. This file remains for MultiGame / Overlay presentation and as a
+ * Phase 2 dual-read fallback until Phase 4 deletion approval.
  */
 
 import type { GameConfig, CheatDefinition, CheatSource, GameImageUrls } from './types.js';
@@ -1959,6 +1965,10 @@ export const CRIMSON_DESERT_CONFIG: GameConfig = {
 // REGISTRY EXPORTS
 // ============================================================================
 
+/**
+ * @deprecated Phase 3 — do not extend with new titles. Seed schema.v1 definitions instead.
+ * Retained for presentation + dual-read fallback until Phase 4.
+ */
 export const ALL_GAMES = [
   PALWORLD_CONFIG,
   ATOMFALL_CONFIG,

@@ -1,3 +1,10 @@
+/**
+ * @deprecated Phase 3 authoring cutover — do NOT add new game profiles or
+ * executable save controls here as the capability SoT. Author schema.v1
+ * `saveEditor.saveFields` (bundled definition / YAML import) instead, keeping
+ * Milestone J field paths for Stardew. This catalog remains for support-matrix
+ * UX and Phase 2 dual-read fallback until Phase 4 deletion approval.
+ */
 import type { GameProfile } from './types.js';
 import { validateGameProfile } from './types.js';
 import stardewProfileData from './profiles/stardew-valley.json';
@@ -16,6 +23,10 @@ export type ProfileUnsupportedReason =
   | 'no-rollback-proof'
   | 'outside-local-single-player-scope';
 
+/**
+ * @deprecated Phase 3 — do not add new profile catalog entries as capability SoT.
+ * Author schema.v1 saveEditor definitions instead.
+ */
 export interface GameProfileCatalogEntry {
   catalogId: string;
   gameId: string;

@@ -89,6 +89,36 @@ function memoryDefinitionFromGame(game: GameConfig): SolithDefinitionV1 {
   };
 }
 
+/**
+ * Phase 3 — mirror verified live-control-catalog pointers into schema.v1 seeds
+ * so dual-read prefers definitions (liveMemory: executable) without fallback.
+ * Source of truth for NEW verified pointers is schema.v1 YAML/JSON authoring —
+ * do not add further entries only to live-control-catalog.ts.
+ */
+const ATOMFALL_VERIFIED_AMMO_FEATURE: MemoryFeatureV1 = {
+  id: 'atomfall-current-weapon-ammo',
+  name: 'Set Current Weapon Ammo',
+  category: 'weapons',
+  type: 'write_once',
+  dataType: 'int32',
+  defaultValue: 99,
+  certificationLevel: 'L2',
+  resolution: {
+    moduleName: 'atomfall_dx12.exe',
+    baseOffset: '0x1959a28',
+    pointerChain: [24],
+  },
+};
+
+function enrichCuratedDefinition(definition: SolithDefinitionV1): SolithDefinitionV1 {
+  if (definition.id !== 'atomfall') return definition;
+  const features = [...(definition.memoryFeatures ?? [])];
+  if (!features.some((f) => f.id === ATOMFALL_VERIFIED_AMMO_FEATURE.id)) {
+    features.unshift(ATOMFALL_VERIFIED_AMMO_FEATURE);
+  }
+  return { ...definition, memoryFeatures: features };
+}
+
 const STARDEW_DEFINITION: SolithDefinitionV1 = {
   schemaVersion: 1,
   id: 'stardew-valley',
@@ -196,11 +226,20 @@ function communityDefinitionFromGame(game: BundledCommunityGame): SolithDefiniti
   };
 }
 
+/**
+ * Phase 3 authoring cutover: curated titles are compiled into schema.v1 payloads
+ * at seed time. New titles/controls must be authored as schema.v1 definitions
+ * (YAML → compile → SQLite), not by extending ALL_GAMES / live-control-catalog /
+ * game-profiles as the capability SoT. Legacy files remain for presentation /
+ * fallback until Phase 4 deletion approval.
+ */
 function buildBundledDefinitions(): SolithDefinitionV1[] {
   const memoryGames = ALL_GAMES.filter(
     (game) => game.cheatDiscoveryType === 'memory-scan' || game.cheatDiscoveryType === 'hybrid',
   );
-  const curated = [STARDEW_DEFINITION, ...memoryGames.map(memoryDefinitionFromGame)];
+  const curated = [STARDEW_DEFINITION, ...memoryGames.map(memoryDefinitionFromGame)].map(
+    enrichCuratedDefinition,
+  );
   const community = BUNDLED_COMMUNITY_GAMES.map(communityDefinitionFromGame);
   return [...curated, ...community];
 }

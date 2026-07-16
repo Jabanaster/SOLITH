@@ -42,6 +42,19 @@ test('memory games ship pinned scan_unknown features', () => {
   assert.equal(palworld?.connectionBaseline, 4);
 });
 
+test('Phase 3: Atomfall seed mirrors verified live-control pointer as executable feature', () => {
+  const atomfall = bundledDefinitionsForTests().find((d) => d.id === 'atomfall');
+  assert.ok(atomfall);
+  const ammo = atomfall?.memoryFeatures?.find((f) => f.id === 'atomfall-current-weapon-ammo');
+  assert.ok(ammo, 'verified ammo feature must be present');
+  assert.equal(ammo?.type, 'write_once');
+  assert.equal(ammo?.resolution.moduleName, 'atomfall_dx12.exe');
+  assert.equal(ammo?.resolution.baseOffset, '0x1959a28');
+  assert.deepEqual(ammo?.resolution.pointerChain, [24]);
+  // scan_unknown pins remain for Discovery L0 surface
+  assert.ok((atomfall?.memoryFeatures?.length ?? 0) >= 4);
+});
+
 test('community bundled games are community tier with scan_unknown features', () => {
   const elden = bundledDefinitionsForTests().find((d) => d.id === 'elden-ring');
   assert.ok(elden);

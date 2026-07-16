@@ -1,12 +1,13 @@
 # Schema.v1 Unification Plan — Control Catalog Consolidation
 
-**Status:** Phase 2 **in progress** on `cursor/schema-v1-phase0-1-capabilities` (dual-read + legacy fallback)  
-**Stability prerequisite:** green `master` with CI Fast **656/656** (`dd6225a` docs lock); Phase 1 at `c29a9f7`
+**Status:** Phase 3 **in progress** on `cursor/schema-v1-phase0-1-capabilities` (authoring cutover + seed mirror)  
+**Stability prerequisite:** green `master` @ `dd6225a`; Phase 1 `c29a9f7`; Phase 2 `cc3884c`
 
 ```
 DONE: Phase 0 inventory + Phase 1 additive capability lanes / Library badges
 DONE: Phase 2 dual-read (schema.v1 preferred → live-control-catalog / game-profiles fallback)
-STOP: await user approval before Phase 3 (authoring cutover / no legacy deletes yet)
+DONE: Phase 3 authoring cutover — legacy mirrored into bundled schema.v1 seeds; @deprecated locks; silence tests
+STOP: await user approval before Phase 4 (legacy catalog deletions)
 ```
 
 ---
@@ -84,9 +85,9 @@ capabilities: {
 |-------|------|------|
 | **0** | Inventory ID maps + consumers (docs only) | **Done** — `SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md` |
 | **1** | Additive capability derivation / badges | **Done** — `c29a9f7` |
-| **2** | Dual-read: definition preferred, legacy fallback | **Done** on branch — legacy catalogs retained |
-| **3** | Authoring cutover; seed definition-first | New cheats only via schema.v1 |
-| **4** | Remove authority from legacy catalogs | Explicit delete approval |
+| **2** | Dual-read: definition preferred, legacy fallback | **Done** — `cc3884c` |
+| **3** | Authoring cutover; seed definition-first | **Done** on branch — legacy retained + @deprecated |
+| **4** | Remove authority from legacy catalogs | **Blocked** until user approval |
 | **5** | Hard IPC enforcement + CI orphan on legacy SoT imports | Release gate |
 
 Each phase ends with **user approval** before the next.
@@ -165,6 +166,7 @@ Additive `catalogDefinitionCapabilities` (or sibling) + optional Library badges;
 ```
 PHASE_0_1=DONE (advisory capabilities + UI badges)
 PHASE_2=DONE (dual-read list/resolve + save controls; legacy fallback retained)
-STOP: do not start Phase 3 authoring cutover / catalog deletion without explicit user approval
+PHASE_3=DONE (bundled seeds mirror legacy; authoring locked to schema.v1; silence tests)
+STOP: do not start Phase 4 legacy deletions without explicit user approval
 REF: Docs/Plans/SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md
 ```

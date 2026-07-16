@@ -16,6 +16,13 @@ import type { LivePointerPath } from './pointer-resolver.js';
  * it (scan for a known value -> narrow with a next scan -> reverse pointer
  * scan -> re-verified against a freshly relaunched process with a new ASLR
  * base and new heap layout).
+ *
+ * @deprecated Phase 3 authoring cutover — do NOT add new verified pointer
+ * controls here. Migrate / author them as schema.v1 `memoryFeatures` with
+ * resolvable `resolution` (moduleName + baseOffset / signature / pointerChain)
+ * so dual-read serves `liveMemory: 'executable'` from definitions. This
+ * catalog remains a Phase 2 fallback until Phase 4 deletion approval.
+ * Atomfall ammo is already mirrored in bundled-definition-seed.
  */
 export interface LiveTrainerControl {
   id: string;
