@@ -1,14 +1,10 @@
 /**
- * Multi-game cheat registry across 7 games, curated from community catalogs,
- * mod documentation, and official references. Every entry here is a
- * concrete CheatDefinition (no placeholders) — counts grow as more titles
- * get verified, not by padding this file with stubs.
+ * Multi-game cheat registry across 7 games — presentation / session UX only.
  *
- * @deprecated Phase 3 authoring cutover — do NOT add new titles or executable
- * cheat definitions here as the capability source of truth. Author a schema.v1
- * YAML/JSON definition (seeded via bundled-definition-seed / catalog import)
- * instead. This file remains for MultiGame / Overlay presentation and as a
- * Phase 2 dual-read fallback until Phase 4 deletion approval.
+ * Phase 4: capability execution is schema.v1-only (bundled definitions + dual-read
+ * removal). Do NOT add new titles here as the execute SoT. Author schema.v1 YAML/JSON
+ * instead. ALL_GAMES remains for MultiGame / Overlay presentation and as material for
+ * scan_unknown feature materialization in bundled-definition-seed.
  */
 
 import type { GameConfig, CheatDefinition, CheatSource, GameImageUrls } from './types.js';
@@ -1966,8 +1962,8 @@ export const CRIMSON_DESERT_CONFIG: GameConfig = {
 // ============================================================================
 
 /**
- * @deprecated Phase 3 — do not extend with new titles. Seed schema.v1 definitions instead.
- * Retained for presentation + dual-read fallback until Phase 4.
+ * Phase 4 — presentation registry only. Capability SoT is schema.v1.
+ * Do not extend with new titles for execute/live/save authority.
  */
 export const ALL_GAMES = [
   PALWORLD_CONFIG,

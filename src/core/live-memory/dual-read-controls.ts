@@ -1,6 +1,6 @@
 /**
- * Phase 2 — dual-read live controls: prefer schema.v1, fall back to live-control-catalog.
- * Legacy catalog is not deleted; fallback is logged when used.
+ * Phase 4 — schema.v1-only live control listing/resolve.
+ * Legacy live-control-catalog fallback removed; missing definition → empty / undefined.
  */
 import {
   catalogDefinitionCapabilities,
@@ -10,41 +10,29 @@ import type { MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.
 import { memoryDataTypeToLiveValue } from '../definitions/schema.v1.js';
 import { searchCatalog } from '../trainer-catalog/store.js';
 import { parseHexOffset } from './feature-resolver.js';
-import {
-  getControl as getLegacyControl,
-  listControlsForGame as listLegacyControlsForGame,
-  type LiveTrainerControl,
-} from './live-control-catalog.js';
+import type { LiveTrainerControl } from './live-trainer-control.js';
 import type { LivePointerPath } from './pointer-resolver.js';
 import type { LiveValueType } from './types.js';
 
-export type LiveControlSource = 'schema.v1' | 'live-control-catalog';
+export type LiveControlSource = 'schema.v1';
 
-export interface DualReadLiveListResult {
+export interface SchemaLiveListResult {
   controls: LiveTrainerControl[];
-  source: LiveControlSource;
+  source: LiveControlSource | null;
   catalogGameId?: string;
 }
 
-export interface DualReadLiveResolveResult {
+export interface SchemaLiveResolveResult {
   control: LiveTrainerControl | undefined;
   source: LiveControlSource | null;
-  /** Present when control came from a memoryFeature (session may use resolveMemoryFeature). */
   feature?: MemoryFeatureV1;
   catalogGameId?: string;
 }
 
-export interface DualReadLiveDeps {
+export interface SchemaLiveDeps {
   loadDefinition?: (catalogGameId: string) => SolithDefinitionV1 | null;
   findCatalogGameIdsByExecutable?: (executableName: string) => string[];
-  listLegacy?: (executableName: string) => LiveTrainerControl[];
-  getLegacy?: (controlId: string) => LiveTrainerControl | undefined;
-  warn?: (message: string) => void;
 }
-
-const DEFAULT_WARN = (message: string) => {
-  console.warn(message);
-};
 
 /** Catalog ids whose entry executables match (case-insensitive). */
 export function findCatalogGameIdsByExecutable(executableName: string): string[] {
@@ -99,14 +87,9 @@ export function memoryFeatureToLiveControl(
   };
 }
 
-function definitionMatchesExecutable(definition: SolithDefinitionV1, executableName: string): boolean {
-  const needle = executableName.toLowerCase();
-  return definition.target.executables.some((exe) => exe.toLowerCase() === needle);
-}
-
 function tryLoadDefinition(
   catalogGameId: string,
-  deps: DualReadLiveDeps,
+  deps: SchemaLiveDeps,
 ): SolithDefinitionV1 | null {
   const load = deps.loadDefinition ?? loadCatalogDefinition;
   try {
@@ -119,13 +102,10 @@ function tryLoadDefinition(
 function tryDefinitionForLive(
   catalogGameId: string,
   executableName: string | undefined,
-  deps: DualReadLiveDeps,
-): DualReadLiveListResult | null {
+  deps: SchemaLiveDeps,
+): SchemaLiveListResult | null {
   const definition = tryLoadDefinition(catalogGameId, deps);
   if (!definition) return null;
-  if (executableName && !definitionMatchesExecutable(definition, executableName)) {
-    // Allow catalogGameId override even if exe list drifts slightly.
-  }
   const caps = catalogDefinitionCapabilities(definition);
   if (caps.liveMemory === 'none') return null;
 
@@ -144,14 +124,13 @@ function tryDefinitionForLive(
 }
 
 /**
- * List live controls: schema.v1 preferred when liveMemory is executable or scan-required.
+ * List live controls exclusively from schema.v1.
+ * Returns empty controls when no definition / liveMemory capability exists.
  */
-export function listLiveControlsDualRead(
+export function listLiveControlsFromSchema(
   options: { executableName?: string; catalogGameId?: string },
-  deps: DualReadLiveDeps = {},
-): DualReadLiveListResult {
-  const warn = deps.warn ?? DEFAULT_WARN;
-  const listLegacy = deps.listLegacy ?? listLegacyControlsForGame;
+  deps: SchemaLiveDeps = {},
+): SchemaLiveListResult {
   const findIds = deps.findCatalogGameIdsByExecutable ?? findCatalogGameIdsByExecutable;
 
   if (options.catalogGameId) {
@@ -166,7 +145,6 @@ export function listLiveControlsDualRead(
       if (preferred) return preferred;
     }
 
-    // Direct load by slug guess (bundled ids often match searchable names)
     const slugGuess = options.executableName
       .replace(/\.exe$/i, '')
       .toLowerCase()
@@ -177,27 +155,24 @@ export function listLiveControlsDualRead(
     }
   }
 
-  const exe = options.executableName ?? '';
-  const fallbackKey = options.catalogGameId ?? (exe.length > 0 ? exe : '(none)');
-  warn(`[Schema.v1] Fallback triggered for Live Memory: ${fallbackKey}`);
   return {
-    controls: exe ? listLegacy(exe) : [],
-    source: 'live-control-catalog',
+    controls: [],
+    source: null,
     catalogGameId: options.catalogGameId,
   };
 }
 
+/** @deprecated Phase 4 alias — use listLiveControlsFromSchema */
+export const listLiveControlsDualRead = listLiveControlsFromSchema;
+
 /**
- * Resolve a control by id — definition-prefixed ids (`game:feature`) or legacy catalog ids.
+ * Resolve a control by id — definition-prefixed ids (`game:feature`) only.
  */
-export function resolveLiveControlDualRead(
+export function resolveLiveControlFromSchema(
   controlId: string,
   options: { executableName?: string; catalogGameId?: string } = {},
-  deps: DualReadLiveDeps = {},
-): DualReadLiveResolveResult {
-  const warn = deps.warn ?? DEFAULT_WARN;
-  const getLegacy = deps.getLegacy ?? getLegacyControl;
-
+  deps: SchemaLiveDeps = {},
+): SchemaLiveResolveResult {
   const colon = controlId.indexOf(':');
   if (colon > 0) {
     const defId = controlId.slice(0, colon);
@@ -224,7 +199,7 @@ export function resolveLiveControlDualRead(
   }
 
   if (options.catalogGameId || options.executableName) {
-    const listed = listLiveControlsDualRead(options, deps);
+    const listed = listLiveControlsFromSchema(options, deps);
     const hit = listed.controls.find((c) => c.id === controlId);
     if (hit) {
       return {
@@ -235,12 +210,13 @@ export function resolveLiveControlDualRead(
     }
   }
 
-  const legacy = getLegacy(controlId);
-  if (legacy) {
-    warn(`[Schema.v1] Fallback triggered for Live Memory resolve: ${controlId}`);
-    return { control: legacy, source: 'live-control-catalog' };
-  }
-
-  warn(`[Schema.v1] Fallback triggered for Live Memory resolve: ${controlId}`);
   return { control: undefined, source: null };
 }
+
+/** @deprecated Phase 4 alias — use resolveLiveControlFromSchema */
+export const resolveLiveControlDualRead = resolveLiveControlFromSchema;
+
+/** Dual-read types retained as aliases for existing imports. */
+export type DualReadLiveListResult = SchemaLiveListResult;
+export type DualReadLiveResolveResult = SchemaLiveResolveResult;
+export type DualReadLiveDeps = SchemaLiveDeps;

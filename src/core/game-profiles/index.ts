@@ -28,6 +28,8 @@ export {
   getBundledGameProfileCatalogEntry,
   validateBundledGameProfileCatalog,
   validateGameProfileCatalogEntry,
+  getStardewSupportProfile,
+  STARDEW_SUPPORT_PROFILE,
   type GameProfileCatalogEntry,
   type GameProfileCatalogValidationError,
   type ProfileEvidenceLevel,

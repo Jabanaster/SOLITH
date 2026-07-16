@@ -10,7 +10,8 @@
  * Workflow:
  *   proposeWrite → show diff/confirmation → approveAndWrite → verify → offer rollback
  *
- * Milestone H refactor: controls are now loaded from src/core/game-profiles/profiles/stardew-valley.json
+ * Milestone H/J: default controls load from schema.v1 via buildControls() (Phase 4).
+ * Former game-profiles/stardew-valley.json deleted.
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';

@@ -19,7 +19,7 @@ import {
 } from '../definitions/fingerprint-verify.js';
 import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
 import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
-import type { LiveTrainerControl } from './live-control-catalog.js';
+import type { LiveTrainerControl } from './live-trainer-control.js';
 import type {
   FreezeStatus,
   FreezeStopReason,

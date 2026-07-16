@@ -333,7 +333,7 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
-  // Read-only: Phase 2 dual-read — schema.v1 preferred, live-control-catalog fallback.
+  // Read-only: Phase 4 schema.v1-only live controls (legacy catalog removed).
   ipcMain.handle('live-memory-list-controls', async (event) => {
     try {
       const session = requireSession(event);
@@ -341,7 +341,7 @@ export function registerLiveMemoryIpc(): void {
       const executableName = session.getAttachedExecutableName();
       if (!executableName) return { success: true, controls: [], source: null };
       const mod = await getLiveMemoryModule();
-      const listed = mod.listLiveControlsDualRead({
+      const listed = mod.listLiveControlsFromSchema({
         executableName,
         catalogGameId: typeof session.getCatalogGameId === 'function' ? session.getCatalogGameId() : undefined,
       });
@@ -356,7 +356,7 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
-  // Read-only: Phase 2 dual-read resolve — definition feature path preferred when available.
+  // Read-only: Phase 4 schema.v1-only resolve.
   // Does not write anything — the caller still goes through proposeWrite/confirmWrite (and
   // therefore the online-session guard) to actually change it.
   ipcMain.handle('live-memory-resolve-control', async (event, payload: unknown) => {
@@ -367,7 +367,7 @@ export function registerLiveMemoryIpc(): void {
       const executableName = session.getAttachedExecutableName() ?? undefined;
       const catalogGameId =
         typeof session.getCatalogGameId === 'function' ? session.getCatalogGameId() ?? undefined : undefined;
-      const resolved = mod.resolveLiveControlDualRead(parsed.controlId, {
+      const resolved = mod.resolveLiveControlFromSchema(parsed.controlId, {
         executableName,
         catalogGameId: catalogGameId ?? undefined,
       });

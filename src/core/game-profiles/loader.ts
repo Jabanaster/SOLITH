@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import type { GameProfile } from './types.js';
 import { validateGameProfile } from './types.js';
+import { getStardewSupportProfile } from './catalog.js';
 
 // Re-export the pure transforms so existing Node/test consumers that import them
 // from the loader continue to work. The renderer must import them from
@@ -50,9 +51,9 @@ export function loadGameProfile(profilePath: string): GameProfile {
 }
 
 /**
- * Loads the Stardew Valley profile (used by default in Milestone H).
+ * Loads the Stardew Valley support-matrix profile (inlined; JSON removed in Phase 4).
+ * Execution SoT is schema.v1 via resolveSaveEditControlsFromSchema.
  */
 export function loadStardewProfile(): GameProfile {
-  const profilePath = path.join(PROFILES_DIR, 'stardew-valley.json');
-  return loadGameProfile(profilePath);
+  return getStardewSupportProfile();
 }

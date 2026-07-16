@@ -17,6 +17,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      - name: Schema.v1 import bans / legacy drift
+        run: npm run verify:schema-v1-boundaries
+      - name: Orphan / boundary check
+        run: npm run orphan-check
       - name: Build electron host bundle (required by trainer-host e2e in npm test)
         run: npm run build:electron
       - name: Run tests

@@ -15,17 +15,18 @@ import {
   loadGameProfile,
   loadStardewProfile,
   loadTrainerControls,
+  getStardewSupportProfile,
   type GameProfile,
 } from '../src/core/game-profiles/index.js';
 import { isControlExecutable, requiresApproval } from '../src/core/trainer-host/trainer-control-schema.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STARDEW_PROFILE_PATH = path.resolve(__dirname, '../src/core/game-profiles/profiles/stardew-valley.json');
 const SHIPPED_PROFILES_DIR = path.resolve(__dirname, '../src/core/game-profiles/profiles');
 const STARDEW_FIXTURE_PATH = path.resolve(__dirname, '../demo-game/save/stardew-fixture.xml');
 const JSON_FIXTURE_PATH = path.resolve(__dirname, './fixtures/discovery-test/game/player_save.json');
 
 function loadShippedProfileFiles(): Array<{ filePath: string; raw: string; profile: GameProfile }> {
+  if (!fs.existsSync(SHIPPED_PROFILES_DIR)) return [];
   return fs.readdirSync(SHIPPED_PROFILES_DIR)
     .filter(file => file.endsWith('.json'))
     .map(file => {
@@ -517,10 +518,11 @@ describe('shipped game profiles â€” hygiene gates', () => {
     }
   });
 
-  it('loads and validates the cleaned Stardew profile', () => {
-    assert.doesNotThrow(() => loadGameProfile(STARDEW_PROFILE_PATH));
-    const profile = loadGameProfile(STARDEW_PROFILE_PATH);
+  it('loads and validates the inlined Stardew support profile (Phase 4)', () => {
+    assert.doesNotThrow(() => loadStardewProfile());
+    const profile = loadStardewProfile();
     assert.deepStrictEqual(validateGameProfile(profile), []);
+    assert.deepStrictEqual(validateGameProfile(getStardewSupportProfile()), []);
   });
 });
 

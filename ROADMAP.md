@@ -18,7 +18,7 @@ Product UI: **Solith** · package `resourceforge@2.0.0`
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
 | Local `npm test` | **656/656 PASS** (verified on merge tip) |
 | CI Fast on `master` | **GREEN** @ `b049577` — [run 29439968186](https://github.com/Jabanaster/ResourceForge/actions/runs/29439968186) · `npm test` **656/656** + fresh-clone verify |
-| Catalog unification / schema.v1 SoT | **Phase 3 done** on `cursor/schema-v1-phase0-1-capabilities` (seed mirror + authoring lock; Phase 4 blocked) |
+| Catalog unification / schema.v1 SoT | **Phase 5 done** on branch (import bans + orphan drift in CI Fast) |
 | Separate concerns | Phase 2+ only after explicit approval; do not reuse offline-sweep branch |
 
 ### Accepted capability stack
@@ -59,7 +59,7 @@ Honest live-memory stance (README): bundled memory features are **L0 `scan_unkno
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
 | **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
-| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Phase 3** — seed cutover; Phase 4+ deletions blocked |
+| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Phase 5 complete** — await merge |
 
 ### Shell polish / evidence (2026-07)
 
@@ -96,13 +96,11 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 - ~~Offline sweep AB / cert docs / watch-confidence / Epic/GOG fixtures~~ — **on master**
 - ~~Catalog search test isolation (`:memory:`) + CI fresh-clone `656/656`~~ — **on master**
 - ~~README L0 honesty + in-process user charter~~ — **on master**
-- ~~schema.v1 Phase 0→1 (capability derivation + Library badges)~~ — `c29a9f7`
-- ~~schema.v1 Phase 2 (dual-read + legacy fallback)~~ — `cc3884c`
-- ~~schema.v1 Phase 3 (authoring cutover + seed mirror + silence tests)~~ — on branch (await COMMIT IT)
-- **Stop:** Phase 4 legacy catalog deletion — await explicit approval
+- ~~schema.v1 Phase 0→5~~ — on `cursor/schema-v1-phase0-1-capabilities` (await COMMIT IT / PUSH IT / MERGE)
 - Live S / U L2+ still require game sessions
 
-See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.  
+See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.
+Run **`npm run verify:schema-v1-boundaries`** and **`npm run orphan-check`** before merge.  
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
 

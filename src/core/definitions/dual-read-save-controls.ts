@@ -1,67 +1,60 @@
 /**
- * Phase 2 — dual-read save-edit controls: prefer schema.v1, fall back to game-profiles.
- * Does not delete profiles; preserves Milestone J field paths + requires_approval.
+ * Phase 4 — schema.v1-only save-edit controls.
+ * Legacy game-profiles fallback removed. Milestone J field paths come from
+ * bundled STARDEW_DEFINITION; panel path placeholders are applied here.
  */
 import {
   catalogDefinitionCapabilities,
   loadCatalogDefinition,
-} from '../definitions/load-catalog-definition.js';
-import {
-  solithDefinitionToTrainerControls,
-} from '../definitions/definition-to-trainer-controls.js';
-import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
-import { validateGameProfile, type GameProfile } from '../game-profiles/types.js';
-import { loadTrainerControls } from '../game-profiles/transform.js';
-import stardewProfileData from '../game-profiles/profiles/stardew-valley.json';
+} from './load-catalog-definition.js';
+import { solithDefinitionToTrainerControls } from './definition-to-trainer-controls.js';
+import type { SolithDefinitionV1 } from './schema.v1.js';
+import { bundledDefinitionsForTests } from '../trainer-catalog/bundled-definition-seed.js';
 import type { TrainerControl } from '../trainer-host/trainer-control-schema.js';
 
-export type SaveEditControlSource = 'schema.v1' | 'game-profiles';
+export type SaveEditControlSource = 'schema.v1';
 
-export interface DualReadSaveResult {
+export interface SchemaSaveResult {
   controls: TrainerControl[];
-  source: SaveEditControlSource;
+  source: SaveEditControlSource | null;
   catalogGameId: string;
 }
 
-export interface DualReadSaveDeps {
+export interface SchemaSaveDeps {
   loadDefinition?: (catalogGameId: string) => SolithDefinitionV1 | null;
-  loadLegacyControls?: (catalogGameId: string) => TrainerControl[];
-  warn?: (message: string) => void;
 }
 
-const DEFAULT_WARN = (message: string) => {
-  console.warn(message);
+/** Historic Stardew panel path-approval id + file placeholder (Milestone J workflow). */
+export const STARDEW_PANEL_GAME_ID = 'demo-game-quest-id-000000000000';
+export const STARDEW_SAVE_FILE_PLACEHOLDER = '{STARDEW_SAVE_FILE}';
+
+const STARDEW_PANEL_CONSTRAINTS: Record<string, { min?: number; max?: number }> = {
+  'stardew-money': { min: 0, max: 2147483647 },
+  'stardew-stamina': { min: 0, max: 508 },
+  'stardew-max-stamina': { min: 270, max: 508 },
+  'stardew-farming-xp': { min: 0, max: 15000 },
 };
 
-/** Legacy Stardew game-profile controls (Milestone J). */
-export function loadStardewProfileControls(): TrainerControl[] {
-  const profile = stardewProfileData as GameProfile;
-  const errors = validateGameProfile(profile);
-  if (errors.length > 0) {
-    console.error('Stardew profile failed validation:', errors);
-    return [];
+function defaultLoadDefinition(catalogGameId: string): SolithDefinitionV1 | null {
+  try {
+    const fromStore = loadCatalogDefinition(catalogGameId);
+    if (fromStore) return fromStore;
+  } catch {
+    // DB may be uninitialized in unit tests.
   }
-  return loadTrainerControls(profile);
-}
-
-function loadLegacyForCatalogId(catalogGameId: string): TrainerControl[] {
-  if (catalogGameId === 'stardew-valley' || catalogGameId === 'demo-game-quest-id-000000000000') {
-    return loadStardewProfileControls();
-  }
-  return [];
+  return bundledDefinitionsForTests().find((d) => d.id === catalogGameId) ?? null;
 }
 
 /**
- * Prefer schema.v1 saveEditor when saveEdit is executable; otherwise fall back to game-profiles.
+ * Load save-edit TrainerControls exclusively from schema.v1.
+ * Returns empty controls when definition missing or saveEdit is not executable.
  */
-export function resolveSaveEditControlsDualRead(
+export function resolveSaveEditControlsFromSchema(
   options: { catalogGameId?: string } = {},
-  deps: DualReadSaveDeps = {},
-): DualReadSaveResult {
+  deps: SchemaSaveDeps = {},
+): SchemaSaveResult {
   const catalogGameId = options.catalogGameId ?? 'stardew-valley';
-  const warn = deps.warn ?? DEFAULT_WARN;
-  const loadDefinition = deps.loadDefinition ?? loadCatalogDefinition;
-  const loadLegacy = deps.loadLegacyControls ?? loadLegacyForCatalogId;
+  const loadDefinition = deps.loadDefinition ?? defaultLoadDefinition;
 
   let definition: SolithDefinitionV1 | null = null;
   try {
@@ -69,6 +62,7 @@ export function resolveSaveEditControlsDualRead(
   } catch {
     definition = null;
   }
+
   if (definition) {
     const caps = catalogDefinitionCapabilities(definition);
     if (caps.saveEdit === 'executable') {
@@ -79,37 +73,37 @@ export function resolveSaveEditControlsDualRead(
     }
   }
 
-  warn(`[Schema.v1] Fallback triggered for Save Edit: ${catalogGameId}`);
-  return {
-    controls: loadLegacy(catalogGameId),
-    source: 'game-profiles',
-    catalogGameId,
-  };
+  return { controls: [], source: null, catalogGameId };
 }
 
+/** @deprecated Phase 4 alias — use resolveSaveEditControlsFromSchema */
+export const resolveSaveEditControlsDualRead = resolveSaveEditControlsFromSchema;
+
 /**
- * Align definition-sourced Stardew controls with the legacy path-approval gameId
- * and `{STARDEW_SAVE_FILE}` placeholder used by the default TrainerControlPanel.
- * Field paths remain those from schema.v1 (must match Milestone J).
+ * Apply Stardew panel path-approval placeholders + Milestone J constraints
+ * without reading game-profiles JSON.
  */
 export function alignStardewPanelPlaceholders(controls: TrainerControl[]): TrainerControl[] {
-  const legacy = loadStardewProfileControls();
-  const byId = new Map(legacy.map((c) => [c.id, c]));
   return controls.map((control) => {
-    const leg = byId.get(control.id);
-    if (!leg?.saveField || !control.saveField) return control;
+    if (!control.saveField) return control;
+    const constraints = STARDEW_PANEL_CONSTRAINTS[control.id];
     return {
       ...control,
-      // Keep constraints from profile when definition omitted them.
-      min: control.min ?? leg.min,
-      max: control.max ?? leg.max,
-      step: control.step ?? leg.step,
+      min: control.min ?? constraints?.min,
+      max: control.max ?? constraints?.max,
       saveField: {
         ...control.saveField,
-        filePath: leg.saveField.filePath,
-        gameId: leg.saveField.gameId,
-        // fieldPath intentionally from schema.v1 (control.saveField.fieldPath)
+        filePath: STARDEW_SAVE_FILE_PLACEHOLDER,
+        gameId: STARDEW_PANEL_GAME_ID,
       },
     };
   });
 }
+
+/** @deprecated Phase 4 — profiles removed; always returns []. */
+export function loadStardewProfileControls(): TrainerControl[] {
+  return [];
+}
+
+export type DualReadSaveResult = SchemaSaveResult;
+export type DualReadSaveDeps = SchemaSaveDeps;

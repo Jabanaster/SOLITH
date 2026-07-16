@@ -1,13 +1,10 @@
 /**
- * @deprecated Phase 3 authoring cutover — do NOT add new game profiles or
- * executable save controls here as the capability SoT. Author schema.v1
- * `saveEditor.saveFields` (bundled definition / YAML import) instead, keeping
- * Milestone J field paths for Stardew. This catalog remains for support-matrix
- * UX and Phase 2 dual-read fallback until Phase 4 deletion approval.
+ * Phase 4 — support-matrix catalog only. Executable save SoT is schema.v1.
+ * Stardew Milestone J field paths are inlined here for support-matrix UX
+ * (former profiles/stardew-valley.json deleted).
  */
 import type { GameProfile } from './types.js';
 import { validateGameProfile } from './types.js';
-import stardewProfileData from './profiles/stardew-valley.json';
 
 export type ProfileSupportStatus = 'supported' | 'preview-only' | 'read-only' | 'blocked' | 'needs-review';
 export type ProfileEvidenceLevel = 'none' | 'fixture-detected' | 'fixture-parsed' | 'fixture-validated' | 'backup-rollback-verified';
@@ -24,8 +21,8 @@ export type ProfileUnsupportedReason =
   | 'outside-local-single-player-scope';
 
 /**
- * @deprecated Phase 3 — do not add new profile catalog entries as capability SoT.
- * Author schema.v1 saveEditor definitions instead.
+ * Support-matrix catalog entry (advisory). Do not add new executable save
+ * controls here — author schema.v1 saveEditor fields instead.
  */
 export interface GameProfileCatalogEntry {
   catalogId: string;
@@ -107,7 +104,109 @@ function cloneProfile(profile: GameProfile): GameProfile {
   return JSON.parse(JSON.stringify(profile)) as GameProfile;
 }
 
-const STARDEW_PROFILE: GameProfile = cloneProfile(stardewProfileData as GameProfile);
+/** Inlined Milestone J Stardew support profile (replaces deleted stardew-valley.json). */
+export const STARDEW_SUPPORT_PROFILE: GameProfile = {
+  profileVersion: '1.0.0',
+  gameId: 'demo-game-quest-id-000000000000',
+  displayName: 'Stardew Valley',
+  saveFormat: 'xml',
+  saveRootHints: {
+    windows: '%APPDATA%\\StardewValley\\Saves',
+  },
+  gameVersionNotes: 'Tested with Stardew Valley 1.5+. Save format is stable across versions.',
+  controls: [
+    {
+      id: 'stardew-money',
+      label: 'Money',
+      description: "Ceriph's gold. Written via TrainerHost XML save workflow with backup + rollback.",
+      category: 'CURRENCY',
+      controlType: 'number_input',
+      backend: 'save_field',
+      safetyStatus: 'requires_approval',
+      saveField: {
+        filePath: '{STARDEW_SAVE_FILE}',
+        fieldPath: 'SaveGame.player.0.money',
+        gameId: 'demo-game-quest-id-000000000000',
+      },
+      constraints: { min: 0, max: 2147483647 },
+      metadata: {
+        valueType: 'int',
+        safeTestValue: 12345,
+        defaultValue: 500,
+        riskNotes: 'Low risk - simple scalar value, proven in Milestone E',
+      },
+    },
+    {
+      id: 'stardew-stamina',
+      label: 'Stamina',
+      description: 'Current energy. Written via TrainerHost XML save workflow with backup + rollback.',
+      category: 'STAMINA',
+      controlType: 'number_input',
+      backend: 'save_field',
+      safetyStatus: 'requires_approval',
+      saveField: {
+        filePath: '{STARDEW_SAVE_FILE}',
+        fieldPath: 'SaveGame.player.0.stamina.0.float.0',
+        gameId: 'demo-game-quest-id-000000000000',
+      },
+      constraints: { min: 0, max: 508 },
+      metadata: {
+        valueType: 'float',
+        safeTestValue: 270,
+        defaultValue: 270,
+        riskNotes: 'Low risk - simple nested float, independent stat',
+      },
+    },
+    {
+      id: 'stardew-max-stamina',
+      label: 'Max Stamina',
+      description: 'Maximum stamina capacity. Written via TrainerHost XML save workflow with backup + rollback.',
+      category: 'STAMINA',
+      controlType: 'number_input',
+      backend: 'save_field',
+      safetyStatus: 'requires_approval',
+      saveField: {
+        filePath: '{STARDEW_SAVE_FILE}',
+        fieldPath: 'SaveGame.player.0.maxStamina.0.float.0',
+        gameId: 'demo-game-quest-id-000000000000',
+      },
+      constraints: { min: 270, max: 508 },
+      metadata: {
+        valueType: 'float',
+        safeTestValue: 304,
+        defaultValue: 270,
+        riskNotes: 'Low-medium risk - simple nested float, bounded, backup/write/verify/rollback-safe',
+      },
+    },
+    {
+      id: 'stardew-farming-xp',
+      label: 'Farming XP',
+      description: 'Farming skill experience points. Written via TrainerHost XML save workflow with backup + rollback.',
+      category: 'SKILLS',
+      controlType: 'number_input',
+      backend: 'save_field',
+      safetyStatus: 'requires_approval',
+      saveField: {
+        filePath: '{STARDEW_SAVE_FILE}',
+        fieldPath: 'SaveGame.player.0.experiencePoints.0.int.0',
+        gameId: 'demo-game-quest-id-000000000000',
+      },
+      constraints: { min: 0, max: 15000 },
+      metadata: {
+        valueType: 'int',
+        safeTestValue: 2000,
+        defaultValue: 0,
+        riskNotes: 'Low risk - simple array element, XP is cumulative',
+      },
+    },
+  ],
+};
+
+const STARDEW_PROFILE: GameProfile = cloneProfile(STARDEW_SUPPORT_PROFILE);
+
+export function getStardewSupportProfile(): GameProfile {
+  return cloneProfile(STARDEW_SUPPORT_PROFILE);
+}
 
 const DEMO_PREVIEW_PROFILE: GameProfile = {
   profileVersion: '1.0.0',
