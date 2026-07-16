@@ -25,3 +25,14 @@ export type { AobPattern, AobScanOptions } from './aob-resolver.js';
 export { resolveMemoryFeatureAddress, SessionAddressCache, parseHexOffset } from './feature-resolver.js';
 export { listControlsForGame, getControl, listAllControls } from './live-control-catalog.js';
 export type { LiveTrainerControl } from './live-control-catalog.js';
+export {
+  listLiveControlsDualRead,
+  resolveLiveControlDualRead,
+  findCatalogGameIdsByExecutable,
+  memoryFeatureToLiveControl,
+} from './dual-read-controls.js';
+export type {
+  DualReadLiveListResult,
+  DualReadLiveResolveResult,
+  LiveControlSource,
+} from './dual-read-controls.js';

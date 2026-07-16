@@ -16,7 +16,7 @@ import { loadCatalogDefinition } from '../src/core/definitions/load-catalog-defi
 import { buildTrainerDeckRows } from '../src/core/trainer-deck/build-deck-rows.js';
 import { getCatalogEntry } from '../src/core/trainer-catalog/store.js';
 import { catalogDefinitionCapabilities } from '../src/core/definitions/load-catalog-definition.js';
-import { solithDefinitionToTrainerControls } from '../src/core/definitions/definition-to-trainer-controls.js';
+import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-read-save-controls.js';
 import {
   setCatalogProcessWatchInterval,
   getLastProcessDetection,
@@ -50,12 +50,15 @@ export function registerTrainerDeckIpc(): void {
       const installed = listInstalledGames().find((g) => g.catalogGameId === catalogGameId);
       const demand = listCatalogDemandSorted(500).find((d) => d.catalogGameId === catalogGameId);
 
+      const dual = resolveSaveEditControlsDualRead({ catalogGameId });
+
       return {
         success: true,
         entry,
         capabilities: definition ? catalogDefinitionCapabilities(definition) : null,
         rows: definition ? buildTrainerDeckRows(definition) : [],
-        controls: definition ? solithDefinitionToTrainerControls(definition) : [],
+        controls: dual.controls,
+        controlsSource: dual.source,
         health,
         installed,
         demand: demand ?? null,

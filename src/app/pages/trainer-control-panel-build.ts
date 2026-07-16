@@ -1,16 +1,19 @@
 import type { TrainerControl } from '../../core/trainer-host/trainer-control-schema.js';
-import type { GameProfile } from '../../core/game-profiles/types.js';
-import { validateGameProfile } from '../../core/game-profiles/types.js';
-import { loadTrainerControls } from '../../core/game-profiles/transform.js';
-import stardewProfileData from '../../core/game-profiles/profiles/stardew-valley.json';
+import {
+  alignStardewPanelPlaceholders,
+  resolveSaveEditControlsDualRead,
+  loadStardewProfileControls,
+} from '../../core/definitions/dual-read-save-controls.js';
 
-/** Loads trainer controls from the bundled Stardew Valley game profile. */
+/**
+ * Loads Stardew Valley trainer controls via Phase 2 dual-read:
+ * schema.v1 preferred; game-profiles fallback. Path placeholders stay
+ * profile-compatible for the default panel approval flow.
+ */
 export function buildControls(): TrainerControl[] {
-  const profile = stardewProfileData as GameProfile;
-  const errors = validateGameProfile(profile);
-  if (errors.length > 0) {
-    console.error('Stardew profile failed validation:', errors);
-    return [];
+  const result = resolveSaveEditControlsDualRead({ catalogGameId: 'stardew-valley' });
+  if (result.source === 'schema.v1') {
+    return alignStardewPanelPlaceholders(result.controls);
   }
-  return loadTrainerControls(profile);
+  return result.controls.length > 0 ? result.controls : loadStardewProfileControls();
 }

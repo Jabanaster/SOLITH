@@ -333,22 +333,30 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
-  // Read-only: lists the catalog's saved controls for whichever game is currently attached.
+  // Read-only: Phase 2 dual-read — schema.v1 preferred, live-control-catalog fallback.
   ipcMain.handle('live-memory-list-controls', async (event) => {
     try {
       const session = requireSession(event);
       LiveMemoryListControlsSchema.parse({});
       const executableName = session.getAttachedExecutableName();
-      if (!executableName) return { success: true, controls: [] };
+      if (!executableName) return { success: true, controls: [], source: null };
       const mod = await getLiveMemoryModule();
-      const controls = mod.listControlsForGame(executableName);
-      return { success: true, controls: controls.map(serializeControlSummary) };
+      const listed = mod.listLiveControlsDualRead({
+        executableName,
+        catalogGameId: typeof session.getCatalogGameId === 'function' ? session.getCatalogGameId() : undefined,
+      });
+      return {
+        success: true,
+        controls: listed.controls.map(serializeControlSummary),
+        source: listed.source,
+        catalogGameId: listed.catalogGameId,
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'list_controls_failed') };
     }
   });
 
-  // Read-only: resolves a catalog control's pointer path to its current address + value.
+  // Read-only: Phase 2 dual-read resolve — definition feature path preferred when available.
   // Does not write anything — the caller still goes through proposeWrite/confirmWrite (and
   // therefore the online-session guard) to actually change it.
   ipcMain.handle('live-memory-resolve-control', async (event, payload: unknown) => {
@@ -356,15 +364,24 @@ export function registerLiveMemoryIpc(): void {
       const session = requireSession(event);
       const parsed = LiveMemoryResolveControlSchema.parse(payload);
       const mod = await getLiveMemoryModule();
-      const control = mod.getControl(parsed.controlId);
-      if (!control) return { success: false, error: 'unknown_control' };
+      const executableName = session.getAttachedExecutableName() ?? undefined;
+      const catalogGameId =
+        typeof session.getCatalogGameId === 'function' ? session.getCatalogGameId() ?? undefined : undefined;
+      const resolved = mod.resolveLiveControlDualRead(parsed.controlId, {
+        executableName,
+        catalogGameId: catalogGameId ?? undefined,
+      });
+      if (!resolved.control) return { success: false, error: 'unknown_control' };
 
-      const address = session.resolveControl(control);
+      const address = resolved.feature
+        ? session.resolveMemoryFeature(resolved.feature)
+        : session.resolveControl(resolved.control);
       const currentValue = session.readValue(address);
       return {
         success: true,
         address: { address: address.address.toString(), dataType: address.dataType },
         currentValue,
+        source: resolved.source,
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'resolve_control_failed') };

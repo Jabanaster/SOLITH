@@ -31,7 +31,7 @@ import {
   loadCatalogDefinition,
   catalogDefinitionCapabilities,
 } from '../src/core/definitions/load-catalog-definition.js';
-import { solithDefinitionToTrainerControls } from '../src/core/definitions/definition-to-trainer-controls.js';
+import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-read-save-controls.js';
 import { ensureCatalogGameForSaveAccess } from '../src/core/trainer-catalog/catalog-game-record.js';
 import { addUserSelectedLocation } from '../src/core/saves/locations.js';
 
@@ -164,13 +164,16 @@ export function registerTrainerCatalogIpc(): void {
   ipcMain.handle('trainer-catalog-get-trainer-controls', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
+      const dual = resolveSaveEditControlsDualRead({ catalogGameId: parsed.catalogGameId });
       const definition = loadCatalogDefinition(parsed.catalogGameId);
-      if (!definition) return { success: false, error: 'no_definition' };
-      const controls = solithDefinitionToTrainerControls(definition);
+      if (dual.controls.length === 0 && !definition) {
+        return { success: false, error: 'no_definition' };
+      }
       return {
         success: true,
-        controls,
-        capabilities: catalogDefinitionCapabilities(definition),
+        controls: dual.controls,
+        source: dual.source,
+        capabilities: definition ? catalogDefinitionCapabilities(definition) : null,
       };
     } catch (error) {
       return { success: false, error: sanitize(error) };

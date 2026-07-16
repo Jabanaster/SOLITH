@@ -1,12 +1,12 @@
 # Schema.v1 Unification Plan — Control Catalog Consolidation
 
-**Status:** Phase 0→1 **implemented** on `cursor/schema-v1-phase0-1-capabilities` (base `dd6225a`+)  
-**Stability prerequisite:** green `master` with CI Fast **656/656** (`dd6225a` docs lock)
+**Status:** Phase 2 **in progress** on `cursor/schema-v1-phase0-1-capabilities` (dual-read + legacy fallback)  
+**Stability prerequisite:** green `master` with CI Fast **656/656** (`dd6225a` docs lock); Phase 1 at `c29a9f7`
 
 ```
 DONE: Phase 0 inventory + Phase 1 additive capability lanes / Library badges
-STOP: await user approval before Phase 2 (dual-read / execute IPC enforcement)
-NEXT: Phase 2 ONLY after explicit approval — do not touch live-memory / TrainerHost execute paths yet
+DONE: Phase 2 dual-read (schema.v1 preferred → live-control-catalog / game-profiles fallback)
+STOP: await user approval before Phase 3 (authoring cutover / no legacy deletes yet)
 ```
 
 ---
@@ -83,8 +83,8 @@ capabilities: {
 | Phase | Work | Gate |
 |-------|------|------|
 | **0** | Inventory ID maps + consumers (docs only) | **Done** — `SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md` |
-| **1** | Additive capability derivation / badges | **Done** on branch — tests green; execute paths unchanged |
-| **2** | Dual-read: definition preferred, legacy fallback | **Blocked** until user approval |
+| **1** | Additive capability derivation / badges | **Done** — `c29a9f7` |
+| **2** | Dual-read: definition preferred, legacy fallback | **Done** on branch — legacy catalogs retained |
 | **3** | Authoring cutover; seed definition-first | New cheats only via schema.v1 |
 | **4** | Remove authority from legacy catalogs | Explicit delete approval |
 | **5** | Hard IPC enforcement + CI orphan on legacy SoT imports | Release gate |
@@ -163,7 +163,8 @@ Additive `catalogDefinitionCapabilities` (or sibling) + optional Library badges;
 ## 10. Stop gate
 
 ```
-PHASE_0_1=DONE (advisory capabilities + UI badges; no execute IPC)
-STOP: do not start Phase 2 dual-read / execute enforcement without explicit user approval
+PHASE_0_1=DONE (advisory capabilities + UI badges)
+PHASE_2=DONE (dual-read list/resolve + save controls; legacy fallback retained)
+STOP: do not start Phase 3 authoring cutover / catalog deletion without explicit user approval
 REF: Docs/Plans/SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md
 ```

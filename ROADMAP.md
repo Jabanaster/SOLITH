@@ -18,7 +18,7 @@ Product UI: **Solith** · package `resourceforge@2.0.0`
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
 | Local `npm test` | **656/656 PASS** (verified on merge tip) |
 | CI Fast on `master` | **GREEN** @ `b049577` — [run 29439968186](https://github.com/Jabanaster/ResourceForge/actions/runs/29439968186) · `npm test` **656/656** + fresh-clone verify |
-| Catalog unification / schema.v1 SoT | **Phase 0→1 in progress** on `cursor/schema-v1-phase0-1-capabilities` (additive lanes + UI; no execute IPC) |
+| Catalog unification / schema.v1 SoT | **Phase 2 done** on `cursor/schema-v1-phase0-1-capabilities` (dual-read + fallback; Phase 3 blocked) |
 | Separate concerns | Phase 2+ only after explicit approval; do not reuse offline-sweep branch |
 
 ### Accepted capability stack
@@ -59,7 +59,7 @@ Honest live-memory stance (README): bundled memory features are **L0 `scan_unkno
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
 | **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
-| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Phase 0→1** — advisory lanes + Library badges; Phase 2 blocked |
+| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Phase 2** — dual-read preferred; Phase 3+ blocked |
 
 ### Shell polish / evidence (2026-07)
 
@@ -96,8 +96,9 @@ Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats 
 - ~~Offline sweep AB / cert docs / watch-confidence / Epic/GOG fixtures~~ — **on master**
 - ~~Catalog search test isolation (`:memory:`) + CI fresh-clone `656/656`~~ — **on master**
 - ~~README L0 honesty + in-process user charter~~ — **on master**
-- ~~schema.v1 Phase 0→1 (capability derivation + Library badges)~~ — branch `cursor/schema-v1-phase0-1-capabilities`
-- **Stop:** Phase 2 dual-read / execute IPC enforcement — await explicit approval
+- ~~schema.v1 Phase 0→1 (capability derivation + Library badges)~~ — `c29a9f7`
+- ~~schema.v1 Phase 2 (dual-read + legacy fallback)~~ — on branch (await COMMIT IT)
+- **Stop:** Phase 3 authoring cutover / legacy deletion — await explicit approval
 - Live S / U L2+ still require game sessions
 
 See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.  
