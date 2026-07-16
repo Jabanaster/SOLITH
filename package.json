@@ -63,7 +63,8 @@
     "test:milestone-j": "tsx --test tests/milestone-j-acceptance.test.ts",
     "test:in-process": "tsx --test tests/in-process-script.test.ts",
     "verify:schema-v1-boundaries": "node scripts/verify-schema-v1-boundaries.mjs",
-    "orphan-check": "node scripts/orphan-check.mjs"
+    "orphan-check": "node scripts/orphan-check.mjs",
+    "certify:live-pointer": "tsx scripts/certify-live-pointer.mjs"
   },
   "keywords": [
     "trainer",
