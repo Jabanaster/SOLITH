@@ -101,7 +101,7 @@ const ATOMFALL_VERIFIED_AMMO_FEATURE: MemoryFeatureV1 = {
   type: 'write_once',
   dataType: 'int32',
   defaultValue: 99,
-  certificationLevel: 'L2',
+  certificationLevel: 'L3',
   resolution: {
     moduleName: 'atomfall_dx12.exe',
     baseOffset: '0x1959a28',
