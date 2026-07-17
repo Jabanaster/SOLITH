@@ -1,7 +1,1 @@
-[
-  {
-    "path": "G:\\ACTIVE_PROJECTS\\ResourceForge\\tests\\fixtures\\gog-game",
-    "exe": "DemoGame.bin",
-    "gameName": "GOG Demo Game"
-  }
-]
+[{"path":"G:\\ACTIVE_PROJECTS\\ResourceForge\\tests\\fixtures\\gog-game","exe":"DemoGame.bin","gameName":"GOG Demo Game"}]
