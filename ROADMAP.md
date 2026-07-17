@@ -1,25 +1,34 @@
 ﻿# Solith / ResourceForge Roadmap
 
-## Current Baseline (Solith 2.0+)
+## Current Baseline (Solith 2.3.0-alpha.1)
 
-Product UI: **Solith** · package `resourceforge@2.0.0`
+Product UI: **Solith** · package `resourceforge@2.3.0-alpha.1`
 
-* Remote **`master` @ `dd6225a`** — CI Fast green + roadmap lock (2026-07-15); offline sweep merged earlier at `ac43ec6`
+* Local **`master` @ `528c243`** — `cursor/atomfall-l3-live-cert` fast-forward merged (2026-07-16)
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
-* Adoption tag: `v2.2-wemod-adoption` → `6ddefb8` (tag tip; master tip is ahead at `ac43ec6`)
-* Merged branch (landing complete): `cursor/offline-sweep-after-v2-2`
+* Adoption tag: `v2.2-wemod-adoption` → `6ddefb8`
+* Pre-alpha lock branch: `cursor/offline-sweep-after-v2-2` (historical)
 
-### Stability lock (do not open catalog consolidation until green)
+### God-Tier Technical Audit — Alpha release blockers
+
+| Blocker | Status |
+|---------|--------|
+| Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
+| CI pipeline green (`npm test` / Electron output verifier) | **RESOLVED** — local Alpha gate **667/667** + Electron **19/19** @ `528c243` |
+| Injection contained (mainstream path RPM/WPM only; Milestone M pilot OFF by default) | **RESOLVED** — charter + gates unchanged |
+| L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
+
+### Stability lock
 
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npm test` | **656/656 PASS** (verified on merge tip) |
-| CI Fast on `master` | **GREEN** @ `b049577` — [run 29439968186](https://github.com/Jabanaster/ResourceForge/actions/runs/29439968186) · `npm test` **656/656** + fresh-clone verify |
-| Catalog unification / schema.v1 SoT | **Phase 5 done** on branch (import bans + orphan drift in CI Fast) |
-| Separate concerns | Phase 2+ only after explicit approval; do not reuse offline-sweep branch |
+| Local `npm test` (Alpha tip) | **667/667 PASS** @ `528c243` |
+| Local `npm run build:electron` (Alpha tip) | **19/19 PASS** @ `528c243` |
+| Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
+| Atomfall L3 live cert branch | **Merged** `cursor/atomfall-l3-live-cert` → `master` |
 
 ### Accepted capability stack
 
@@ -34,7 +43,7 @@ Trainer Research Lab → PE / memory diff / Script Analyzer / Dumpspace (Milesto
 In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by default)
 ```
 
-Honest live-memory stance (README): bundled memory features are **L0 `scan_unknown` / Discovery-required**, not verified pointer packs.
+Honest live-memory stance (README): most bundled memory features remain **L0 `scan_unknown` / Discovery-required**. **Exception:** Atomfall `atomfall-current-weapon-ammo` is an **L3** restart-stable verified pointer (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`).
 
 ### Milestone map (recent)
 
@@ -44,9 +53,9 @@ Honest live-memory stance (README): bundled memory features are **L0 `scan_unkno
 | **M** | In-process pilot — Crimson Desert hooks / trainer spawn | **Accepted** (tag + remote); user charter + default OFF |
 | **M–Q** *(legacy lettering)* | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
 | **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
-| **S** | Connection baselines + restart-stable pointers | **Blocked** — live sessions |
+| **S** | Connection baselines + restart-stable pointers | **Partial** — Atomfall ammo L3 done; other titles still live-blocked |
 | **T** | 50 bundled + 1000 catalog seed | **Done** |
-| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — offline L0/L1 + catalog-id path; L2–L4 live-blocked |
+| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — offline L0/L1 + Atomfall L3 live evidence; other L2–L4 still live-blocked |
 | **V** | Feedback, promotion, rating prompt | **Done** |
 | **W** | CT import, pointer scan, watch-list, speedhack | **Done** |
 | **X** | Binary save router + research stubs | **Partial** — demo profiles + stub fixture; commercial `canWrite` blocked |
@@ -59,7 +68,8 @@ Honest live-memory stance (README): bundled memory features are **L0 `scan_unkno
 | **AE** | Process-detect quick attach | **Done** |
 | **AF** | Local demand + repair pipeline | **Done** |
 | **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
-| **AH** *(proposed)* | schema.v1 catalog unification (capability SoT) | **Phase 5 complete** — await merge |
+| **AH** | schema.v1 catalog unification (capability SoT) | **Done** — merged to `master` (Phases 0→5) |
+| **AI** *(Alpha)* | Verified Alpha cut — installer + `v2.3.0-alpha.1` | **Done** — NSIS `dist/Solith Setup 2.3.0-alpha.1.exe`; await push/tag lock |
 
 ### Shell polish / evidence (2026-07)
 
@@ -76,28 +86,31 @@ Honest live-memory stance (README): bundled memory features are **L0 `scan_unkno
 | Save UX + live-memory/catalog harden | `a9483f6` |
 | Shell polish acceptance | tag `v2.1-shell-polish` → `0928d29` |
 | AG smoke + matrix + overlay bounds | `6ddefb8` / tag `v2.2-wemod-adoption` |
+| Atomfall L3 live evidence + harness | `528c243` / `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md` |
 | Offline sweep + CI/honesty lock | `20739f5` + `ac43ec6` → **`master`** |
 
 ### Bundled schema.v1 definitions
 
 All seven curated games (`games.ts`) ship as `schema.v1` payloads via `bundled-definition-seed.ts`:
-Stardew Valley (save-field controls) plus six live-memory titles (pinned cheats as `scan_unknown` features).
+Stardew Valley (save-field controls) plus six live-memory titles. Atomfall includes verified
+`atomfall-current-weapon-ammo` at **L3**; other pinned live cheats remain `scan_unknown` until certified.
 
-### Blocked on live sessions (do not fake)
+### Remaining live-session work (do not fake)
 
 1. Connection baselines — Avowed, Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
-2. Restart-verify pointer paths for bundled memory games (`verify-pointer-path.mjs` live mode)
-3. L2–L4 certification runs with in-game evidence (`certify-cheat.mjs` L3+)
+2. Restart-verify pointer paths for remaining bundled memory games (beyond Atomfall ammo)
+3. Additional L2–L4 certification runs with in-game evidence for non-Atomfall titles
 4. Commercial binary save writes without sandbox fixtures (Terraria `.plr` wave 1)
 5. Managed-runtime live memory spike (Milestone Z)
 
 ### Can continue offline (post-merge)
 
 - ~~Offline sweep AB / cert docs / watch-confidence / Epic/GOG fixtures~~ — **on master**
-- ~~Catalog search test isolation (`:memory:`) + CI fresh-clone `656/656`~~ — **on master**
+- ~~Catalog search test isolation (`:memory:`) + CI fresh-clone~~ — **on master**
 - ~~README L0 honesty + in-process user charter~~ — **on master**
-- ~~schema.v1 Phase 0→5~~ — on `cursor/schema-v1-phase0-1-capabilities` (await COMMIT IT / PUSH IT / MERGE)
-- Live S / U L2+ still require game sessions
+- ~~schema.v1 Phase 0→5~~ — **on master**
+- ~~Atomfall L3 live baseline~~ — **on master** (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`)
+- Remaining S / U live titles still require game sessions
 
 See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.
 Run **`npm run verify:schema-v1-boundaries`** and **`npm run orphan-check`** before merge.  
