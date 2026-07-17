@@ -7,7 +7,7 @@ import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
-import { describeCapabilityLanes } from '../../core/definitions/load-catalog-definition.js';
+import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';

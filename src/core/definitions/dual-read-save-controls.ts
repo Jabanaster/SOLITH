@@ -3,10 +3,7 @@
  * Legacy game-profiles fallback removed. Milestone J field paths come from
  * bundled STARDEW_DEFINITION; panel path placeholders are applied here.
  */
-import {
-  catalogDefinitionCapabilities,
-  loadCatalogDefinition,
-} from './load-catalog-definition.js';
+import { catalogDefinitionCapabilities } from './catalog-definition-capabilities.js';
 import { solithDefinitionToTrainerControls } from './definition-to-trainer-controls.js';
 import type { SolithDefinitionV1 } from './schema.v1.js';
 import { bundledDefinitionsForTests } from '../trainer-catalog/bundled-definition-seed.js';
@@ -35,13 +32,11 @@ const STARDEW_PANEL_CONSTRAINTS: Record<string, { min?: number; max?: number }> 
   'stardew-farming-xp': { min: 0, max: 15000 },
 };
 
+/**
+ * Renderer-safe default: bundled seed only.
+ * Electron IPC / host paths that need SQLite can inject loadCatalogDefinition via deps.
+ */
 function defaultLoadDefinition(catalogGameId: string): SolithDefinitionV1 | null {
-  try {
-    const fromStore = loadCatalogDefinition(catalogGameId);
-    if (fromStore) return fromStore;
-  } catch {
-    // DB may be uninitialized in unit tests.
-  }
   return bundledDefinitionsForTests().find((d) => d.id === catalogGameId) ?? null;
 }
 

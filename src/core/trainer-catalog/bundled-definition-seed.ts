@@ -1,20 +1,19 @@
 import { ALL_GAMES } from '../cheat-system/games.js';
 import type { CheatDefinition, GameConfig } from '../cheat-system/types.js';
-import { compileDefinitionToPayload } from '../definitions/compile-yaml.v1.js';
-import { solithDefinitionToModPack } from '../definitions/mod-pack-adapter.js';
 import type { MemoryDataType, MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import {
   BUNDLED_COMMUNITY_GAMES,
   communityGameId,
   type BundledCommunityGame,
 } from './bundled-community-games.js';
-import { buildSearchableText, steamCdnImages } from './types.js';
-import {
-  getCatalogEntry,
-  getDefinitionPayload,
-  upsertCatalogEntry,
-  upsertDefinitionPayload,
-} from './store.js';
+
+/**
+ * Browser-safe bundled schema.v1 seed data.
+ *
+ * Do NOT import ./store.js here — that pulls sql.js / app-paths into the Vite
+ * renderer via dual-read save controls. SQLite upsert lives in
+ * ensure-bundled-definitions.ts (Electron / Node only).
+ */
 
 function mapValueType(valueType: string): MemoryDataType {
   switch (valueType) {
@@ -245,77 +244,6 @@ function buildBundledDefinitions(): SolithDefinitionV1[] {
 }
 
 const BUNDLED_DEFINITIONS: SolithDefinitionV1[] = buildBundledDefinitions();
-
-function cheatCountForDefinition(definition: SolithDefinitionV1): number {
-  return (definition.memoryFeatures?.length ?? 0) + (definition.saveEditor?.saveFields.length ?? 0);
-}
-
-function syncCatalogEntryForDefinition(
-  definition: SolithDefinitionV1,
-  packId: string,
-  meta?: Pick<BundledCommunityGame, 'steamAppId' | 'categories' | 'executables'>,
-): void {
-  const catalogGameId = definition.id;
-  const existing = getCatalogEntry(catalogGameId);
-  const steamAppId = meta?.steamAppId ?? existing?.steamAppId;
-  const images = steamAppId ? steamCdnImages(steamAppId) : {};
-  const categories = meta?.categories ?? existing?.categories ?? ['Action'];
-  const executables = meta?.executables ?? definition.target.executables;
-  upsertCatalogEntry({
-    catalogGameId,
-    displayName: definition.title,
-    steamAppId,
-    executables,
-    categories,
-    ...images,
-    headerUrl: existing?.headerUrl ?? images.headerUrl,
-    coverUrl: existing?.coverUrl ?? images.coverUrl,
-    iconUrl: existing?.iconUrl ?? images.iconUrl,
-    verificationStatus: definition.safety.verificationStatus,
-    sources: existing?.sources ?? [{ provider: 'bundled', url: 'bundled://schema.v1' }],
-    hasModPack: true,
-    modPackId: packId,
-    cheatCount: cheatCountForDefinition(definition),
-    searchableText: buildSearchableText({
-      displayName: definition.title,
-      executables,
-      categories,
-    }),
-  });
-}
-
-const COMMUNITY_META_BY_ID = new Map(
-  BUNDLED_COMMUNITY_GAMES.map((g) => [
-    communityGameId(g),
-    { steamAppId: g.steamAppId, categories: g.categories, executables: g.executables },
-  ]),
-);
-
-/** Upsert schema.v1 payloads for all curated catalog games. */
-export function ensureBundledDefinitions(): number {
-  let upserted = 0;
-  const syncedAt = new Date().toISOString();
-
-  for (const definition of BUNDLED_DEFINITIONS) {
-    const pack = solithDefinitionToModPack(definition);
-    const payloadJson = compileDefinitionToPayload(definition);
-    const existing = getDefinitionPayload(definition.id);
-    if (existing && compileDefinitionToPayload(existing) === payloadJson) continue;
-
-    upsertDefinitionPayload(
-      pack.packId,
-      definition.id,
-      payloadJson,
-      definition.safety.verificationStatus,
-      'bundled',
-      syncedAt,
-    );
-    syncCatalogEntryForDefinition(definition, pack.packId, COMMUNITY_META_BY_ID.get(definition.id));
-    upserted += 1;
-  }
-
-  return upserted;
-}
 
 export function bundledDefinitionIds(): string[] {
   return BUNDLED_DEFINITIONS.map((d) => d.id);

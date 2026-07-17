@@ -1,5 +1,11 @@
+/**
+ * Browser-safe trainer-research surface.
+ *
+ * Do NOT re-export pe-analyzer here — it uses node:crypto / node:fs / node:path
+ * and would crash the Vite renderer when ExternalTrainerResearchLab imports this
+ * barrel. Electron main imports pe-analyzer directly via trainer-research-ipc.
+ */
 export * from './types.js';
-export * from './pe-analyzer.js';
 export * from './ct-export.js';
 export * from './schema-draft.js';
 

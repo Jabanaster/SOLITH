@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import TrainerControlPanel from './TrainerControlPanel.js';
 import type { TrainerControl } from '../../core/trainer-host/trainer-control-schema.js';
-import type { CatalogDefinitionCapabilities } from '../../core/definitions/load-catalog-definition.js';
+import type { CatalogDefinitionCapabilities } from '../../core/definitions/catalog-definition-capabilities.js';
 
 export default function CatalogTrainerControlsPage({
   catalogGameId,

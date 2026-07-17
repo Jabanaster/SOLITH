@@ -4,7 +4,7 @@
 import { describe, test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetForTesting } from '../src/core/database/index.ts';
-import { ensureBundledDefinitions } from '../src/core/trainer-catalog/bundled-definition-seed.ts';
+import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.ts';
 import {
   catalogDefinitionCapabilities,
   getCatalogDefinitionCapabilities,

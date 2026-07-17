@@ -9,7 +9,7 @@ import {
   getRecentSyncLogs,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
-import { ensureBundledDefinitions } from '../src/core/trainer-catalog/bundled-definition-seed.js';
+import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.js';
 import { syncAllTrainerSources } from '../src/core/trainer-catalog/sync/index.js';
 import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-loader.js';
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
