@@ -176,6 +176,32 @@ interface Window {
       report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
       error?: string;
     }>;
+    trainerCatalogSyncHub: () => Promise<{
+      success: boolean;
+      report?: {
+        status: 'disabled' | 'synced';
+        imported: number;
+        skippedUserDefinitions: number;
+        rejected: number;
+        pages: number;
+        maxLocalTimestamp: number;
+      };
+      error?: string;
+    }>;
+    publishToCommunity: (payload: {
+      definition: unknown;
+      executableHash: string;
+    }) => Promise<{
+      success: boolean;
+      published?: {
+        id: string;
+        gameId: string;
+        certLevel: 'L0_Community';
+        createdAt: string;
+        updatedAt: string;
+      };
+      error?: string;
+    }>;
     trainerCatalogLoadGame: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       gameId?: string;

@@ -208,6 +208,22 @@
   color: #cde0ff;
 }
 
+.communityBadge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(245, 158, 11, 0.7);
+  border-radius: 6px;
+  background: rgba(43, 31, 8, 0.94);
+  color: #fde68a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: none;
+}
+
 .installedBadge {
   position: absolute;
   top: 8px;

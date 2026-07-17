@@ -119,6 +119,7 @@ function featureToCheat(feature: MemoryFeatureV1, primaryExecutable: string): Mo
     valueType: memoryDataTypeToCheatValueType(feature.dataType),
     requiresDiscovery: requiresDiscovery || !pointerPath,
     verified: false,
+    certificationLevel: feature.certificationLevel,
     pointerPath,
     infiniteValue: feature.type === 'freeze' ? Number(feature.defaultValue) : undefined,
     defaultValue: typeof feature.defaultValue === 'boolean' ? (feature.defaultValue ? 1 : 0) : feature.defaultValue,

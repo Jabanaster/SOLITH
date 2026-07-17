@@ -16,6 +16,8 @@ import type {
   HookInstallProposal,
   InjectorLaunchProposal,
 } from '../../core/in-process-script/types.js';
+import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
+import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 
 interface ProcessEntry {
   pid: number;
@@ -34,6 +36,7 @@ const ExternalTrainerResearchLab: React.FC = () => {
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [publishDefinition, setPublishDefinition] = useState<SolithDefinitionV1 | null>(null);
 
   const [trainerPath, setTrainerPath] = useState('');
   const [trainerAnalysis, setTrainerAnalysis] = useState<TrainerExeAnalysis | null>(null);
@@ -1022,8 +1025,30 @@ const ExternalTrainerResearchLab: React.FC = () => {
             <button type="button" className="btn-primary" disabled={!exportBundle || busy} onClick={() => void importToLibrary()}>
               Import CT → Trainer Library
             </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!exportBundle || busy}
+              onClick={() => {
+                if (exportBundle) {
+                  setPublishDefinition(JSON.parse(exportBundle.schemaJson) as SolithDefinitionV1);
+                }
+              }}
+            >
+              Publish to Community Hub
+            </button>
           </div>
         </div>
+      )}
+      {publishDefinition && (
+        <PublishDefinitionModal
+          definition={publishDefinition}
+          onClose={() => setPublishDefinition(null)}
+          onPublished={(id) => {
+            setPublishDefinition(null);
+            setMessage(`Published to the Solith Hub as L0 Community definition ${id}.`);
+          }}
+        />
       )}
     </div>
   );

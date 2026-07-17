@@ -1,12 +1,20 @@
 import type { GameConfig, CheatDefinition } from '../cheat-system/types.js';
 import type { ModPack, ModPackCheat, TrainerCatalogEntry } from './types.js';
-import { getModPackForGame } from './store.js';
+import {
+  getDefinitionCertificationForGame,
+  getModPackForGame,
+  type HubCertificationLevel,
+} from './store.js';
 
 function isMemoryCheat(cheat: ModPackCheat): boolean {
   return !cheat.tags?.includes('save-field');
 }
 
-function cheatFromModPack(cheat: ModPackCheat, pack: ModPack): CheatDefinition {
+function cheatFromModPack(
+  cheat: ModPackCheat,
+  pack: ModPack,
+  certLevel?: HubCertificationLevel,
+): CheatDefinition {
   return {
     id: cheat.id,
     name: cheat.name,
@@ -15,7 +23,12 @@ function cheatFromModPack(cheat: ModPackCheat, pack: ModPack): CheatDefinition {
     valueType: cheat.valueType as CheatDefinition['valueType'],
     infiniteValue: cheat.infiniteValue,
     defaultValue: cheat.defaultValue,
-    requiresDiscovery: cheat.requiresDiscovery || !cheat.pointerPath,
+    requiresDiscovery:
+      certLevel === 'L0_Community' ||
+      cheat.requiresDiscovery ||
+      !cheat.pointerPath,
+    certLevel,
+    certificationLevel: cheat.certificationLevel,
     tags: cheat.tags,
     source: {
       name: 'Community',
@@ -29,7 +42,11 @@ function cheatFromModPack(cheat: ModPackCheat, pack: ModPack): CheatDefinition {
   };
 }
 
-export function modPackToGameConfig(pack: ModPack, entry?: TrainerCatalogEntry): GameConfig {
+export function modPackToGameConfig(
+  pack: ModPack,
+  entry?: TrainerCatalogEntry,
+  certLevel?: HubCertificationLevel,
+): GameConfig {
   const executables = pack.versions.flatMap((v) => v.executables);
   const uniqueExecutables = [...new Set(executables)];
   const primaryExecutable = uniqueExecutables[0] ?? `${pack.gameName.replace(/[^a-z0-9]/gi, '')}.exe`;
@@ -47,7 +64,9 @@ export function modPackToGameConfig(pack: ModPack, entry?: TrainerCatalogEntry):
       id,
       name: id,
     })),
-    cheats: pack.cheats.filter(isMemoryCheat).map((c) => cheatFromModPack(c, pack)),
+    cheats: pack.cheats
+      .filter(isMemoryCheat)
+      .map((cheat) => cheatFromModPack(cheat, pack, certLevel)),
     connectionBaseline: pack.connectionBaseline,
     description: entry?.sources?.[0]?.url
       ? `Imported mod pack from ${pack.source.provider}`
@@ -71,5 +90,9 @@ export function modPackToGameConfig(pack: ModPack, entry?: TrainerCatalogEntry):
 export function loadGameConfigFromCatalog(catalogGameId: string): GameConfig | null {
   const pack = getModPackForGame(catalogGameId);
   if (!pack) return null;
-  return modPackToGameConfig(pack);
+  return modPackToGameConfig(
+    pack,
+    undefined,
+    getDefinitionCertificationForGame(catalogGameId),
+  );
 }

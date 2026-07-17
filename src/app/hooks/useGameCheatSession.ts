@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
 import { cheatsForHotkeySlots, parseCheatHotkeySlot } from '../../core/cheat-system/cheat-hotkey-slots.js';
+import { requiresCommunityExecutionApproval } from '../../core/trainer-catalog/community-trust.js';
 
 export type CheatStatus = 'idle' | 'discovering' | 'confirmed' | 'frozen' | 'error';
 
@@ -79,10 +80,18 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   const [states, setStates] = useState<Record<string, CheatSessionState>>({});
   const [driftPrompt, setDriftPrompt] = useState<DriftPromptState | null>(null);
   const [ratingPrompt, setRatingPrompt] = useState<{ cheatId: string } | null>(null);
+  const [communityPrompt, setCommunityPrompt] = useState<{ cheatName: string } | null>(null);
   const driftResolverRef = useRef<((proceed: boolean) => void) | null>(null);
+  const communityResolverRef = useRef<((proceed: boolean) => void) | null>(null);
+  const communityApprovalChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const communityApprovedCheatsRef = useRef(new Set<string>());
   const attachedRef = useRef(false);
   const frozenCheatIdRef = useRef<string | null>(null);
   const reappliedRef = useRef(false);
+  const getStateRef = useRef<(cheatId: string) => CheatSessionState>(() => IDLE_STATE);
+  const toggleCheatRef = useRef<(cheat: CheatDefinition, enable: boolean) => void | Promise<void>>(
+    () => undefined,
+  );
 
   const getState = useCallback((cheatId: string): CheatSessionState => states[cheatId] ?? IDLE_STATE, [states]);
 
@@ -122,6 +131,43 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       driftResolverRef.current = resolve;
       setDriftPrompt({ warning });
     });
+  }, []);
+
+  const resolveCommunityPrompt = useCallback((proceed: boolean) => {
+    communityResolverRef.current?.(proceed);
+    communityResolverRef.current = null;
+    setCommunityPrompt(null);
+  }, []);
+
+  const requireCommunityApproval = useCallback((cheat: CheatDefinition) => {
+    if (
+      !requiresCommunityExecutionApproval(cheat.certLevel) ||
+      communityApprovedCheatsRef.current.has(cheat.id)
+    ) {
+      return Promise.resolve(true);
+    }
+
+    // Serialize prompts so concurrent L0 actions cannot overwrite the single
+    // resolver ref and leave orphaned promises.
+    const ask = (): Promise<boolean> => {
+      if (communityApprovedCheatsRef.current.has(cheat.id)) {
+        return Promise.resolve(true);
+      }
+      return new Promise<boolean>((resolve) => {
+        communityResolverRef.current = (proceed) => {
+          if (proceed) communityApprovedCheatsRef.current.add(cheat.id);
+          resolve(proceed);
+        };
+        setCommunityPrompt({ cheatName: cheat.name });
+      });
+    };
+
+    const queued = communityApprovalChainRef.current.then(ask, ask);
+    communityApprovalChainRef.current = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
   }, []);
 
   const ensureAttached = useCallback(async (): Promise<void> => {
@@ -190,6 +236,9 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
 
       if (!dataType) return { allowed: false, reason: 'Console-command cheat — not memory-backed' };
       if (!current.confirmedAddress) return { allowed: false, reason: 'No confirmed address yet' };
+      if (!(await requireCommunityApproval(cheat))) {
+        return { allowed: false, reason: 'Community definition execution cancelled' };
+      }
 
       try {
         // A cheat can reach here with a confirmedAddress restored from a persisted session
@@ -227,7 +276,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         return { allowed: false, reason };
       }
     },
-    [getState, patchState, ensureAttached],
+    [getState, patchState, ensureAttached, requireCommunityApproval],
   );
 
   const discover = useCallback(
@@ -509,7 +558,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   );
 
   const toggleCheat = useCallback(
-    (cheat: CheatDefinition, enabled: boolean) => {
+    async (cheat: CheatDefinition, enabled: boolean) => {
       if (!enabled) {
         void stopFreeze(cheat.id);
         // Toggling off is the explicit "forget this" action — clear the confirmed address too,
@@ -530,6 +579,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         return;
       }
 
+      if (!(await requireCommunityApproval(cheat))) return;
       patchState(cheat.id, { enabled: true });
       const current = getState(cheat.id);
       if (current.confirmedAddress) {
@@ -549,7 +599,16 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         persist(cheat, true, null, null);
       }
     },
-    [getState, patchState, stopFreeze, writeValue, persist, clearPersisted, tryResolveStableCheat],
+    [
+      getState,
+      patchState,
+      stopFreeze,
+      writeValue,
+      persist,
+      clearPersisted,
+      tryResolveStableCheat,
+      requireCommunityApproval,
+    ],
   );
 
   const startFreeze = useCallback(
@@ -557,6 +616,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       const current = getState(cheat.id);
       const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
       if (!dataType || !current.confirmedAddress) return;
+      if (!(await requireCommunityApproval(cheat))) return;
 
       try {
         // Same reasoning as writeValue — a restored confirmedAddress may never have gone
@@ -586,7 +646,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       frozenCheatIdRef.current = cheat.id;
       patchState(cheat.id, { isFrozen: true, status: 'frozen' });
     },
-    [getState, patchState, stopFreeze, ensureAttached],
+    [getState, patchState, stopFreeze, ensureAttached, requireCommunityApproval],
   );
 
   const toggleFreeze = useCallback(
@@ -609,7 +669,8 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   );
 
   const applyValue = useCallback(
-    (cheat: CheatDefinition, value: number) => {
+    async (cheat: CheatDefinition, value: number) => {
+      if (!(await requireCommunityApproval(cheat))) return;
       const current = getState(cheat.id);
       if (current.confirmedAddress) {
         void writeValue(cheat, value);
@@ -617,7 +678,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         void discover(cheat, value);
       }
     },
-    [getState, writeValue, discover],
+    [getState, writeValue, discover, requireCommunityApproval],
   );
 
   const resetError = useCallback(
@@ -665,16 +726,18 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     if (!userConfirmedOffline || reappliedRef.current) return;
     reappliedRef.current = true;
 
-    for (const cheat of game.cheats) {
-      const state = getState(cheat.id);
-      if (!state.enabled) continue;
+    void (async () => {
+      for (const cheat of game.cheats) {
+        const state = getState(cheat.id);
+        if (!state.enabled) continue;
 
-      if (state.confirmedAddress) {
-        void writeValue(cheat, Number(cheat.infiniteValue ?? 1));
-      } else if (state.status === 'discovering') {
-        void discoverUnknown(cheat);
+        if (state.confirmedAddress) {
+          await writeValue(cheat, Number(cheat.infiniteValue ?? 1));
+        } else if (state.status === 'discovering') {
+          await discoverUnknown(cheat);
+        }
       }
-    }
+    })();
     // Deliberately omits getState/writeValue/discoverUnknown/game.cheats from deps — this must
     // run exactly once when offline is first confirmed (guarded by reappliedRef), not on every
     // render those callbacks are recreated.
@@ -690,6 +753,9 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     };
   }, []);
 
+  getStateRef.current = getState;
+  toggleCheatRef.current = toggleCheat;
+
   useEffect(() => {
     if (!userConfirmedOffline) return undefined;
     const slots = cheatsForHotkeySlots(game);
@@ -698,16 +764,18 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       if (slotIndex == null) return;
       const cheat = slots[slotIndex];
       if (!cheat) return;
-      const enabled = getState(cheat.id).enabled;
-      toggleCheat(cheat, !enabled);
+      const enabled = getStateRef.current(cheat.id).enabled;
+      void toggleCheatRef.current(cheat, !enabled);
     });
     return () => unsubscribe?.();
-  }, [game, userConfirmedOffline, toggleCheat, getState]);
+  }, [game, userConfirmedOffline]);
 
   return {
     getState,
     driftPrompt,
     resolveDriftPrompt,
+    communityPrompt,
+    resolveCommunityPrompt,
     ratingPrompt,
     dismissRatingPrompt: () => setRatingPrompt(null),
     hotkeyCheats: cheatsForHotkeySlots(game),

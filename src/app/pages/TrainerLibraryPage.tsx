@@ -8,6 +8,10 @@ import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
+import {
+  COMMUNITY_WARNING_LABEL,
+  requiresCommunityExecutionApproval,
+} from '../../core/trainer-catalog/community-trust.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
@@ -38,6 +42,9 @@ interface TrustMeta {
 const PAGE_SIZE = 120;
 
 function tierHint(entry: TrainerCatalogEntry): string {
+  if (requiresCommunityExecutionApproval(entry.certLevel)) {
+    return 'Community definition — active scan and explicit approval required';
+  }
   if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
   if (entry.verificationStatus === 'community') return 'First session scan may be required';
   return 'Metadata only — sync or import a definition';
@@ -90,6 +97,15 @@ function CatalogCard({
         <span className={styles.badge} title={tierHint(entry)}>
           {entry.verificationStatus}
         </span>
+        {requiresCommunityExecutionApproval(entry.certLevel) && (
+          <span
+            className={styles.communityBadge}
+            aria-label={COMMUNITY_WARNING_LABEL}
+          >
+            <span aria-hidden="true">⚠ </span>
+            {COMMUNITY_WARNING_LABEL}
+          </span>
+        )}
         {installed && (
           <span className={styles.installedBadge} title="Detected on this PC">
             Installed

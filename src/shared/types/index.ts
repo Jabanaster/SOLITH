@@ -219,6 +219,8 @@ export interface Settings {
   v2FreeformMemoryEnabled: boolean;
   v2RemoteCatalogSyncEnabled: boolean;
   trainerRemoteSyncCompleted?: boolean;
+  /** Opt-in Solith Definition Hub synchronization. Default: false. */
+  communitySyncEnabled: boolean;
   /** V2 read-only session lifecycle monitor. Default: false. */
   v2SessionMonitorEnabled: boolean;
   /** Scan Steam/Epic/GOG installs for Trainer Library badges. Default: true. */

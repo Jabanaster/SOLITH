@@ -23,6 +23,8 @@ export interface CheatDefinition {
   defaultValue?: number | string;
   normalValues?: { min: number; max: number };
   requiresDiscovery: boolean; // false = known/stable, true = user must scan
+  certLevel?: 'L0_Community' | 'L3_Certified';
+  certificationLevel?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
   tags?: string[]; // 'infinite', 'multiplier', 'toggle', 'toggle', etc.
   source: CheatSource;
   verified: boolean;
