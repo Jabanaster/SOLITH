@@ -5,6 +5,7 @@ import { LiveWatchPanel } from './LiveWatchPanel.js';
 import { FingerprintDriftDialog } from './FingerprintDriftDialog.js';
 import { DefinitionRatingPrompt } from './DefinitionRatingPrompt.js';
 import { CommunityExecutionDialog } from './CommunityExecutionDialog.js';
+import { AvowedCheatDeck } from './AvowedCheatDeck.js';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
 import {
   COMMUNITY_WARNING_LABEL,
@@ -558,6 +559,28 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
         </div>
       )}
 
+      {game.gameId !== 'avowed' &&
+        userConfirmedOffline &&
+        session.zeroInputStatus.phase !== 'idle' && (
+        <div
+          className={styles['offline-warning']}
+          role="status"
+          aria-live="polite"
+          data-zero-input-phase={session.zeroInputStatus.phase}
+        >
+          {session.zeroInputStatus.phase === 'preparing' && (session.zeroInputStatus.message ?? 'Zero-Input preparing…')}
+          {session.zeroInputStatus.phase === 'ready' && (
+            <>
+              {session.zeroInputStatus.message ?? 'Zero-Input ready'}
+              {session.zeroInputStatus.counts
+                ? ` — resolved ${session.zeroInputStatus.counts.resolved}, scan-required ${session.zeroInputStatus.counts.scanRequired}, failed ${session.zeroInputStatus.counts.failed}`
+                : null}
+            </>
+          )}
+          {session.zeroInputStatus.phase === 'error' && (session.zeroInputStatus.message ?? 'Zero-Input error')}
+        </div>
+      )}
+
       {game.cheats.some((cheat) => requiresCommunityExecutionApproval(cheat.certLevel)) && (
         <div className={styles['community-warning']} role="status">
           <span aria-hidden="true">⚠ </span>
@@ -573,7 +596,16 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
         </div>
       )}
 
-      {pinnedCheats.length > 0 && (
+      {game.gameId === 'avowed' && pinnedCheats.length > 0 && (
+        <AvowedCheatDeck
+          features={pinnedCheats}
+          zeroInputStatus={session.zeroInputStatus}
+          getState={session.getState}
+          renderFeature={renderCheatRow}
+        />
+      )}
+
+      {game.gameId !== 'avowed' && pinnedCheats.length > 0 && (
         <section className={styles['cheat-section']}>
           <h2 className={styles['section-title']}>📌 Pinned</h2>
           <div className={styles['cheat-list']}>
@@ -585,12 +617,18 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
       {game.categories.map((category) => {
         const cheats = cheatsByCategory.get(category.name) ?? cheatsByCategory.get(category.id) ?? [];
         if (cheats.length === 0) return null;
+        // Avowed L0 pins are shown in AvowedCheatDeck — skip duplicates in category lists.
+        const visible =
+          game.gameId === 'avowed'
+            ? cheats.filter((c) => !pinnedCheats.some((p) => p.id === c.id))
+            : cheats;
+        if (visible.length === 0) return null;
 
         return (
           <section key={category.id} className={styles['cheat-section']}>
             <h2 className={styles['section-title']}>{category.name}</h2>
             <div className={styles['cheat-list']}>
-              {cheats.map((cheat) => renderCheatRow(cheat))}
+              {visible.map((cheat) => renderCheatRow(cheat))}
             </div>
           </section>
         );

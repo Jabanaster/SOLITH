@@ -13,7 +13,7 @@ export const STEAM_EXECUTABLE_LOOKUP = new Map<number, string[]>([
   [264710, ['Subnautica.exe']],
   [427520, ['factorio.exe']],
   [108600, ['ProjectZomboid64.exe']],
-  [2457220, ['Avowed.exe']],
+  [2457220, ['Avowed.exe', 'Avowed-WinGDK-Shipping.exe']],
   [801800, ['Atomfall.exe', 'Atomfall_dx12.exe']],
   [1562430, ['Dredge.exe']],
   [3321460, ['CrimsonDesert.exe']],

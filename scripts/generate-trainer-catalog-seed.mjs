@@ -140,7 +140,7 @@ const BASE_GAMES = [
   { name: 'STALKER 2', steamAppId: 1643320, categories: ['Shooter', 'Survival'] },
   { name: 'S.T.A.L.K.E.R.: Shadow of Chernobyl', steamAppId: 4500, categories: ['Shooter', 'Survival'] },
   { name: 'Atomic Heart', steamAppId: 668580, categories: ['Shooter', 'RPG'] },
-  { name: 'Avowed', steamAppId: 2457220, executables: ['Avowed.exe'], categories: ['RPG', 'Fantasy'] },
+  { name: 'Avowed', steamAppId: 2457220, executables: ['Avowed.exe', 'Avowed-WinGDK-Shipping.exe'], categories: ['RPG', 'Fantasy'] },
   { name: 'Atomfall', steamAppId: 801800, executables: ['Atomfall.exe', 'Atomfall_dx12.exe'], categories: ['Action', 'Survival'] },
   { name: 'Dredge', steamAppId: 1562430, executables: ['Dredge.exe'], categories: ['Horror', 'Fishing'] },
   { name: 'Crimson Desert', steamAppId: 3321460, executables: ['CrimsonDesert.exe'], categories: ['Action', 'Open World'] },

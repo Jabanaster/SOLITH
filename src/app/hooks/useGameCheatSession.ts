@@ -88,10 +88,16 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   const attachedRef = useRef(false);
   const frozenCheatIdRef = useRef<string | null>(null);
   const reappliedRef = useRef(false);
+  const featureHintsRef = useRef<Record<string, string>>({});
   const getStateRef = useRef<(cheatId: string) => CheatSessionState>(() => IDLE_STATE);
   const toggleCheatRef = useRef<(cheat: CheatDefinition, enable: boolean) => void | Promise<void>>(
     () => undefined,
   );
+  const [zeroInputStatus, setZeroInputStatus] = useState<{
+    phase: 'idle' | 'preparing' | 'ready' | 'error';
+    message?: string;
+    counts?: { resolved: number; failed: number; scanRequired: number };
+  }>({ phase: 'idle' });
 
   const getState = useCallback((cheatId: string): CheatSessionState => states[cheatId] ?? IDLE_STATE, [states]);
 
@@ -170,6 +176,34 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     return queued;
   }, []);
 
+  const hydrateFromZeroInputFeatures = useCallback(
+    (features: Array<{ featureId: string; address: string; resolution: string; error?: string }>) => {
+      const hints: Record<string, string> = { ...featureHintsRef.current };
+      setStates((prev) => {
+        const next = { ...prev };
+        for (const feature of features) {
+          if (feature.resolution === 'failed' || !feature.address || feature.address === '0x0') {
+            continue;
+          }
+          hints[feature.featureId] = feature.address;
+          const cheat = game.cheats.find((c) => c.id === feature.featureId);
+          const dataType = cheat ? resolveMemoryDataType(cheat) : null;
+          const existing = next[feature.featureId] ?? IDLE_STATE;
+          next[feature.featureId] = {
+            ...existing,
+            status: 'confirmed',
+            confirmedAddress: feature.address,
+            confirmedDataType: existing.confirmedDataType ?? dataType ?? 'int32',
+            error: null,
+          };
+        }
+        return next;
+      });
+      featureHintsRef.current = hints;
+    },
+    [game.cheats],
+  );
+
   const ensureAttached = useCallback(async (): Promise<void> => {
     if (attachedRef.current) return;
 
@@ -184,7 +218,62 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         (game.aliases ?? []).some((a) => a.toLowerCase() === p.name.toLowerCase()),
     );
     if (!match) {
-      throw new Error(`${game.name} is not running (looked for ${game.executable})`);
+      const lookedFor = [game.executable, ...(game.aliases ?? [])].join(', ');
+      throw new Error(`${game.name} is not running (looked for ${lookedFor})`);
+    }
+
+    setZeroInputStatus({ phase: 'preparing', message: 'Zero-Input: attaching and resolving…' });
+
+    const preparePayload = {
+      pid: match.pid,
+      executableName: match.name,
+      catalogGameId: game.gameId,
+      userConfirmedOffline: true as const,
+      featureHints: featureHintsRef.current,
+    };
+
+    const prepareFn = window.electronAPI.liveMemoryZeroInputPrepare;
+    if (prepareFn) {
+      let prepareResult = await prepareFn(preparePayload);
+      if (
+        !prepareResult.success &&
+        (prepareResult.error === 'executable_fingerprint_mismatch' ||
+          prepareResult.fingerprintStatus === 'mismatch' ||
+          /fingerprint|mismatch|drift/i.test(String(prepareResult.error ?? prepareResult.blockReason ?? '')))
+      ) {
+        const warning =
+          prepareResult.fingerprintWarning ??
+          prepareResult.blockReason ??
+          'Executable hash does not match the loaded trainer definition (possible game patch).';
+        const proceed = await waitForDriftAck(warning);
+        if (!proceed) {
+          setZeroInputStatus({ phase: 'error', message: warning });
+          throw new Error(warning);
+        }
+        prepareResult = await prepareFn({ ...preparePayload, driftAcknowledged: true });
+      }
+
+      if (prepareResult.success) {
+        attachedRef.current = true;
+        if (prepareResult.featureHints) {
+          featureHintsRef.current = prepareResult.featureHints as Record<string, string>;
+        }
+        if (Array.isArray(prepareResult.features)) {
+          hydrateFromZeroInputFeatures(prepareResult.features);
+        }
+        setZeroInputStatus({
+          phase: 'ready',
+          message: 'Zero-Input ready',
+          counts: prepareResult.counts,
+        });
+        return;
+      }
+
+      // Fall back to classic attach if prepare failed for a non-fatal reason.
+      setZeroInputStatus({
+        phase: 'error',
+        message: prepareResult.error ?? prepareResult.blockReason ?? 'Zero-Input prepare failed — falling back',
+      });
     }
 
     const attachPayload = {
@@ -213,7 +302,8 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       throw new Error(attachResult.guard?.reason ?? attachResult.error ?? 'Failed to attach to process');
     }
     attachedRef.current = true;
-  }, [game, waitForDriftAck]);
+    setZeroInputStatus({ phase: 'ready', message: 'Attached (classic path)' });
+  }, [game, waitForDriftAck, hydrateFromZeroInputFeatures]);
 
   const stopFreeze = useCallback(async (cheatId: string) => {
     if (frozenCheatIdRef.current !== cheatId) return;
@@ -526,6 +616,20 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       patchState(cheat.id, { status: 'discovering', error: null });
       try {
         await ensureAttached();
+
+        // Prefer Zero-Input hydrated / hint address before another resolve round-trip.
+        const hinted = featureHintsRef.current[cheat.id] ?? getState(cheat.id).confirmedAddress;
+        if (hinted) {
+          const dataType = getState(cheat.id).confirmedDataType ?? resolveMemoryDataType(cheat);
+          patchState(cheat.id, {
+            status: 'confirmed',
+            confirmedAddress: hinted,
+            confirmedDataType: dataType,
+          });
+          persist(cheat, true, hinted, dataType);
+          return true;
+        }
+
         const result = await window.electronAPI.liveMemoryResolveDefinitionFeature?.({
           catalogGameId: game.gameId,
           featureId: cheat.id,
@@ -538,6 +642,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
           return false;
         }
 
+        featureHintsRef.current[cheat.id] = result.address.address;
         patchState(cheat.id, {
           status: 'confirmed',
           confirmedAddress: result.address.address,
@@ -554,7 +659,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         return false;
       }
     },
-    [ensureAttached, game.gameId, patchState, persist],
+    [ensureAttached, game.gameId, patchState, persist, getState],
   );
 
   const toggleCheat = useCallback(
@@ -770,8 +875,27 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     return () => unsubscribe?.();
   }, [game, userConfirmedOffline]);
 
+  // Kick Zero-Input prepare as soon as offline is confirmed (not only on first toggle).
+  useEffect(() => {
+    if (!userConfirmedOffline) {
+      setZeroInputStatus({ phase: 'idle' });
+      if (attachedRef.current) {
+        attachedRef.current = false;
+        void window.electronAPI.liveMemoryDetach?.();
+      }
+      return;
+    }
+    void ensureAttached().catch((err) => {
+      setZeroInputStatus({
+        phase: 'error',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }, [userConfirmedOffline, ensureAttached]);
+
   return {
     getState,
+    zeroInputStatus,
     driftPrompt,
     resolveDriftPrompt,
     communityPrompt,

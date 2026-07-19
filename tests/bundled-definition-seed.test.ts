@@ -62,3 +62,26 @@ test('community bundled games are community tier with scan_unknown features', ()
   assert.equal(elden?.memoryFeatures?.length, 3);
   assert.equal(elden?.memoryFeatures?.[0]?.type, 'scan_unknown');
 });
+
+test('Avowed L0 scaffold: WinGDK exe + scan_unknown features with empty resolution paths', () => {
+  const avowed = bundledDefinitionsForTests().find((d) => d.id === 'avowed');
+  assert.ok(avowed);
+  assert.deepEqual(avowed?.target.executables, ['Avowed.exe', 'Avowed-WinGDK-Shipping.exe']);
+  assert.equal(avowed?.safety.requiresApproval, true);
+  assert.equal(avowed?.safety.requiresOfflineConfirm, true);
+  assert.equal(avowed?.safety.verificationStatus, 'unverified');
+  assert.equal(avowed?.certificationLevel, 'L0');
+  assert.equal(avowed?.memoryFeatures?.length, 3);
+
+  const ids = (avowed?.memoryFeatures ?? []).map((f) => f.id).sort();
+  assert.deepEqual(ids, ['infinite-essence', 'infinite-health', 'infinite-stamina']);
+
+  for (const feature of avowed?.memoryFeatures ?? []) {
+    assert.equal(feature.type, 'scan_unknown');
+    assert.equal(feature.certificationLevel, 'L0');
+    assert.equal(feature.resolution.signature, undefined);
+    assert.equal(feature.resolution.baseOffset, undefined);
+    assert.equal(feature.resolution.pointerChain, undefined);
+    assert.ok(feature.resolution.moduleName.length > 0);
+  }
+});
