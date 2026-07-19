@@ -387,7 +387,13 @@ For project files, all write operations must stay inside:
 G:\ACTIVE_PROJECTS\ResourceForge
 ```
 
-For real game save files, default mode is **read-only** unless the user explicitly authorizes a specific write operation.
+For real game save files, writes are allowed only when the **product backup gate** passes:
+
+```
+automatic verified backup created under the approved backup directory
+restore plan available (restoreBackup / Restore UI)
+target path stays inside an explicitly approved real-save root
+```
 
 Real Stardew Valley save paths, if inspected, must strictly reside under:
 ```
@@ -396,15 +402,13 @@ Real Stardew Valley save paths, if inspected, must strictly reside under:
 
 A path outside that folder is not a valid Stardew save path.
 
-Do not write to real Stardew saves unless the user explicitly authorizes that exact write operation.
-
-Before any real save write, report and stop:
+Do **not** silently overwrite a real save without a verified backup. If the backup gate fails, report and stop:
 ```
-REAL_SAVE_WRITE_REQUESTED=YES
+REAL_SAVE_WRITE_BLOCKED=YES
+REASON=Backup gate failed
 TARGET_PATH=<real resolved path>
-BACKUP_PLAN=<specific backup path/operation>
-RESTORE_PLAN=<specific restore operation>
-WAITING_FOR_USER_APPROVAL=YES
+BACKUP_PLAN=<specific backup path/operation or NONE>
+RESTORE_PLAN=<specific restore operation or NONE>
 ```
 
 If a path is outside the project root or outside an explicitly approved real save directory, report:
@@ -465,6 +469,41 @@ preset/toggle persistence improvements
 
 ---
 
+## Solith Zero-Input Offline Framework (USER AUTHORIZED)
+
+Decisions locked: `OFFLINE_ONLY` + `CHARTER_THEN_PRODUCT`.
+
+Architecture blueprint: `Docs/Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md`
+
+**Hard constraints (mainstream path):**
+```
+OFFLINE_ONLY — online-session guard remains fail-closed
+user-mode only — ReadProcessMemory / WriteProcessMemory / VirtualProtectEx; no kernel drivers
+no malware paths — no remote trainer binary download/exec; no unverified code injection
+```
+
+**Authorized Zero-Input product work:**
+```
+ProcessWatcher orchestration (detect → fingerprint → attach → load SolithDefinitionV1 → resolve)
+SignatureEngine (exact AOB + bounded fuzzy match after patch drift)
+MemoryManager safe-write facade + local memory audit log
+telemetry-free local crash_report.txt (no network phone-home)
+metadata-driven zero-input apply for verified pointer/AOB profiles
+sandboxed local scripting later (no network sockets, no inject APIs)
+```
+
+**Still out of scope (do not build):**
+```
+kernel drivers
+packet capture
+auto-download/install third-party trainer binaries
+expanding in-process pilot beyond CrimsonDesert.exe without new authorization
+online / multiplayer targeting
+anti-cheat bypass / stealth / debugger attachment for bypass
+```
+
+---
+
 ## Hard Safety Boundaries
 
 Do not add, modify, enable, or suggest executable support for:
@@ -472,17 +511,22 @@ Do not add, modify, enable, or suggest executable support for:
 online or multiplayer support
 anti-cheat interaction
 packet capture
-DLL injection
+DLL injection (except quarantined Crimson Desert in-process pilot)
+kernel drivers
 debugger attachment
 stealth behavior
+remote trainer binary download/execution
 ```
 
-The following are **permitted** under Milestone M live-trainer scope (ReadProcessMemory/WriteProcessMemory only, catalog-bound, offline guard):
+The following are **permitted** under Solith Zero-Input / Milestone M live-trainer scope (ReadProcessMemory/WriteProcessMemory only, catalog-bound, offline guard):
 ```
 runtime memory editing
 live process writes
 memory scanning
+AOB / fuzzy signature resolution
+pointer chain resolution
 verified per-game health/stamina/inventory/currency controls in catalog
+local audit logging and local crash reports
 ```
 
 Do not add outside verified catalog without explicit per-control verification:
@@ -544,10 +588,10 @@ NEXT_SAFE_COMMAND=git status --short
 
 ## Current Allowed Work Mode
 
-User authorized Milestone M live trainer parity work.
+User authorized Solith Zero-Input Offline Framework work (includes Milestone M live trainer parity).
 
 ```
-IMPLEMENT_TRAINER_PARITY
+SOLITH_ZERO_INPUT_OFFLINE_FRAMEWORK
 ```
 
 **Allowed:**
@@ -558,12 +602,17 @@ run tests
 run builds
 enable trainer capabilities (live memory, overlay, hotkeys)
 catalog and UX expansion within safety boundaries
+Zero-Input gaps: ProcessWatcher, SignatureEngine fuzzy AOB, MemoryManager audit log, local crash_report.txt
+charter + architecture blueprint documentation for Zero-Input
 ```
 
 **Forbidden:**
 ```
-DLL injection / kernel / anti-cheat bypass
-remote trainer binary ingestion
+kernel drivers
+packet capture
+anti-cheat bypass / online targeting
+remote trainer binary ingestion / auto-exec
+expanding in-process pilot beyond CrimsonDesert.exe without authorization
 committing without COMMIT IT
 tagging without TAG IT
 pushing without PUSH IT

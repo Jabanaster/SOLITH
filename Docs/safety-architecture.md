@@ -2,6 +2,8 @@
 
 This document describes the core design and safety guarantees built into **ResourceForge** to prevent save file corruption, directory escapes, concurrent edits, and interrupted writes.
 
+**Related (Zero-Input live trainer):** See [`Docs/Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md`](Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md) for the Solith OFFLINE_ONLY ProcessWatcher / SignatureEngine / MemoryManager architecture, local memory audit logging, and telemetry-free `crash_report.txt` resilience layer. That blueprint does not weaken the constraints below.
+
 ---
 
 ## 1. Safety Boundaries (Strict Constraints)

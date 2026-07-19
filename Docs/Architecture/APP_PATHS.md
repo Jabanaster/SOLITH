@@ -35,7 +35,7 @@ When running inside Electron, `app.getPath('userData')` is used for mutable data
 ALL mutable data is written to `userDataRoot`:
 - `resourceforge.db` — SQLite database (via sql.js)
 - Backups — written by `src/core/backups/`
-- Logs — future use
+- Logs — `logs/crash_report.txt` via `src/core/crash/local-crash-reporter.ts` (telemetry-free)
 
 **Never** write mutable data into:
 - `dist/` or `dist-electron/` (build outputs, regenerated on each build)

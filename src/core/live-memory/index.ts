@@ -22,6 +22,31 @@ export { resolvePointerPath } from './pointer-resolver.js';
 export type { LivePointerPath } from './pointer-resolver.js';
 export { parseAobSignature, findAobInBuffer, scanAobInProcess } from './aob-resolver.js';
 export type { AobPattern, AobScanOptions } from './aob-resolver.js';
+export {
+  aobHammingDistance,
+  findBestFuzzyAobInBuffer,
+  scanExactSignature,
+  scanFuzzySignature,
+  resolveSignature,
+  resolveSignatureInBuffer,
+} from './signature-engine.js';
+export type { FuzzyScanOptions, SignatureMatch } from './signature-engine.js';
+export { MemoryAuditLog } from './audit-log.js';
+export type { MemoryAuditEntry, MemoryAuditOp, MemoryAuditLogOptions } from './audit-log.js';
+export { MemoryManager } from './memory-manager.js';
+export type { SafeWriteResult } from './memory-manager.js';
+export {
+  matchCatalogProcess,
+  buildZeroInputAttachPlan,
+  resolveDefinitionFeatures,
+} from './process-watcher.js';
+export type {
+  CatalogExecutableEntry,
+  ProcessWatchDetection,
+  ZeroInputAttachPlan,
+  ResolvedFeatureAddress,
+  BuildAttachPlanInput,
+} from './process-watcher.js';
 export { resolveMemoryFeatureAddress, SessionAddressCache, parseHexOffset } from './feature-resolver.js';
 export type { LiveTrainerControl } from './live-trainer-control.js';
 export {

@@ -50,6 +50,7 @@ import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
+import { installLocalCrashHandlers } from '../src/core/crash/local-crash-reporter.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
@@ -73,6 +74,11 @@ const moduleDirectory = dirname(moduleFilename);
 if (process.env.ELECTRON_USER_DATA_PATH) {
   app.setPath('userData', process.env.ELECTRON_USER_DATA_PATH);
 }
+
+// Telemetry-free local crash_report.txt under userData/logs (Zero-Input resilience).
+installLocalCrashHandlers({
+  logsDir: path.join(app.getPath('userData'), 'logs'),
+});
 
 // ── Single-instance lock ─────────────────────────────────────────────────────
 // Prevents multiple ResourceForge dev instances from stacking up.
