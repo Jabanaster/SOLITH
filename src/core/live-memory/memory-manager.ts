@@ -19,7 +19,15 @@ export interface SafeWriteResult {
   error?: string;
 }
 
+/** Optional hook after a confirmed process write (e.g. Avowed WinGDK save snapshot). */
+export type MemoryManagerSnapshotListener = (info: {
+  featureId?: string;
+  reason?: string;
+}) => void;
+
 export class MemoryManager {
+  private snapshotListener: MemoryManagerSnapshotListener | null = null;
+
   constructor(
     private readonly session: LiveMemorySession,
     private readonly audit: MemoryAuditLog,
@@ -27,6 +35,22 @@ export class MemoryManager {
 
   getAuditLog(): MemoryAuditLog {
     return this.audit;
+  }
+
+  /**
+   * Register a listener invoked after successful confirmWrite / safeWrite.
+   * Used by Electron backup orchestrators — does not perform memory I/O itself.
+   */
+  setSnapshotListener(listener: MemoryManagerSnapshotListener | null): void {
+    this.snapshotListener = listener;
+  }
+
+  private emitSnapshot(info: { featureId?: string; reason?: string }): void {
+    try {
+      this.snapshotListener?.(info);
+    } catch {
+      // Backup hooks must never fail a live write path.
+    }
   }
 
   read(address: LiveMemoryAddress, reason = 'read'): number {
@@ -83,6 +107,7 @@ export class MemoryManager {
       valueAfter: confirm.manifest?.valueAfter,
       reason: `${options.reason ?? 'confirm'}:confirmed`,
     });
+    this.emitSnapshot({ featureId: options.featureId, reason: options.reason ?? 'confirm' });
     return confirm;
   }
 
@@ -143,6 +168,7 @@ export class MemoryManager {
       valueAfter: confirm.manifest?.valueAfter,
       reason: `${reason}:confirmed`,
     });
+    this.emitSnapshot({ featureId: options.featureId, reason });
 
     if (options.verifyReadback === false) {
       return { success: true, proposal, confirm, verified: undefined };

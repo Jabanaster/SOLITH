@@ -31,6 +31,11 @@ import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
+import {
+  onAvowedMemoryManagerSnapshotEvent,
+  onAvowedProcessAttached,
+  resetAvowedWingdkBackupSession,
+} from './avowed-wingdk-backup-watch.js';
 
 /**
  * Live Memory Trainer IPC — feature-flagged (`v2LiveModeEnabled`, off by
@@ -140,7 +145,12 @@ export function registerLiveMemoryIpc(): void {
       );
 
       if (result.success) {
-        bindSessionBundle(event.sender.id, session, mod);
+        const bundle = bindSessionBundle(event.sender.id, session, mod);
+        maybeStartAvowedWingdkBackups({
+          executableName: parsed.executableName,
+          catalogGameId: parsed.catalogGameId,
+          manager: bundle.manager,
+        });
         if (result.fingerprintWarning && parsed.catalogGameId) {
           const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
           quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
@@ -204,6 +214,12 @@ export function registerLiveMemoryIpc(): void {
         const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
         quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
       }
+
+      maybeStartAvowedWingdkBackups({
+        executableName: parsed.executableName,
+        catalogGameId: parsed.catalogGameId,
+        manager: bundle.manager,
+      });
 
       const readyPayload = {
         catalogGameId: parsed.catalogGameId,
@@ -674,11 +690,31 @@ function bindSessionBundle(senderId: number, session: LiveMemorySession, mod: an
   return bundle;
 }
 
+function maybeStartAvowedWingdkBackups(input: {
+  executableName: string;
+  catalogGameId?: string;
+  manager: MemoryManager;
+}): void {
+  const { config, watcherStarted } = onAvowedProcessAttached({
+    executableName: input.executableName,
+    catalogGameId: input.catalogGameId,
+  });
+  if (config || watcherStarted) {
+    input.manager.setSnapshotListener(() => {
+      onAvowedMemoryManagerSnapshotEvent();
+    });
+  }
+}
+
 function disposeSession(senderId: number): void {
   const existing = sessions.get(senderId);
   if (existing) {
+    existing.manager.setSnapshotListener(null);
     existing.session.detach();
     sessions.delete(senderId);
+  }
+  if (sessions.size === 0) {
+    resetAvowedWingdkBackupSession();
   }
 }
 

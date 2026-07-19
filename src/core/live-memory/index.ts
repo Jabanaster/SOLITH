@@ -34,7 +34,7 @@ export type { FuzzyScanOptions, SignatureMatch } from './signature-engine.js';
 export { MemoryAuditLog } from './audit-log.js';
 export type { MemoryAuditEntry, MemoryAuditOp, MemoryAuditLogOptions } from './audit-log.js';
 export { MemoryManager } from './memory-manager.js';
-export type { SafeWriteResult } from './memory-manager.js';
+export type { SafeWriteResult, MemoryManagerSnapshotListener } from './memory-manager.js';
 export {
   matchCatalogProcess,
   buildZeroInputAttachPlan,

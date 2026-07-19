@@ -87,4 +87,34 @@ describe('memory-manager + audit-log', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  test('snapshot listener fires after successful confirmWrite', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 10 });
+    driver.setProcessExecutableName(1234, 'Demo.exe');
+    const session = new LiveMemorySession(driver);
+    session._injectRemoteConnectionObserver(async () => ({
+      availability: 'available',
+      remoteConnectionCount: 0,
+      observedAt: new Date().toISOString(),
+    }));
+    await session.attach({ pid: 1234, executableName: 'Demo.exe' }, true);
+
+    const audit = new MemoryAuditLog();
+    const manager = new MemoryManager(session, audit);
+    let hits = 0;
+    manager.setSnapshotListener(() => {
+      hits += 1;
+    });
+
+    const address: LiveMemoryAddress = { address: 0x1000n, dataType: 'int32' };
+    const proposal = manager.proposeWrite(address, 7, { featureId: 'demo' });
+    const confirm = await manager.confirmWrite(proposal.proposalId, { featureId: 'demo' });
+    assert.equal(confirm.success, true);
+    assert.equal(hits, 1);
+
+    manager.setSnapshotListener(null);
+    const proposal2 = manager.proposeWrite(address, 8);
+    await manager.confirmWrite(proposal2.proposalId);
+    assert.equal(hits, 1);
+  });
 });
