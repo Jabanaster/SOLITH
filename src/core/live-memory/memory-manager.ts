@@ -25,6 +25,10 @@ export class MemoryManager {
     private readonly audit: MemoryAuditLog,
   ) {}
 
+  getAuditLog(): MemoryAuditLog {
+    return this.audit;
+  }
+
   read(address: LiveMemoryAddress, reason = 'read'): number {
     const value = this.session.readValue(address);
     this.audit.append({
@@ -35,6 +39,51 @@ export class MemoryManager {
       reason,
     });
     return value;
+  }
+
+  proposeWrite(
+    address: LiveMemoryAddress,
+    requestedValue: number,
+    options: { featureId?: string; reason?: string } = {},
+  ): LiveWriteProposal {
+    const proposal = this.session.proposeWrite(address, requestedValue);
+    this.audit.append({
+      op: 'write',
+      featureId: options.featureId,
+      address: `0x${address.address.toString(16)}`,
+      valueType: address.dataType,
+      valueBefore: proposal.currentValue,
+      valueAfter: proposal.requestedValue,
+      reason: `${options.reason ?? 'propose'}:proposed`,
+    });
+    return proposal;
+  }
+
+  async confirmWrite(
+    proposalId: string,
+    options: { featureId?: string; reason?: string } = {},
+  ): Promise<ConfirmWriteResult> {
+    const confirm = await this.session.confirmWrite(proposalId);
+    if (!confirm.success) {
+      this.audit.append({
+        op: 'abort',
+        featureId: options.featureId,
+        reason: confirm.error ?? 'confirm_failed',
+      });
+      return confirm;
+    }
+    this.audit.append({
+      op: 'write',
+      featureId: options.featureId,
+      address: confirm.manifest
+        ? `0x${confirm.manifest.target.address.toString(16)}`
+        : undefined,
+      valueType: confirm.manifest?.target.dataType,
+      valueBefore: confirm.manifest?.valueBefore,
+      valueAfter: confirm.manifest?.valueAfter,
+      reason: `${options.reason ?? 'confirm'}:confirmed`,
+    });
+    return confirm;
   }
 
   /**

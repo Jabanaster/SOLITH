@@ -268,6 +268,17 @@ export const LiveMemoryAttachSchema = z.object({
   catalogGameId: z.string().min(1).max(128).optional(),
 });
 
+/** Zero-Input prepare: plan → attach → SignatureEngine resolve (no cheat writes). */
+export const LiveMemoryZeroInputPrepareSchema = z.object({
+  pid: z.number().int().positive(),
+  executableName: z.string().min(1).max(260),
+  catalogGameId: z.string().min(1).max(128),
+  userConfirmedOffline: z.literal(true),
+  executableHashSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  driftAcknowledged: z.boolean().optional(),
+  maxFuzzyDistance: z.number().int().min(0).max(8).optional(),
+});
+
 export const LiveMemoryDetachSchema = z.object({});
 
 export const LiveMemoryReadSchema = z.object({

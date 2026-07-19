@@ -55,6 +55,15 @@ interface Window {
       driftAcknowledged?: boolean;
       catalogGameId?: string;
     }) => Promise<any>;
+    liveMemoryZeroInputPrepare: (payload: {
+      pid: number;
+      executableName: string;
+      catalogGameId: string;
+      userConfirmedOffline: true;
+      executableHashSHA256?: string;
+      driftAcknowledged?: boolean;
+      maxFuzzyDistance?: number;
+    }) => Promise<any>;
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
     liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) => Promise<any>;
@@ -377,7 +386,26 @@ interface Window {
       error?: string;
     }>;
     onCatalogProcessDetected?: (
-      callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void,
+      callback: (payload: {
+        catalogGameId: string;
+        displayName: string;
+        pid: number;
+        executable: string;
+        planAllowed?: boolean;
+        blockReason?: string;
+        fingerprintStatus?: string;
+        hasDefinition?: boolean;
+        prepareReady?: boolean;
+      }) => void,
+    ) => (() => void) | undefined;
+    onZeroInputReady?: (
+      callback: (payload: {
+        catalogGameId: string;
+        pid: number;
+        executable: string;
+        counts?: { resolved: number; failed: number; scanRequired: number };
+        features?: unknown[];
+      }) => void,
     ) => (() => void) | undefined;
 
     installDiscoveryScan: (payload?: {

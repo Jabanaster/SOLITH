@@ -76,6 +76,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryListProcesses: () => ipcRenderer.invoke('live-memory-list-processes'),
   liveMemoryAttach: (payload: { pid: number; executableName: string; userConfirmedOffline: true }) =>
     ipcRenderer.invoke('live-memory-attach', payload),
+  liveMemoryZeroInputPrepare: (payload: {
+    pid: number;
+    executableName: string;
+    catalogGameId: string;
+    userConfirmedOffline: true;
+    executableHashSHA256?: string;
+    driftAcknowledged?: boolean;
+    maxFuzzyDistance?: number;
+  }) => ipcRenderer.invoke('live-memory-zero-input-prepare', payload),
   liveMemoryDetach: () => ipcRenderer.invoke('live-memory-detach'),
   liveMemoryRead: (payload: { address: string; dataType: string }) =>
     ipcRenderer.invoke('live-memory-read', payload),
@@ -215,10 +224,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('in-process-propose-injector-launch', payload),
   inProcessConfirmInjectorLaunch: (payload: { proposalId: string; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-confirm-injector-launch', payload),
-  onCatalogProcessDetected: (callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void) => {
-    const listener = (_event: unknown, payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => callback(payload);
+  onCatalogProcessDetected: (callback: (payload: {
+    catalogGameId: string;
+    displayName: string;
+    pid: number;
+    executable: string;
+    planAllowed?: boolean;
+    blockReason?: string;
+    fingerprintStatus?: string;
+    hasDefinition?: boolean;
+    prepareReady?: boolean;
+  }) => void) => {
+    const listener = (_event: unknown, payload: {
+      catalogGameId: string;
+      displayName: string;
+      pid: number;
+      executable: string;
+      planAllowed?: boolean;
+      blockReason?: string;
+      fingerprintStatus?: string;
+      hasDefinition?: boolean;
+      prepareReady?: boolean;
+    }) => callback(payload);
     ipcRenderer.on('catalog-process-detected', listener);
     return () => ipcRenderer.removeListener('catalog-process-detected', listener);
+  },
+  onZeroInputReady: (callback: (payload: {
+    catalogGameId: string;
+    pid: number;
+    executable: string;
+    counts?: { resolved: number; failed: number; scanRequired: number };
+    features?: unknown[];
+  }) => void) => {
+    const listener = (_event: unknown, payload: {
+      catalogGameId: string;
+      pid: number;
+      executable: string;
+      counts?: { resolved: number; failed: number; scanRequired: number };
+      features?: unknown[];
+    }) => callback(payload);
+    ipcRenderer.on('zero-input-ready', listener);
+    return () => ipcRenderer.removeListener('zero-input-ready', listener);
   },
 
   installDiscoveryScan: (payload?: {

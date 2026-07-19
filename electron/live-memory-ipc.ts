@@ -1,7 +1,9 @@
-import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import path from 'node:path';
 import {
   LiveMemoryListProcessesSchema,
   LiveMemoryAttachSchema,
+  LiveMemoryZeroInputPrepareSchema,
   LiveMemoryDetachSchema,
   LiveMemoryReadSchema,
   LiveMemoryProposeWriteSchema,
@@ -27,6 +29,8 @@ import {
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
+import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
+import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
 
 /**
  * Live Memory Trainer IPC — feature-flagged (`v2LiveModeEnabled`, off by
@@ -136,7 +140,7 @@ export function registerLiveMemoryIpc(): void {
       );
 
       if (result.success) {
-        sessions.set(event.sender.id, session);
+        bindSessionBundle(event.sender.id, session, mod);
         if (result.fingerprintWarning && parsed.catalogGameId) {
           const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
           quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
@@ -145,6 +149,87 @@ export function registerLiveMemoryIpc(): void {
       return result;
     } catch (error) {
       return { success: false, error: sanitize(error, 'attach_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-zero-input-prepare', async (event, payload: unknown) => {
+    try {
+      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const parsed = LiveMemoryZeroInputPrepareSchema.parse(payload);
+      const mod = await getLiveMemoryModule();
+      const { loadCatalogDefinition } = await import('../src/core/definitions/load-catalog-definition.js');
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
+
+      disposeSession(event.sender.id);
+      const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
+      const bundle = bindSessionBundle(event.sender.id, session, mod);
+
+      const evidence = await mod.observeRemoteConnections(parsed.pid);
+      const result = await mod.prepareZeroInputSession(
+        session,
+        {
+          detection: {
+            catalogGameId: parsed.catalogGameId,
+            displayName: definition?.title ?? parsed.catalogGameId,
+            pid: parsed.pid,
+            executable: parsed.executableName,
+          },
+          definition,
+          userConfirmedOffline: parsed.userConfirmedOffline,
+          remoteConnections: evidence,
+          executableHashSHA256: parsed.executableHashSHA256,
+          driftAcknowledged: parsed.driftAcknowledged,
+          fuzzyOptions:
+            parsed.maxFuzzyDistance != null ? { maxDistance: parsed.maxFuzzyDistance } : undefined,
+        },
+        bundle.audit,
+      );
+
+      if (!result.success) {
+        disposeSession(event.sender.id);
+        return {
+          success: false,
+          error: result.error ?? 'prepare_failed',
+          planAllowed: result.plan.allowed,
+          blockReason: result.plan.blockReason,
+          fingerprintStatus: result.plan.fingerprint.status,
+          fingerprintWarning: result.fingerprintWarning,
+          attachError: result.attachError,
+        };
+      }
+
+      if (result.fingerprintWarning) {
+        const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
+        quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
+      }
+
+      const readyPayload = {
+        catalogGameId: parsed.catalogGameId,
+        pid: parsed.pid,
+        executable: parsed.executableName,
+        counts: result.counts,
+        features: result.features,
+      };
+
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('zero-input-ready', readyPayload);
+        }
+      }
+
+      return {
+        success: true,
+        planAllowed: true,
+        fingerprintStatus: result.plan.fingerprint.status,
+        fingerprintWarning: result.fingerprintWarning,
+        counts: result.counts,
+        features: result.features,
+      };
+    } catch (error) {
+      disposeSession(event.sender.id);
+      return { success: false, error: sanitize(error, 'zero_input_prepare_failed') };
     }
   });
 
@@ -160,9 +245,9 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-read', async (event, payload: unknown) => {
     try {
-      const session = requireSession(event);
+      const { manager } = requireBundle(event);
       const parsed = LiveMemoryReadSchema.parse(payload);
-      const value = session.readValue({ address: BigInt(parsed.address), dataType: parsed.dataType });
+      const value = manager.read({ address: BigInt(parsed.address), dataType: parsed.dataType });
       return { success: true, value };
     } catch (error) {
       return { success: false, error: sanitize(error, 'read_failed') };
@@ -171,9 +256,9 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-propose-write', async (event, payload: unknown) => {
     try {
-      const session = requireSession(event);
+      const { manager } = requireBundle(event);
       const parsed = LiveMemoryProposeWriteSchema.parse(payload);
-      const proposal = session.proposeWrite(
+      const proposal = manager.proposeWrite(
         { address: BigInt(parsed.address), dataType: parsed.dataType },
         parsed.requestedValue,
       );
@@ -186,9 +271,9 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-confirm-write', async (event, payload: unknown) => {
     try {
-      const session = requireSession(event);
+      const { manager } = requireBundle(event);
       const parsed = LiveMemoryConfirmWriteSchema.parse(payload);
-      const result = await session.confirmWrite(parsed.proposalId);
+      const result = await manager.confirmWrite(parsed.proposalId);
       return serializeWriteResult(result);
     } catch (error) {
       return { success: false, error: sanitize(error, 'confirm_write_failed') };
@@ -197,13 +282,13 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-rollback', async (event, payload: unknown) => {
     try {
-      const session = requireSession(event);
+      const { manager } = requireBundle(event);
       const parsed = LiveMemoryRollbackSchema.parse(payload);
       const manifest = {
         ...parsed.manifest,
         target: { ...parsed.manifest.target, address: BigInt(parsed.manifest.target.address) },
       };
-      const result = await session.rollback(manifest);
+      const result = await manager.rollback(manifest);
       return { success: result.success, guard: result.guard, error: result.error };
     } catch (error) {
       return { success: false, error: sanitize(error, 'rollback_failed') };
@@ -569,21 +654,43 @@ export function registerLiveMemoryIpc(): void {
 
 // ── Per-sender session ownership ─────────────────────────────────────────────
 
-const sessions = new Map<number, LiveMemorySession>();
+interface SessionBundle {
+  session: LiveMemorySession;
+  audit: MemoryAuditLog;
+  manager: MemoryManager;
+}
+
+const sessions = new Map<number, SessionBundle>();
+
+function memoryAuditFilePath(): string {
+  return path.join(app.getPath('userData'), 'logs', 'memory-audit.jsonl');
+}
+
+function bindSessionBundle(senderId: number, session: LiveMemorySession, mod: any): SessionBundle {
+  const audit = new mod.MemoryAuditLog({ filePath: memoryAuditFilePath() });
+  const manager = new mod.MemoryManager(session, audit);
+  const bundle: SessionBundle = { session, audit, manager };
+  sessions.set(senderId, bundle);
+  return bundle;
+}
 
 function disposeSession(senderId: number): void {
   const existing = sessions.get(senderId);
   if (existing) {
-    existing.detach();
+    existing.session.detach();
     sessions.delete(senderId);
   }
 }
 
-function requireSession(event: IpcMainInvokeEvent) {
+function requireBundle(event: IpcMainInvokeEvent): SessionBundle {
   if (event.sender.isDestroyed()) throw new Error('sender_invalid');
-  const session = sessions.get(event.sender.id);
-  if (!session || !session.isAttached()) throw new Error('not_attached');
-  return session;
+  const bundle = sessions.get(event.sender.id);
+  if (!bundle || !bundle.session.isAttached()) throw new Error('not_attached');
+  return bundle;
+}
+
+function requireSession(event: IpcMainInvokeEvent): LiveMemorySession {
+  return requireBundle(event).session;
 }
 
 function serializeControlSummary(control: {

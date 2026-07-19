@@ -47,6 +47,15 @@ export type {
   ResolvedFeatureAddress,
   BuildAttachPlanInput,
 } from './process-watcher.js';
+export {
+  planZeroInputDetection,
+  prepareZeroInputSession,
+} from './zero-input-prepare.js';
+export type {
+  ZeroInputPrepareInput,
+  ZeroInputPrepareResult,
+  SerializedResolvedFeature,
+} from './zero-input-prepare.js';
 export { resolveMemoryFeatureAddress, SessionAddressCache, parseHexOffset } from './feature-resolver.js';
 export type { LiveTrainerControl } from './live-trainer-control.js';
 export {

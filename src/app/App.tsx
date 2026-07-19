@@ -165,6 +165,8 @@ const App: React.FC = () => {
     displayName: string;
     pid: number;
     executable: string;
+    prepareReady?: boolean;
+    blockReason?: string;
   } | null>(null);
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -489,6 +491,8 @@ const App: React.FC = () => {
         <ProcessDetectToast
           displayName={processToast.displayName}
           executable={processToast.executable}
+          prepareReady={processToast.prepareReady}
+          blockReason={processToast.blockReason}
           onOpenDeck={openDeckFromToast}
           onDismiss={() => setProcessToast(null)}
         />

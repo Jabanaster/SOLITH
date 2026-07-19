@@ -17,6 +17,13 @@
   margin-bottom: 0.65rem;
 }
 
+.hint {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: rgba(200, 220, 255, 0.75);
+  line-height: 1.35;
+}
+
 .actions {
   display: flex;
   gap: 0.5rem;

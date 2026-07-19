@@ -382,6 +382,16 @@ export class LiveMemorySession {
     return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache);
   }
 
+  /** Expose session address cache for Zero-Input bulk resolve. */
+  getAddressCache(): SessionAddressCache {
+    return this.addressCache;
+  }
+
+  getMemoryAccessOrThrow(): { driver: MemoryDriver; handle: LiveProcessHandle } {
+    if (!this.handle) throw new Error('No process attached.');
+    return { driver: this.driver, handle: this.handle };
+  }
+
   /** Reverse pointer scan from a dynamic address (Advanced Scan Mode). */
   pointerScan(targetAddress: bigint, bounds?: PointerScanBounds) {
     if (!this.handle) throw new Error('No process attached.');
