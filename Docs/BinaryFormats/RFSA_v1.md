@@ -1,4 +1,4 @@
-# RFSA v1 — ResourceForge Structured Save Archive
+# RFSA v1 — Solith Structured Save Archive
 
 **Status:** Documented binary save format #1 (demo + test harness)  
 **Profile id:** `rfsa-v1`  

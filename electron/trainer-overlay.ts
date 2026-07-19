@@ -10,7 +10,10 @@ const moduleDirectory = dirname(moduleFilename);
 let overlayWindow: BrowserWindow | null = null;
 
 function overlayUrl(): string {
-  const isDev = process.argv.includes('--dev') || process.env.RESOURCEFORGE_DEV === '1';
+  const isDev =
+    process.argv.includes('--dev') ||
+    process.env.SOLITH_DEV === '1' ||
+    process.env.RESOURCEFORGE_DEV === '1';
   if (isDev) {
     return 'http://localhost:3000/#trainer-overlay';
   }

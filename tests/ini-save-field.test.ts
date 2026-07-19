@@ -14,7 +14,7 @@ describe('ini save-field writes', () => {
   let filePath = '';
 
   test('setup fixture', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-write-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ini-write-'));
     filePath = path.join(tmpDir, 'settings.ini');
     fs.writeFileSync(filePath, '[stats]\n; gold counter\ngold=100\n', 'utf-8');
   });

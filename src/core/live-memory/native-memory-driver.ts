@@ -33,7 +33,7 @@ const nodeRequire = nodeCreateRequire(import.meta.url);
  * of a startup crash.
  *
  * Build note: `memoryjs` compiles a native addon via node-gyp and requires a
- * working MSVC/Python toolchain on the machine running ResourceForge. Run
+ * working MSVC/Python toolchain on the machine running Solith. Run
  * `npm install memoryjs` (and `npx electron-rebuild` for the packaged app)
  * in a normal Windows dev environment with Visual Studio Build Tools
  * ("Desktop development with C++") installed.

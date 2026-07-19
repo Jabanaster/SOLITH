@@ -794,7 +794,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   );
 
   // Hydrate from the persisted cheat_toggle_state table on mount — restores which cheats
-  // were on and their confirmed address from before ResourceForge last closed. This is local
+  // were on and their confirmed address from before Solith last closed. This is local
   // UI state only; nothing is written to game memory here (that happens in the reapply effect
   // below, gated on userConfirmedOffline).
   useEffect(() => {

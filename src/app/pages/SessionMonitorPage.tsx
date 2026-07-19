@@ -3,7 +3,7 @@ import { PageModuleHeader } from '../components/PageModuleHeader.js';
 
 type LifecycleState =
   | 'disabled' | 'idle' | 'game_not_running' | 'game_running' | 'observing'
-  | 'external_session_observed' | 'resourceforge_session_connected'
+  | 'external_session_observed' | 'solith_session_connected'
   | 'session_ended_game_running' | 'game_exited' | 'stale_evidence'
   | 'error' | 'stopped';
 
@@ -35,7 +35,7 @@ const STATE_LABELS: Record<LifecycleState, string> = {
   game_running: 'Game Running',
   observing: 'Observing (Partial Evidence)',
   external_session_observed: 'External Session Detected',
-  resourceforge_session_connected: 'Solith Session Connected',
+  solith_session_connected: 'Solith Session Connected',
   session_ended_game_running: 'Session Ended — Game Still Running',
   game_exited: 'Game Exited',
   stale_evidence: 'Stale Evidence',
@@ -50,7 +50,7 @@ const STATE_CLASSES: Record<LifecycleState, string> = {
   game_running: 'v2-state-active',
   observing: 'v2-state-active',
   external_session_observed: 'v2-state-session',
-  resourceforge_session_connected: 'v2-state-session',
+  solith_session_connected: 'v2-state-session',
   session_ended_game_running: 'v2-state-warn',
   game_exited: 'v2-state-neutral',
   stale_evidence: 'v2-state-warn',
@@ -156,7 +156,7 @@ const SessionMonitorPage: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `resourceforge-v2-diagnostics-${Date.now()}.json`;
+      a.download = `solith-v2-diagnostics-${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {

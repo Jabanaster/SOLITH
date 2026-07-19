@@ -1,7 +1,7 @@
 # Solith Zero-Input Architectural Blueprint
 
 **Status:** Authorized — `OFFLINE_ONLY` + `CHARTER_THEN_PRODUCT`  
-**Product UI:** Solith · **Package / repo:** ResourceForge  
+**Product UI:** Solith · **Package / repo:** Solith  
 **Charter:** `AGENTS.md` → Solith Zero-Input Offline Framework  
 **Safety:** `Docs/safety-architecture.md` · `Docs/IN_PROCESS_PILOT_SAFETY_CHARTER.md`
 

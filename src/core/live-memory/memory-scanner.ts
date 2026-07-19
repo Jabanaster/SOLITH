@@ -112,7 +112,7 @@ function decodeValue(dataType: LiveValueType, buf: Buffer, offset: number): numb
  * First scan: finds every aligned occurrence of `targetValue` across the
  * attached process's writable, committed memory regions.
  *
- * Read-only regions are skipped — the only reason ResourceForge scans memory
+ * Read-only regions are skipped — the only reason Solith scans memory
  * at all is to eventually write to a found address (mirrors classic memory-scanner
  * "value scan" step, but scoped from the start to writable candidates so the
  * result set is never full of addresses a later write would just fail on).

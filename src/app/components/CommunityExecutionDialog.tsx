@@ -77,7 +77,7 @@ export function CommunityExecutionDialog({
             <strong>{cheatName}</strong>
           </div>
           <p id="community-execution-description">
-            This definition has not been verified by ResourceForge. Executing it requires an
+            This definition has not been verified by Solith. Executing it requires an
             active memory scan. Proceed?
           </p>
         </div>

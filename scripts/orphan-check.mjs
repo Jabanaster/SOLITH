@@ -1,5 +1,5 @@
 /**
- * Orphan / drift checks for ResourceForge.
+ * Orphan / drift checks for Solith.
  *
  * Phase 5:
  *  1) schema.v1 boundary + deleted-legacy-catalog drift (always runs)

@@ -1,4 +1,4 @@
-# ResourceForge — Electron Runtime & Package Acceptance-Gate Reconciliation
+# Solith — Electron Runtime & Package Acceptance-Gate Reconciliation
 
 **Date:** 2026-06-23  
 **Session:** Electron Runtime and Package Verification (continuation)  
@@ -157,7 +157,7 @@
 | `app_get_app_path` | `G:\GAME TRAINER\dist\win-unpacked\resources\app.asar` |
 | `resources_path` | `G:\GAME TRAINER\dist\win-unpacked\resources` |
 | `preload_path` | `G:\GAME TRAINER\dist\win-unpacked\resources\app.asar\dist-electron\preload.cjs` |
-| `db_path` | `C:\Users\chase\AppData\Local\Temp\rf-pkg-smoke-1782248335178-falujl4blbd\resourceforge.db` |
+| `db_path` | `C:\Users\chase\AppData\Local\Temp\rf-pkg-smoke-1782248335178-falujl4blbd\solith.db` |
 
 The preload resolves inside `app.asar` (ASAR-packaged). The database resides in the isolated temp `userData` — not in the ASAR or the installation directory.
 
@@ -180,7 +180,7 @@ The preload resolves inside `app.asar` (ASAR-packaged). The database resides in 
 |-------|-------------|--------|
 | 01 | Packaged exe exists at `dist/win-unpacked/ResourceForge.exe` | ✅ PASS |
 | 02 | App launches and first window appears | ✅ PASS |
-| 03 | Window title contains ResourceForge | ✅ PASS |
+| 03 | Window title contains Solith | ✅ PASS |
 | 04 | Window reaches `domcontentloaded` state | ✅ PASS |
 | 05 | React root mounts (`#root > *` present) | ✅ PASS |
 | 06 | `contextIsolation` active: `require` not available in renderer | ✅ PASS |

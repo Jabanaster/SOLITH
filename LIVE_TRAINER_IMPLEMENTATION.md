@@ -101,7 +101,7 @@ Implemented a complete auto-scan trainer workflow matching WeMod's UX for discov
 
 ## Key Differences from WeMod
 
-| Feature | WeMod | ResourceForge Live Trainer |
+| Feature | WeMod | Solith Live Trainer |
 |---------|-------|---------------------------|
 | **Restart-Stable Addresses** | Pointer chains (per-game curated) | Not supported yet (raw ASLR addresses) |
 | **First-Time Setup** | Click → scan → narrow | Same (auto-scan workflow) |

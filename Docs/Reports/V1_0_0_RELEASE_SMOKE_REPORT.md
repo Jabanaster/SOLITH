@@ -1,4 +1,4 @@
-# ResourceForge v1.0.0 Release Smoke Report
+# Solith v1.0.0 Release Smoke Report
 
 ## Audit Scope
 

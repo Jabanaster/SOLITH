@@ -13,7 +13,7 @@ Every Electron test run uses:
 | `ELECTRON_USER_DATA_PATH` | Temp directory per run ID |
 | `APPDATA` | Temp directory per run ID |
 | `USERPROFILE` | Temp directory per run ID |
-| Database | `{ELECTRON_USER_DATA_PATH}/resourceforge.db` — fresh per run |
+| Database | `{ELECTRON_USER_DATA_PATH}/solith.db` — fresh per run |
 | Game files | Copied to temp directory — never under `process.cwd()` |
 | Source fixture | Written to separate `source/` dir — immutable reference copy |
 | Workspace fixture | Written to `game/` dir — the file actually written and restored |

@@ -1,6 +1,6 @@
 # Third-Party Licenses
 
-ResourceForge vendors the following third-party assets directly into the repository (not installed as npm dependencies). This file indexes what's vendored, where, and under what license.
+Solith vendors the following third-party assets directly into the repository (not installed as npm dependencies). This file indexes what's vendored, where, and under what license.
 
 ## Fonts
 
@@ -29,7 +29,7 @@ ResourceForge vendors the following third-party assets directly into the reposit
 - **Source:** https://github.com/tabler/tabler-icons
 - **Copyright:** Paweł Kuna
 
-Vendored icons: `activity`, `apply` (check), `backups` (archive), `blocked` (lock), `cancel` (x), `caution` (alert-triangle), `database`, `discovery` (flask), `game` (device-gamepad-2), `log` (terminal-2), `refresh`, `safe` (shield-check), `save` (device-floppy), `search`, `settings`, `trainer` (adjustments-horizontal). Each source Tabler icon name is noted in parentheses where it differs from the ResourceForge-internal name used in `<Icon name="...">`.
+Vendored icons: `activity`, `apply` (check), `backups` (archive), `blocked` (lock), `cancel` (x), `caution` (alert-triangle), `database`, `discovery` (flask), `game` (device-gamepad-2), `log` (terminal-2), `refresh`, `safe` (shield-check), `save` (device-floppy), `search`, `settings`, `trainer` (adjustments-horizontal). Each source Tabler icon name is noted in parentheses where it differs from the Solith-internal name used in `<Icon name="...">`.
 
 ## Native modules
 

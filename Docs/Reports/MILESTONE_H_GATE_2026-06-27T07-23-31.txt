@@ -59,7 +59,7 @@ PASS: npx tsc --noEmit
 RUNNING: npm run test:game-profile
 ============================================================
 
-> resourceforge@1.0.0 test:game-profile
+> solith@1.0.0 test:game-profile
 > tsx --test tests/game-profile.test.ts
 
 ▶ validateGameProfile — structure validation
@@ -110,7 +110,7 @@ PASS: npm run test:game-profile
 RUNNING: npm run test:trainer-schema
 ============================================================
 
-> resourceforge@1.0.0 test:trainer-schema
+> solith@1.0.0 test:trainer-schema
 > tsx --test tests/trainer-control-schema.test.ts
 
 ▶ validateControl — required fields
@@ -173,7 +173,7 @@ PASS: npm run test:trainer-schema
 RUNNING: npm run test:trainer-host
 ============================================================
 
-> resourceforge@1.0.0 test:trainer-host
+> solith@1.0.0 test:trainer-host
 > tsx --test tests/trainer-host/protocol.test.ts tests/trainer-host/read-save-field.test.ts tests/trainer-host/host-runt
 ime.test.ts tests/trainer-host/host-supervisor.test.ts tests/trainer-host/write-save-field.test.ts tests/trainer-host/e2
 e.test.ts
@@ -286,7 +286,7 @@ PASS: npm run test:trainer-host
 RUNNING: npm test
 ============================================================
 
-> resourceforge@1.0.0 test
+> solith@1.0.0 test
 > tsx --test tests/core.test.ts tests/parsers.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/fai
 lure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-bindin
 g.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/v2-lifecycle.test.
@@ -311,13 +311,13 @@ est.ts
   ✔ CR-13: cmd and args are separate values in spawn call (0.9558ms)
   ✔ CR-14: executable name reaches child via env var, not PowerShell source (0.4264ms)
 ✔ command-runner (96.1144ms)
-▶ ResourceForge Core Modules Tests
+▶ Solith Core Modules Tests
   ✔ 1. Scanner & Save Detection Checks (3.1146ms)
   ✔ 2. Custom Parsers Tests (23.579ms)
   ✔ 3. Binary Save Safe Analysis Checks (2.6964ms)
   ✔ 4. Value Classification and Confidence Scoring (0.4774ms)
   ✔ 5. Recipe Safety & Staleness Verification (9.6436ms)
-✔ ResourceForge Core Modules Tests (40.3638ms)
+✔ Solith Core Modules Tests (40.3638ms)
 ▶ deleteGame — IPC Regression Tests
   ✔ 1. valid deletion returns true (4.6312ms)
   ✔ 2. deleted game is no longer found (1.2263ms)
@@ -329,7 +329,7 @@ est.ts
   ✔ 8. demo game deletion sets demoGameDeleted flag in settings (1.2722ms)
 ✔ deleteGame — IPC Regression Tests (77.6793ms)
 Adapter comparison failed, using fallback: Error: ENOENT: no such file or directory, open 'C:\Users\chase\AppData\Local\
-Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
+Temp\solith-discovery-1782570218894-umc29f0r19\game\saveA.json'
     at Object.readFileSync (node:fs:441:20)
     at compareSaves (G:\GAME TRAINER\src\core\discovery\index.ts:96:23)
     at TestContext.<anonymous> (G:\GAME TRAINER\tests\discovery.test.ts:111:19)
@@ -339,10 +339,10 @@ Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
   errno: -4058,
   code: 'ENOENT',
   syscall: 'open',
-  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\resourceforge-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
+  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\solith-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
 }
 Adapter comparison failed, using fallback: Error: ENOENT: no such file or directory, open 'C:\Users\chase\AppData\Local\
-Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
+Temp\solith-discovery-1782570218894-umc29f0r19\game\saveA.json'
     at Object.readFileSync (node:fs:441:20)
     at compareSaves (G:\GAME TRAINER\src\core\discovery\index.ts:96:23)
     at TestContext.<anonymous> (G:\GAME TRAINER\tests\discovery.test.ts:147:26)
@@ -352,10 +352,10 @@ Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
   errno: -4058,
   code: 'ENOENT',
   syscall: 'open',
-  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\resourceforge-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
+  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\solith-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
 }
 Adapter comparison failed, using fallback: Error: ENOENT: no such file or directory, open 'C:\Users\chase\AppData\Local\
-Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
+Temp\solith-discovery-1782570218894-umc29f0r19\game\saveA.json'
     at Object.readFileSync (node:fs:441:20)
     at compareSaves (G:\GAME TRAINER\src\core\discovery\index.ts:96:23)
     at TestContext.<anonymous> (G:\GAME TRAINER\tests\discovery.test.ts:151:28)
@@ -365,15 +365,15 @@ Temp\resourceforge-discovery-1782570218894-umc29f0r19\game\saveA.json'
   errno: -4058,
   code: 'ENOENT',
   syscall: 'open',
-  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\resourceforge-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
+  path: 'C:\\Users\\chase\\AppData\\Local\\Temp\\solith-discovery-1782570218894-umc29f0r19\\game\\saveA.json'
 }
-▶ ResourceForge Save Discovery, Locations, and Discovery Engine Tests
+▶ Solith Save Discovery, Locations, and Discovery Engine Tests
   ✔ 1. Save Location Suggestions and Approvals (12.1144ms)
   ✔ 2. Path Approval Containment Checks (6.4287ms)
   ✔ 3. Discovery Engine Diffing & Confidence Scoring (6.6921ms)
   ✔ 4. Known-Value Guided Matches & Repeated Session Boost (3.0655ms)
   ✔ 5. End-to-End Save Edit & Restore Workflow (34.1188ms)
-✔ ResourceForge Save Discovery, Locations, and Discovery Engine Tests (122.1197ms)
+✔ Solith Save Discovery, Locations, and Discovery Engine Tests (122.1197ms)
 ▶ Discovery Suite — Consecutive-Run Isolation Regression
   ✔ Consecutive run: no recipe conflict from a prior run (2.1399ms)
 ✔ Discovery Suite — Consecutive-Run Isolation Regression (12.5532ms)
@@ -417,21 +417,21 @@ tion 2 (line 1 column 3)
     at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
 [Crash Recovery] Found 1 interrupted operations.
 [Crash Recovery] Recovering operation ff19d51e-002c-411c-89fa-ca4aa67499ef (stuck in APPLYING) for target: C:\Users\chas
-e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_a.json
+e\AppData\Local\Temp\solith-failure-tests\save_recovery_a.json
 [Crash Recovery] Case A: Current target matches original hash. Original was not replaced.
 [Crash Recovery] Found 1 interrupted operations.
 [Crash Recovery] Recovering operation 74049107-77e6-4e58-8dd4-f9a7e7686f4b (stuck in APPLYING) for target: C:\Users\chas
-e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_b.json
+e\AppData\Local\Temp\solith-failure-tests\save_recovery_b.json
 [Crash Recovery] Case B: Current target matches expected final hash and is valid.
 [Crash Recovery] Found 1 interrupted operations.
 [Crash Recovery] Recovering operation 6684a133-b7a4-471b-8404-8fbabfa147a9 (stuck in APPLYING) for target: C:\Users\chas
-e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_d.json
+e\AppData\Local\Temp\solith-failure-tests\save_recovery_d.json
 [Crash Recovery] Case D: Ambiguous target state (proposal missing or expected final hash uncomputable).
 [Crash Recovery] Found 1 interrupted operations.
 [Crash Recovery] Recovering operation 29453991-1e37-4908-931b-d5e1ecb59958 (stuck in APPLYING) for target: C:\Users\chas
-e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
+e\AppData\Local\Temp\solith-failure-tests\save_recovery_e.json
 [Crash Recovery] Case E: Backup record not found in database.
-▶ ResourceForge Failure Injection & Security Invariant Tests
+▶ Solith Failure Injection & Security Invariant Tests
   ✔ 1. Invalid IPC Payloads Validation (3.257ms)
   ✔ 2. Recipe Validation, Safety Filters & Malicious Payload Rejection (6.3891ms)
   ✔ 3. Recipe Conflict Detection (1.5813ms)
@@ -442,7 +442,7 @@ e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
   ✔ 8. Crash Recovery Case D (Ambiguous state: proposal missing) (17.6818ms)
   ✔ 9. Crash Recovery Case E (Backup is invalid or missing) (2.9208ms)
   ✔ 10. Scan Cancellation Support (4.511ms)
-✔ ResourceForge Failure Injection & Security Invariant Tests (158.4153ms)
+✔ Solith Failure Injection & Security Invariant Tests (158.4153ms)
 ▶ validateGameProfile — structure validation
   ✔ returns no errors for a valid minimal profile (0.9496ms)
   ✔ rejects missing profileVersion (0.1316ms)
@@ -477,7 +477,7 @@ e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
   ✔ unsupported and non-save_field backends are never executable (0.3692ms)
   ✔ disabled save_field controls are not executable (0.3897ms)
 ✔ loadTrainerControls — profile to TrainerControl conversion (4.0725ms)
-▶ ResourceForge Parser Adapters Expansion & Safety Tests
+▶ Solith Parser Adapters Expansion & Safety Tests
   ✔ 1. JSON Adapter Features & Safety (2.2927ms)
   ✔ 2. INI / CFG Adapter Duplicate Keys (1.5723ms)
   ✔ 3. XML Adapter Security & XXE Blocks (0.7572ms)
@@ -485,7 +485,7 @@ e\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
   ✔ 5. Lua-like Table Static Parser Check (0.6285ms)
   ✔ 6. Binary Safe Read-Only Adapter Check (1.0678ms)
   ✔ 7. Sparse extensionless binary with integrity-like trailer remains read-only (43.2253ms)
-✔ ResourceForge Parser Adapters Expansion & Safety Tests (78.4873ms)
+✔ Solith Parser Adapters Expansion & Safety Tests (78.4873ms)
 ✔ intake-01 — JSON fixture: success, ACCEPTED, hash chain verified (23.6368ms)
 ✔ intake-02 — INI fixture: ACCEPTED (14.7723ms)
 ✔ intake-03 — XML fixture: ACCEPTED (16.0432ms)
@@ -523,16 +523,16 @@ Apply failed, initiating rollback: Error: File "save_lock.json" is currently loc
     at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
 [Crash Recovery] Found 1 interrupted operations.
 [Crash Recovery] Recovering operation 8549ef99-e2bd-41cd-b390-463ca0fda9f8 (stuck in APPLYING) for target: C:\Users\chas
-e\AppData\Local\Temp\resourceforge-test-game\save_crash.json
+e\AppData\Local\Temp\solith-test-game\save_crash.json
 [Crash Recovery] Case C: Target is invalid/missing, but verified backup exists. Restoring...
 [Crash Recovery] Restoration successful. Marking operation as RESTORED.
-▶ ResourceForge Safety & Lifecycle Hardening Tests
+▶ Solith Safety & Lifecycle Hardening Tests
   ✔ 1. Path Containment and Safety Validation (9.067ms)
   ✔ 2. Exclusive Write Locking (42.1533ms)
   ✔ 3. Stale Value Verification (Concurrent Mod Protection) (4.4543ms)
   ✔ 4. Atomic Write Integrity & Hash Validation Mismatch (15.3819ms)
   ✔ 5. Interrupted Run (Crash Recovery) (11.1692ms)
-✔ ResourceForge Safety & Lifecycle Hardening Tests (134.694ms)
+✔ Solith Safety & Lifecycle Hardening Tests (134.694ms)
 ✓ Single quotes round-trip correctly via parameter binding
 ✓ SQL injection attempt safely handled by parameter binding
 ✓ Special characters preserve correctly through parameter binding
@@ -846,7 +846,7 @@ PASS: npm test
 RUNNING: npm run build:electron
 ============================================================
 
-> resourceforge@1.0.0 build:electron
+> solith@1.0.0 build:electron
 > tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
 
 CLI Building entry: {"main":"electron/main.ts"}
@@ -877,7 +877,7 @@ ESM dist-electron\main.js     287.40 KB
 ESM dist-electron\main.js.map 542.68 KB
 ESM ⚡⚡️ Build success in 531ms
 
-�� ResourceForge — Electron Output Verifier
+�� Solith — Electron Output Verifier
 
 ── Required files
   ✅✅ PASS [1] main.js exists
@@ -919,11 +919,11 @@ PASS: npm run build:electron
 RUNNING: npm run build
 ============================================================
 
-> resourceforge@1.0.0 build
+> solith@1.0.0 build
 > npm run build:vite && npm run build:electron && electron-builder
 
 
-> resourceforge@1.0.0 build:vite
+> solith@1.0.0 build:vite
 > vite build
 
 vite v8.0.16 building client environment for production...
@@ -935,7 +935,7 @@ dist-electron/dist/assets/main-C8DBs5zT.js   291.75 kB │ gzip: 83.48 kB
 
 ✓ built in 690ms
 
-> resourceforge@1.0.0 build:electron
+> solith@1.0.0 build:electron
 > tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
 
 CLI Building entry: {"main":"electron/main.ts"}
@@ -966,7 +966,7 @@ ESM dist-electron\main.js     287.40 KB
 ESM dist-electron\main.js.map 542.68 KB
 ESM ⚡⚡️ Build success in 131ms
 
-�� ResourceForge — Electron Output Verifier
+�� Solith — Electron Output Verifier
 
 ── Required files
   ✅✅ PASS [1] main.js exists
@@ -1074,7 +1074,7 @@ PASS: node scripts/orphan-check.mjs
 RUNNING: npm run test:milestone-e
 ============================================================
 
-> resourceforge@1.0.0 test:milestone-e
+> solith@1.0.0 test:milestone-e
 > playwright test tests/milestone-e-acceptance.test.ts --config playwright.e2e.config.ts
 
 

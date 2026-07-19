@@ -1,6 +1,6 @@
 # Milestone K Acceptance Summary
 
-This document summarizes accepted ResourceForge V1 evidence for Milestones E through J.
+This document summarizes accepted Solith V1 evidence for Milestones E through J.
 
 ## Accepted Baseline
 

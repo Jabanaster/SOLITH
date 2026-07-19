@@ -722,7 +722,7 @@ function applySchema(): void {
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_mod_packs_game ON trainer_mod_packs(catalogGameId)');
 
   // Persisted cheat toggle state (Multi-Game Live Trainer) — remembers which cheats were
-  // enabled and their confirmed address so a ResourceForge restart (not a game restart) can
+  // enabled and their confirmed address so a Solith restart (not a game restart) can
   // re-arm them automatically instead of forcing the user to redo discovery from scratch.
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS cheat_toggle_state (

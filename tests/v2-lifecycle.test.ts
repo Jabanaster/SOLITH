@@ -1,5 +1,5 @@
-/**
- * V2 Session Lifecycle Monitor — Unit and Integration Tests
+﻿/**
+ * V2 Session Lifecycle Monitor â€” Unit and Integration Tests
  *
  * All tests are deterministic and do not require external trainer products or
  * Tale of Immortal to be installed. Fixtures represent the captured
@@ -36,7 +36,7 @@ import type {
   PollScheduler,
 } from '../src/core/v2/session-monitor.js';
 
-// ── Fixture helpers ──────────────────────────────────────────────────────────
+// â”€â”€ Fixture helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const NOW = '2026-06-26T00:10:00.000Z';
 
@@ -107,11 +107,11 @@ function bundle(
   return { process: proc, endpoints, marker, collectedAt: NOW };
 }
 
-// ── Evaluator Tests ──────────────────────────────────────────────────────────
+// â”€â”€ Evaluator Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('evaluator', () => {
 
-  test('T01 — feature disabled returns disabled state (feature flag off handled by caller)', () => {
+  test('T01 â€” feature disabled returns disabled state (feature flag off handled by caller)', () => {
     // The feature flag is enforced by the IPC handler. The evaluator itself
     // handles disabled by receiving an 'idle' previous state and no evidence.
     // Verify game_not_running is returned when game absent and state is idle.
@@ -119,26 +119,26 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'game_not_running');
   });
 
-  test('T02 — game not running', () => {
+  test('T02 â€” game not running', () => {
     const snap = evaluateEvidence(bundle(noProcess()), 'game_not_running', null);
     assert.equal(snap.state, 'game_not_running');
     assert.equal(snap.gameIdentity, null);
   });
 
-  test('T03 — game appears', () => {
+  test('T03 â€” game appears', () => {
     const snap = evaluateEvidence(bundle(makeProcess(40744)), 'game_not_running', null);
     assert.equal(snap.state, 'game_running');
     assert.ok(snap.gameIdentity !== null);
     assert.equal(snap.gameIdentity!.pid, 40744);
   });
 
-  test('T04 — process identity includes pid and start time', () => {
+  test('T04 â€” process identity includes pid and start time', () => {
     const snap = evaluateEvidence(bundle(makeProcess(40744, '2026-06-25T23:35:00.000Z')), 'game_not_running', null);
     assert.equal(snap.gameIdentity?.pid, 40744);
     assert.equal(snap.gameIdentity?.startTime, '2026-06-25T23:35:00.000Z');
   });
 
-  test('T05 — PID reuse is detected', () => {
+  test('T05 â€” PID reuse is detected', () => {
     const previous: ProcessIdentity = {
       pid: 40744,
       name: 'guigubahuang.exe',
@@ -155,7 +155,7 @@ describe('evaluator', () => {
     assert.ok(snap.evidenceSummary.includes('PID reuse'));
   });
 
-  test('T06 — external marker appears', () => {
+  test('T06 â€” external marker appears', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), noEndpoints(), markerPresent()),
       'game_running', null
@@ -164,7 +164,7 @@ describe('evaluator', () => {
     assert.equal(snap.externalSessionActive, false); // single signal only
   });
 
-  test('T07 — local listener appears', () => {
+  test('T07 â€” local listener appears', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), makeListeners([57363])),
       'game_running', null
@@ -172,17 +172,17 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'observing');
   });
 
-  test('T08 — both sides of a local connection appear', () => {
+  test('T08 â€” both sides of a local connection appear', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), makeConnection(57363, 57364)),
       'game_running', null
     );
-    // listener + connection = 2 signals → external_session_observed
+    // listener + connection = 2 signals â†’ external_session_observed
     assert.equal(snap.state, 'external_session_observed');
     assert.equal(snap.externalSessionActive, true);
   });
 
-  test('T09 — external session becomes strongly observed (3 signals)', () => {
+  test('T09 â€” external session becomes strongly observed (3 signals)', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), makeConnection(57363, 57364), markerPresent()),
       'game_running', null
@@ -192,16 +192,16 @@ describe('evaluator', () => {
     assert.equal(snap.externalSessionActive, true);
   });
 
-  test('T10 — listener disappears while marker still present', () => {
+  test('T10 â€” listener disappears while marker still present', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), noEndpoints(), markerPresent()),
       'external_session_observed', null
     );
-    // single signal — drops back to observing
+    // single signal â€” drops back to observing
     assert.equal(snap.state, 'observing');
   });
 
-  test('T11 — connection pair disappears', () => {
+  test('T11 â€” connection pair disappears', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), makeListeners([57363])),
       'external_session_observed', null
@@ -210,7 +210,7 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'observing');
   });
 
-  test('T12 — marker disappears along with endpoints', () => {
+  test('T12 â€” marker disappears along with endpoints', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), noEndpoints(), markerAbsent()),
       'external_session_observed', null
@@ -218,7 +218,7 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'session_ended_game_running');
   });
 
-  test('T13 — game remains running after session evidence disappears', () => {
+  test('T13 â€” game remains running after session evidence disappears', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), noEndpoints(), markerAbsent()),
       'external_session_observed', null
@@ -227,7 +227,7 @@ describe('evaluator', () => {
     assert.ok(snap.gameIdentity !== null, 'Game identity must be present');
   });
 
-  test('T14 — state becomes session_ended_game_running', () => {
+  test('T14 â€” state becomes session_ended_game_running', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744)),
       'external_session_observed', null
@@ -236,7 +236,7 @@ describe('evaluator', () => {
     assert.ok(snap.evidenceSummary.includes('The observed trainer session ended'));
   });
 
-  test('T15 — game exits after session ends', () => {
+  test('T15 â€” game exits after session ends', () => {
     const snap = evaluateEvidence(
       bundle(noProcess()),
       'session_ended_game_running', null
@@ -244,7 +244,7 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'game_exited');
   });
 
-  test('T16 — game exits while session evidence is present', () => {
+  test('T16 â€” game exits while session evidence is present', () => {
     // When coming from external_session_observed, a missing game process
     // produces game_exited (session was active when game disappeared).
     // stale_evidence fires when markers appear without a game from a non-session state.
@@ -255,7 +255,7 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'game_exited');
   });
 
-  test('T17 — marker remains but process is gone', () => {
+  test('T17 â€” marker remains but process is gone', () => {
     const snap = evaluateEvidence(
       bundle(noProcess(), noEndpoints(), markerPresent()),
       'game_running', null
@@ -263,7 +263,7 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'stale_evidence');
   });
 
-  test('T18 — stale marker is reported', () => {
+  test('T18 â€” stale marker is reported', () => {
     const snap = evaluateEvidence(
       bundle(noProcess(), noEndpoints(), markerPresent()),
       'idle', null
@@ -271,7 +271,7 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'stale_evidence');
   });
 
-  test('T19 — permission-denied process observation returns game_not_running', () => {
+  test('T19 â€” permission-denied process observation returns game_not_running', () => {
     const snap = evaluateEvidence(
       bundle(permissionDeniedProcess()),
       'game_not_running', null
@@ -280,16 +280,16 @@ describe('evaluator', () => {
     assert.equal(snap.state, 'game_not_running');
   });
 
-  test('T20 — endpoint observer unavailable still works', () => {
+  test('T20 â€” endpoint observer unavailable still works', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), unavailableEndpoints()),
       'game_not_running', null
     );
-    // Game running, endpoints unavailable — partial observation
+    // Game running, endpoints unavailable â€” partial observation
     assert.equal(snap.state, 'game_running');
   });
 
-  test('T21 — observer error on process does not crash evaluator', () => {
+  test('T21 â€” observer error on process does not crash evaluator', () => {
     const badBundle: EvidenceBundle = {
       process: { availability: 'error', identity: null, error: 'timeout', observedAt: NOW },
       endpoints: noEndpoints(),
@@ -303,17 +303,17 @@ describe('evaluator', () => {
 
 });
 
-// ── Timeline Tests ───────────────────────────────────────────────────────────
+// â”€â”€ Timeline Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('timeline', () => {
 
-  test('T22 — poll cancellation — timeline starts empty', () => {
+  test('T22 â€” poll cancellation â€” timeline starts empty', () => {
     const tl = createTimeline();
     assert.equal(tl.entries.length, 0);
     assert.ok(tl.startedAt);
   });
 
-  test('T23 — duplicate polling loops prevented — timeline records transitions', () => {
+  test('T23 â€” duplicate polling loops prevented â€” timeline records transitions', () => {
     let tl = createTimeline();
     tl = recordTransition(tl, 'game_not_running', 'game_running', 'game_appeared',
       null, noEndpoints(), unavailableMarker());
@@ -322,14 +322,14 @@ describe('timeline', () => {
     assert.equal(tl.entries[0].nextState, 'game_running');
   });
 
-  test('T24 — monitoring stop cleanup — clear resets timeline', () => {
+  test('T24 â€” monitoring stop cleanup â€” clear resets timeline', () => {
     let tl = createTimeline();
     tl = recordTransition(tl, 'idle', 'game_not_running', 'start', null, noEndpoints(), unavailableMarker());
     tl = clearTimeline(tl);
     assert.equal(tl.entries.length, 0);
   });
 
-  test('T25 — timeline retention bound — oldest entries dropped', () => {
+  test('T25 â€” timeline retention bound â€” oldest entries dropped', () => {
     let tl = createTimeline(5);
     for (let i = 0; i < 8; i++) {
       tl = recordTransition(tl, 'idle', 'game_not_running', `step-${i}`, null, noEndpoints(), unavailableMarker());
@@ -339,7 +339,7 @@ describe('timeline', () => {
     assert.ok(tl.entries[0].reasonCode.startsWith('step-3'));
   });
 
-  test('T26 — diagnostic sanitization — export contains no secrets', () => {
+  test('T26 â€” diagnostic sanitization â€” export contains no secrets', () => {
     let tl = createTimeline();
     tl = recordTransition(tl, 'idle', 'game_running', 'game_appeared',
       { pid: 40744, name: 'guigubahuang.exe', startTime: NOW, observedAt: NOW },
@@ -354,7 +354,7 @@ describe('timeline', () => {
     assert.ok(!str.includes('secret'));
   });
 
-  test('T27 — no external files are modified by timeline operations', async () => {
+  test('T27 â€” no external files are modified by timeline operations', async () => {
     // Timeline is purely in-memory. This test verifies the createTimeline and
     // recordTransition functions do not touch the filesystem.
     const fs = await import('node:fs');
@@ -367,7 +367,7 @@ describe('timeline', () => {
     assert.ok(!fs.existsSync(tmpPath), 'Timeline must not write to filesystem');
   });
 
-  test('T28 — existing V1 functionality unaffected by V2 types import', () => {
+  test('T28 â€” existing V1 functionality unaffected by V2 types import', () => {
     // Verify that V2 createTimeline does not interfere with V1 by calling it here
     const tl = createTimeline();
     assert.ok(tl.entries !== undefined);
@@ -376,7 +376,7 @@ describe('timeline', () => {
 
 });
 
-// ── Session Monitor Service Tests ────────────────────────────────────────────
+// â”€â”€ Session Monitor Service Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('session-monitor service', () => {
 
@@ -384,21 +384,21 @@ describe('session-monitor service', () => {
     _resetMonitorForTesting();
   });
 
-  test('T-SM1 — default state is idle', () => {
+  test('T-SM1 â€” default state is idle', () => {
     const monitor = getSessionMonitor();
     const status = monitor.getStatus();
     assert.equal(status.state, 'idle');
     assert.equal(status.isRunning, false);
   });
 
-  test('T-SM2 — start requires executableName', () => {
+  test('T-SM2 â€” start requires executableName', () => {
     const monitor = getSessionMonitor();
     const result = monitor.start({ gameId: 'demo-game-quest-id-000000000000', executableName: '' });
     assert.equal(result.success, false);
     assert.ok(result.error);
   });
 
-  test('T-SM3 — start succeeds with valid config', () => {
+  test('T-SM3 â€” start succeeds with valid config', () => {
     const monitor = getSessionMonitor();
     const result = monitor.start({
       gameId: 'demo-game-quest-id-000000000000',
@@ -408,7 +408,7 @@ describe('session-monitor service', () => {
     monitor.stop('test_cleanup');
   });
 
-  test('T-SM4 — second start while running returns error', () => {
+  test('T-SM4 â€” second start while running returns error', () => {
     const monitor = getSessionMonitor();
     monitor.start({ gameId: 'demo-game-quest-id-000000000000', executableName: 'fake-game.exe' });
     const second = monitor.start({ gameId: 'demo-game-quest-id-000000000000', executableName: 'other-game.exe' });
@@ -417,7 +417,7 @@ describe('session-monitor service', () => {
     monitor.stop('test_cleanup');
   });
 
-  test('T-SM5 — stop transitions to stopped state', () => {
+  test('T-SM5 â€” stop transitions to stopped state', () => {
     const monitor = getSessionMonitor();
     monitor.start({ gameId: 'demo-game-quest-id-000000000000', executableName: 'fake-game.exe' });
     monitor.stop('user_stopped');
@@ -425,7 +425,7 @@ describe('session-monitor service', () => {
     assert.equal(monitor.getStatus().isRunning, false);
   });
 
-  test('T-SM6 — clearTimeline resets entry count', () => {
+  test('T-SM6 â€” clearTimeline resets entry count', () => {
     const monitor = getSessionMonitor();
     monitor.start({ gameId: 'demo-game-quest-id-000000000000', executableName: 'fake-game.exe' });
     // Wait a tick for initial poll, then clear
@@ -434,10 +434,10 @@ describe('session-monitor service', () => {
     assert.equal(monitor.getStatus().timelineEntryCount, 0);
   });
 
-  test('T-SM7 — exportDiagnostics returns sanitized structure', () => {
+  test('T-SM7 â€” exportDiagnostics returns sanitized structure', () => {
     const monitor = getSessionMonitor();
     const diag = monitor.exportDiagnostics() as any;
-    assert.ok(diag.resourceForgeVersion);
+    assert.ok(diag.solithVersion);
     assert.ok(diag.platform);
     assert.equal(diag.featureFlag, 'v2SessionMonitorEnabled');
     assert.equal(diag.isMockMode, false);
@@ -448,11 +448,11 @@ describe('session-monitor service', () => {
 
 });
 
-// ── Integration: Full lifecycle through mock adapters ────────────────────────
+// â”€â”€ Integration: Full lifecycle through mock adapters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('lifecycle integration (mock evidence)', () => {
 
-  test('T-INT1 — full A→B→C→D→E lifecycle via evaluator', () => {
+  test('T-INT1 â€” full Aâ†’Bâ†’Câ†’Dâ†’E lifecycle via evaluator', () => {
     // Simulate each state transition using evidence bundles
     const states: LifecycleState[] = [];
     let state: LifecycleState = 'game_not_running';
@@ -484,7 +484,7 @@ describe('lifecycle integration (mock evidence)', () => {
     assert.equal(states[4], 'game_exited');
   });
 
-  test('T-INT2 — session_ended_game_running message is correct', () => {
+  test('T-INT2 â€” session_ended_game_running message is correct', () => {
     const snap = evaluateEvidence(
       bundle(makeProcess(40744), noEndpoints(), markerAbsent()),
       'external_session_observed', null
@@ -494,7 +494,7 @@ describe('lifecycle integration (mock evidence)', () => {
     assert.ok(snap.evidenceSummary.includes('game is still running'));
   });
 
-  test('T-INT3 — verify timeline and state transitions recorded', () => {
+  test('T-INT3 â€” verify timeline and state transitions recorded', () => {
     let tl = createTimeline();
     const transitions: Array<[LifecycleState, LifecycleState]> = [
       ['idle', 'game_not_running'],
@@ -513,17 +513,17 @@ describe('lifecycle integration (mock evidence)', () => {
 
 });
 
-// ── Concurrency, cancellation, and partial-failure tests ─────────────────────
+// â”€â”€ Concurrency, cancellation, and partial-failure tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // All tests in this section use:
-//   • injected observer stubs (Deferred promises) — no real PowerShell / netstat
-//   • injected schedulers — no real setTimeout / elapsed wall-clock timing
-//   • AbortSignal inspection — verifies child-process cancellation without spawning
+//   â€¢ injected observer stubs (Deferred promises) â€” no real PowerShell / netstat
+//   â€¢ injected schedulers â€” no real setTimeout / elapsed wall-clock timing
+//   â€¢ AbortSignal inspection â€” verifies child-process cancellation without spawning
 //
 // The monitor's public API (getStatus / start / stop) is the only observation
 // surface; implementation internals are not inspected directly.
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** A manually-resolved/rejected promise for deterministic async control. */
 class Deferred<T> {
@@ -593,7 +593,7 @@ function makeManualScheduler(): PollScheduler & { fire(): void; callCount: numbe
   };
 }
 
-// ── Helpers for setting up a fresh monitor with injected stubs ────────────────
+// â”€â”€ Helpers for setting up a fresh monitor with injected stubs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function setupMonitor(observers: ObserverSet, scheduler?: PollScheduler) {
   _resetMonitorForTesting();
@@ -603,13 +603,13 @@ function setupMonitor(observers: ObserverSet, scheduler?: PollScheduler) {
   return monitor;
 }
 
-// ── Test suites ───────────────────────────────────────────────────────────────
+// â”€â”€ Test suites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('session-monitor: basic lifecycle (injected observers)', () => {
 
   beforeEach(() => { _resetMonitorForTesting(); });
 
-  test('T-CONC1 — second start while running is rejected', () => {
+  test('T-CONC1 â€” second start while running is rejected', () => {
     const sched = makeManualScheduler();
     const monitor = setupMonitor({
       observeProcess: () => Promise.resolve(notFound()),
@@ -625,7 +625,7 @@ describe('session-monitor: basic lifecycle (injected observers)', () => {
     monitor.stop('test_cleanup');
   });
 
-  test('T-CONC2 — stop sets isRunning=false and state=stopped immediately', () => {
+  test('T-CONC2 â€” stop sets isRunning=false and state=stopped immediately', () => {
     const monitor = setupMonitor({
       observeProcess: () => Promise.resolve(notFound()),
       observeLocalEndpoints: () => Promise.resolve(emptyEndpoints()),
@@ -638,7 +638,7 @@ describe('session-monitor: basic lifecycle (injected observers)', () => {
     assert.equal(monitor.getStatus().state, 'stopped');
   });
 
-  test('T-CONC3 — start initialises state to game_not_running', () => {
+  test('T-CONC3 â€” start initialises state to game_not_running', () => {
     const monitor = setupMonitor({
       observeProcess: () => Promise.resolve(notFound()),
       observeLocalEndpoints: () => Promise.resolve(emptyEndpoints()),
@@ -655,7 +655,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
 
   beforeEach(() => { _resetMonitorForTesting(); });
 
-  test('T-RST1 — new generation fires initial poll before old deferred resolves', async () => {
+  test('T-RST1 â€” new generation fires initial poll before old deferred resolves', async () => {
     const procCalls: Array<{ gen: string; abortSignal: AbortSignal | undefined }> = [];
     const deferreds: Array<Deferred<ProcessObservationResult>> = [];
 
@@ -672,7 +672,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
       observeLocalEndpoints: () => Promise.resolve(emptyEndpoints()),
     });
 
-    // ── Generation 1 ──
+    // â”€â”€ Generation 1 â”€â”€
     const sched1 = makeManualScheduler();
     const mon1 = setupMonitor(makeObservers(), sched1);
     mon1.start({ gameId: 'g1', executableName: 'game.exe', pollIntervalMs: 60000 });
@@ -682,7 +682,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
     assert.equal(procCalls.length, 1, 'gen-1 initial poll must have started');
     const gen1Deferred = deferreds[0];
 
-    // ── Stop gen-1, immediately start gen-2 ──
+    // â”€â”€ Stop gen-1, immediately start gen-2 â”€â”€
     mon1.stop('restart');
     _resetMonitorForTesting();
 
@@ -694,7 +694,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
 
     assert.equal(procCalls.length, 2, 'gen-2 initial poll must have started before gen-1 deferred resolved');
 
-    // ── Resolve the old gen-1 deferred (already aborted, so it will reject) ──
+    // â”€â”€ Resolve the old gen-1 deferred (already aborted, so it will reject) â”€â”€
     // gen-1's abort signal was fired during mon1.stop(), so d.reject() already ran.
     // Just drain any pending microtasks.
     await tick();
@@ -706,7 +706,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
     mon2.stop('test_cleanup');
   });
 
-  test('T-RST2 — old generation result cannot overwrite new generation state', async () => {
+  test('T-RST2 â€” old generation result cannot overwrite new generation state', async () => {
     let gen1Deferred: Deferred<ProcessObservationResult> | null = null;
     let callCount = 0;
 
@@ -731,7 +731,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
     mon.stop('pre_resolve_stop');
     // State is now 'stopped'. Gen-1 poll is still awaiting gen1Deferred.
 
-    // Resolve gen-1 deferred AFTER stop — result must be discarded.
+    // Resolve gen-1 deferred AFTER stop â€” result must be discarded.
     gen1Deferred!.resolve(foundGame());
     await tick();
     await tick();
@@ -739,7 +739,7 @@ describe('session-monitor: immediate restart while old poll is unresolved', () =
     assert.equal(mon.getStatus().state, 'stopped', 'stopped state must survive old gen resolving');
   });
 
-  test('T-RST3 — pollInFlight is false after stop so new gen can start immediately', async () => {
+  test('T-RST3 â€” pollInFlight is false after stop so new gen can start immediately', async () => {
     const gen1Deferred = new Deferred<ProcessObservationResult>();
     let callCount = 0;
 
@@ -784,7 +784,7 @@ describe('session-monitor: abort signal and child-process cancellation', () => {
 
   beforeEach(() => { _resetMonitorForTesting(); });
 
-  test('T-ABORT1 — stop() aborts the AbortSignal before awaited observers return', async () => {
+  test('T-ABORT1 â€” stop() aborts the AbortSignal before awaited observers return', async () => {
     let capturedSignal: AbortSignal | undefined;
     const deferred = new Deferred<ProcessObservationResult>();
 
@@ -810,7 +810,7 @@ describe('session-monitor: abort signal and child-process cancellation', () => {
     assert.equal(mon.getStatus().state, 'stopped');
   });
 
-  test('T-ABORT2 — abort signal fires on stop() even when poll is awaiting allSettled', async () => {
+  test('T-ABORT2 â€” abort signal fires on stop() even when poll is awaiting allSettled', async () => {
     const signals: AbortSignal[] = [];
     const procDeferred = new Deferred<ProcessObservationResult>();
     const epDeferred = new Deferred<EndpointObservationResult>();
@@ -838,7 +838,7 @@ describe('session-monitor: abort signal and child-process cancellation', () => {
     assert.equal(mon.getStatus().state, 'stopped');
   });
 
-  test('T-ABORT3 — renderer destruction (stop) cancels active work', async () => {
+  test('T-ABORT3 â€” renderer destruction (stop) cancels active work', async () => {
     const deferred = new Deferred<ProcessObservationResult>();
     let signalAborted = false;
 
@@ -862,7 +862,7 @@ describe('session-monitor: abort signal and child-process cancellation', () => {
     await tick();
   });
 
-  test('T-ABORT4 — app shutdown (stop) cancels active work', async () => {
+  test('T-ABORT4 â€” app shutdown (stop) cancels active work', async () => {
     const deferred = new Deferred<ProcessObservationResult>();
     let aborted = false;
 
@@ -892,15 +892,15 @@ describe('session-monitor: partial observer failures (allSettled)', () => {
 
   beforeEach(() => { _resetMonitorForTesting(); });
 
-  test('T-PART1 — only process observer rejects: endpoint evidence is preserved', async () => {
+  test('T-PART1 â€” only process observer rejects: endpoint evidence is preserved', async () => {
     // When process observer rejects, endpoint evidence must still flow through
-    // to the evaluator — allSettled must not discard the successful endpoint result.
+    // to the evaluator â€” allSettled must not discard the successful endpoint result.
     //
     // Scenario: process observer rejects (normalized to error/not-found),
     // endpoint observer succeeds with one listener on port 9999.
     //
     // The evaluator sees: no game process + active listener = contradictory evidence
-    // → stale_evidence state. This proves the endpoint result reached the evaluator
+    // â†’ stale_evidence state. This proves the endpoint result reached the evaluator
     // (if it had been erased, we'd see game_not_running instead).
     const sched = makeManualScheduler();
     const mon = setupMonitor({
@@ -916,7 +916,7 @@ describe('session-monitor: partial observer failures (allSettled)', () => {
     const status = mon.getStatus();
     assert.ok(status.state !== undefined, 'must have a valid state after process observer rejects');
     // Endpoints present + no game process = stale_evidence (listener without a running game).
-    // This is the proof that endpoint evidence was NOT discarded — had it been erased,
+    // This is the proof that endpoint evidence was NOT discarded â€” had it been erased,
     // state would be game_not_running.
     assert.equal(status.state, 'stale_evidence',
       'endpoint evidence must reach evaluator even when process observer rejects');
@@ -924,7 +924,7 @@ describe('session-monitor: partial observer failures (allSettled)', () => {
     mon.stop('test_cleanup');
   });
 
-  test('T-PART2 — only endpoint observer rejects: process evidence is preserved', async () => {
+  test('T-PART2 â€” only endpoint observer rejects: process evidence is preserved', async () => {
     const sched = makeManualScheduler();
     const mon = setupMonitor({
       observeProcess: () => Promise.resolve(foundGame()),
@@ -944,7 +944,7 @@ describe('session-monitor: partial observer failures (allSettled)', () => {
     mon.stop('test_cleanup');
   });
 
-  test('T-PART3 — both observers reject: normalized error state, no crash', async () => {
+  test('T-PART3 â€” both observers reject: normalized error state, no crash', async () => {
     const sched = makeManualScheduler();
     const mon = setupMonitor({
       observeProcess: () => Promise.reject(new Error('proc failed')),
@@ -963,7 +963,7 @@ describe('session-monitor: partial observer failures (allSettled)', () => {
     mon.stop('test_cleanup');
   });
 
-  test('T-PART4 — observer timeout (late rejection): result discarded cleanly', async () => {
+  test('T-PART4 â€” observer timeout (late rejection): result discarded cleanly', async () => {
     // Simulate an observer that rejects after a delay (mimics internal timeout).
     // The key: the monitor must not crash and must continue operating.
     let resolveTimeout!: () => void;
@@ -984,7 +984,7 @@ describe('session-monitor: partial observer failures (allSettled)', () => {
 
     mon.stop('pre_timeout_stop');
 
-    // Release the "timed-out" observer after stop — result must be discarded.
+    // Release the "timed-out" observer after stop â€” result must be discarded.
     resolveTimeout();
     await tick();
     await tick();
@@ -998,7 +998,7 @@ describe('session-monitor: recursive scheduling (exactly one poll per generation
 
   beforeEach(() => { _resetMonitorForTesting(); });
 
-  test('T-SCHED1 — next poll is scheduled after current poll completes', async () => {
+  test('T-SCHED1 â€” next poll is scheduled after current poll completes', async () => {
     const sched = makeManualScheduler();
     let pollCount = 0;
 
@@ -1025,7 +1025,7 @@ describe('session-monitor: recursive scheduling (exactly one poll per generation
     mon.stop('test_cleanup');
   });
 
-  test('T-SCHED2 — no overlapping polls: second tick is dropped while first is in-flight', async () => {
+  test('T-SCHED2 â€” no overlapping polls: second tick is dropped while first is in-flight', async () => {
     const procDeferred = new Deferred<ProcessObservationResult>();
     let pollCount = 0;
     const sched = makeManualScheduler();
@@ -1038,7 +1038,7 @@ describe('session-monitor: recursive scheduling (exactly one poll per generation
     mon.start({ gameId: 'g1', executableName: 'game.exe', pollIntervalMs: 5000 });
     await tick(); // initial poll started, suspended in deferred
 
-    // Fire the scheduler again — poll() must skip because pollInFlight=true
+    // Fire the scheduler again â€” poll() must skip because pollInFlight=true
     sched.fire();
     await tick();
 
@@ -1054,7 +1054,7 @@ describe('session-monitor: recursive scheduling (exactly one poll per generation
     mon.stop('test_cleanup');
   });
 
-  test('T-SCHED3 — stop cancels the pending next-poll timer', async () => {
+  test('T-SCHED3 â€” stop cancels the pending next-poll timer', async () => {
     const sched = makeManualScheduler();
     let pollCount = 0;
 
@@ -1077,7 +1077,7 @@ describe('session-monitor: recursive scheduling (exactly one poll per generation
     assert.equal(mon.getStatus().state, 'stopped');
   });
 
-  test('T-SCHED4 — stale generation poll from scheduler does not update state', async () => {
+  test('T-SCHED4 â€” stale generation poll from scheduler does not update state', async () => {
     const sched = makeManualScheduler();
     let pollCount = 0;
 

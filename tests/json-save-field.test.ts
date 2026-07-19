@@ -14,7 +14,7 @@ describe('json save-field writes', () => {
   let filePath = '';
 
   test('setup fixture', () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-write-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-write-'));
     filePath = path.join(tmpDir, 'save.json');
     fs.writeFileSync(filePath, JSON.stringify({ stats: { gold: 100, alive: true } }, null, 2), 'utf-8');
   });

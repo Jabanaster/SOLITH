@@ -2,7 +2,7 @@
 
 > **ARCHIVED supplement** — See `ROADMAP.md` and `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` for current status.
 
-This document tracks the implementation and verification status of ResourceForge core modules and security hardening requirements.
+This document tracks the implementation and verification status of Solith core modules and security hardening requirements.
 
 ## V1 Trainer UX + Compatibility Pilot — Current Status
 
@@ -63,7 +63,7 @@ See `PROJECT_SPEC.md` Section 3.1 / 42.1 for the safety contract this feature mu
 | Feature Area | Status | Notes |
 | ------------ | ------ | ----- |
 | Multi-format Save Parsers | **VERIFIED** | Supports JSON, XML, INI, CSV, TXT, Lua. Validated in unit tests. |
-| In-Memory Database (sql.js) | **VERIFIED** | Persisted to `data/resourceforge.db` on disk. |
+| In-Memory Database (sql.js) | **VERIFIED** | Persisted to `data/solith.db` on disk. |
 | Save File Comparison | **VERIFIED** | Discovery lab comparison and confidence scoring. |
 | Recipe CRUD & Validations | **VERIFIED** | Strict Zod schema validation, safety filters checking for arbitrary JS/SQL/shell/IPC, conflict detection, and validated slider/dropdown control configuration. |
 | Proposals Engine | **VERIFIED** | pending, approved, rejected state transitions. |

@@ -23,11 +23,11 @@ workspace-copy, source-after-copy, and source-after-inspection SHA-256 values ma
 The full hash and personal filesystem paths remain only in ignored local evidence.
 
 Read-only triage found an extensionless, fixed-size, sparse binary container with unknown
-magic and possible integrity metadata at the trailer. ResourceForge has no deterministic
+magic and possible integrity metadata at the trailer. Solith has no deterministic
 Atomfall parser, serializer, checksum implementation, or format-version validator.
 
 No parser, serializer, candidate, recipe, write, apply, validation, or restore compatibility
-is claimed. Atomfall is a successful real-world safety result: ResourceForge preserved the
+is claimed. Atomfall is a successful real-world safety result: Solith preserved the
 source and refused to infer writable compatibility from opaque bytes.
 
 This result does not satisfy the first writable real-game pilot. Release-candidate work

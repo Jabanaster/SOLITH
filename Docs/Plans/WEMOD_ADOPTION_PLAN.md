@@ -1,7 +1,7 @@
-# WeMod Adoption Plan — Solith / ResourceForge
+# WeMod Adoption Plan — Solith / Solith
 
 **Status:** AA–AG **shipped** · tag `v2.2-wemod-adoption` @ `6ddefb8`  
-**Product:** Solith 2.0+ (`resourceforge@2.0.0`)  
+**Product:** Solith 2.0+ (`solith@2.0.0`)  
 **Baseline:** `master` @ `6ddefb8` · L/M tagged · `v2.1-shell-polish` + `v2.2-wemod-adoption`  
 **Date:** 2026-07-15 (status refresh)  
 

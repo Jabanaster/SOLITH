@@ -1,6 +1,6 @@
 # Operation State Machine
 
-Every file-backed modification in ResourceForge is tracked via a strict, database-persisted operation state machine to guarantee atomicity and safety.
+Every file-backed modification in Solith is tracked via a strict, database-persisted operation state machine to guarantee atomicity and safety.
 
 ## Authoritative Transition Graph
 

@@ -1,7 +1,7 @@
 # Solith Definition Hub Backend
 
 Cloudflare Workers + D1 API for opt-in distribution of community-authored
-ResourceForge `schema.v1` definitions.
+Solith `schema.v1` definitions.
 
 Phase 1 implements the remote trust boundary only. The Electron client is not
 wired to this service yet.

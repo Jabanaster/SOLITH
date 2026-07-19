@@ -14,7 +14,7 @@ import {
 } from '../scripts/release-artifact-utils.mjs';
 
 function makeRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-release-artifacts-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'solith-release-artifacts-'));
 }
 
 test('release artifact paths follow package productName (Solith 2.0.0)', () => {
@@ -50,7 +50,7 @@ test('release checksum helper returns sha256 for generated artifacts', () => {
   const dist = path.join(root, 'dist');
   fs.mkdirSync(dist, { recursive: true });
   const installer = path.join(dist, 'Solith Setup 2.0.0.exe');
-  fs.writeFileSync(installer, 'resourceforge');
+  fs.writeFileSync(installer, 'solith');
 
   const pkg = { version: '2.0.0', build: { productName: 'Solith' } };
   assert.deepEqual(getReleaseFiles(root, pkg), [installer]);

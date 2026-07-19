@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import GameLibrary from './routes/GameLibrary';
 import TrainerPage from './pages/TrainerPage';
 import SaveEditor from './pages/SaveEditor';
@@ -22,7 +22,9 @@ import { solithBranding } from './assets/branding/index.js';
 import { BrandingArtwork } from './components/BrandingArtwork.js';
 import { SolithTopBanner } from './components/SolithTopBanner.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
+import { OpeningCinematic } from './components/OpeningCinematic.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
+import openingCinematicUrl from '../../Create_a_second_cinematic_a.mp4';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -143,6 +145,9 @@ const SIDEBAR_COLLAPSED_KEY = 'solith-sidebar-collapsed';
 
 const App: React.FC = () => {
   const e2eTrainerState = (window as any).electronAPI?.e2eTrainerState as string | null;
+  const [showOpeningCinematic, setShowOpeningCinematic] = useState(
+    () => !navigator.webdriver && !e2eTrainerState,
+  );
   const [currentView, setCurrentView] = useState<View>(e2eTrainerState ? 'trainer' : 'library');
   const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(
     e2eTrainerState ? { id: 'e2e-renderer-state-fixture', name: 'Renderer State Fixture' } : null
@@ -170,6 +175,9 @@ const App: React.FC = () => {
   } | null>(null);
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const finishOpeningCinematic = useCallback(() => {
+    setShowOpeningCinematic(false);
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -495,6 +503,13 @@ const App: React.FC = () => {
           blockReason={processToast.blockReason}
           onOpenDeck={openDeckFromToast}
           onDismiss={() => setProcessToast(null)}
+        />
+      )}
+
+      {showOpeningCinematic && (
+        <OpeningCinematic
+          source={openingCinematicUrl}
+          onComplete={finishOpeningCinematic}
         />
       )}
     </div>

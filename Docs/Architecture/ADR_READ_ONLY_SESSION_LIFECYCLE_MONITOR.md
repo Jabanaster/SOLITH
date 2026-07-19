@@ -14,7 +14,7 @@ The Wand/WeMod runtime investigation (see `Docs/Research/WAND_TALE_OF_IMMORTAL_R
 2. Lifecycle transitions can be observed read-only from publicly accessible system metadata (process list, local TCP connections, session-marker files).
 3. Reliable lifecycle state requires correlating multiple evidence sources — a single signal is insufficient.
 
-ResourceForge needs a foundation for future live trainer features that (a) does not destabilize V1 and (b) models game lifecycle and session lifecycle as separate concerns from the start.
+Solith needs a foundation for future live trainer features that (a) does not destabilize V1 and (b) models game lifecycle and session lifecycle as separate concerns from the start.
 
 ---
 
@@ -22,7 +22,7 @@ ResourceForge needs a foundation for future live trainer features that (a) does 
 
 Implement a read-only, disabled-by-default **Session Lifecycle Monitor** scaffold in V2.
 
-The monitor observes publicly available system metadata to determine which lifecycle state is currently active. It takes no actions: it does not connect to game processes, inject code, open trainer sessions, or modify any file outside ResourceForge's own data directory.
+The monitor observes publicly available system metadata to determine which lifecycle state is currently active. It takes no actions: it does not connect to game processes, inject code, open trainer sessions, or modify any file outside Solith's own data directory.
 
 ---
 
@@ -41,9 +41,9 @@ Collapsing these into "game running / not running" would prevent correct diagnos
 
 ## Why the monitor is read-only
 
-ResourceForge V1 is a file-backed trainer. V2 live modification capabilities are deferred pending:
+Solith V1 is a file-backed trainer. V2 live modification capabilities are deferred pending:
 
-1. A ResourceForge-owned authenticated local service protocol (not yet designed).
+1. A Solith-owned authenticated local service protocol (not yet designed).
 2. A separate TrainerHost process architecture.
 3. A memory access safety audit.
 
@@ -57,13 +57,13 @@ V1's save-editing architecture is proven, tested, and shipping. The V2 monitor s
 
 ---
 
-## Why external sessions are not ResourceForge-owned sessions
+## Why external sessions are not Solith-owned sessions
 
-Observed Wand sessions are external research artifacts. ResourceForge has no authentication mechanism to verify ownership of a localhost IPC endpoint opened by a different application. Claiming ownership of an external session would be architecturally dishonest and could mislead future diagnostic tooling.
+Observed Wand sessions are external research artifacts. Solith has no authentication mechanism to verify ownership of a localhost IPC endpoint opened by a different application. Claiming ownership of an external session would be architecturally dishonest and could mislead future diagnostic tooling.
 
 The data model distinguishes:
 - `ExternalSessionObservation` — evidence that some external trainer has an active session
-- ResourceForge-owned session — future state, not yet implemented
+- Solith-owned session — future state, not yet implemented
 
 ---
 
@@ -75,13 +75,13 @@ Port `57363` and PIDs `40744`, `3048` were specific to one session captured on 2
 
 ## Why overlays and capture are excluded
 
-`capture.exe` (OBS Studio–based) loads ~187 modules including FFmpeg, NVENC/QSV/x264 encoders, and Windows.Graphics.Capture. This is a substantial dependency footprint with significant attack surface (video encoding, audio capture). ResourceForge does not require game capture for lifecycle monitoring. Overlay rendering requires a separate design review.
+`capture.exe` (OBS Studio–based) loads ~187 modules including FFmpeg, NVENC/QSV/x264 encoders, and Windows.Graphics.Capture. This is a substantial dependency footprint with significant attack surface (video encoding, audio capture). Solith does not require game capture for lifecycle monitoring. Overlay rendering requires a separate design review.
 
 ---
 
-## Why future authenticated IPC must use ResourceForge-owned protocols
+## Why future authenticated IPC must use Solith-owned protocols
 
-Connecting to Wand's private `tophat_service` IPC without authorization would violate the terms of service of third-party applications and could trigger anti-cheat detection in games that inspect network activity. ResourceForge's own IPC protocol, when implemented, must use a separately registered endpoint with a defined authentication handshake.
+Connecting to Wand's private `tophat_service` IPC without authorization would violate the terms of service of third-party applications and could trigger anti-cheat detection in games that inspect network activity. Solith's own IPC protocol, when implemented, must use a separately registered endpoint with a defined authentication handshake.
 
 ---
 
@@ -91,7 +91,7 @@ Connecting to Wand's private `tophat_service` IPC without authorization would vi
 - V1 is unaffected.
 - Lifecycle state model is established before write paths are added.
 - Read-only observation is auditable and safe.
-- External and ResourceForge-owned sessions are distinguishable from day one.
+- External and Solith-owned sessions are distinguishable from day one.
 
 **Negative:**
 - No live modification capability from this ADR.
@@ -104,7 +104,7 @@ Connecting to Wand's private `tophat_service` IPC without authorization would vi
 
 | Item | Reason deferred |
 |------|----------------|
-| ResourceForge-owned game IPC | Requires TrainerHost design, protocol spec, auth |
+| Solith-owned game IPC | Requires TrainerHost design, protocol spec, auth |
 | Trainer option dispatch | Depends on owned IPC |
 | Memory read/write | Requires separate safety audit |
 | Memory / pointer scanning | Depends on memory access |

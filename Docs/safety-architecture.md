@@ -1,15 +1,15 @@
-# ResourceForge Core Safety & Lifecycle Architecture
+# Solith Core Safety & Lifecycle Architecture
 
-This document describes the core design and safety guarantees built into **ResourceForge** to prevent save file corruption, directory escapes, concurrent edits, and interrupted writes.
+This document describes the core design and safety guarantees built into **Solith** to prevent save file corruption, directory escapes, concurrent edits, and interrupted writes.
 
 **Related (Zero-Input live trainer):** See [`Docs/Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md`](Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md) for the Solith OFFLINE_ONLY ProcessWatcher / SignatureEngine / MemoryManager architecture, local memory audit logging, and telemetry-free `crash_report.txt` resilience layer. That blueprint does not weaken the constraints below.
 
 ---
 
 ## 1. Safety Boundaries (Strict Constraints)
-ResourceForge's default and primary edit path is safe, offline, file-backed save/config editing. It strictly enforces the following security principles:
-* **File-Backed Editing Is the Safer, Default Path**: Save and configuration file editing (Sections 2–6 below) covers the large majority of ResourceForge's supported use cases and carries the lowest risk. Prefer it whenever a game's data is file-backed.
-* **Live Memory Access Is Gated, Not Blanket-Permitted**: ResourceForge also ships a scoped live-memory subsystem (see Section 1a). This is not a general RAM-editing capability — it operates only against the explicit, catalogued controls for supported games, behind an off-by-default feature flag, an online/offline confirmation gate, and a fail-closed connection guard. Unsupported games and unsupported controls remain blocked.
+Solith's default and primary edit path is safe, offline, file-backed save/config editing. It strictly enforces the following security principles:
+* **File-Backed Editing Is the Safer, Default Path**: Save and configuration file editing (Sections 2–6 below) covers the large majority of Solith's supported use cases and carries the lowest risk. Prefer it whenever a game's data is file-backed.
+* **Live Memory Access Is Gated, Not Blanket-Permitted**: Solith also ships a scoped live-memory subsystem (see Section 1a). This is not a general RAM-editing capability — it operates only against the explicit, catalogued controls for supported games, behind an off-by-default feature flag, an online/offline confirmation gate, and a fail-closed connection guard. Unsupported games and unsupported controls remain blocked.
 * **Offline Only**: Operates locally on files and local process memory only. It does not perform network writes and does not bypass online anti-cheat systems. Live-memory writes fail closed if the game process shows active remote connections (see Section 1a).
 * **No Executable Modification**: Modifies only save/configuration files and, within the gated live-memory subsystem, in-memory values of a running game's own process — never the executable, libraries, or system files on disk. `.exe`, `.dll`, `.sys`, and `.drv` file modification is completely blocked.
 * **No Anti-Cheat Bypass, No Multiplayer/Commercial-Trainer Claim**: Neither the file-backed path nor the live-memory subsystem is designed to defeat, evade, or interact with anti-cheat systems, and neither is scoped for multiplayer or general commercial-game live-trainer use. Support is limited to catalogued, single-player, offline use of games/saves the user owns.
@@ -18,7 +18,7 @@ ResourceForge's default and primary edit path is safe, offline, file-backed save
 
 ## 1a. Live-Memory Subsystem — Gated & Scoped
 
-ResourceForge's live-memory subsystem (`src/core/live-memory/`, `electron/live-memory-ipc.ts`,
+Solith's live-memory subsystem (`src/core/live-memory/`, `electron/live-memory-ipc.ts`,
 `electron/cheat-toggle-ipc.ts`) exists and is verified by test, but it is not an open RAM-editing
 feature. It is constrained on every axis below; removing any one of these constraints would be a
 scope change requiring separate, explicit safety-scope authorization — it is not implied by this
@@ -39,7 +39,7 @@ document.
   schemas (`electron/ipc-validation.ts`) before it reaches process-memory or persistence code.
 * **Persistence does not grant execution authority**: Cheat toggle persistence
   (`src/core/cheat-system/cheat-toggle-store.ts`, `cheat_toggle_state` table) remembers which toggles
-  were enabled and their last confirmed address so they can be re-armed after a ResourceForge
+  were enabled and their last confirmed address so they can be re-armed after a Solith
   restart. It does not itself perform a write, and a remembered address is not trusted blindly — it
   must be re-verified against the live process before reuse. The active UI for manual discovery is
   `LiveWatchPanel` (`src/app/components/LiveWatchPanel.tsx`); the earlier `LiveTrainer` /
@@ -75,8 +75,8 @@ To prevent race conditions and concurrent write conflicts on the same save file:
 ---
 
 ## 4. Atomic Write Sequence
-Edits are never written directly to the target file. ResourceForge employs a sibling temporary file replacement strategy:
-1. **Sibling Temp Creation**: Writes new contents to a temporary file (`.resourceforge-<uuid>.tmp`) residing in the **same directory** as the target file. This guarantees they reside on the same physical disk volume, enabling atomic renames.
+Edits are never written directly to the target file. Solith employs a sibling temporary file replacement strategy:
+1. **Sibling Temp Creation**: Writes new contents to a temporary file (`.solith-<uuid>.tmp`) residing in the **same directory** as the target file. This guarantees they reside on the same physical disk volume, enabling atomic renames.
 2. **Pre-commit Validation**: Parses and validates the temporary file using the file format adapter (e.g. JSON/XML/INI validation) to confirm it is not malformed before committing it.
 3. **Metadata & Permission Preservation**: Copies target file file permissions (chmod modes) to the temp file.
 4. **Atomic Swap**: Invokes `fs.renameSync` to overwrite the target file in a single atomic OS-level operation.
@@ -107,7 +107,7 @@ Every data modification is managed through a database-backed transaction lifecyc
 ```
 
 ### Crash Recovery Routine
-If ResourceForge crashes, loses power, or is terminated mid-operation, the startup routine:
+If Solith crashes, loses power, or is terminated mid-operation, the startup routine:
 1. Queries the SQLite database for operations stuck in critical transitional states: `APPLYING`, `VALIDATING`, or `RESTORING`.
 2. Checks the target file hash against the verified backup file hash.
 3. If the target file was modified or corrupted, automatically restores the original file content from the backup using the atomic restore workflow.

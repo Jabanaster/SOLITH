@@ -55,7 +55,7 @@ async function launchFresh(label: string, rendererState?: string) {
       APPDATA: appDataDir,
       USERPROFILE: appDataDir,
       NODE_ENV: 'test',
-      ...(rendererState ? { RESOURCEFORGE_E2E_TRAINER_STATE: rendererState } : {}),
+      ...(rendererState ? { SOLITH_E2E_TRAINER_STATE: rendererState } : {}),
     },
   });
   const win = await app.firstWindow();

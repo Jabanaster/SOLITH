@@ -35,7 +35,7 @@ Wand renderer (36776)
 
 Wand did not launch the game directly. A `cmd.exe` intermediary decoupled the renderer from being the direct parent of the game process.
 
-**ResourceForge implication:** Do not treat the direct-parent PID as a reliable session ownership marker. PIDs in a process tree can be separated by shell intermediaries.
+**Solith implication:** Do not treat the direct-parent PID as a reliable session ownership marker. PIDs in a process tree can be separated by shell intermediaries.
 
 ---
 
@@ -48,7 +48,7 @@ Wand did not launch the game directly. A `cmd.exe` intermediary decoupled the re
 - State C (game launched): populated, containing port `57363`
 - State E (session ended): `[]`
 
-This file is a live session indicator owned by `WandAuxiliaryService.exe`. It is **not** a ResourceForge file. ResourceForge can observe its presence as external evidence that a Wand session is active.
+This file is a live session indicator owned by `WandAuxiliaryService.exe`. It is **not** a Solith file. Solith can observe its presence as external evidence that a Wand session is active.
 
 **Port values are session-specific.** Port `57363` was observed in this session only. Future sessions will use different dynamic ports. Never hardcode `57363` as a protocol constant.
 
@@ -82,7 +82,7 @@ For the "Max Drop Rate" toggle (a runtime probability flag), `TrainerHost_x64.ex
 
 `capture.exe` (OBS Studio–based overlay, spawned by Wand main process at State C) stopped when the session ended at State E. Its lifetime was exactly the game session.
 
-ResourceForge does not need to reproduce this subsystem for lifecycle monitoring.
+Solith does not need to reproduce this subsystem for lifecycle monitoring.
 
 ---
 
@@ -92,7 +92,7 @@ ResourceForge does not need to reproduce this subsystem for lifecycle monitoring
 
 At State E, `guigubahuang.exe` (PID 40744) and `cmd.exe` (PID 3048) remained present. Wand did not force-kill the game when the trainer session ended.
 
-**ResourceForge implication:** "Trainer session ended" and "game exited" are separate conditions and must be modeled separately.
+**Solith implication:** "Trainer session ended" and "game exited" are separate conditions and must be modeled separately.
 
 ---
 
@@ -102,7 +102,7 @@ At State E, `guigubahuang.exe` (PID 40744) and `cmd.exe` (PID 3048) remained pre
 
 `Trainer_46908_2110d80892.dll` remained in `%APPDATA%\WeMod\App\trainers\` after the session ended. It was cached at game launch (State C) and not removed at session end (State E).
 
-ResourceForge must not copy, load, or depend upon this binary.
+Solith must not copy, load, or depend upon this binary.
 
 ---
 
@@ -122,7 +122,7 @@ These are conclusions drawn from the evidence. They are defensible but not direc
 
 The message format exchanged over `127.0.0.1:57363` was not captured (memory reads and packet sniffing were out of scope). Messages are likely JSON or protobuf over a plain TCP socket based on the OpenTelemetry logging pattern, but this is an inference.
 
-ResourceForge must not attempt to connect to or replicate this private protocol.
+Solith must not attempt to connect to or replicate this private protocol.
 
 ### I-2: TrainerHost spawning is option-type dependent
 
@@ -147,7 +147,7 @@ The file's timing (written at game launch, cleared at session end) is consistent
 
 ---
 
-## ResourceForge V1 / V2 Boundary
+## Solith V1 / V2 Boundary
 
 **V1 (unchanged):**
 - File-backed save editing
@@ -167,10 +167,10 @@ The file's timing (written at game launch, cleared at session end) is consistent
 
 ## Legal and Safety Notes
 
-- No Wand or WeMod proprietary binaries, algorithms, pointer paths, or patch bytes are present in ResourceForge.
-- `service-ports.json` is observed as a readable file. ResourceForge does not write to it.
+- No Wand or WeMod proprietary binaries, algorithms, pointer paths, or patch bytes are present in Solith.
+- `service-ports.json` is observed as a readable file. Solith does not write to it.
 - The Wand IPC protocol was not reverse-engineered.
-- ResourceForge marks any observed Wand session as **externally observed**, not as a ResourceForge-owned session.
+- Solith marks any observed Wand session as **externally observed**, not as a Solith-owned session.
 
 ---
 

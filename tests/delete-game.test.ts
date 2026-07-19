@@ -27,7 +27,7 @@ import { addGame, deleteGame, getGameById } from '../src/core/games/index.ts';
 import { DeleteGameSchema } from '../electron/ipc-validation.ts';
 
 const RUN_ID    = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const TEMP_ROOT = path.join(os.tmpdir(), `resourceforge-delete-game-${RUN_ID}`);
+const TEMP_ROOT = path.join(os.tmpdir(), `solith-delete-game-${RUN_ID}`);
 const TEMP_DB   = path.join(TEMP_ROOT, 'test.db');
 
 describe('deleteGame — IPC Regression Tests', () => {

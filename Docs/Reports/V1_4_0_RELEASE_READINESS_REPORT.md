@@ -1,4 +1,4 @@
-# ResourceForge v1.4.0 Release Readiness Report
+# Solith v1.4.0 Release Readiness Report
 
 ## Scope
 
@@ -28,11 +28,11 @@
 
 ## Verification Results
 
-- Bite 3 reconciliation fresh clone: PASS at `G:\RESOURCEFORGE_V14_BITE3_VERIFY_RECONCILE`
+- Bite 3 reconciliation fresh clone: PASS at `G:\SOLITH_V14_BITE3_VERIFY_RECONCILE`
 - Bite 4 source verification: PASS
-- Bite 4 fresh clone: PASS at `G:\RESOURCEFORGE_V14_BITE4_VERIFY_2`
+- Bite 4 fresh clone: PASS at `G:\SOLITH_V14_BITE4_VERIFY_2`
 - Final source verification: PASS at `G:\GAME TRAINER`
-- Final fresh-clone verification: PASS at `G:\RESOURCEFORGE_V14_FINAL_VERIFY`
+- Final fresh-clone verification: PASS at `G:\SOLITH_V14_FINAL_VERIFY`
 
 ## Final Source Gate
 
@@ -53,7 +53,7 @@
 
 ## Final Fresh-Clone Gate
 
-- Verification path: `G:\RESOURCEFORGE_V14_FINAL_VERIFY`
+- Verification path: `G:\SOLITH_V14_FINAL_VERIFY`
 - Clone source: `G:\GAME TRAINER`
 - Clone HEAD: `5d6f8c6694e156fd367da44607843e421eaf4b30`
 - `npx tsc --noEmit`: PASS
@@ -73,8 +73,8 @@
 
 ## Safety Guarantees Preserved
 
-- ResourceForge remains local-only, offline-first, and single-player focused.
-- ResourceForge edits local files only after an approved supported action is executed.
+- Solith remains local-only, offline-first, and single-player focused.
+- Solith edits local files only after an approved supported action is executed.
 - Unsupported and preview-only formats remain blocked from write execution.
 - JSON and INI write execution remain blocked.
 - Backup, rollback, and failure visibility are preserved.

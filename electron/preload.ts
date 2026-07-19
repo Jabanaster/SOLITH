@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electronAPI', {
   // Deterministic renderer-state fixture. This is unavailable in normal builds/runs.
   e2eTrainerState: process.env.NODE_ENV === 'test'
-    ? (process.env.RESOURCEFORGE_E2E_TRAINER_STATE ?? null)
+    ? (process.env.SOLITH_E2E_TRAINER_STATE ?? process.env.RESOURCEFORGE_E2E_TRAINER_STATE ?? null)
     : null,
 
   // Database operations
@@ -127,7 +127,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryResolveDefinitionFeature: (payload: { catalogGameId: string; featureId: string }) =>
     ipcRenderer.invoke('live-memory-resolve-definition-feature', payload),
 
-  // Persisted cheat toggle state — survives a ResourceForge restart (see
+  // Persisted cheat toggle state — survives a Solith restart (see
   // cheat-toggle-store.ts for why this is scoped to "app restart", not "game restart").
   cheatToggleGetAll: (payload: { gameId: string }) => ipcRenderer.invoke('cheat-toggle-get-all', payload),
   cheatToggleSet: (payload: {

@@ -212,7 +212,11 @@ export function scanGame(gameId: string): { success: boolean; result?: any; erro
     const sizeLimitMB = getScanSizeLimitMB();
     const sizeLimitBytes = sizeLimitMB * 1024 * 1024;
     
-    const backupsDir = path.join(process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'), 'ResourceForge', 'backups').toLowerCase();
+    const appDataRoot = process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming');
+    const backupsDirs = new Set([
+      path.join(appDataRoot, 'Solith', 'backups').toLowerCase(),
+      path.join(appDataRoot, 'ResourceForge', 'backups').toLowerCase(),
+    ]);
     const installDir = path.resolve(process.cwd()).toLowerCase();
 
     // 2. Perform database insertions inside a safe transaction
@@ -240,7 +244,12 @@ export function scanGame(gameId: string): { success: boolean; result?: any; erro
         try {
           const canonicalDir = path.resolve(dir).toLowerCase();
           // Skip internal app backups or installer files
-          if (canonicalDir === backupsDir || canonicalDir === installDir || canonicalDir.includes('.resourceforge')) {
+          if (
+            backupsDirs.has(canonicalDir) ||
+            canonicalDir === installDir ||
+            canonicalDir.includes('.solith') ||
+            canonicalDir.includes('.resourceforge')
+          ) {
             return;
           }
           

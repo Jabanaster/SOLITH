@@ -1,9 +1,9 @@
 {
-  "name": "resourceforge",
+  "name": "solith",
   "version": "2.3.0-alpha.1",
   "description": "Local AI Game Trainer + Save Editor + Discovery Lab",
   "main": "dist-electron/main.js",
-  "author": "ResourceForge",
+  "author": "Solith",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -73,7 +73,7 @@
     "game-trainer"
   ],
   "build": {
-    "appId": "com.resourceforge.app",
+    "appId": "com.solith.app",
     "productName": "Solith",
     "directories": {
       "output": "dist"

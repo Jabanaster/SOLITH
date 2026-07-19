@@ -8,7 +8,7 @@ ELAPSED_MS: 11105
 CMD: npm test
 START: 2026-07-15T08:20:04.1728835-07:00
 
-> resourceforge@2.0.0 test
+> solith@2.0.0 test
 > tsx --test tests/core.test.ts tests/parsers.test.ts tests/save-format.test.ts tests/json-save-field.test.ts tests/ini-save-field.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-binding.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/v2-lifecycle.test.ts tests/command-runner.test.ts tests/v2-lifecycle-wiri...
 
 Γû╢ binary-field-proposal
@@ -93,13 +93,13 @@ START: 2026-07-15T08:20:04.1728835-07:00
   Γ£ö CR-13: cmd and args are separate values in spawn call (0.9354ms)
   Γ£ö CR-14: executable name reaches child via env var, not PowerShell source (0.4679ms)
 Γ£ö command-runner (88.3358ms)
-Γû╢ ResourceForge Core Modules Tests
+Γû╢ Solith Core Modules Tests
   Γ£ö 1. Scanner & Save Detection Checks (3.1669ms)
   Γ£ö 2. Custom Parsers Tests (23.37ms)
   Γ£ö 3. Binary Save Safe Analysis Checks (2.7088ms)
   Γ£ö 4. Value Classification and Confidence Scoring (0.4686ms)
   Γ£ö 5. Recipe Safety & Staleness Verification (12.8785ms)
-Γ£ö ResourceForge Core Modules Tests (43.4204ms)
+Γ£ö Solith Core Modules Tests (43.4204ms)
 Γû╢ ct-import
   Γ£ö parses memory entries and rejects script cheats (5.5417ms)
   Γ£ö rejects nested group-only entries without address (0.5498ms)
@@ -154,7 +154,7 @@ START: 2026-07-15T08:20:04.1728835-07:00
   Γ£ö 7. Zod schema accepts a valid UUID (2.0038ms)
   Γ£ö 8. demo game deletion sets demoGameDeleted flag in settings (0.9804ms)
 Γ£ö deleteGame ΓÇö IPC Regression Tests (83.0184ms)
-Γû╢ ResourceForge Save Discovery, Locations, and Discovery Engine Tests
+Γû╢ Solith Save Discovery, Locations, and Discovery Engine Tests
   Γ£ö 1. Save Location Suggestions and Approvals (14.5225ms)
   Γ£ö 2. Path Approval Containment Checks (8.8662ms)
   Γ£ö 3. Discovery Engine Diffing & Confidence Scoring (13.273ms)
@@ -166,7 +166,7 @@ START: 2026-07-15T08:20:04.1728835-07:00
   Γ£ö 4f. Discovery report serialization is deterministic for stable inputs (1.1335ms)
   Γ£ö 4g. Advisory comparison returns report metadata for save diff tooling (2.3667ms)
   Γ£ö 5. End-to-End Save Edit & Restore Workflow (94.2486ms)
-Γ£ö ResourceForge Save Discovery, Locations, and Discovery Engine Tests (227.1494ms)
+Γ£ö Solith Save Discovery, Locations, and Discovery Engine Tests (227.1494ms)
 Γû╢ Discovery Suite ΓÇö Consecutive-Run Isolation Regression
   Γ£ö Consecutive run: no recipe conflict from a prior run (10.2011ms)
 Γ£ö Discovery Suite ΓÇö Consecutive-Run Isolation Regression (32.0552ms)
@@ -208,18 +208,18 @@ Atomic write failed: Error: Temporary file validation failed: SyntaxError: Expec
     at async Test.run (node:internal/test_runner/test:1208:7)
     at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
 [Crash Recovery] Found 1 interrupted operations.
-[Crash Recovery] Recovering operation 5d069d8b-6bba-45ca-975e-7427fb1db3be (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_a.json
+[Crash Recovery] Recovering operation 5d069d8b-6bba-45ca-975e-7427fb1db3be (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\solith-failure-tests\save_recovery_a.json
 [Crash Recovery] Case A: Current target matches original hash. Original was not replaced.
 [Crash Recovery] Found 1 interrupted operations.
-[Crash Recovery] Recovering operation 05174c97-23dc-47bb-9d9c-6671ced7e489 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_b.json
+[Crash Recovery] Recovering operation 05174c97-23dc-47bb-9d9c-6671ced7e489 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\solith-failure-tests\save_recovery_b.json
 [Crash Recovery] Case B: Current target matches expected final hash and is valid.
 [Crash Recovery] Found 1 interrupted operations.
-[Crash Recovery] Recovering operation 593c74ca-1bb7-4ed0-aaa1-15f461260f67 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_d.json
+[Crash Recovery] Recovering operation 593c74ca-1bb7-4ed0-aaa1-15f461260f67 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\solith-failure-tests\save_recovery_d.json
 [Crash Recovery] Case D: Ambiguous target state (proposal missing or expected final hash uncomputable).
 [Crash Recovery] Found 1 interrupted operations.
-[Crash Recovery] Recovering operation a42325af-e5e2-454d-a596-ca36b3aff714 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-failure-tests\save_recovery_e.json
+[Crash Recovery] Recovering operation a42325af-e5e2-454d-a596-ca36b3aff714 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\solith-failure-tests\save_recovery_e.json
 [Crash Recovery] Case E: Backup record not found in database.
-Γû╢ ResourceForge Failure Injection & Security Invariant Tests
+Γû╢ Solith Failure Injection & Security Invariant Tests
   Γ£ö 1. Invalid IPC Payloads Validation (3.6375ms)
   Γ£ö 2. Recipe Validation, Safety Filters & Malicious Payload Rejection (7.1926ms)
   Γ£ö 3. Recipe Conflict Detection (1.6705ms)
@@ -230,7 +230,7 @@ Atomic write failed: Error: Temporary file validation failed: SyntaxError: Expec
   Γ£ö 8. Crash Recovery Case D (Ambiguous state: proposal missing) (63.2757ms)
   Γ£ö 9. Crash Recovery Case E (Backup is invalid or missing) (4.1134ms)
   Γ£ö 10. Scan Cancellation Support (4.7312ms)
-Γ£ö ResourceForge Failure Injection & Security Invariant Tests (362.8207ms)
+Γ£ö Solith Failure Injection & Security Invariant Tests (362.8207ms)
 Γ£ö bundled game profile catalog is valid and deterministic (2.0651ms)
 Γ£ö catalog validation rejects remote or non-local references (0.1582ms)
 Γ£ö game profile exchange review classifies supported, preview-only, and blocked entries (6.1588ms)
@@ -425,7 +425,7 @@ Atomic write failed: Error: Temporary file validation failed: SyntaxError: Expec
   Γ£ö section artwork matches the current sidebar sections (0.08ms)
 Γ£ö sidebar module artwork mapping (1.3483ms)
 Parse error: Save file is too large to parse safely (8388609 bytes > 8388608 bytes; limit 8.0 MiB).
-Γû╢ ResourceForge Parser Adapters Expansion & Safety Tests
+Γû╢ Solith Parser Adapters Expansion & Safety Tests
   Γ£ö 1. JSON Adapter Features & Safety (2.6448ms)
   Γ£ö 2. INI / CFG Adapter Duplicate Keys (1.5313ms)
   Γ£ö 3. XML Adapter Security & XXE Blocks (1.1746ms)
@@ -437,7 +437,7 @@ Parse error: Save file is too large to parse safely (8388609 bytes > 8388608 byt
   Γ£ö 9. parseSaveFile rejects oversized XML before full parse with sanitized error (8.0135ms)
   Γ£ö 10. parseSaveFile rejects oversized binary before base64 encoding with sanitized error (8.7297ms)
   Γ£ö 11. parseSaveFile still parses normal JSON, XML, and binary saves (4.4087ms)
-Γ£ö ResourceForge Parser Adapters Expansion & Safety Tests (152.6411ms)
+Γ£ö Solith Parser Adapters Expansion & Safety Tests (152.6411ms)
 Γ£ö intake-01 ΓÇö JSON fixture: success, ACCEPTED, hash chain verified (16.4112ms)
 Γ£ö intake-02 ΓÇö INI fixture: ACCEPTED (10.1109ms)
 Γ£ö intake-03 ΓÇö XML fixture: ACCEPTED (10.8503ms)
@@ -494,10 +494,10 @@ Restore failed: Error: File "save_lock.json" is currently locked by another oper
     at async Test.run (node:internal/test_runner/test:1208:7)
     at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
 [Crash Recovery] Found 1 interrupted operations.
-[Crash Recovery] Recovering operation dc37954f-e0f3-4a5d-b77a-212b43bb79e9 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\resourceforge-safety-1784128809826-4quxnjl7855\game\save_crash.json
+[Crash Recovery] Recovering operation dc37954f-e0f3-4a5d-b77a-212b43bb79e9 (stuck in APPLYING) for target: C:\Users\chase\AppData\Local\Temp\solith-safety-1784128809826-4quxnjl7855\game\save_crash.json
 [Crash Recovery] Case C: Target is invalid/missing, but verified backup exists. Restoring...
 [Crash Recovery] Restoration successful. Marking operation as RESTORED.
-Restore failed: Error: Backup file not found: C:\Users\chase\AppData\Local\Temp\resourceforge-safety-1784128809826-4quxnjl7855\game\backups\6531b8ab-0d2a-4a70-9c46-507b24475e8c.json
+Restore failed: Error: Backup file not found: C:\Users\chase\AppData\Local\Temp\solith-safety-1784128809826-4quxnjl7855\game\backups\6531b8ab-0d2a-4a70-9c46-507b24475e8c.json
     at restoreBackup (G:\ACTIVE_PROJECTS\ResourceForge\src\core\backups\index.ts:257:13)
     at TestContext.<anonymous> (G:\ACTIVE_PROJECTS\ResourceForge\tests\safety-integration.test.ts:254:22)
     at Test.runInAsyncScope (node:async_hooks:227:14)
@@ -521,7 +521,7 @@ Restore failed: Error: Backup ownership check failed for a737d9ee-eca4-4082-ae26
     at Test.runInAsyncScope (node:async_hooks:227:14)
     at Test.run (node:internal/test_runner/test:1201:25)
     at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)
-Γû╢ ResourceForge Safety & Lifecycle Hardening Tests
+Γû╢ Solith Safety & Lifecycle Hardening Tests
   Γ£ö 1. Path Containment and Safety Validation (6.96ms)
   Γ£ö 2. Exclusive Write Locking (58.9704ms)
   Γ£ö 3. Stale Value Verification (Concurrent Mod Protection) (6.6644ms)
@@ -532,7 +532,7 @@ Restore failed: Error: Backup ownership check failed for a737d9ee-eca4-4082-ae26
   Γ£ö 8. Backup restore fails cleanly on hash mismatch and preserves current target (23.9734ms)
   Γ£ö 9. Backup restore rejects target outside the approved game root (15.1641ms)
   Γ£ö 10. Backup restore rejects symlink target escape when practical (35.7818ms)
-Γ£ö ResourceForge Safety & Lifecycle Hardening Tests (412.0832ms)
+Γ£ö Solith Safety & Lifecycle Hardening Tests (412.0832ms)
 Γû╢ save format capabilities
   Γ£ö recognizes supported declared formats (0.6419ms)
   Γ£ö detects known safe formats from extensions (0.2081ms)
@@ -960,7 +960,7 @@ ELAPSED_MS: 24705
 CMD: npm run build:electron
 START: 2026-07-15T08:20:28.8792131-07:00
 
-> resourceforge@2.0.0 build:electron
+> solith@2.0.0 build:electron
 > tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
 
 CLI Building entry: {"main":"electron/main.ts"}
@@ -991,7 +991,7 @@ ESM dist-electron\main.js     627.31 KB
 ESM dist-electron\main.js.map 1.19 MB
 ESM ΓÜí∩╕Å Build success in 1004ms
 
-≡ƒöì ResourceForge ΓÇö Electron Output Verifier
+≡ƒöì Solith ΓÇö Electron Output Verifier
 
 ΓöÇΓöÇ Required files
   Γ£à PASS [1] main.js exists
@@ -1035,11 +1035,11 @@ ELAPSED_MS: 4688
 CMD: npm run build
 START: 2026-07-15T08:20:33.5675217-07:00
 
-> resourceforge@2.0.0 build
+> solith@2.0.0 build
 > npm run build:vite && npm run build:electron && electron-builder
 
 
-> resourceforge@2.0.0 build:vite
+> solith@2.0.0 build:vite
 > vite build
 
 vite v8.0.16 building client environment for production...
@@ -1067,7 +1067,7 @@ dist-electron/dist/assets/main-CVMrfxfF.js                          553.79 kB Γ
 
 Γ£ô built in 2.30s
 
-> resourceforge@2.0.0 build:electron
+> solith@2.0.0 build:electron
 > tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
 
 CLI Building entry: {"main":"electron/main.ts"}
@@ -1098,7 +1098,7 @@ ESM dist-electron\main.js     627.31 KB
 ESM dist-electron\main.js.map 1.19 MB
 ESM ΓÜí∩╕Å Build success in 193ms
 
-≡ƒöì ResourceForge ΓÇö Electron Output Verifier
+≡ƒöì Solith ΓÇö Electron Output Verifier
 
 ΓöÇΓöÇ Required files
   Γ£à PASS [1] main.js exists
@@ -1164,7 +1164,7 @@ HEAD=620e76de427aa01f46bb143d09cca4b901602068
 TSC=0 NPM_TEST=0 BUILD_ELECTRON=0 BUILD=0
 ===== A11Y =====
 
-> resourceforge@2.0.0 test:accessibility
+> solith@2.0.0 test:accessibility
 > playwright test tests/accessibility.e2e.test.ts --config playwright.e2e.config.ts
 
 

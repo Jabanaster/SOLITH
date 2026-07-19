@@ -14,9 +14,9 @@ import { createBackup, restoreBackup } from '../src/core/backups/index.ts';
 import { Proposal } from '../src/shared/types/index.ts';
 import { acquireFileLock, releaseFileLock } from '../src/core/safety/file-lock.ts';
 
-describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
+describe('Solith Safety & Lifecycle Hardening Tests', () => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const testRoot = path.join(os.tmpdir(), `resourceforge-safety-${runId}`);
+  const testRoot = path.join(os.tmpdir(), `solith-safety-${runId}`);
   const testGameDir = path.join(testRoot, 'game');
   let gameId = '';
 
@@ -60,7 +60,7 @@ describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
     assert.ok(driveRootResult.reason?.includes('roots'));
 
     // 1c. Containment enforcement (outside game directory)
-    const outsidePath = path.join(os.tmpdir(), 'resourceforge-unauthorized.json');
+    const outsidePath = path.join(os.tmpdir(), 'solith-unauthorized.json');
     // Write a dummy file to ensure realpath can check it if it exists
     fs.writeFileSync(outsidePath, '{}');
     try {
@@ -276,7 +276,7 @@ describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
   test('9. Backup restore rejects target outside the approved game root', () => {
     const targetFile = path.join(testGameDir, 'save_restore_contained.json');
     const backupDir = path.join(testGameDir, 'backups');
-    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-restore-outside-'));
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-restore-outside-'));
     const outsideTarget = path.join(outsideDir, 'outside-save.json');
     const outsideContent = JSON.stringify({ gold: 777 });
     fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
@@ -296,7 +296,7 @@ describe('ResourceForge Safety & Lifecycle Hardening Tests', () => {
   test('10. Backup restore rejects symlink target escape when practical', (t) => {
     const targetFile = path.join(testGameDir, 'save_restore_symlink_source.json');
     const backupDir = path.join(testGameDir, 'backups');
-    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-restore-link-'));
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-restore-link-'));
     const outsideTarget = path.join(outsideDir, 'outside-save.json');
     const linkTarget = path.join(testGameDir, 'linked-outside-save.json');
     const outsideContent = JSON.stringify({ gold: 777 });

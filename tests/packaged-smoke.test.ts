@@ -87,7 +87,7 @@ test.afterAll(async () => {
       resourcesPath = await electronApp.evaluate(() => process.resourcesPath);
       // Compute derived paths from the known appPath and userData
       preloadPath = appGetAppPath + '\\dist-electron\\preload.cjs';
-      dbPath      = USER_DATA + '\\resourceforge.db';
+      dbPath      = USER_DATA + '\\solith.db';
     } catch { /* ignore if app closed early */ }
 
     await electronApp.close().catch(() => {});

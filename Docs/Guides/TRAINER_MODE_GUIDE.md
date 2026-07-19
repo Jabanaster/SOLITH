@@ -6,7 +6,7 @@ Trainer Mode is the simple editing interface. It shows your game's editable fiel
 
 ## Getting Started
 
-1. Launch ResourceForge
+1. Launch Solith
 2. Make sure the sidebar shows "Trainer" as the active mode (click it if not)
 3. Open "Game Library" and add your game's folder
 4. Click your game to open the Trainer
@@ -56,7 +56,7 @@ Use the sidebar categories to filter cards. "All Items" shows everything. Catego
 
 ## Safety Notes
 
-- ResourceForge never modifies a file without your confirmation
+- Solith never modifies a file without your confirmation
 - A backup is always created before any write
 - The game-running warning prevents accidental overwrites
 - Blocked and broken items cannot be edited at all

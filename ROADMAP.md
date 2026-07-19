@@ -1,8 +1,8 @@
-﻿# Solith / ResourceForge Roadmap
+﻿# Solith / Solith Roadmap
 
 ## Current Baseline (Solith 2.3.0-alpha.1)
 
-Product UI: **Solith** · package `resourceforge@2.3.0-alpha.1`
+Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 
 * Local **`master` @ `528c243`** — `cursor/atomfall-l3-live-cert` fast-forward merged (2026-07-16)
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
@@ -121,7 +121,7 @@ See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
 
 ## Historical: v1.0.2 baseline
 
-ResourceForge v1.0.2 remains the prior save-editor / Stardew-controls release baseline.
+Solith v1.0.2 remains the prior save-editor / Stardew-controls release baseline.
 
 * Tag: `v1.0.2`
 * Commit: `d84b155a8f6729f8428b5c777f0784853c65d419`
@@ -189,7 +189,7 @@ Current local development state:
 
 Fresh local-clone verification for Bite 2 passed from:
 
-`G:\RESOURCEFORGE_V11_BITE2_VERIFY`
+`G:\SOLITH_V11_BITE2_VERIFY`
 
 Bite 2 verification results:
 
@@ -550,7 +550,7 @@ Suggested pilot order:
 
 ## V1.3 Compatibility Pilot Process
 
-V1.3 makes ResourceForge safer for limited compatibility pilots without enabling new executable game controls by default.
+V1.3 makes Solith safer for limited compatibility pilots without enabling new executable game controls by default.
 
 V1.3 scope:
 
@@ -666,7 +666,7 @@ The following must not be altered casually:
 
 ## Explicit Non-Goals
 
-ResourceForge should not support:
+Solith should not support:
 
 * Online game cheating.
 * Multiplayer manipulation.

@@ -1,10 +1,10 @@
-﻿# ResourceForge Agent Skill File
+﻿# Solith Agent Skill File
 
 ## Identity
 
-You are an autonomous coding assistant working on **ResourceForge**.
+You are an autonomous coding assistant working on **Solith**.
 
-ResourceForge is a local-only, offline-only, single-player trainer/save-editor application.
+Solith is a local-only, offline-only, single-player trainer/save-editor application.
 
 Project root:
 ```
@@ -173,7 +173,7 @@ Bad:
 {
   "name": "read_file",
   "arguments": {
-    "path": "G:\\ACTIVE_PROJECTS\\ResourceForge\\AGENTS.md"
+    "path": "G:\\ACTIVE_PROJECTS\\Solith\\AGENTS.md"
   }
 }
 ```

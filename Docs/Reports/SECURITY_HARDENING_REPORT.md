@@ -1,6 +1,6 @@
 # Security Hardening Report
 
-This report details the implementation of safety guarantees, invariants, and mitigations constructed during the ResourceForge Security, Atomicity, and Core Architecture Hardening milestone.
+This report details the implementation of safety guarantees, invariants, and mitigations constructed during the Solith Security, Atomicity, and Core Architecture Hardening milestone.
 
 ## Executive Summary
 All security and safety invariants requested have been implemented, tested, and fully verified. The test suite has been expanded from 10 to 20 tests, covering all failure-injection cases, crash recovery outcomes (Cases A-E), path containment violations, concurrency locks, and recipe schema safety.
@@ -18,7 +18,7 @@ All security and safety invariants requested have been implemented, tested, and 
 ## 2. Windows Path Containment & Boundary Safety
 - **Canonical Path Resolution**: Handles drive roots, UNC paths, and case-insensitivity on Windows using `getCanonicalPath()` in [path-safety.ts](file:///g:/GAME%20TRAINER/src/core/safety/path-safety.ts).
 - **Junction & Reparse-Point Escape Protection**: The system re-verifies containment immediately before every write, rename, backup, and restore operation, ensuring that symbolic link or junction modifications pointing outside the game directory are blocked.
-- **System Folder Exclusions**: Rejects operations touching Windows system folders, drive roots, User profile roots, and the ResourceForge application installation directory.
+- **System Folder Exclusions**: Rejects operations touching Windows system folders, drive roots, User profile roots, and the Solith application installation directory.
 
 ---
 
@@ -30,7 +30,7 @@ All security and safety invariants requested have been implemented, tested, and 
 ---
 
 ## 4. Atomic Write & Sibling Swap Correctness
-- **Sibling Temp Writing**: File edits are generated in-memory via the adapter, written to a sibling temporary file (`.resourceforge-[uuid].tmp`) in the same folder on the same volume (preventing cross-volume rename failures), and validated before swap.
+- **Sibling Temp Writing**: File edits are generated in-memory via the adapter, written to a sibling temporary file (`.solith-[uuid].tmp`) in the same folder on the same volume (preventing cross-volume rename failures), and validated before swap.
 - **Permission Clones**: Sibling temporary files inherit the target file's original read/write permissions via `fs.chmodSync` before replacement.
 - **Atomic Replacement**: Targets are replaced atomically using `fs.renameSync`.
 - **Post-Write Hash Verification**: The system hashes the replaced target and verifies it matches the generated content hash, throwing an error on mismatch.

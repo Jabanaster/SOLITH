@@ -159,7 +159,7 @@ export async function recoverInterruptedOperations(): Promise<void> {
       
       const tmpPath = path.join(
         path.dirname(targetFile),
-        `${path.basename(targetFile)}.resourceforge-${opId}.tmp`
+        `${path.basename(targetFile)}.solith-${opId}.tmp`
       );
       const tmpExists = fs.existsSync(tmpPath);
       

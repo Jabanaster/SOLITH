@@ -103,7 +103,7 @@ export async function atomicWrite(
     // 7. Write to uniquely named sibling temporary file on the same volume
     tmpPath = path.join(
       path.dirname(canonicalTarget),
-      `${path.basename(canonicalTarget)}.resourceforge-${operationId}.tmp`
+      `${path.basename(canonicalTarget)}.solith-${operationId}.tmp`
     );
     
     // 8. Flush and close the temporary file
@@ -140,7 +140,7 @@ export async function atomicWrite(
     console.error('Atomic write failed:', error);
     return { success: false, error: String(error) };
   } finally {
-    // 13. Remove ResourceForge-owned temporary file if it remains (on failure)
+    // 13. Remove Solith-owned temporary file if it remains (on failure)
     if (tmpPath && fs.existsSync(tmpPath)) {
       try {
         fs.unlinkSync(tmpPath);
@@ -154,7 +154,7 @@ export async function atomicWrite(
 }
 
 /**
- * Scans a directory and cleans up any abandoned ResourceForge temporary files.
+ * Scans a directory and cleans up any abandoned Solith temporary files.
  */
 export function cleanupAbandonedTempFiles(dirPath: string): void {
   try {
@@ -165,7 +165,11 @@ export function cleanupAbandonedTempFiles(dirPath: string): void {
       const fullPath = path.join(dirPath, entry.name);
       if (entry.isDirectory()) {
         cleanupAbandonedTempFiles(fullPath);
-      } else if (entry.isFile() && entry.name.includes('.resourceforge-') && entry.name.endsWith('.tmp')) {
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith('.tmp') &&
+        (entry.name.includes('.solith-') || entry.name.includes('.resourceforge-'))
+      ) {
         try {
           fs.unlinkSync(fullPath);
           console.log(`Cleaned up abandoned temporary file: ${entry.name}`);

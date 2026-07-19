@@ -1,14 +1,14 @@
-# ResourceForge - Local AI Game Trainer & Save Editor
+# Solith - Local AI Game Trainer & Save Editor
 
-ResourceForge is a local/offline-only trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
+Solith is a local/offline-only trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
 
-ResourceForge is strictly designed for single-player, offline games or applications that you own or have permission to modify.
+Solith is strictly designed for single-player, offline games or applications that you own or have permission to modify.
 
 ---
 
 ## Multi-Game Live Trainer & Cheat Hub
 
-ResourceForge includes a **discovery-first live trainer** for curated titles plus a **save-field editor** for Stardew Valley. Memory cheats are **not** shipped as verified pointer packs. Bundled live features are typically **L0 `scan_unknown`**: you must discover (scan → narrow → confirm) addresses each session; addresses are session-local unless separately restart-verified (L3+), which is not claimed here.
+Solith includes a **discovery-first live trainer** for curated titles plus a **save-field editor** for Stardew Valley. Memory cheats are **not** shipped as verified pointer packs. Bundled live features are typically **L0 `scan_unknown`**: you must discover (scan → narrow → confirm) addresses each session; addresses are session-local unless separately restart-verified (L3+), which is not claimed here.
 
 | Game | Cheat defs (approx.) | Backend | Certification / honesty |
 |------|----------------------|---------|-------------------------|
@@ -37,7 +37,7 @@ ResourceForge includes a **discovery-first live trainer** for curated titles plu
    ```
    See [ANTIVIRUS_SETUP.md](Docs/ANTIVIRUS_SETUP.md) for detailed instructions.
 
-2. **Open ResourceForge** → Select a game from the cheat menu
+2. **Open Solith** → Select a game from the cheat menu
 3. **Confirm offline-only mode** (safety checkbox required)
 4. **Toggle cheats** or manually discover values
 5. **Enable freeze** to maintain infinite values
@@ -82,7 +82,7 @@ UI → useGameCheatSession (src/app/hooks/useGameCheatSession.ts)
    → cheat_toggle_state table (src/core/database/index.ts)
 ```
 
-Toggle state (enabled/disabled, last confirmed address, data type) survives a ResourceForge
+Toggle state (enabled/disabled, last confirmed address, data type) survives a Solith
 restart. It does **not** assume the target game process itself is still running with the same
 address layout — the caller re-verifies before reuse (see `cheat-toggle-store.ts` doc comment).
 
@@ -115,7 +115,7 @@ broad commercial-game live-trainer support, not multiplayer, and not anti-cheat 
 
 ## 🛡️ Safety Policy & Scope Limits
 
-To prevent accidental data loss, anti-cheat flags, or system instability, ResourceForge enforces strict scope gates:
+To prevent accidental data loss, anti-cheat flags, or system instability, Solith enforces strict scope gates:
 
 ### **Allowed Actions (Safe & File-Backed — default path)**
 - Save file editing (JSON, XML, INI, CSV, TSV, key/value text, Lua tables).
@@ -151,7 +151,7 @@ and the online-session guard — they are not available for arbitrary games or u
 
 ## 🧾 V2 Safe Support Workflow (UI + Report Model)
 
-ResourceForge V2 surfaces support state as **reviewable evidence**, not implicit execution capability:
+Solith V2 surfaces support state as **reviewable evidence**, not implicit execution capability:
 
 - **Profile catalog is local/offline** and bundled for deterministic review.
 - **Imported profiles are review-required** before any supported claim.
@@ -179,7 +179,7 @@ No remote calls are used for this workflow.
 
 ## 📂 Supported File Types & Parsers
 
-ResourceForge scans directories and automatically parses the following formats to extract values, categories, and safety ratings:
+Solith scans directories and automatically parses the following formats to extract values, categories, and safety ratings:
 
 1. **JSON**: Standard JSON and JSON with Comments (comments are safely stripped before parsing).
 2. **INI / CFG / CONF**: Supports standard configurations, sections, comments (`;` or `#`), and root-level keys.
@@ -187,13 +187,13 @@ ResourceForge scans directories and automatically parses the following formats t
 4. **CSV / TSV**: Delimiter-based tables.
 5. **Plain Text**: Standard `key = value` or `key: value` lines.
 6. **Lua Tables**: Safely parses simple key-value Lua tables (e.g. `{ hp = 100 }`) via safe regex mapping without executing code.
-7. **Binary Files (.sav, .dat, .bin)**: Unknown binary files are parsed as **read-only**. ResourceForge supports string extraction (printable ASCII >= 4 characters) and byte-diffing candidates between two saves. **Blind binary writing is strictly blocked.**
+7. **Binary Files (.sav, .dat, .bin)**: Unknown binary files are parsed as **read-only**. Solith supports string extraction (printable ASCII >= 4 characters) and byte-diffing candidates between two saves. **Blind binary writing is strictly blocked.**
 
 ---
 
 ## 💾 Save Discovery & External Scanning Policy
 
-ResourceForge scans directories for saves. To protect user privacy and system folders:
+Solith scans directories for saves. To protect user privacy and system folders:
 - **Default Scans**: Scans are local to the selected game folder only.
 - **External Scans**: Scans can check `Documents`, `Documents/My Games`, `AppData/Local`, `AppData/LocalLow`, `AppData/Roaming`, `Saved Games`, and Steam userdata folders.
 - **Approval Requirement**: External save location scanning is **disabled by default**. It must be explicitly approved/enabled by checking the "Enable External Save Scan" checkbox in the UI, which writes `externalSaveScanEnabled = true` to settings.
@@ -202,7 +202,7 @@ ResourceForge scans directories for saves. To protect user privacy and system fo
 
 ## 🧠 Value Classification & Confidence Scoring
 
-When comparing saves in the **Discovery Lab**, ResourceForge applies a confidence scoring pass to help you identify gameplay variables (like gold or health) while ignoring system metadata:
+When comparing saves in the **Discovery Lab**, Solith applies a confidence scoring pass to help you identify gameplay variables (like gold or health) while ignoring system metadata:
 
 - **Boosts (+10 to +25)**: Matches safe gameplay keywords (`health`, `gold`, `xp`, `stamina`, `level`), numeric changes, or exact old/new value matches.
 - **Penalties (-20 to -30)**: Matches risky keywords (`id`, `uuid`, `quest`), stats paths (`total_gold_earned`), or timestamps/session/autosave metadata.
@@ -223,7 +223,7 @@ Trainer recipes are compiled configurations. To prevent corrupting saves when ga
 
 ## 🛠️ Development Setup & Verification
 
-ResourceForge is built on **Electron**, **React**, and **TypeScript** with an offline-first **sql.js** persistent database.
+Solith is built on **Electron**, **React**, and **TypeScript** with an offline-first **sql.js** persistent database.
 
 ### **Install Dependencies**
 ```bash

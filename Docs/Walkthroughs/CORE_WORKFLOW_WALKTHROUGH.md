@@ -1,6 +1,6 @@
 # Core Workflow Walkthrough
 
-This document describes the complete flow from scanning to rollback in ResourceForge.
+This document describes the complete flow from scanning to rollback in Solith.
 
 ## Core Flow Steps
 1. **Game Registration**: A game is added to the library. The path is canonicalized and validated.

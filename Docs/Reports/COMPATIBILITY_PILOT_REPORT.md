@@ -52,7 +52,7 @@ Invariants:
 
 1. User nominates a real single-player game with a JSON or plain-text save format
 2. User provides or consents to copy one save file from their install
-3. ResourceForge Discovery Lab identifies candidate fields
+3. Solith Discovery Lab identifies candidate fields
 4. Sandbox pilot runs the full apply → verify → restore → verify cycle
 5. Tier 1 hash evidence recorded in `Docs/Compatibility/PILOT_RESULTS.md`
 6. Profile level updated to VERIFIED for that game

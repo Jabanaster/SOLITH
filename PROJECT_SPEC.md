@@ -1,6 +1,6 @@
-# RESOURCEFORGE — MASTER PROJECT SPECIFICATION
+﻿# SOLITH â€” MASTER PROJECT SPECIFICATION
 
-You are the principal software architect, product designer, security engineer, and implementation agent for a Windows desktop application named ResourceForge.
+You are the principal software architect, product designer, security engineer, and implementation agent for a Windows desktop application named Solith.
 
 This document is the authoritative project specification.
 
@@ -19,7 +19,7 @@ Do not repeatedly ask for product decisions already answered here.
 
 If the repository is empty, create the project from scratch.
 
-If the repository already contains ResourceForge code, continue from the current codebase without starting over or performing an unnecessary rewrite.
+If the repository already contains Solith code, continue from the current codebase without starting over or performing an unnecessary rewrite.
 
 ---
 
@@ -27,7 +27,7 @@ If the repository already contains ResourceForge code, continue from the current
 
 Product name:
 
-ResourceForge
+Solith
 
 Product category:
 
@@ -35,23 +35,23 @@ Local/offline game trainer, save editor, resource editor, and trainer-building p
 
 Primary product vision:
 
-ResourceForge should provide the polished trainer experience of applications such as Wand/WeMod while adding a major capability those products generally do not provide:
+Solith should provide the polished trainer experience of applications such as Wand/WeMod while adding a major capability those products generally do not provide:
 
-ResourceForge can inspect supported local games, discover editable values, explain those values, convert successful discoveries into reusable trainer controls, safely apply modifications, and restore original files.
+Solith can inspect supported local games, discover editable values, explain those values, convert successful discoveries into reusable trainer controls, safely apply modifications, and restore original files.
 
-ResourceForge is not merely a file browser or generic save editor.
+Solith is not merely a file browser or generic save editor.
 
 It must feel like a premium game trainer.
 
 The default user experience should be:
 
 Choose a game
-→ view trainer controls
-→ set or enable an option
-→ preview the change
-→ safely apply it
-→ continue playing
-→ roll back whenever necessary
+â†’ view trainer controls
+â†’ set or enable an option
+â†’ preview the change
+â†’ safely apply it
+â†’ continue playing
+â†’ roll back whenever necessary
 
 Advanced technical details should be available, but they must not dominate the default experience.
 
@@ -59,7 +59,7 @@ Advanced technical details should be available, but they must not dominate the d
 
 # 2. TARGET PLATFORM AND TECHNOLOGY
 
-Build ResourceForge as a Windows desktop application.
+Build Solith as a Windows desktop application.
 
 Required stack:
 
@@ -91,7 +91,7 @@ The app must continue to function when no local AI system is installed.
 
 # 3. NON-NEGOTIABLE PRODUCT BOUNDARIES
 
-ResourceForge is for:
+Solith is for:
 
 - Local games
 - Offline games
@@ -105,7 +105,7 @@ ResourceForge is for:
 - User-approved modifications
 - Reversible modifications
 
-ResourceForge V1 must not implement:
+Solith V1 must not implement:
 
 - Online game cheating
 - Multiplayer game modifications
@@ -131,11 +131,11 @@ Blocked files can be detected, cataloged, and shown, but they must not be modifi
 
 Live trainer functions belong to later V2 research and must not be falsely represented as functional during V1.
 
-### 3.1 Scoped exception — Live Memory Trainer (V2, decided 2026-07-05)
+### 3.1 Scoped exception â€” Live Memory Trainer (V2, decided 2026-07-05)
 
 Live process memory modification is permitted starting in V2, but only under
 all of the following constraints. These constraints are not optional or
-per-feature — they are the boundary of the capability itself:
+per-feature â€” they are the boundary of the capability itself:
 
 - Standard `ReadProcessMemory`/`WriteProcessMemory` only. No DLL injection,
   no code injection, no kernel drivers, no debugger attachment used to
@@ -144,7 +144,7 @@ per-feature — they are the boundary of the capability itself:
   check: the user must explicitly confirm the session is single-player/
   offline, AND automatic evidence (active non-loopback network connections
   owned by the target process) must show no sign of an online session.
-  Evidence overrides user confirmation — if evidence is unavailable or
+  Evidence overrides user confirmation â€” if evidence is unavailable or
   contradicts the confirmation, the operation is blocked. See
   `src/core/live-memory/online-guard.ts`.
 - The guard is rechecked immediately before every write and every rollback,
@@ -156,12 +156,12 @@ per-feature — they are the boundary of the capability itself:
 - A request to remove the online-session guard, or to apply this capability
   "regardless of online/multiplayer state," was explicitly declined during
   the 2026-07-05 design discussion because it would let the tool modify a
-  user's state while playing against real people online — that is a
+  user's state while playing against real people online â€” that is a
   different, unacceptable capability, not a configuration option of this
   one.
 
 This exception narrows the V1 prohibition above (V1 itself still ships with
-no live memory capability at all — see Milestone ordering in Section 45/
+no live memory capability at all â€” see Milestone ordering in Section 45/
 Section 42). It does not relax any other V1 boundary: no anti-cheat bypass,
 no DRM bypass, no online-game cheating, no multiplayer manipulation.
 
@@ -176,14 +176,14 @@ No modification may be applied immediately.
 Every modification must follow:
 
 Discovery or trainer selection
-→ proposal
-→ preview
-→ dry run
-→ explicit user approval
-→ backup
-→ atomic apply
-→ validation
-→ completion or automatic restoration
+â†’ proposal
+â†’ preview
+â†’ dry run
+â†’ explicit user approval
+â†’ backup
+â†’ atomic apply
+â†’ validation
+â†’ completion or automatic restoration
 
 ## 4.2 Deterministic execution
 
@@ -211,7 +211,7 @@ All file operations must be performed by deterministic, validated application co
 
 ## 4.3 Reversible modifications
 
-No edit may proceed unless ResourceForge can create a verified backup.
+No edit may proceed unless Solith can create a verified backup.
 
 ## 4.4 Transparent behavior
 
@@ -235,7 +235,7 @@ Those details belong in an advanced Workshop Mode.
 
 # 5. PRODUCT MODES
 
-ResourceForge must have two clearly separated experiences.
+Solith must have two clearly separated experiences.
 
 ## 5.1 Trainer Mode
 
@@ -343,31 +343,31 @@ Workshop Mode allows advanced users to discover and build trainer controls.
 
 1. User chooses Add Game.
 2. User selects a local game folder.
-3. ResourceForge canonicalizes and validates the path.
-4. ResourceForge blocks system or unsafe locations.
-5. ResourceForge records the game.
-6. ResourceForge scans the folder.
-7. ResourceForge detects the probable game engine.
-8. ResourceForge classifies resources.
-9. ResourceForge searches approved locations for saves.
-10. ResourceForge creates a game fingerprint.
-11. ResourceForge displays compatible trainer actions and suggestions.
+3. Solith canonicalizes and validates the path.
+4. Solith blocks system or unsafe locations.
+5. Solith records the game.
+6. Solith scans the folder.
+7. Solith detects the probable game engine.
+8. Solith classifies resources.
+9. Solith searches approved locations for saves.
+10. Solith creates a game fingerprint.
+11. Solith displays compatible trainer actions and suggestions.
 
 ## 6.2 Use an existing trainer action
 
 1. User opens a game.
 2. User selects a trainer option.
-3. ResourceForge resolves the correct target.
-4. ResourceForge reads the current value.
+3. Solith resolves the correct target.
+4. Solith reads the current value.
 5. User enters or selects a new value.
-6. ResourceForge creates a proposal.
+6. Solith creates a proposal.
 7. User previews the exact modification.
-8. ResourceForge performs a dry run.
+8. Solith performs a dry run.
 9. User approves.
-10. ResourceForge creates a backup.
-11. ResourceForge applies the change atomically.
-12. ResourceForge validates the result.
-13. ResourceForge records the operation.
+10. Solith creates a backup.
+11. Solith applies the change atomically.
+12. Solith validates the result.
+13. Solith records the operation.
 14. User can roll back later.
 
 ## 6.3 Discover a value
@@ -376,24 +376,24 @@ Workshop Mode allows advanced users to discover and build trainer controls.
 2. User selects Save or File A.
 3. User changes a known value in the game.
 4. User creates Save or File B.
-5. User optionally tells ResourceForge what changed.
-6. ResourceForge compares the files.
-7. ResourceForge filters noisy changes.
-8. ResourceForge ranks meaningful candidates.
+5. User optionally tells Solith what changed.
+6. Solith compares the files.
+7. Solith filters noisy changes.
+8. Solith ranks meaningful candidates.
 9. User confirms a candidate.
-10. ResourceForge creates a reusable trainer recipe.
+10. Solith creates a reusable trainer recipe.
 11. The new control appears in Trainer Mode.
 
 ## 6.4 Roll back a modification
 
 1. User opens Backups or operation history.
 2. User selects a completed modification.
-3. ResourceForge verifies the backup.
-4. ResourceForge verifies the current target.
+3. Solith verifies the backup.
+4. Solith verifies the current target.
 5. User confirms restoration.
-6. ResourceForge restores atomically.
-7. ResourceForge validates the restoration.
-8. ResourceForge records the rollback.
+6. Solith restores atomically.
+7. Solith validates the restoration.
+8. Solith records the rollback.
 
 ---
 
@@ -414,7 +414,7 @@ Primary layout:
 
 Include:
 
-- ResourceForge logo
+- Solith logo
 - Global search
 - Favorites
 - My Games
@@ -496,7 +496,7 @@ Categories with no available actions should either be hidden or show a useful em
 
 # 8. VISUAL DESIGN SYSTEM
 
-ResourceForge must be visually original.
+Solith must be visually original.
 
 Do not copy trademarks, logos, exact layouts, assets, or branded visuals from other trainer applications.
 
@@ -647,7 +647,7 @@ Use strict separation between UI, privileged operations, domain logic, adapters,
 
 Suggested structure:
 
-ResourceForge/
+Solith/
   package.json
   tsconfig.json
   electron-builder.yml
@@ -813,7 +813,7 @@ Blocked root examples include:
 - Program Files root
 - Drive roots
 - User profile root
-- ResourceForge application installation directory unless used for bundled read-only assets
+- Solith application installation directory unless used for bundled read-only assets
 
 External save locations require explicit user approval.
 
@@ -845,7 +845,7 @@ Requirements:
 - Do not leave a partially written original.
 - If temporary validation fails, delete the temporary file and keep the original.
 - If replacement fails, keep the original.
-- Detect and clean abandoned ResourceForge temporary files safely.
+- Detect and clean abandoned Solith temporary files safely.
 - Do not remove unrelated temporary files.
 - Prevent simultaneous modifications to the same target.
 - Support crash recovery.
@@ -961,8 +961,8 @@ Default ignored locations:
 - tmp
 - logs
 - crash dumps
-- .resourceforge
-- ResourceForge backup folders
+- .solith
+- Solith backup folders
 
 Progress should report:
 
@@ -1287,13 +1287,13 @@ Group related changes.
 Example:
 
 player.gold:
-100 → 250
+100 â†’ 250
 High confidence
 Inventory
 Suggested trainer: Set Gold
 
 stats.total_gold_earned:
-1000 → 1150
+1000 â†’ 1150
 Medium confidence
 Historical statistic
 Do not treat as current gold without confirmation
@@ -1330,11 +1330,11 @@ Keyword matching alone is insufficient.
 
 Confidence bands:
 
-- 90–100: Very High
-- 75–89: High
-- 50–74: Medium
-- 25–49: Low
-- 0–24: Very Low
+- 90â€“100: Very High
+- 75â€“89: High
+- 50â€“74: Medium
+- 25â€“49: Low
+- 0â€“24: Very Low
 
 Low-confidence discoveries must require additional confirmation.
 
@@ -1459,7 +1459,7 @@ When applying multiple recipes:
 - Support grouped transactions where safely possible
 - Stop on failure
 - Roll back the group when guaranteed safe
-- Never silently overwrite another recipe’s result
+- Never silently overwrite another recipeâ€™s result
 
 ---
 
@@ -1527,7 +1527,7 @@ Text:
 - Controlled replacement
 - Context lines
 
-Never show only “file will be modified.”
+Never show only â€œfile will be modified.â€
 
 Users must be able to understand the specific change.
 
@@ -1563,7 +1563,7 @@ Dry run must not modify the target.
 Support:
 
 - Per-game backup storage
-- Global ResourceForge-managed backup storage
+- Global Solith-managed backup storage
 - User-visible backup location
 - Backup verification
 - Retention preferences
@@ -1648,11 +1648,11 @@ AI output must not contain executable instructions used without validation.
 
 # 33. RULE-BASED FALLBACK
 
-ResourceForge must provide useful explanations without AI.
+Solith must provide useful explanations without AI.
 
 Example:
 
-“This value is likely current currency because its path contains ‘gold’, it appears under the player inventory structure, and it changed from 100 to 250 between the selected saves. It is considered a strong candidate because the change matches the values provided by the user. Structural IDs, checksums, and quest dependency fields remain locked.”
+â€œThis value is likely current currency because its path contains â€˜goldâ€™, it appears under the player inventory structure, and it changed from 100 to 250 between the selected saves. It is considered a strong candidate because the change matches the values provided by the user. Structural IDs, checksums, and quest dependency fields remain locked.â€
 
 Fallback explanations should use:
 
@@ -1705,7 +1705,7 @@ Requirements:
 - Timestamps
 - Versioned schemas
 
-Store the production database under Electron’s userData directory.
+Store the production database under Electronâ€™s userData directory.
 
 Do not store production state inside the source repository.
 
@@ -1758,7 +1758,7 @@ EACCES
 
 Good:
 
-“ResourceForge could not read this file. The file may be locked by the game or require additional permission. Close the game and try again.”
+â€œSolith could not read this file. The file may be locked by the game or require additional permission. Close the game and try again.â€
 
 Handle:
 
@@ -1803,7 +1803,7 @@ Steps:
 
 Required acknowledgement:
 
-“I will only use ResourceForge with local/offline games or applications that I own or have permission to modify.”
+â€œI will only use Solith with local/offline games or applications that I own or have permission to modify.â€
 
 AI setup must be skippable.
 
@@ -1901,7 +1901,7 @@ Required:
 
 # 41. V1 SCOPE
 
-ResourceForge V1 includes:
+Solith V1 includes:
 
 - Premium trainer-style UI
 - Trainer Mode
@@ -1975,20 +1975,20 @@ V2 features require separate architecture, safety, and testing milestones.
 
 Do not implement live trainer behavior while completing V1.
 
-### 42.1 Live Memory Trainer foundation — status (2026-07-05)
+### 42.1 Live Memory Trainer foundation â€” status (2026-07-05)
 
 First scoped bite landed (logic layer only; see Section 3.1 for the safety
 contract):
 
-- `src/core/live-memory/online-guard.ts` — fail-closed evaluator combining
+- `src/core/live-memory/online-guard.ts` â€” fail-closed evaluator combining
   user offline confirmation with remote-connection evidence.
-- `src/core/live-memory/remote-connection-observer.ts` — read-only
+- `src/core/live-memory/remote-connection-observer.ts` â€” read-only
   `netstat`-based observer counting ESTABLISHED non-loopback connections
   owned by the target PID (Windows only so far).
-- `src/core/live-memory/native-memory-driver.ts` — lazy-loaded wrapper over
+- `src/core/live-memory/native-memory-driver.ts` â€” lazy-loaded wrapper over
   the `memoryjs` native addon (ReadProcessMemory/WriteProcessMemory only).
-- `src/core/live-memory/live-memory-session.ts` — attach → propose → confirm
-  (guard rechecked immediately before write) → rollback → detach, mirroring
+- `src/core/live-memory/live-memory-session.ts` â€” attach â†’ propose â†’ confirm
+  (guard rechecked immediately before write) â†’ rollback â†’ detach, mirroring
   the file-based proposal/dry-run/apply/rollback philosophy in Section 4.1.
 - 14/14 unit tests passing against a fake driver
   (`tests/fixtures/fake-memory-driver.ts`); `npx tsc --noEmit` clean; full
@@ -1998,11 +1998,11 @@ Update (2026-07-05, same day): `memoryjs` now builds cleanly (two upstream
 bugs patched durably via `patch-package`, see `Docs/KNOWN_ISSUES.md` KI-015)
 and a real `ReadProcessMemory`/`WriteProcessMemory` round trip has been
 verified against a genuine separate live process via
-`scripts/live-memory-verify.mts` (not a mock — confirmed twice, including
+`scripts/live-memory-verify.mts` (not a mock â€” confirmed twice, including
 after a full reinstall/rebuild).
 
 Update (2026-07-06): IPC channels, typed preload API, and a Trainer-mode UI
-(`LiveMemoryTrainerPage.tsx`) landed — process picker, explicit offline
+(`LiveMemoryTrainerPage.tsx`) landed â€” process picker, explicit offline
 confirmation, manual address/dataType read/write through the propose/confirm
 flow. Also verified attach mechanics against a real, running commercial game
 (Stardew Valley.exe): process enumeration found it, and
@@ -2010,11 +2010,11 @@ flow. Also verified attach mechanics against a real, running commercial game
 anti-tamper blocking). This testing caught and fixed a real bug in the
 remote-connection observer (see `Docs/KNOWN_ISSUES.md` KI-017) and surfaced
 an unresolved design question about the guard blocking most Steam-integrated
-single-player games due to platform background networking — documented, not
+single-player games due to platform background networking â€” documented, not
 silently changed.
 
 Update (2026-07-06, same day): added a Cheat-Engine-style memory scanner
-(`src/core/live-memory/memory-scanner.ts` — first scan on an exact value
+(`src/core/live-memory/memory-scanner.ts` â€” first scan on an exact value
 across writable/committed regions, next scan narrowing an existing candidate
 set by exact/changed/unchanged/increased/decreased, all bounded by
 region-size/total-bytes/match-count caps so a scan cannot hang the main
@@ -2031,24 +2031,24 @@ real Stardew Valley (found the exact on-screen gold value; caught and fixed
 a real default-budget bug in the process). Added a reverse pointer scanner
 (`pointer-scanner.ts`) and pointer-path resolver (`pointer-resolver.ts`) to
 turn a session-specific scanned address into a restart-stable module+offset
-chain — necessary because a raw scanned address is only valid for the
+chain â€” necessary because a raw scanned address is only valid for the
 current process instance. Real-world testing found this technique does
-**not** work against Stardew Valley (a managed .NET/MonoGame game — its
+**not** work against Stardew Valley (a managed .NET/MonoGame game â€” its
 static roots live in CLR-internal structures, not fixed module offsets; see
 KI-018), but **does** work against Atomfall (a native C++ engine): found 20
-candidate static pointers, and — critically — verified by fully closing and
+candidate static pointers, and â€” critically â€” verified by fully closing and
 relaunching the game (new PID, new ASLR base, new heap layout) that exactly
 1 of those 20 still resolved correctly, while the other 19 resolved to
 garbage. That one path is now a real, named, reusable control
 (`live-control-catalog.ts`: `atomfall-current-weapon-ammo`), deliberately
 kept in its own catalog rather than added to `GameProfile.controls[]`,
 whose `validateGameProfile()` explicitly rejects `memory_write`/
-`memory_observation` backends as executable — a deliberate V1 boundary this
+`memory_observation` backends as executable â€” a deliberate V1 boundary this
 work does not touch. Also added a per-game connection-baseline exception to
 the online guard (`acceptedConnectionBaseline`, default 0/strict for any
 unreviewed game) so genuinely offline single-player sessions of specific,
 manually-reviewed games aren't blocked by their platform's own background
-networking (Steamworks/Xbox Live) — Stardew Valley (baseline 5) and Atomfall
+networking (Steamworks/Xbox Live) â€” Stardew Valley (baseline 5) and Atomfall
 (baseline 2) are the two reviewed entries; every other game still gets
 today's strict "any remote connection blocks" behavior. Full pipeline
 (attach with guard+baseline, catalog lookup, pointer resolution, live read)
@@ -2058,7 +2058,7 @@ live Atomfall process. `npm test` 508/508, `tsc --noEmit` clean,
 
 Not yet done: no per-game trainer controls exist for Palworld (the
 originally-requested game) or any game besides Atomfall. No value has ever
-been WRITTEN to a real game process — every real-game verification in this
+been WRITTEN to a real game process â€” every real-game verification in this
 work was deliberately read-only (scan, resolve, read), since a write to a
 live save carries real risk of corrupting the user's actual progress; the
 freeze-value loop and confirmWrite/rollback paths remain verified only
@@ -2185,11 +2185,11 @@ B. A verified backup exists and the recovery state is clearly recorded.
 
 # 44. COMPATIBILITY CLAIMS
 
-Do not claim ResourceForge can modify every game.
+Do not claim Solith can modify every game.
 
 Use accurate product language:
 
-“ResourceForge discovers and safely modifies supported local game resources. Unsupported, encrypted, signed, packed, protected, or custom formats are identified and left unchanged.”
+â€œSolith discovers and safely modifies supported local game resources. Unsupported, encrypted, signed, packed, protected, or custom formats are identified and left unchanged.â€
 
 Maintain a compatibility matrix.
 
@@ -2210,7 +2210,7 @@ Track:
 
 Execute in this order.
 
-## Milestone 0 — Repository audit and project foundation
+## Milestone 0 â€” Repository audit and project foundation
 
 - Inspect repository
 - Map implemented features
@@ -2223,7 +2223,7 @@ Execute in this order.
 - Create test foundation
 - Create implementation status document
 
-## Milestone 1 — Premium trainer UI foundation
+## Milestone 1 â€” Premium trainer UI foundation
 
 - Main shell
 - Sidebar
@@ -2237,7 +2237,7 @@ Execute in this order.
 - Settings shell
 - No fake functional claims
 
-## Milestone 2 — Game library, scanner, and fingerprinting
+## Milestone 2 â€” Game library, scanner, and fingerprinting
 
 - Add Game
 - Safe folder picker
@@ -2249,7 +2249,7 @@ Execute in this order.
 - Progress and cancellation
 - SQLite persistence
 
-## Milestone 3 — Security, adapters, atomicity, and operations
+## Milestone 3 â€” Security, adapters, atomicity, and operations
 
 - Typed IPC
 - Runtime validation
@@ -2263,7 +2263,7 @@ Execute in this order.
 
 This milestone must be complete before production file editing.
 
-## Milestone 4 — Save detection and parser adapters
+## Milestone 4 â€” Save detection and parser adapters
 
 - External save location approval
 - Latest-save detection
@@ -2274,7 +2274,7 @@ This milestone must be complete before production file editing.
 - Text key/value adapter
 - Read-only binary analysis
 
-## Milestone 5 — Discovery Lab and confidence engine
+## Milestone 5 â€” Discovery Lab and confidence engine
 
 - Comparison sessions
 - Noise suppression
@@ -2284,7 +2284,7 @@ This milestone must be complete before production file editing.
 - Optional AI explanations
 - Candidate confirmation
 
-## Milestone 6 — Trainer Builder and recipe system
+## Milestone 6 â€” Trainer Builder and recipe system
 
 - Versioned recipes
 - Trainer Builder
@@ -2294,7 +2294,7 @@ This milestone must be complete before production file editing.
 - Conflict detection
 - Trainer card generation
 
-## Milestone 7 — Proposal, preview, dry run, and apply
+## Milestone 7 â€” Proposal, preview, dry run, and apply
 
 - Proposal engine
 - Format-aware preview
@@ -2305,7 +2305,7 @@ This milestone must be complete before production file editing.
 - Automatic restoration
 - Operation journal
 
-## Milestone 8 — Rollback and recovery
+## Milestone 8 â€” Rollback and recovery
 
 - Backup browser
 - Restore verification
@@ -2313,7 +2313,7 @@ This milestone must be complete before production file editing.
 - Interrupted-operation recovery
 - Failure-injection tests
 
-## Milestone 9 — Local AI integration
+## Milestone 9 â€” Local AI integration
 
 - Ollama
 - LM Studio
@@ -2324,7 +2324,7 @@ This milestone must be complete before production file editing.
 - Rule fallback
 - Explanation UI
 
-## Milestone 10 — Demo workflow and UX polish
+## Milestone 10 â€” Demo workflow and UX polish
 
 - Guided demo
 - Reset demo
@@ -2335,7 +2335,7 @@ This milestone must be complete before production file editing.
 - Trainer-focused polish
 - Workshop-focused polish
 
-## Milestone 11 — Packaging infrastructure
+## Milestone 11 â€” Packaging infrastructure
 
 - userData paths
 - better-sqlite3 or SQLite packaging verification
@@ -2345,7 +2345,7 @@ This milestone must be complete before production file editing.
 - Packaged demo support
 - Packaged database smoke test
 
-## Milestone 12 — Release candidate QA
+## Milestone 12 â€” Release candidate QA
 
 - Complete workflow verification
 - Regression tests
@@ -2354,7 +2354,7 @@ This milestone must be complete before production file editing.
 - QA checklist
 - Packaged-mode testing
 
-## Milestone 13 — V1 release
+## Milestone 13 â€” V1 release
 
 - Version
 - Release notes
@@ -2365,7 +2365,7 @@ This milestone must be complete before production file editing.
 - Diagnostic export
 - Final verification
 
-## Milestone 14 — V2 architecture planning
+## Milestone 14 â€” V2 architecture planning
 
 Planning and scaffolding only:
 
@@ -2513,7 +2513,7 @@ Begin now.
 First:
 
 1. Inspect the repository.
-2. Determine whether ResourceForge already exists.
+2. Determine whether Solith already exists.
 3. Map the current codebase against this specification.
 4. Create or update:
    - PROJECT_SPEC.md
@@ -2523,7 +2523,7 @@ First:
 6. Start Milestone 0.
 7. Do not begin production game-file modifications until Electron security, path containment, adapter contracts, operation states, backup verification, and atomic-write infrastructure are in place.
 
-ResourceForge’s central promise is:
+Solithâ€™s central promise is:
 
 A premium trainer experience backed by transparent discovery, deterministic safety, verified backups, atomic changes, and reliable rollback.
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Compatibility profiles record how well ResourceForge works with a specific game's save files. They gate which operations are allowed and surface evidence quality to the user.
+Compatibility profiles record how well Solith works with a specific game's save files. They gate which operations are allowed and surface evidence quality to the user.
 
 ## Profile Levels
 
@@ -108,4 +108,4 @@ As of the V1 Trainer UX pilot commit, no commercial game saves have been submitt
 - Synthetic demo fixtures (VERIFIED via Tier 2 sandbox evidence)
 - Absent (no profile → dashboard shows BLOCKED_PENDING_USER_DATA)
 
-Real-world pilot data must be provided by the user per the Compatibility Pilot milestone. ResourceForge will never automatically fetch, store, or transmit commercial game saves.
+Real-world pilot data must be provided by the user per the Compatibility Pilot milestone. Solith will never automatically fetch, store, or transmit commercial game saves.

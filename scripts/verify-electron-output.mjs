@@ -33,7 +33,7 @@ function readBundleText(relativePath) {
   return readFileSync(full, 'utf8');
 }
 
-console.log('\n🔍 ResourceForge — Electron Output Verifier\n');
+console.log('\n🔍 Solith — Electron Output Verifier\n');
 
 // ── 1. Required files exist ──────────────────────────────────────────────────
 console.log('── Required files');

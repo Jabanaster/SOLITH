@@ -4,7 +4,7 @@ This log records the commands run during baseline validation and final milestone
 
 ## 2026-06-28 — Electron Runtime, Build Pipeline & Complete Workflow Verification
 
-Executed complete baseline and post-change verification command sets to prove that ResourceForge works as a real Electron application, using tsup bundler, strict local-only CSP, system font fallbacks, single-instance dev safeguards, and Playwright verification tests.
+Executed complete baseline and post-change verification command sets to prove that Solith works as a real Electron application, using tsup bundler, strict local-only CSP, system font fallbacks, single-instance dev safeguards, and Playwright verification tests.
 
 ### Verification Sequence:
 ```powershell
@@ -26,7 +26,7 @@ node scripts/verify-electron-output.mjs
 # 6. Production frontend Vite build
 npm run build:vite
 
-# 7. Package distribution build (after terminating locked background ResourceForge instances)
+# 7. Package distribution build (after terminating locked background Solith instances)
 npm run build
 
 # 8. Playwright Electron window smoke checks (6/6 passed)

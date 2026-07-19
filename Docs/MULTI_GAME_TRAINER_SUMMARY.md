@@ -1,4 +1,4 @@
-# ResourceForge Multi-Game Live Trainer - Complete Summary
+# Solith Multi-Game Live Trainer - Complete Summary
 
 > **ARCHIVED (2026-07-12)** — Historical milestone summary. Superseded by
 > `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` and `Docs/SOLITH_LIVE_TRAINER_PARITY.md`.
@@ -395,7 +395,7 @@ Others: connectionBaseline = 0 (strict mode)
 powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
 ```
 
-### **2. Launch ResourceForge**
+### **2. Launch Solith**
 - Build: `npm run build`
 - Dev: `npm run dev`
 - Package: `npm run package`
@@ -435,7 +435,7 @@ powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
 
 ## 🏆 Summary
 
-**ResourceForge now includes a production-ready, multi-game cheat trainer system that rivals WeMod in features while maintaining a fail-closed safety architecture, supporting 7 of your most-played games with 245+ pre-curated cheats, all delivered in one comprehensive commit sprint.**
+**Solith now includes a production-ready, multi-game cheat trainer system that rivals WeMod in features while maintaining a fail-closed safety architecture, supporting 7 of your most-played games with 245+ pre-curated cheats, all delivered in one comprehensive commit sprint.**
 
 **Status: Ready to use. Infrastructure complete. UI wiring and polish next.**
 

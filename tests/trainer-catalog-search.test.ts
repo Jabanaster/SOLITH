@@ -1,5 +1,5 @@
 /**
- * Catalog search filter unit tests — isolated from shared project data/resourceforge.db.
+ * Catalog search filter unit tests — isolated from shared project data/solith.db.
  * Uses resetForTesting() (:memory: sql.js) so Action+community LIMIT queries only see seeded rows.
  */
 import { after as afterAll, before as beforeAll, describe, test } from 'node:test';

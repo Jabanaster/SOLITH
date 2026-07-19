@@ -1,4 +1,4 @@
-# ResourceForge V1 — Non-User-Data Closeout Evidence Matrix
+# Solith V1 — Non-User-Data Closeout Evidence Matrix
 
 **Date:** 2026-06-23  
 **Milestone:** V1 Trainer UX + Real-World Compatibility  
@@ -270,7 +270,7 @@ Evidence tier: **Tier 2 (sandbox fixture)**. Real-world save evidence (Tier 1) r
 
 ### 2.9 No-Injection Safety Constraint
 
-The following operation types are permanently out of scope for ResourceForge:
+The following operation types are permanently out of scope for Solith:
 
 - Process injection, DLL injection, memory injection, live process patching, kernel drivers
 - Executable modification

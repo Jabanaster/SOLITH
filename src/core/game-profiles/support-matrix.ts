@@ -31,7 +31,7 @@ export interface SupportMatrixRow {
 }
 
 export interface SupportMatrixReport {
-  reportType: 'resourceforge-support-matrix';
+  reportType: 'solith-support-matrix';
   reportVersion: '1.0.0';
   localOnly: true;
   offlineOnly: true;
@@ -106,7 +106,7 @@ export function createSupportMatrixReport(
     .map(toRow);
 
   return {
-    reportType: 'resourceforge-support-matrix',
+    reportType: 'solith-support-matrix',
     reportVersion: '1.0.0',
     localOnly: true,
     offlineOnly: true,
@@ -122,7 +122,7 @@ export function renderSupportMatrixJson(report: SupportMatrixReport): string {
 
 export function renderSupportMatrixMarkdown(report: SupportMatrixReport): string {
   const lines: string[] = [
-    '# ResourceForge Support Matrix Report',
+    '# Solith Support Matrix Report',
     '',
     '- Scope: local-only, offline-only, single-player-only',
     `- Profiles: ${report.profileCount}`,

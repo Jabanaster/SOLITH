@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
 /**
- * Centrally managed unique ID generator for ResourceForge.
+ * Centrally managed unique ID generator for Solith.
  * Ensures consistent UUID generation across all database tables.
  */
 export function generateId(): string {

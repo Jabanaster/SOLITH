@@ -2,7 +2,7 @@
 
 ## Overview
 
-Trainer Mode is the primary end-user interface for ResourceForge. It presents editable trainer items as cards in a 3-region layout (sidebar categories, main card grid, right context panel). Every edit goes through a proposal → backup → apply → validate flow with a restore path.
+Trainer Mode is the primary end-user interface for Solith. It presents editable trainer items as cards in a 3-region layout (sidebar categories, main card grid, right context panel). Every edit goes through a proposal → backup → apply → validate flow with a restore path.
 
 ## Components
 

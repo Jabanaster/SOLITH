@@ -94,11 +94,11 @@ installElectronAppCrashHooks(app, {
 });
 
 // ── Single-instance lock ─────────────────────────────────────────────────────
-// Prevents multiple ResourceForge dev instances from stacking up.
+// Prevents multiple Solith dev instances from stacking up.
 // Only terminates OUR second instance — never touches unrelated Electron apps.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
-  console.log('[ResourceForge] Another instance is already running. Focusing it and exiting.');
+  console.log('[Solith] Another instance is already running. Focusing it and exiting.');
   app.quit();
   process.exit(0);
 }
@@ -134,6 +134,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      autoplayPolicy: 'no-user-gesture-required',
       // tsup bundles preload.ts as CJS into dist-electron/preload.cjs
       // (CJS is required for sandbox:true + contextIsolation:true to work)
       preload: path.join(moduleDirectory, 'preload.cjs')
@@ -146,7 +147,10 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setMenu(null);
 
-  const isDev = process.argv.includes('--dev') || process.env.RESOURCEFORGE_DEV === '1';
+  const isDev =
+    process.argv.includes('--dev') ||
+    process.env.SOLITH_DEV === '1' ||
+    process.env.RESOURCEFORGE_DEV === '1';
   const isCompatTest = process.argv.includes('--compat-test');
 
   if (isCompatTest) {

@@ -68,7 +68,7 @@ function ensureFixtures() {
   fs.writeFileSync(path.join(FIXTURES_DIR, 'binary/after.dat'), Buffer.from([0x46, 0x47, 0x01, 0x00, 0xfa, 0x00, 0x00, 0x00, 0x47, 0x6f, 0x6c, 0x64, 0x00])); // Gold = 250
 }
 
-describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
+describe('Solith Parser Adapters Expansion & Safety Tests', () => {
   before(() => {
     ensureFixtures();
   });
@@ -193,7 +193,7 @@ describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
 
   test('7. Sparse extensionless binary with integrity-like trailer remains read-only', async () => {
     const adapter = new BinaryAdapter();
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-sparse-binary-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-sparse-binary-'));
     const sparsePath = path.join(tempDir, 'synthetic-slot');
     const content = Buffer.alloc(4 * 1024 * 1024, 0);
     content.set([0x01, 0x00, 0x00, 0x80, 0x10, 0x20, 0x30, 0x40], 0);
@@ -218,7 +218,7 @@ describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
   });
 
   test('8. parseSaveFile rejects oversized JSON before full parse with sanitized error', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-oversize-json-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-oversize-json-'));
     const hugeJson = path.join(tempDir, 'private-character-save.json');
     try {
       fs.writeFileSync(hugeJson, Buffer.alloc(MAX_SAVE_FILE_BYTES + 1, 0x7b));
@@ -239,7 +239,7 @@ describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
   });
 
   test('9. parseSaveFile rejects oversized XML before full parse with sanitized error', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-oversize-xml-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-oversize-xml-'));
     const hugeXml = path.join(tempDir, 'private-character-save.xml');
     try {
       fs.writeFileSync(hugeXml, Buffer.alloc(MAX_SAVE_FILE_BYTES + 1, 0x3c));
@@ -259,7 +259,7 @@ describe('ResourceForge Parser Adapters Expansion & Safety Tests', () => {
   });
 
   test('10. parseSaveFile rejects oversized binary before base64 encoding with sanitized error', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-oversize-bin-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-oversize-bin-'));
     const hugeBin = path.join(tempDir, 'private-character-save.dat');
     try {
       fs.writeFileSync(hugeBin, Buffer.alloc(MAX_SAVE_FILE_BYTES + 1, 0x00));
