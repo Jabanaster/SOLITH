@@ -69,11 +69,19 @@ export interface CommunityPublishResult {
 function redactPii(value: unknown): unknown {
   if (typeof value === 'string') {
     return value
+      // Windows user profile paths
       .replace(/[A-Za-z]:\\Users\\[^\\/"']+/gi, '%USERPROFILE%')
       .replace(/\\\\[^\\/"']+\\Users\\[^\\/"']+/gi, '%USERPROFILE%')
+      // WSL / POSIX homes
       .replace(/\\\\wsl\$\\[^\\/"']+/gi, '$WSL_HOME')
       .replace(/\/\/wsl\$\/[^/"']+/gi, '$WSL_HOME')
-      .replace(/\/(?:Users|home)\/[^/"]+/gi, '$HOME');
+      .replace(/\/(?:Users|home)\/[^/"]+/gi, '$HOME')
+      // Generic absolute Windows drive paths (keep basename only for later)
+      .replace(/[A-Za-z]:\\(?:[^\\/"'\s]+\\)+/gi, '')
+      // Generic UNC roots
+      .replace(/\\\\[^\\/"'\s]+\\(?:[^\\/"'\s]+\\)*/gi, '')
+      // Generic POSIX absolute dirs
+      .replace(/\/(?:[^/"'\s]+\/)+/g, '/');
   }
   if (Array.isArray(value)) return value.map(redactPii);
   if (!value || typeof value !== 'object') return value;

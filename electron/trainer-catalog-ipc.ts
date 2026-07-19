@@ -6,7 +6,9 @@ import {
   searchCatalog,
   countCatalogEntries,
   getCatalogEntry,
+  getDefinitionPayload,
   getRecentSyncLogs,
+  hasUserAuthoredDefinition,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
 import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.js';
@@ -67,6 +69,10 @@ const ImportYamlSchema = z.object({
 const PublishToCommunitySchema = z.object({
   definition: SolithDefinitionV1Schema,
   executableHash: z.string().regex(/^[a-f0-9]{64}$/i),
+}).strict();
+
+const SyncHubSchema = z.object({
+  overwriteUserDefinitions: z.boolean().optional().default(false),
 }).strict();
 
 const moduleFilename = fileURLToPath(import.meta.url);
@@ -141,10 +147,29 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-sync-hub', async () => {
+  ipcMain.handle('trainer-catalog-sync-hub', async (_event, payload: unknown) => {
     try {
-      const report = await syncCommunityDefinitions();
+      const parsed = SyncHubSchema.parse(payload ?? {});
+      const report = await syncCommunityDefinitions({
+        overwriteUserDefinitions: parsed.overwriteUserDefinitions === true,
+      });
       return { success: report.status === 'synced', report };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-get-definition', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const definition = getDefinitionPayload(parsed.catalogGameId);
+      if (!definition) return { success: false, error: 'no_definition' };
+      const validated = SolithDefinitionV1Schema.parse(definition);
+      return {
+        success: true,
+        definition: validated,
+        canPublish: hasUserAuthoredDefinition(parsed.catalogGameId),
+      };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }
@@ -378,12 +403,8 @@ export async function bootstrapTrainerCatalog(): Promise<void> {
     }
   }
 
-  try {
-    await syncCommunityDefinitions();
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn('[trainer-catalog] Solith Hub sync skipped:', error);
-  }
+  // Automatic Hub polling is owned by electron/community-sync-orchestrator.ts
+  // (opt-in via communitySyncEnabled). Do not fetch here.
 }
 
 function sanitize(error: unknown): string {

@@ -235,4 +235,84 @@ describe('Solith Hub community definition sync', () => {
     assert.equal(stored?.safety.requiresApproval, true);
     assert.equal(stored?.safety.requiresOfflineConfirm, true);
   });
+
+  test('paginated delta sync advances the since cursor', async () => {
+    setSetting('communitySyncEnabled', true);
+    const requested: string[] = [];
+    const page1 = communityRecord();
+    const page2 = {
+      ...communityRecord(),
+      id: 'hub-record-2',
+      game_id: 'synthetic-game-2',
+      updated_at: '2026-07-17T09:00:00.000Z',
+      definition_payload: {
+        ...communityRecord().definition_payload,
+        id: 'synthetic-game-2',
+        title: 'Synthetic Game 2',
+      },
+    };
+
+    const result = await syncCommunityDefinitions({
+      fetchImpl: async (input) => {
+        const url = new URL(String(input));
+        requested.push(url.searchParams.get('since') ?? '');
+        if (requested.length === 1) {
+          return new Response(JSON.stringify({
+            definitions: [page1],
+            count: 1,
+            next_since: '2026-07-17T08:30:00.000Z',
+            has_more: true,
+          }));
+        }
+        return new Response(JSON.stringify({
+          definitions: [page2],
+          count: 1,
+          next_since: '2026-07-17T09:01:00.000Z',
+          has_more: false,
+        }));
+      },
+    });
+
+    assert.equal(result.status, 'synced');
+    assert.equal(result.imported, 2);
+    assert.equal(result.pages, 2);
+    assert.deepEqual(requested, [
+      '1970-01-01T00:00:00.000Z',
+      '2026-07-17T08:30:00.000Z',
+    ]);
+  });
+
+  test('explicit overwrite replaces a user-authored definition', async () => {
+    setSetting('communitySyncEnabled', true);
+    const local = communityRecord().definition_payload;
+    local.author = 'Local User';
+    upsertDefinitionPayload(
+      'synthetic-game-pack',
+      'synthetic-game',
+      JSON.stringify(local),
+      'community',
+      'user',
+      '2026-07-17T07:00:00.000Z',
+    );
+
+    const remote = communityRecord();
+    remote.definition_payload = {
+      ...remote.definition_payload,
+      author: 'Hub Author',
+    };
+
+    const result = await syncCommunityDefinitions({
+      overwriteUserDefinitions: true,
+      fetchImpl: async () => new Response(JSON.stringify({
+        definitions: [remote],
+        count: 1,
+        next_since: '2026-07-17T08:01:00.000Z',
+        has_more: false,
+      })),
+    });
+
+    assert.equal(result.imported, 1);
+    assert.equal(result.skippedUserDefinitions, 0);
+    assert.equal(getDefinitionPayload('synthetic-game')?.author, 'Hub Author');
+  });
 });

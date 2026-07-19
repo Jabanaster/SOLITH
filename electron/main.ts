@@ -50,6 +50,10 @@ import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
+import {
+  reconcileCommunitySyncPolling,
+  stopCommunitySyncPolling,
+} from './community-sync-orchestrator.js';
 import { installLocalCrashHandlers } from '../src/core/crash/local-crash-reporter.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
@@ -172,6 +176,7 @@ app.whenReady().then(async () => {
 
     try {
       await bootstrapTrainerCatalog();
+      await reconcileCommunitySyncPolling();
       await startCatalogProcessWatch();
     } catch (error) {
       console.error('Trainer catalog bootstrap failed:', error);
@@ -207,6 +212,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   unregisterTrainerHotkeys();
   destroyTrainerOverlay();
+  stopCommunitySyncPolling();
 });
 
 // Remove the app-level 'before-quit' listener installed by lifecycle wiring.
@@ -381,6 +387,11 @@ ipcMain.handle('set-setting', async (event, key: any, value: any) => {
     // immediately in the main process — do not rely solely on renderer cleanup.
     if (parsed.key === 'v2SessionMonitorEnabled' && parsed.value === false && lifecycleWiring) {
       lifecycleWiring.notifyFeatureChanged(false);
+    }
+
+    // Community Hub poller must mount/unmount immediately with the opt-in flag.
+    if (parsed.key === 'communitySyncEnabled') {
+      void reconcileCommunitySyncPolling();
     }
 
     return { success: true };

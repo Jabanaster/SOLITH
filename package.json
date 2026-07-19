@@ -65,7 +65,7 @@
     "verify:schema-v1-boundaries": "node scripts/verify-schema-v1-boundaries.mjs",
     "orphan-check": "node scripts/orphan-check.mjs",
     "certify:live-pointer": "tsx scripts/certify-live-pointer.mjs",
-    "test:phase3": "tsx --test tests/hub-sync.test.ts tests/community-trust.test.ts"
+    "test:phase3": "tsx --test tests/hub-sync.test.ts tests/community-trust.test.ts tests/community-sync-orchestrator.test.ts"
   },
   "keywords": [
     "trainer",

@@ -162,7 +162,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-catalog-get', payload),
   trainerCatalogSeed: () => ipcRenderer.invoke('trainer-catalog-seed'),
   trainerCatalogSyncRemote: () => ipcRenderer.invoke('trainer-catalog-sync-remote'),
-  trainerCatalogSyncHub: () => ipcRenderer.invoke('trainer-catalog-sync-hub'),
+  trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) =>
+    ipcRenderer.invoke('trainer-catalog-sync-hub', payload ?? {}),
+  trainerCatalogGetDefinition: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-get-definition', payload),
   publishToCommunity: (payload: {
     definition: unknown;
     executableHash: string;

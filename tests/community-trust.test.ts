@@ -34,6 +34,8 @@ describe('community definition trust layer', () => {
         executables: [
           'C:\\Users\\chase\\Games\\LocalGame.exe',
           '\\\\NAS\\Users\\chase\\Games\\LocalGame.exe',
+          'C:\\Games\\Other\\LocalGame.exe',
+          '/opt/games/LocalGame.exe',
         ],
         arch: 'x64',
       },
@@ -54,13 +56,18 @@ describe('community definition trust layer', () => {
 
     assert.equal(sanitized.author, 'community-contributor');
     assert.equal(sanitized.targetSHA256, 'a'.repeat(64));
-    assert.deepEqual(sanitized.target.executables, ['LocalGame.exe', 'LocalGame.exe']);
+    assert.deepEqual(sanitized.target.executables, [
+      'LocalGame.exe',
+      'LocalGame.exe',
+      'LocalGame.exe',
+      'LocalGame.exe',
+    ]);
     assert.equal(sanitized.certificationLevel, undefined);
     assert.equal(sanitized.memoryFeatures?.[0]?.certificationLevel, undefined);
     assert.equal(sanitized.safety.verificationStatus, 'community');
     assert.equal(sanitized.safety.requiresApproval, true);
     assert.equal(sanitized.safety.requiresOfflineConfirm, true);
     assert.equal(sanitized.memoryFeatures?.[0]?.resolution.moduleName, 'LocalGame.exe');
-    assert.doesNotMatch(JSON.stringify(sanitized), /chase|NAS|wsl/i);
+    assert.doesNotMatch(JSON.stringify(sanitized), /chase|NAS|wsl|Users\\|opt\/games/i);
   });
 });

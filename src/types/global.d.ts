@@ -185,7 +185,7 @@ interface Window {
       report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
       error?: string;
     }>;
-    trainerCatalogSyncHub: () => Promise<{
+    trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) => Promise<{
       success: boolean;
       report?: {
         status: 'disabled' | 'synced';
@@ -195,6 +195,12 @@ interface Window {
         pages: number;
         maxLocalTimestamp: number;
       };
+      error?: string;
+    }>;
+    trainerCatalogGetDefinition: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      definition?: import('../core/definitions/schema.v1.js').SolithDefinitionV1;
+      canPublish?: boolean;
       error?: string;
     }>;
     publishToCommunity: (payload: {
