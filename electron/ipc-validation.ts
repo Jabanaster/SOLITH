@@ -277,6 +277,11 @@ export const LiveMemoryZeroInputPrepareSchema = z.object({
   executableHashSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
   driftAcknowledged: z.boolean().optional(),
   maxFuzzyDistance: z.number().int().min(0).max(8).optional(),
+  /** Prior feature addresses (0x-hex) for SignatureEngine hint windows on re-prepare. */
+  featureHints: z.record(
+    z.string().min(1).max(128),
+    z.string().regex(/^0x[0-9a-f]{1,16}$/i),
+  ).optional(),
 });
 
 export const LiveMemoryDetachSchema = z.object({});

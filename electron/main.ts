@@ -54,7 +54,10 @@ import {
   reconcileCommunitySyncPolling,
   stopCommunitySyncPolling,
 } from './community-sync-orchestrator.js';
-import { installLocalCrashHandlers } from '../src/core/crash/local-crash-reporter.js';
+import {
+  installLocalCrashHandlers,
+  installElectronAppCrashHooks,
+} from '../src/core/crash/local-crash-reporter.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
@@ -80,8 +83,14 @@ if (process.env.ELECTRON_USER_DATA_PATH) {
 }
 
 // Telemetry-free local crash_report.txt under userData/logs (Zero-Input resilience).
+const crashLogsDir = path.join(app.getPath('userData'), 'logs');
 installLocalCrashHandlers({
-  logsDir: path.join(app.getPath('userData'), 'logs'),
+  logsDir: crashLogsDir,
+  appVersion: app.getVersion(),
+});
+installElectronAppCrashHooks(app, {
+  logsDir: crashLogsDir,
+  appVersion: app.getVersion(),
 });
 
 // ── Single-instance lock ─────────────────────────────────────────────────────

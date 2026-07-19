@@ -152,6 +152,11 @@ export class LiveMemorySession {
     return this.target?.executableName ?? null;
   }
 
+  /** Attached PID, or null if not attached. */
+  getAttachedPid(): number | null {
+    return this.target?.pid ?? null;
+  }
+
   isOfflineConfirmed(): boolean {
     return this.userConfirmedOffline;
   }

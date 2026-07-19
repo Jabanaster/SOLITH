@@ -31,6 +31,8 @@ import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
+import { setCrashReportContext } from '../src/core/crash/local-crash-reporter.js';
+import { hashInstalledExecutableForCatalog } from '../src/core/live-memory/installed-exe-hash.js';
 import {
   onAvowedMemoryManagerSnapshotEvent,
   onAvowedProcessAttached,
@@ -84,6 +86,12 @@ export function registerLiveMemoryIpc(): void {
       const mod = await getLiveMemoryModule();
       disposeSession(event.sender.id);
       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
+      const executableHashSHA256 =
+        parsed.executableHashSHA256 ??
+        (parsed.catalogGameId
+          ? hashInstalledExecutableForCatalog(parsed.catalogGameId, parsed.executableName) ??
+            undefined
+          : undefined);
 
       let fingerprint:
         | {
@@ -92,17 +100,18 @@ export function registerLiveMemoryIpc(): void {
             targetSHA256?: string;
             driftAcknowledged?: boolean;
             connectionBaseline?: number;
+            catalogGameId?: string;
           }
         | undefined;
 
       if (
-        parsed.executableHashSHA256 ||
+        executableHashSHA256 ||
         parsed.executableHashPrefixes?.length ||
         parsed.targetSHA256 ||
         parsed.catalogGameId
       ) {
         fingerprint = {
-          executableHashSHA256: parsed.executableHashSHA256,
+          executableHashSHA256,
           executableHashPrefixes: parsed.executableHashPrefixes,
           targetSHA256: parsed.targetSHA256,
           driftAcknowledged: parsed.driftAcknowledged,
@@ -133,7 +142,7 @@ export function registerLiveMemoryIpc(): void {
             targetSHA256: fingerprint?.targetSHA256 ?? fields.targetSHA256,
             connectionBaseline: fields.connectionBaseline,
             driftAcknowledged: fingerprint?.driftAcknowledged,
-            executableHashSHA256: fingerprint?.executableHashSHA256,
+            executableHashSHA256: fingerprint?.executableHashSHA256 ?? executableHashSHA256,
           };
         }
       }
@@ -146,6 +155,7 @@ export function registerLiveMemoryIpc(): void {
 
       if (result.success) {
         const bundle = bindSessionBundle(event.sender.id, session, mod);
+        refreshCrashContext(bundle);
         maybeStartAvowedWingdkBackups({
           executableName: parsed.executableName,
           catalogGameId: parsed.catalogGameId,
@@ -176,6 +186,13 @@ export function registerLiveMemoryIpc(): void {
       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
       const bundle = bindSessionBundle(event.sender.id, session, mod);
 
+      const executableHashSHA256 =
+        parsed.executableHashSHA256 ??
+        hashInstalledExecutableForCatalog(parsed.catalogGameId, parsed.executableName) ??
+        undefined;
+      const storedHints = featureHintStore.get(parsed.catalogGameId) ?? {};
+      const featureHints = { ...storedHints, ...(parsed.featureHints ?? {}) };
+
       const evidence = await mod.observeRemoteConnections(parsed.pid);
       const result = await mod.prepareZeroInputSession(
         session,
@@ -189,10 +206,11 @@ export function registerLiveMemoryIpc(): void {
           definition,
           userConfirmedOffline: parsed.userConfirmedOffline,
           remoteConnections: evidence,
-          executableHashSHA256: parsed.executableHashSHA256,
+          executableHashSHA256,
           driftAcknowledged: parsed.driftAcknowledged,
           fuzzyOptions:
             parsed.maxFuzzyDistance != null ? { maxDistance: parsed.maxFuzzyDistance } : undefined,
+          featureHints,
         },
         bundle.audit,
       );
@@ -207,6 +225,7 @@ export function registerLiveMemoryIpc(): void {
           fingerprintStatus: result.plan.fingerprint.status,
           fingerprintWarning: result.fingerprintWarning,
           attachError: result.attachError,
+          executableHashSHA256,
         };
       }
 
@@ -214,6 +233,15 @@ export function registerLiveMemoryIpc(): void {
         const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
         quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
       }
+
+      const nextHints: Record<string, string> = { ...storedHints };
+      for (const feature of result.features ?? []) {
+        if (feature.resolution !== 'failed' && feature.address && feature.address !== '0x0') {
+          nextHints[feature.featureId] = feature.address;
+        }
+      }
+      featureHintStore.set(parsed.catalogGameId, nextHints);
+      refreshCrashContext(bundle);
 
       maybeStartAvowedWingdkBackups({
         executableName: parsed.executableName,
@@ -227,6 +255,7 @@ export function registerLiveMemoryIpc(): void {
         executable: parsed.executableName,
         counts: result.counts,
         features: result.features,
+        featureHints: nextHints,
       };
 
       for (const win of BrowserWindow.getAllWindows()) {
@@ -242,6 +271,8 @@ export function registerLiveMemoryIpc(): void {
         fingerprintWarning: result.fingerprintWarning,
         counts: result.counts,
         features: result.features,
+        executableHashSHA256,
+        featureHints: nextHints,
       };
     } catch (error) {
       disposeSession(event.sender.id);
@@ -261,9 +292,10 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-read', async (event, payload: unknown) => {
     try {
-      const { manager } = requireBundle(event);
+      const bundle = requireBundle(event);
       const parsed = LiveMemoryReadSchema.parse(payload);
-      const value = manager.read({ address: BigInt(parsed.address), dataType: parsed.dataType });
+      const value = bundle.manager.read({ address: BigInt(parsed.address), dataType: parsed.dataType });
+      refreshCrashContext(bundle);
       return { success: true, value };
     } catch (error) {
       return { success: false, error: sanitize(error, 'read_failed') };
@@ -272,12 +304,13 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-propose-write', async (event, payload: unknown) => {
     try {
-      const { manager } = requireBundle(event);
+      const bundle = requireBundle(event);
       const parsed = LiveMemoryProposeWriteSchema.parse(payload);
-      const proposal = manager.proposeWrite(
+      const proposal = bundle.manager.proposeWrite(
         { address: BigInt(parsed.address), dataType: parsed.dataType },
         parsed.requestedValue,
       );
+      refreshCrashContext(bundle);
       // Serialize bigint address to a string for the structured-clone IPC boundary.
       return { success: true, proposal: { ...proposal, target: { ...proposal.target, address: proposal.target.address.toString() } } };
     } catch (error) {
@@ -287,9 +320,10 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-confirm-write', async (event, payload: unknown) => {
     try {
-      const { manager } = requireBundle(event);
+      const bundle = requireBundle(event);
       const parsed = LiveMemoryConfirmWriteSchema.parse(payload);
-      const result = await manager.confirmWrite(parsed.proposalId);
+      const result = await bundle.manager.confirmWrite(parsed.proposalId);
+      refreshCrashContext(bundle);
       return serializeWriteResult(result);
     } catch (error) {
       return { success: false, error: sanitize(error, 'confirm_write_failed') };
@@ -298,13 +332,14 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-rollback', async (event, payload: unknown) => {
     try {
-      const { manager } = requireBundle(event);
+      const bundle = requireBundle(event);
       const parsed = LiveMemoryRollbackSchema.parse(payload);
       const manifest = {
         ...parsed.manifest,
         target: { ...parsed.manifest.target, address: BigInt(parsed.manifest.target.address) },
       };
-      const result = await manager.rollback(manifest);
+      const result = await bundle.manager.rollback(manifest);
+      refreshCrashContext(bundle);
       return { success: result.success, guard: result.guard, error: result.error };
     } catch (error) {
       return { success: false, error: sanitize(error, 'rollback_failed') };
@@ -677,9 +712,23 @@ interface SessionBundle {
 }
 
 const sessions = new Map<number, SessionBundle>();
+/** catalogGameId → featureId → last resolved absolute address. */
+const featureHintStore = new Map<string, Record<string, string>>();
 
 function memoryAuditFilePath(): string {
   return path.join(app.getPath('userData'), 'logs', 'memory-audit.jsonl');
+}
+
+function refreshCrashContext(bundle: SessionBundle | undefined): void {
+  if (!bundle || !bundle.session.isAttached()) {
+    if (sessions.size === 0) setCrashReportContext(undefined);
+    return;
+  }
+  setCrashReportContext({
+    pid: bundle.session.getAttachedPid() ?? undefined,
+    executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+    recentAuditLines: bundle.audit.recent(25).map((entry) => JSON.stringify(entry)),
+  });
 }
 
 function bindSessionBundle(senderId: number, session: LiveMemorySession, mod: any): SessionBundle {
@@ -715,6 +764,7 @@ function disposeSession(senderId: number): void {
   }
   if (sessions.size === 0) {
     resetAvowedWingdkBackupSession();
+    setCrashReportContext(undefined);
   }
 }
 
@@ -722,6 +772,7 @@ function requireBundle(event: IpcMainInvokeEvent): SessionBundle {
   if (event.sender.isDestroyed()) throw new Error('sender_invalid');
   const bundle = sessions.get(event.sender.id);
   if (!bundle || !bundle.session.isAttached()) throw new Error('not_attached');
+  refreshCrashContext(bundle);
   return bundle;
 }
 

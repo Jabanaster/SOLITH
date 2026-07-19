@@ -63,6 +63,7 @@ interface Window {
       executableHashSHA256?: string;
       driftAcknowledged?: boolean;
       maxFuzzyDistance?: number;
+      featureHints?: Record<string, string>;
     }) => Promise<any>;
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
@@ -402,6 +403,7 @@ interface Window {
         fingerprintStatus?: string;
         hasDefinition?: boolean;
         prepareReady?: boolean;
+        executableHashSHA256?: string;
       }) => void,
     ) => (() => void) | undefined;
     onZeroInputReady?: (
@@ -411,6 +413,7 @@ interface Window {
         executable: string;
         counts?: { resolved: number; failed: number; scanRequired: number };
         features?: unknown[];
+        featureHints?: Record<string, string>;
       }) => void,
     ) => (() => void) | undefined;
 

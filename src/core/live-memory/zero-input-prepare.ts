@@ -24,6 +24,33 @@ export interface ZeroInputPrepareInput {
   executableHashSHA256?: string | null;
   driftAcknowledged?: boolean;
   fuzzyOptions?: FuzzyScanOptions;
+  /** Prior featureId → absolute address (bigint or 0x-hex string). */
+  featureHints?: Map<string, bigint> | Record<string, string>;
+}
+
+function normalizeFeatureHints(
+  hints: ZeroInputPrepareInput['featureHints'],
+): Map<string, bigint> | undefined {
+  if (!hints) return undefined;
+  if (hints instanceof Map) {
+    const valid = new Map(
+      [...hints.entries()].filter(
+        ([featureId, address]) => featureId.length > 0 && address > 0n,
+      ),
+    );
+    return valid.size > 0 ? valid : undefined;
+  }
+  const map = new Map<string, bigint>();
+  for (const [featureId, raw] of Object.entries(hints)) {
+    try {
+      if (!/^0x[0-9a-f]{1,16}$/i.test(raw)) continue;
+      const value = BigInt(raw);
+      if (value > 0n) map.set(featureId, value);
+    } catch {
+      // skip invalid
+    }
+  }
+  return map.size > 0 ? map : undefined;
 }
 
 export interface SerializedResolvedFeature {
@@ -167,6 +194,7 @@ export async function prepareZeroInputSession(
     features,
     session.getAddressCache(),
     input.fuzzyOptions,
+    normalizeFeatureHints(input.featureHints),
   );
 
   for (const f of resolved) {

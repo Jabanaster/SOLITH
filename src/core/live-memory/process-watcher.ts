@@ -185,6 +185,8 @@ export function resolveDefinitionFeatures(
   features: MemoryFeatureV1[],
   cache: SessionAddressCache,
   fuzzyOptions: FuzzyScanOptions = {},
+  /** Prior match addresses per featureId — used as SignatureEngine hint windows. */
+  featureHints?: Map<string, bigint>,
 ): ResolvedFeatureAddress[] {
   const results: ResolvedFeatureAddress[] = [];
 
@@ -208,11 +210,16 @@ export function resolveDefinitionFeatures(
     const { resolution } = feature;
     try {
       if (resolution.signature) {
+        const hintAddress = featureHints?.get(feature.id);
         const match: SignatureMatch | null = resolveSignature(
           driver,
           handle,
           resolution.signature,
-          { moduleName: resolution.moduleName, ...fuzzyOptions },
+          {
+            moduleName: resolution.moduleName,
+            ...fuzzyOptions,
+            ...(hintAddress != null ? { hintAddress } : {}),
+          },
         );
         if (match) {
           const baseOffset = parseHexOffset(resolution.baseOffset);

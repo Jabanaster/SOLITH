@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     executableHashSHA256?: string;
     driftAcknowledged?: boolean;
     maxFuzzyDistance?: number;
+    featureHints?: Record<string, string>;
   }) => ipcRenderer.invoke('live-memory-zero-input-prepare', payload),
   liveMemoryDetach: () => ipcRenderer.invoke('live-memory-detach'),
   liveMemoryRead: (payload: { address: string; dataType: string }) =>
@@ -248,6 +249,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       fingerprintStatus?: string;
       hasDefinition?: boolean;
       prepareReady?: boolean;
+      executableHashSHA256?: string;
     }) => callback(payload);
     ipcRenderer.on('catalog-process-detected', listener);
     return () => ipcRenderer.removeListener('catalog-process-detected', listener);
@@ -258,6 +260,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     executable: string;
     counts?: { resolved: number; failed: number; scanRequired: number };
     features?: unknown[];
+    featureHints?: Record<string, string>;
   }) => void) => {
     const listener = (_event: unknown, payload: {
       catalogGameId: string;
@@ -265,6 +268,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       executable: string;
       counts?: { resolved: number; failed: number; scanRequired: number };
       features?: unknown[];
+      featureHints?: Record<string, string>;
     }) => callback(payload);
     ipcRenderer.on('zero-input-ready', listener);
     return () => ipcRenderer.removeListener('zero-input-ready', listener);

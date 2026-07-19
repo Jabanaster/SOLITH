@@ -15,6 +15,7 @@ export interface CatalogProcessDetectionPayload {
   fingerprintStatus?: string;
   hasDefinition: boolean;
   prepareReady: boolean;
+  executableHashSHA256?: string;
 }
 
 let lastDetection: CatalogProcessDetectionPayload | null = null;
@@ -37,11 +38,20 @@ async function pollCatalogProcesses(): Promise<void> {
     if (!detection) return;
 
     const definition = loadCatalogDefinition(detection.catalogGameId);
+    const { hashInstalledExecutableForCatalog } = await import(
+      '../src/core/live-memory/installed-exe-hash.js'
+    );
+    const executableHashSHA256 = hashInstalledExecutableForCatalog(
+      detection.catalogGameId,
+      detection.executable,
+    );
+
     // Poll-time plan never auto-attaches: offline confirm is false until the user opts in.
     const plan = mod.planZeroInputDetection({
       detection,
       definition,
       userConfirmedOffline: false,
+      executableHashSHA256,
       remoteConnections: {
         availability: 'available',
         remoteConnectionCount: 0,
@@ -61,6 +71,7 @@ async function pollCatalogProcesses(): Promise<void> {
       hasDefinition: definition != null,
       // User must confirm offline + call prepare IPC; watch never attaches.
       prepareReady: definition != null,
+      executableHashSHA256: executableHashSHA256 ?? undefined,
     };
     lastDetection = payload;
 

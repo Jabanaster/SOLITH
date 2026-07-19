@@ -2,7 +2,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aobHammingDistance,
+  aobBoundedEditDistance,
   findBestFuzzyAobInBuffer,
+  findBestDriftAobInBuffer,
   resolveSignatureInBuffer,
   scanFuzzySignature,
   resolveSignature,
@@ -29,10 +31,43 @@ describe('signature-engine', () => {
     assert.equal(hit!.distance, 1);
   });
 
+  test('aobBoundedEditDistance tolerates a one-byte insert (byte-shift)', () => {
+    const pattern = parseAobSignature('DE AD BE EF');
+    // Inserted 0x00 between AD and BE
+    const haystack = Buffer.from([0xde, 0xad, 0x00, 0xbe, 0xef]);
+    const hit = aobBoundedEditDistance(haystack, pattern, 0, 1);
+    assert.ok(hit);
+    assert.equal(hit!.edits, 1);
+    assert.equal(hit!.consumed, 5);
+  });
+
+  test('edit matching tolerates a one-byte deletion at the buffer boundary', () => {
+    const pattern = parseAobSignature('DE AD BE EF');
+    const haystack = Buffer.from([0xde, 0xad, 0xef]);
+    const hit = findBestDriftAobInBuffer(haystack, pattern, {
+      maxDistance: 0,
+      maxEdits: 1,
+    });
+    assert.ok(hit);
+    assert.equal(hit!.offset, 0);
+    assert.equal(hit!.driftKind, 'edit');
+    assert.equal(hit!.distance, 1);
+  });
+
+  test('findBestDriftAobInBuffer recovers inserted-byte drift via edit kind', () => {
+    const pattern = parseAobSignature('11 22 33 44');
+    const haystack = Buffer.from([0xff, 0x11, 0x22, 0x99, 0x33, 0x44, 0x00]);
+    const hit = findBestDriftAobInBuffer(haystack, pattern, { maxDistance: 0, maxEdits: 1 });
+    assert.ok(hit);
+    assert.equal(hit!.driftKind, 'edit');
+    assert.equal(hit!.offset, 1);
+    assert.equal(hit!.distance, 1);
+  });
+
   test('resolveSignatureInBuffer prefers exact over fuzzy', () => {
     const haystack = Buffer.from([0xaa, 0x48, 0x8b, 0x05, 0x01, 0x02, 0x03, 0x04]);
-    const hit = resolveSignatureInBuffer(haystack, '48 8B 05 ? ? ? ?', 2);
-    assert.deepEqual(hit, { offset: 1, mode: 'exact', distance: 0 });
+    const hit = resolveSignatureInBuffer(haystack, '48 8B 05 ? ? ? ?', 2, 1);
+    assert.deepEqual(hit, { offset: 1, mode: 'exact', distance: 0, driftKind: 'hamming' });
   });
 
   test('scanFuzzySignature finds drifted pattern in process region', () => {
@@ -54,11 +89,97 @@ describe('signature-engine', () => {
     const match = scanFuzzySignature(driver, handle, '48 8B 05 ? ? ? ?', {
       moduleName: 'Demo.exe',
       maxDistance: 1,
+      maxEdits: 0,
     });
     assert.ok(match);
     assert.equal(match!.mode, 'fuzzy');
     assert.equal(match!.distance, 1);
+    assert.equal(match!.driftKind, 'hamming');
     assert.equal(match!.address, moduleBase + 8n);
+  });
+
+  test('scanFuzzySignature respects hintAddress shift window', () => {
+    const driver = new FakeMemoryDriver();
+    const moduleBase = 0x400000n;
+    driver.addModule('Demo.exe', moduleBase, 0x1000);
+    const region = Buffer.alloc(256, 0);
+    // Pattern only at offset 200 — far from a wrong hint near 0
+    region.writeUInt8(0xde, 200);
+    region.writeUInt8(0xad, 201);
+    region.writeUInt8(0xbe, 202);
+    region.writeUInt8(0xef, 203);
+    driver.addRegion(moduleBase, region);
+    const handle = driver.openProcess(1);
+
+    const miss = scanFuzzySignature(driver, handle, 'DE AD BE EF', {
+      moduleName: 'Demo.exe',
+      hintAddress: moduleBase + 8n,
+      maxShiftBytes: 16,
+      maxDistance: 0,
+      maxEdits: 0,
+    });
+    assert.equal(miss, null);
+
+    const hit = scanFuzzySignature(driver, handle, 'DE AD BE EF', {
+      moduleName: 'Demo.exe',
+      hintAddress: moduleBase + 190n,
+      maxShiftBytes: 32,
+      maxDistance: 0,
+      maxEdits: 0,
+    });
+    assert.ok(hit);
+    assert.equal(hit!.address, moduleBase + 200n);
+    assert.equal(hit!.shiftBytes, 10);
+  });
+
+  test('hint window includes a match exactly at maxShiftBytes', () => {
+    const driver = new FakeMemoryDriver();
+    const moduleBase = 0x410000n;
+    driver.addModule('Demo.exe', moduleBase, 0x1000);
+    const region = Buffer.alloc(64, 0);
+    region.set([0xde, 0xad, 0xbe, 0xef], 24);
+    driver.addRegion(moduleBase, region);
+    const handle = driver.openProcess(1);
+
+    const hit = scanFuzzySignature(driver, handle, 'DE AD BE EF', {
+      moduleName: 'Demo.exe',
+      hintAddress: moduleBase + 8n,
+      maxShiftBytes: 16,
+      maxDistance: 0,
+      maxEdits: 0,
+    });
+    assert.ok(hit);
+    assert.equal(hit!.address, moduleBase + 24n);
+    assert.equal(hit!.shiftBytes, 16);
+  });
+
+  test('module-scoped resolution fails closed when module is absent', () => {
+    const driver = new FakeMemoryDriver();
+    const regionBase = 0x420000n;
+    const region = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+    driver.addRegion(regionBase, region);
+    const handle = driver.openProcess(1);
+
+    assert.equal(
+      resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Missing.exe' }),
+      null,
+    );
+  });
+
+  test('module-scoped resolution does not match bytes outside module bounds', () => {
+    const driver = new FakeMemoryDriver();
+    const moduleBase = 0x430004n;
+    driver.addModule('Demo.exe', moduleBase, 4);
+    driver.addRegion(
+      moduleBase - 4n,
+      Buffer.from([0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x00, 0x00]),
+    );
+    const handle = driver.openProcess(1);
+
+    assert.equal(
+      resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' }),
+      null,
+    );
   });
 
   test('resolveSignature returns exact when available', () => {

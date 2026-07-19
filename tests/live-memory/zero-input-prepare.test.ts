@@ -171,4 +171,52 @@ describe('zero-input-prepare', () => {
     assert.ok(audit.recent().some((e) => e.op === 'attach'));
     assert.ok(audit.recent().some((e) => e.op === 'resolve' && e.featureId === 'health'));
   });
+
+  test('prepareZeroInputSession accepts featureHints map without failing', async () => {
+    const driver = new FakeMemoryDriver({ '4352': 50 });
+    driver.setProcessExecutableName(1234, 'Demo.exe');
+    driver.addModule('Demo.exe', 0x1000n, 0x1000);
+    const region = Buffer.alloc(0x200, 0);
+    region.set([0xde, 0xad, 0xbe, 0xef], 0x100);
+    driver.addRegion(0x1000n, region);
+    const session = new LiveMemorySession(driver);
+    session._injectRemoteConnectionObserver(async () => CLEAN);
+
+    const result = await prepareZeroInputSession(session, {
+      detection: {
+        catalogGameId: 'demo',
+        displayName: 'Demo',
+        pid: 1234,
+        executable: 'Demo.exe',
+      },
+      definition: makeDefinition({
+        memoryFeatures: [
+          {
+            id: 'sig-health',
+            name: 'Sig Health',
+            category: 'Player',
+            type: 'write_once',
+            dataType: 'int32',
+            defaultValue: 100,
+            resolution: {
+              moduleName: 'Demo.exe',
+              signature: 'DE AD BE EF',
+              baseOffset: '0x0',
+            },
+          },
+        ],
+        executableHashPrefixes: [],
+      }),
+      userConfirmedOffline: true,
+      remoteConnections: CLEAN,
+      featureHints: { 'sig-health': '0x1100' },
+      fuzzyOptions: { maxDistance: 2, maxEdits: 1 },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(session.isAttached(), true);
+    const feature = result.features?.find((entry) => entry.featureId === 'sig-health');
+    assert.equal(feature?.resolution, 'exact_aob');
+    assert.equal(feature?.address, '0x1100');
+  });
 });
