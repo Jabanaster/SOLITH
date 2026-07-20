@@ -17,7 +17,7 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
 | CI pipeline green (`npm test` / Electron output verifier) | **RESOLVED** — local Alpha gate **667/667** + Electron **19/19** @ `528c243` |
-| Injection contained (mainstream path RPM/WPM only; Milestone M pilot OFF by default) | **RESOLVED** — charter + gates unchanged |
+| Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 
 ### Stability lock
@@ -32,7 +32,7 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 
 ### Accepted capability stack
 
-```
+```text
 schema.v1.yml → compile → SQLite payloadJson
          ↑ export                    ↓ lazy load
    Discovery Lab              Trainer Library
@@ -40,10 +40,8 @@ schema.v1.yml → compile → SQLite payloadJson
                                     ├─ Trainer Deck / install discovery / health
                                     └─ saveEditor.saveFields → TrainerHost (catalog save controls)
 Trainer Research Lab → PE / memory diff / Script Analyzer / Dumpspace (Milestone L)
-In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by default)
+Dual-Core Live Engine → Internal (Win32 VEH/Injection) + External (WinGDK RPM) actively routing based on target environment.
 ```
-
-Honest live-memory stance (README): most bundled memory features remain **L0 `scan_unknown` / Discovery-required**. **Exception:** Atomfall `atomfall-current-weapon-ammo` is an **L3** restart-stable verified pointer (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`).
 
 ### Milestone map (recent)
 

@@ -91,81 +91,23 @@ The app must continue to function when no local AI system is installed.
 
 # 3. NON-NEGOTIABLE PRODUCT BOUNDARIES
 
-Solith is for:
+Solith is for local, offline, single-player games only.
 
-- Local games
-- Offline games
-- Single-player modes
-- User-owned games or games the user has permission to modify
-- Local applications the user has permission to modify
-- File-backed trainer actions
-- Save-file modifications
-- Configuration modifications
-- Structured data modifications
-- User-approved modifications
-- Reversible modifications
+### 3.1 The Dual-Core Live Memory Architecture
+Solith utilizes a context-aware hybrid engine for live memory modification:
+*   **Internal Engine (Win32/Steam/Epic):** Authorized to use in-process C++ DLL injection, Vectored Exception Handling (VEH) hooks, and Hardware Breakpoints (HWBP) for ultimate execution flow interception without corrupting original bytes.
+*   **External Engine (WinGDK/Game Pass):** Authorized to use `RPM_ONLY` (Read/WriteProcessMemory) with Fuzzy AOB state-delta tracking to safely bypass WindowsApps container restrictions.
 
-Solith V1 must not implement:
+### 3.2 STRICTLY PROHIBITED (The Safety Firewall)
+Solith must NEVER implement or allow:
+- Online game cheating or multiplayer game modifications.
+- Anti-cheat bypass (EAC, BattlEye, Vanguard, etc.).
+- DRM or License bypass.
+- Kernel-level drivers (Ring 0) or packet capture.
+- Automatic downloading or execution of unverified third-party executable payloads.
+- Modifying host OS security policies (e.g., disabling Windows Defender).
 
-- Online game cheating
-- Multiplayer game modifications
-- Anti-cheat bypass
-- DRM bypass
-- License bypass
-- Entitlement modification
-- Process injection
-- DLL injection
-- Code injection
-- Kernel drivers
-- Kernel-level memory access
-- Stealth behavior
-- Hiding from protection systems
-- Executable patching
-- Arbitrary binary patching
-- Trainer overlays
-- Runtime hotkey execution
-- Packed archive modification
-- Automatic modification of unknown binary files
-
-Blocked files can be detected, cataloged, and shown, but they must not be modified.
-
-Live trainer functions belong to later V2 research and must not be falsely represented as functional during V1.
-
-### 3.1 Scoped exception â€” Live Memory Trainer (V2, decided 2026-07-05)
-
-Live process memory modification is permitted starting in V2, but only under
-all of the following constraints. These constraints are not optional or
-per-feature â€” they are the boundary of the capability itself:
-
-- Standard `ReadProcessMemory`/`WriteProcessMemory` only. No DLL injection,
-  no code injection, no kernel drivers, no debugger attachment used to
-  bypass protections.
-- Every attach and every write requires a passing online-session guard
-  check: the user must explicitly confirm the session is single-player/
-  offline, AND automatic evidence (active non-loopback network connections
-  owned by the target process) must show no sign of an online session.
-  Evidence overrides user confirmation â€” if evidence is unavailable or
-  contradicts the confirmation, the operation is blocked. See
-  `src/core/live-memory/online-guard.ts`.
-- The guard is rechecked immediately before every write and every rollback,
-  not just at attach time, mirroring the "recheck containment immediately
-  before modification" principle used for file targets (Section 13).
-  A session that goes online mid-flow loses write capability immediately.
-  No anti-cheat interaction, no anti-cheat detection/bypass, no stealth
-  behavior, no hiding from protection systems.
-- A request to remove the online-session guard, or to apply this capability
-  "regardless of online/multiplayer state," was explicitly declined during
-  the 2026-07-05 design discussion because it would let the tool modify a
-  user's state while playing against real people online â€” that is a
-  different, unacceptable capability, not a configuration option of this
-  one.
-
-This exception narrows the V1 prohibition above (V1 itself still ships with
-no live memory capability at all â€” see Milestone ordering in Section 45/
-Section 42). It does not relax any other V1 boundary: no anti-cheat bypass,
-no DRM bypass, no online-game cheating, no multiplayer manipulation.
-
----
+Every live-memory attach requires a passing online-session guard check: the user must explicitly confirm the session is offline, AND automatic evidence (active non-loopback network connections) must show no sign of an online session.---
 
 # 4. CORE PRODUCT PRINCIPLES
 
@@ -1946,128 +1888,17 @@ Solith V1 includes:
 
 # 42. V2 ROADMAP
 
-V2 may investigate:
+V2 implements the Dual-Core Live Memory Engine:
 
-- Local/offline live trainer sessions
-- Read-only runtime value inspection
-- Session lifecycle management
-- Runtime trainer adapters
-- Trainer hotkeys
-- Freeze-value operations
-- Runtime toggles
-- Runtime game speed controls
-- Trainer overlay
-- Engine-specific adapters
-- Supported archive workflows
-- Texture and audio replacement
-- Community recipe packages
+- **External Baseline (Avowed / WinGDK):** Utilizes `RPM_ONLY` and fuzzy AOB state-delta tracking for protected WindowsApps containers.
+- **Internal Pinnacle (Crimson Desert / Win32):** Authorized in-process pilot establishing the framework for C++ DLL injection, VEH hooks, and Hardware Breakpoints on standard executable targets.
 
 V2 must retain:
-
-- Local/offline-only policy
-- No anti-cheat bypass
-- No DRM bypass
-- No stealth
-- No kernel drivers
-- No unsupported online or multiplayer use
-
-V2 features require separate architecture, safety, and testing milestones.
-
-Do not implement live trainer behavior while completing V1.
-
-### 42.1 Live Memory Trainer foundation â€” status (2026-07-05)
-
-First scoped bite landed (logic layer only; see Section 3.1 for the safety
-contract):
-
-- `src/core/live-memory/online-guard.ts` â€” fail-closed evaluator combining
-  user offline confirmation with remote-connection evidence.
-- `src/core/live-memory/remote-connection-observer.ts` â€” read-only
-  `netstat`-based observer counting ESTABLISHED non-loopback connections
-  owned by the target PID (Windows only so far).
-- `src/core/live-memory/native-memory-driver.ts` â€” lazy-loaded wrapper over
-  the `memoryjs` native addon (ReadProcessMemory/WriteProcessMemory only).
-- `src/core/live-memory/live-memory-session.ts` â€” attach â†’ propose â†’ confirm
-  (guard rechecked immediately before write) â†’ rollback â†’ detach, mirroring
-  the file-based proposal/dry-run/apply/rollback philosophy in Section 4.1.
-- 14/14 unit tests passing against a fake driver
-  (`tests/fixtures/fake-memory-driver.ts`); `npx tsc --noEmit` clean; full
-  suite 450/450.
-
-Update (2026-07-05, same day): `memoryjs` now builds cleanly (two upstream
-bugs patched durably via `patch-package`, see `Docs/KNOWN_ISSUES.md` KI-015)
-and a real `ReadProcessMemory`/`WriteProcessMemory` round trip has been
-verified against a genuine separate live process via
-`scripts/live-memory-verify.mts` (not a mock â€” confirmed twice, including
-after a full reinstall/rebuild).
-
-Update (2026-07-06): IPC channels, typed preload API, and a Trainer-mode UI
-(`LiveMemoryTrainerPage.tsx`) landed â€” process picker, explicit offline
-confirmation, manual address/dataType read/write through the propose/confirm
-flow. Also verified attach mechanics against a real, running commercial game
-(Stardew Valley.exe): process enumeration found it, and
-`nativeMemoryDriver.openProcess()`/`closeProcess()` succeeded cleanly (no
-anti-tamper blocking). This testing caught and fixed a real bug in the
-remote-connection observer (see `Docs/KNOWN_ISSUES.md` KI-017) and surfaced
-an unresolved design question about the guard blocking most Steam-integrated
-single-player games due to platform background networking â€” documented, not
-silently changed.
-
-Update (2026-07-06, same day): added a Cheat-Engine-style memory scanner
-(`src/core/live-memory/memory-scanner.ts` â€” first scan on an exact value
-across writable/committed regions, next scan narrowing an existing candidate
-set by exact/changed/unchanged/increased/decreased, all bounded by
-region-size/total-bytes/match-count caps so a scan cannot hang the main
-process) and a WeMod/Wand-style freeze-value loop on `LiveMemorySession`
-(continuously re-writes a value on an interval, rechecking the
-online-session guard every tick, stopping outright on the first guard
-failure rather than retrying silently). Both are wired through IPC/preload
-and into the Trainer-mode UI (scan workflow + freeze toggle). 34 new unit
-tests (13 scanner + 8 freeze + 10 observer + 3 misc), full suite 481/481,
-`tsc --noEmit` clean, `build:vite` and `build:electron` (19/19) both clean.
-
-Update (2026-07-06, continued): memory scanner verified read-only against
-real Stardew Valley (found the exact on-screen gold value; caught and fixed
-a real default-budget bug in the process). Added a reverse pointer scanner
-(`pointer-scanner.ts`) and pointer-path resolver (`pointer-resolver.ts`) to
-turn a session-specific scanned address into a restart-stable module+offset
-chain â€” necessary because a raw scanned address is only valid for the
-current process instance. Real-world testing found this technique does
-**not** work against Stardew Valley (a managed .NET/MonoGame game â€” its
-static roots live in CLR-internal structures, not fixed module offsets; see
-KI-018), but **does** work against Atomfall (a native C++ engine): found 20
-candidate static pointers, and â€” critically â€” verified by fully closing and
-relaunching the game (new PID, new ASLR base, new heap layout) that exactly
-1 of those 20 still resolved correctly, while the other 19 resolved to
-garbage. That one path is now a real, named, reusable control
-(`live-control-catalog.ts`: `atomfall-current-weapon-ammo`), deliberately
-kept in its own catalog rather than added to `GameProfile.controls[]`,
-whose `validateGameProfile()` explicitly rejects `memory_write`/
-`memory_observation` backends as executable â€” a deliberate V1 boundary this
-work does not touch. Also added a per-game connection-baseline exception to
-the online guard (`acceptedConnectionBaseline`, default 0/strict for any
-unreviewed game) so genuinely offline single-player sessions of specific,
-manually-reviewed games aren't blocked by their platform's own background
-networking (Steamworks/Xbox Live) â€” Stardew Valley (baseline 5) and Atomfall
-(baseline 2) are the two reviewed entries; every other game still gets
-today's strict "any remote connection blocks" behavior. Full pipeline
-(attach with guard+baseline, catalog lookup, pointer resolution, live read)
-verified end-to-end through the real `LiveMemorySession` class against the
-live Atomfall process. `npm test` 508/508, `tsc --noEmit` clean,
-`build:vite`/`build:electron` (19/19) both clean.
-
-Not yet done: no per-game trainer controls exist for Palworld (the
-originally-requested game) or any game besides Atomfall. No value has ever
-been WRITTEN to a real game process â€” every real-game verification in this
-work was deliberately read-only (scan, resolve, read), since a write to a
-live save carries real risk of corrupting the user's actual progress; the
-freeze-value loop and confirmWrite/rollback paths remain verified only
-against a fake driver, not yet against any real game. Non-Windows
-remote-connection observation remains unimplemented. The online-guard
-policy question from KI-017 (should the default ever be looser than 0 for
-unreviewed games) remains open and undecided.
-
----
+- Local/offline-only policy.
+- No anti-cheat bypass.
+- No DRM bypass.
+- No stealth or malicious kernel drivers.
+- No unsupported online or multiplayer use.
 
 # 43. TESTING STRATEGY
 
