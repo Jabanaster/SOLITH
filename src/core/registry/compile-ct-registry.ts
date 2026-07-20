@@ -57,6 +57,11 @@ export interface CompileSolithCtRegistryOptions {
   compiledAt?: string;
 }
 
+export interface CompileSolithCtRegistryFromXmlOptions extends CompileSolithCtRegistryOptions {
+  sourceFile: string;
+  sourcePath: string;
+}
+
 function slugId(value: string, fallback: string): string {
   const slug = value
     .toLowerCase()
@@ -126,8 +131,21 @@ export async function compileSolithCtRegistry(
   const xmlText = await fs.readFile(ctFilePath, 'utf8');
   const sourceFile = path.basename(ctFilePath);
   const sourcePath = path.resolve(ctFilePath);
+  return compileSolithCtRegistryFromXml(xmlText, {
+    ...options,
+    sourceFile,
+    sourcePath,
+  });
+}
+
+export async function compileSolithCtRegistryFromXml(
+  xmlText: string,
+  options: CompileSolithCtRegistryFromXmlOptions,
+): Promise<SolithUnifiedCtRegistry> {
+  const sourceFile = options.sourceFile;
+  const sourcePath = options.sourcePath;
   const sourceSha256 = crypto.createHash('sha256').update(xmlText, 'utf8').digest('hex');
-  const game = options.game ?? options.title ?? path.basename(ctFilePath, path.extname(ctFilePath));
+  const game = options.game ?? options.title ?? path.basename(sourceFile, path.extname(sourceFile));
   const title = options.title ?? game;
 
   const [pointers, scripts] = await Promise.all([

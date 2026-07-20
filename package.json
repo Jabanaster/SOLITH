@@ -36,6 +36,7 @@
     "prepare:branding": "node scripts/prepare-branding-assets.mjs",
     "scan:installed-games": "tsx scripts/scan-installed-games.mjs",
     "registry:compile": "tsx scripts/compile-ct-registry.mjs",
+    "ct-library:import": "tsx scripts/compile-ct-zip.mjs",
     "registry:inspect": "tsx scripts/inspect-registry.mjs",
     "registry:search": "tsx scripts/search-registry.mjs",
     "smoke:runtime-readonly": "tsx scripts/smoke-windows-readonly-runtime.mjs",
@@ -119,6 +120,8 @@
     "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.61.0",
     "@types/node": "^26.0.0",
+    "@types/yauzl": "^2.10.3",
+    "@types/yazl": "^2.4.5",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
     "electron": "^42.4.1",
@@ -128,7 +131,8 @@
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "vite": "^8.0.16",
-    "wait-on": "^8.0.3"
+    "wait-on": "^8.0.3",
+    "yazl": "^3.3.1"
   },
   "dependencies": {
     "@types/react": "^19.2.17",
@@ -141,6 +145,7 @@
     "typescript": "^6.0.3",
     "xml2js": "^0.6.2",
     "yaml": "^2.9.0",
+    "yauzl": "^3.2.0",
     "zod": "^4.4.3"
   }
 }
