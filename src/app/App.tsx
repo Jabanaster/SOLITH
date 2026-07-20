@@ -24,7 +24,7 @@ import { SolithTopBanner } from './components/SolithTopBanner.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
 import { OpeningCinematic } from './components/OpeningCinematic.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
-import openingCinematicUrl from '../../Create_a_second_cinematic_a.mp4';
+import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
