@@ -1,4 +1,4 @@
-import type { MemoryDriver, LiveProcessHandle } from '../live-memory/types.js';
+import type { LiveProcessHandle, MemoryModule } from '../live-memory/types.js';
 import { nativeMemoryDriver } from '../live-memory/native-memory-driver.js';
 import type { ReadOnlyMemoryReader } from './memory-reader.js';
 import type { RuntimeModuleInfo } from './module-inspection.js';
@@ -31,13 +31,29 @@ export interface WindowsReadOnlyProcessSession extends ReadOnlyMemoryReader {
   close(): void;
 }
 
+export interface ReadOnlyProcessModuleDriver {
+  openProcess(pid: number): LiveProcessHandle;
+  closeProcess(handle: LiveProcessHandle): void;
+  getProcessExecutableName(handle: LiveProcessHandle): string | null;
+  getModules(handle: LiveProcessHandle): MemoryModule[];
+  readBuffer(handle: LiveProcessHandle, address: bigint, size: number): Buffer;
+}
+
 export interface WindowsReadOnlyAdapterOptions {
-  driver?: MemoryDriver;
+  driver?: ReadOnlyProcessModuleDriver;
   platform?: NodeJS.Platform;
   maxReadBytes?: number;
 }
 
 const DEFAULT_MAX_READ_BYTES = 1024 * 1024;
+
+const nativeReadOnlyProcessModuleDriver: ReadOnlyProcessModuleDriver = {
+  openProcess: nativeMemoryDriver.openProcess.bind(nativeMemoryDriver),
+  closeProcess: nativeMemoryDriver.closeProcess.bind(nativeMemoryDriver),
+  getProcessExecutableName: nativeMemoryDriver.getProcessExecutableName.bind(nativeMemoryDriver),
+  getModules: nativeMemoryDriver.getModules.bind(nativeMemoryDriver),
+  readBuffer: nativeMemoryDriver.readBuffer.bind(nativeMemoryDriver),
+};
 
 function toAdapterError(error: unknown): WindowsReadOnlyAdapterError {
   const message = error instanceof Error ? error.message : String(error);
@@ -67,7 +83,7 @@ class WindowsReadOnlyProcessModuleSession implements WindowsReadOnlyProcessSessi
     public readonly process: RuntimeProcessSummary,
     private readonly handle: LiveProcessHandle,
     private readonly modules: RuntimeModuleInfo[],
-    private readonly driver: MemoryDriver,
+    private readonly driver: ReadOnlyProcessModuleDriver,
     private readonly maxReadBytes: number,
   ) {}
 
@@ -118,7 +134,7 @@ export function openWindowsReadOnlyProcessSession(
   }
   assertExplicitProcessSelection(process);
 
-  const driver = options.driver ?? nativeMemoryDriver;
+  const driver = options.driver ?? nativeReadOnlyProcessModuleDriver;
   let handle: LiveProcessHandle | null = null;
   try {
     handle = driver.openProcess(process.pid);

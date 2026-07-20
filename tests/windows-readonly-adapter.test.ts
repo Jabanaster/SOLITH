@@ -2,11 +2,12 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   openWindowsReadOnlyProcessSession,
+  type ReadOnlyProcessModuleDriver,
   WindowsReadOnlyAdapterError,
 } from '../src/core/runtime/windows-readonly-process-module-reader.ts';
-import type { MemoryDriver, LiveProcessHandle, LiveValueType, MemoryModule, MemoryRegion } from '../src/core/live-memory/types.ts';
+import type { LiveProcessHandle, MemoryModule } from '../src/core/live-memory/types.ts';
 
-class FakeMemoryDriver implements MemoryDriver {
+class FakeReadOnlyProcessModuleDriver implements ReadOnlyProcessModuleDriver {
   opened = false;
   closed = false;
   executableName: string | null = 'Game.exe';
@@ -39,26 +40,11 @@ class FakeMemoryDriver implements MemoryDriver {
     return this.partialRead ? result.subarray(0, Math.max(0, result.length - 1)) : result;
   }
 
-  readMemory(): number {
-    return 0;
-  }
-
-  writeMemory(_handle: LiveProcessHandle, _address: bigint, _dataType: LiveValueType, _value: number): void {
-    throw new Error('Fake test driver should not write.');
-  }
-
-  getRegions(): MemoryRegion[] {
-    return [];
-  }
-
-  readPointer(): bigint {
-    return 0n;
-  }
 }
 
 describe('Windows read-only process module adapter', () => {
   test('opens explicitly selected Windows process, verifies executable, reads module bytes, and closes', async () => {
-    const driver = new FakeMemoryDriver();
+    const driver = new FakeReadOnlyProcessModuleDriver();
     const session = openWindowsReadOnlyProcessSession(
       { pid: 123, executableName: 'Game.exe', selectedByUser: true },
       { driver, platform: 'win32' },
@@ -73,17 +59,17 @@ describe('Windows read-only process module adapter', () => {
 
   test('rejects unsupported platforms and non-explicit process selection', () => {
     assert.throws(
-      () => openWindowsReadOnlyProcessSession({ pid: 1, executableName: 'Game.exe', selectedByUser: true }, { driver: new FakeMemoryDriver(), platform: 'linux' }),
+      () => openWindowsReadOnlyProcessSession({ pid: 1, executableName: 'Game.exe', selectedByUser: true }, { driver: new FakeReadOnlyProcessModuleDriver(), platform: 'linux' }),
       /does not support linux/,
     );
     assert.throws(
-      () => openWindowsReadOnlyProcessSession({ pid: 1, executableName: 'Game.exe', selectedByUser: false }, { driver: new FakeMemoryDriver(), platform: 'win32' }),
+      () => openWindowsReadOnlyProcessSession({ pid: 1, executableName: 'Game.exe', selectedByUser: false }, { driver: new FakeReadOnlyProcessModuleDriver(), platform: 'win32' }),
       /explicitly selected/,
     );
   });
 
   test('cleans up handle when executable identity verification fails', () => {
-    const driver = new FakeMemoryDriver();
+    const driver = new FakeReadOnlyProcessModuleDriver();
     driver.executableName = 'Other.exe';
 
     assert.throws(
@@ -94,14 +80,14 @@ describe('Windows read-only process module adapter', () => {
   });
 
   test('returns structured errors for access denial, missing modules, invalid ranges, and partial reads', async () => {
-    const denied = new FakeMemoryDriver();
+    const denied = new FakeReadOnlyProcessModuleDriver();
     denied.throwOnOpen = new Error('Access is denied');
     assert.throws(
       () => openWindowsReadOnlyProcessSession({ pid: 123, executableName: 'Game.exe', selectedByUser: true }, { driver: denied, platform: 'win32' }),
       (error) => error instanceof WindowsReadOnlyAdapterError && error.code === 'access_denied',
     );
 
-    const driver = new FakeMemoryDriver();
+    const driver = new FakeReadOnlyProcessModuleDriver();
     const session = openWindowsReadOnlyProcessSession(
       { pid: 123, executableName: 'Game.exe', selectedByUser: true },
       { driver, platform: 'win32', maxReadBytes: 4 },
@@ -125,5 +111,12 @@ describe('Windows read-only process module adapter', () => {
       () => session.readModuleBytes(session.getModules()[0]!, 0, 3),
       (error) => error instanceof WindowsReadOnlyAdapterError && error.code === 'partial_read',
     );
+  });
+
+  test('exposes no write-capable driver surface to the adapter', () => {
+    const driver = new FakeReadOnlyProcessModuleDriver();
+    assert.equal('writeMemory' in driver, false);
+    assert.equal('readPointer' in driver, false);
+    assert.equal('getRegions' in driver, false);
   });
 });
