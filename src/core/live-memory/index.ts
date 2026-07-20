@@ -15,6 +15,12 @@ export type {
 } from './live-memory-session.js';
 export { scanFirst, scanNext } from './memory-scanner.js';
 export type { ScanResult } from './memory-scanner.js';
+export { RealtimeScanner } from './real-time-scanner.js';
+export type {
+  RealtimeScannerCandidate,
+  RealtimeScannerConfig,
+  RealtimeScannerStopReason,
+} from './real-time-scanner.js';
 export { getConnectionBaseline, listReviewedConnectionBaselines } from './game-connection-baselines.js';
 export { scanForPointerPath } from './pointer-scanner.js';
 export type { PointerScanBounds, PointerPathCandidate, PointerScanResult } from './pointer-scanner.js';
