@@ -38,6 +38,7 @@
     "registry:compile": "tsx scripts/compile-ct-registry.mjs",
     "registry:inspect": "tsx scripts/inspect-registry.mjs",
     "registry:search": "tsx scripts/search-registry.mjs",
+    "smoke:runtime-readonly": "tsx scripts/smoke-windows-readonly-runtime.mjs",
     "test:install-discovery": "tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts tests/install-discovery-epic-gog.test.ts",
     "test:trainer-health": "tsx --test tests/trainer-health.test.ts tests/trainer-deck-rows.test.ts tests/catalog-demand.test.ts",
     "test:drill-core": "tsx --test tests/drill-core-settings.test.ts",
