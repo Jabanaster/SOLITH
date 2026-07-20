@@ -79,3 +79,4 @@ export function summarizeCtLibraryIndex(
 }
 
 export * from './types.js';
+export * from './search.js';

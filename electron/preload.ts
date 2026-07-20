@@ -197,6 +197,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogExportDefinition: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-export-definition', payload),
   trainerCatalogPendingQuarantine: () => ipcRenderer.invoke('trainer-catalog-pending-quarantine'),
+  ctLibrarySummary: () => ipcRenderer.invoke('ct-library-summary'),
+  ctLibrarySearch: (payload: {
+    query?: string;
+    gameId?: string;
+    kind?: 'all' | 'pointer' | 'script' | 'aob';
+    limit?: number;
+    offset?: number;
+  }) => ipcRenderer.invoke('ct-library-search', payload),
+  ctLibraryGameDetail: (payload: { gameId: string }) => ipcRenderer.invoke('ct-library-game-detail', payload),
   trainerResearchPickExe: () => ipcRenderer.invoke('trainer-research-pick-exe'),
   trainerResearchAnalyzeExe: (payload: { filePath: string }) =>
     ipcRenderer.invoke('trainer-research-analyze-exe', payload),

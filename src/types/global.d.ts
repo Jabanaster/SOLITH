@@ -350,6 +350,33 @@ interface Window {
       }>;
       error?: string;
     }>;
+    ctLibrarySummary: () => Promise<{
+      success: boolean;
+      available: boolean;
+      summary?: import('../core/ct-library/types.js').CtLibrarySummaryIndex;
+      error?: string;
+    }>;
+    ctLibrarySearch: (payload: {
+      query?: string;
+      gameId?: string;
+      kind?: 'all' | 'pointer' | 'script' | 'aob';
+      limit?: number;
+      offset?: number;
+    }) => Promise<{
+      success: boolean;
+      available: boolean;
+      summary?: import('../core/ct-library/types.js').CtLibrarySummaryIndex;
+      total: number;
+      results: import('../core/ct-library/search.js').CtLibrarySearchResult[];
+      error?: string;
+    }>;
+    ctLibraryGameDetail: (payload: { gameId: string }) => Promise<{
+      success: boolean;
+      available: boolean;
+      game?: import('../core/ct-library/types.js').CtLibraryGameSummary;
+      tables: import('../core/registry/compile-ct-zip.js').CtZipCatalogEntry[];
+      error?: string;
+    }>;
     liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) => Promise<{
       success: boolean;
       result?: {

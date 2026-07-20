@@ -16,6 +16,7 @@ export type ModuleViewId =
   | 'controls'
   | 'live-memory'
   | 'trainer-library'
+  | 'ct-library'
   | 'trainer-deck'
   | 'catalog-save-controls';
 
@@ -30,6 +31,7 @@ export type ModuleViewId =
 export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtwork>> = {
   library: 'trainerController',
   'trainer-library': 'trainerController',
+  'ct-library': 'hoodedProfile',
   trainer: 'trainerController',
   saves: 'saveTools',
   controls: 'saveTools',
