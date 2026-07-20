@@ -15,6 +15,7 @@ import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import TrainerLibraryPage from './pages/TrainerLibraryPage';
 import TrainerDeckPage from './pages/TrainerDeckPage';
 import CatalogTrainerControlsPage from './pages/CatalogTrainerControlsPage';
+import RegistryExplorerPage from './pages/RegistryExplorerPage';
 import { ProcessDetectToast } from './components/ProcessDetectToast.js';
 import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode } from './components/LibraryLaunchDialog.js';
 import { Icon, type IconName } from './components/icons/index.js';
@@ -57,7 +58,7 @@ type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'trainer-research'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
   | 'session-monitor' | 'controls' | 'live-memory' | 'trainer-library'
-  | 'catalog-save-controls' | 'trainer-deck';
+  | 'catalog-save-controls' | 'trainer-deck' | 'registry-explorer';
 
 type NavItem = {
   id: View;
@@ -126,6 +127,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'discovery', label: 'Discovery Lab', icon: 'discovery' },
       { id: 'trainer-research', label: 'Trainer Research Lab', icon: 'search' },
+      { id: 'registry-explorer', label: 'Registry Explorer', icon: 'database' },
       { id: 'data', label: 'Data Editor', icon: 'database' },
       { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
       { id: 'recipes', label: 'Recipes', icon: 'apply' },
@@ -304,6 +306,8 @@ const App: React.FC = () => {
         return <DiscoveryLab gameId={selectedGame?.id ?? null} />;
       case 'trainer-research':
         return <ExternalTrainerResearchLab />;
+      case 'registry-explorer':
+        return <RegistryExplorerPage />;
       case 'recipes':
         return <Recipes gameId={selectedGame?.id ?? null} />;
       case 'backups':
