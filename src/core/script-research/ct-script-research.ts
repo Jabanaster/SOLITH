@@ -79,13 +79,19 @@ function walkRawScriptCatalog(
   const raw = rawScriptFromEntry(record);
 
   if (raw && desc) {
-    out.push({
+    const scriptEntry: CtRawScriptCatalogEntry = {
       name: desc,
       path: currentPath,
       type: raw.type,
+      script_excerpt: raw.content.slice(0, 500),
       raw_script_content: raw.content,
       executable: false,
-    });
+    };
+    const ctId = textValue(record.ID).trim();
+    if (ctId) {
+      scriptEntry.ctId = ctId;
+    }
+    out.push(scriptEntry);
   }
 
   const children = record.CheatEntry;

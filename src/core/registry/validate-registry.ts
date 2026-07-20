@@ -84,8 +84,12 @@ export function validateRegistryArtifact(value: unknown): RegistryValidationResu
         errors.push(`aobSignatures[${index}] must be an object.`);
         return;
       }
-      for (const field of ['id', 'symbol', 'scanType', 'pattern', 'normalizedPattern', 'sourceEntryDescription']) {
+      for (const field of ['id', 'symbol', 'scanType', 'sourceEntryDescription']) {
         requireString(signature, field, errors, `aobSignatures[${index}]`);
+      }
+      if (typeof signature.pattern !== 'string') errors.push(`aobSignatures[${index}].pattern must be a string.`);
+      if (typeof signature.normalizedPattern !== 'string') {
+        errors.push(`aobSignatures[${index}].normalizedPattern must be a string.`);
       }
       if (signature.executable !== false) errors.push(`aobSignatures[${index}].executable must be false.`);
       if (!Array.isArray(signature.warnings)) errors.push(`aobSignatures[${index}].warnings must be an array.`);

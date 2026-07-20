@@ -5,12 +5,15 @@ import { slugifyGameId } from '../trainer-catalog/types.js';
 
 export interface CtImportEntry {
   id: string;
+  ctId?: string;
   name: string;
   category: string;
   dataType: MemoryDataType;
   moduleName: string;
+  rawAddress: string;
   baseOffset?: string;
   pointerChain: number[];
+  showAsHex: boolean;
   rejectedReason?: string;
 }
 
@@ -24,6 +27,7 @@ export interface CtImportResult {
 }
 
 const REJECTED_CHILD_TAGS = [
+  'CheatScript',
   'AutoAssemblerScript',
   'AssemblerScript',
   'LuaScript',
@@ -69,6 +73,7 @@ function hasRejectedScript(entry: Record<string, unknown>): string | null {
     if (tag === 'CheatEntry') continue;
     if (entry[tag]) return `${tag} not supported`;
   }
+  if (entry.CheatScript && String(entry.CheatScript).trim()) return 'CheatScript not supported';
   if (entry.LuaScript && String(entry.LuaScript).trim()) return 'LuaScript not supported';
   if (entry.AutoAssemblerScript && String(entry.AutoAssemblerScript).trim()) return 'AutoAssembler not supported';
   return null;
@@ -169,15 +174,22 @@ export async function parseCheatTableXml(xmlText: string, options: { title?: str
       return;
     }
 
-    accepted.push({
+    const acceptedEntry: CtImportEntry = {
       id: slugId(name, index),
       name,
       category: 'Imported',
       dataType,
       moduleName: address.moduleName,
+      rawAddress: textValue(entry.Address).trim(),
       baseOffset: address.baseOffset,
       pointerChain: parseOffsets(entry),
-    });
+      showAsHex: /^1|true$/i.test(textValue(entry.ShowAsHex).trim()),
+    };
+    const ctId = textValue(entry.ID).trim();
+    if (ctId) {
+      acceptedEntry.ctId = ctId;
+    }
+    accepted.push(acceptedEntry);
   });
 
   const memoryFeatures: MemoryFeatureV1[] = accepted.map((e) => ({

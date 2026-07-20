@@ -11,6 +11,7 @@ const ENTRY: CtRawScriptCatalogEntry = {
   path: 'Avowed 2.0 AOB script > Infinite Health',
   type: 'AutoAssembler_Script',
   executable: false,
+  script_excerpt: '[ENABLE]',
   raw_script_content: `[ENABLE]
 aobscanmodule(playerHealth,Avowed-Win64-Shipping.exe,48 8B ?? * 89 45 F8)
 label(returnHealth)
@@ -71,7 +72,8 @@ aobscanmodule(badThing,Game.exe,AA ZZ)
           ...ENTRY,
           name: 'Infinite Essence',
           path: 'Avowed 2.0 AOB script > Infinite Essence',
-          raw_script_content: '[ENABLE]\naobscanmodule(playerEssence,Avowed-Win64-Shipping.exe,48 8B ?? * 89 45 F8)\n[DISABLE]',
+      raw_script_content: '[ENABLE]\naobscanmodule(playerEssence,Avowed-Win64-Shipping.exe,48 8B ?? * 89 45 F8)\n[DISABLE]',
+          script_excerpt: '[ENABLE]',
         },
       ],
     };

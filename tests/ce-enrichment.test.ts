@@ -9,6 +9,7 @@ describe('CE script enrichment', () => {
       path: 'Root > Health Hook',
       type: 'AutoAssembler_Script',
       executable: false,
+      script_excerpt: '[ENABLE]',
       raw_script_content: `[ENABLE]
 aobscanmodule(playerHealth,Game.exe,48 8B ??)
 alloc(newmem,$1000,playerHealth)
@@ -44,6 +45,7 @@ unregistersymbol(playerHealth)`,
       path: 'Broken',
       type: 'AutoAssembler_Script',
       executable: false,
+      script_excerpt: '[ENABLE]',
       raw_script_content: '[ENABLE]\nregistersymbol(orphan)',
     });
 

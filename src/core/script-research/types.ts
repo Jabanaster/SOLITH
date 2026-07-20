@@ -40,9 +40,11 @@ export interface CtScriptResearchReport {
 export type CtRawScriptType = 'AutoAssembler_Script' | 'Lua_Script' | 'CheatScript_Metadata';
 
 export interface CtRawScriptCatalogEntry {
+  ctId?: string;
   name: string;
   path: string;
   type: CtRawScriptType;
+  script_excerpt: string;
   raw_script_content: string;
   executable: false;
 }

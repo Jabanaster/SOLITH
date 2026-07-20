@@ -34,6 +34,7 @@ const registry = {
       name: 'Health Script',
       path: 'Health Script',
       type: 'AutoAssembler_Script',
+      script_excerpt: '[ENABLE]',
       raw_script_content: '[ENABLE]\naobscanmodule(playerHealth,Avowed-Win64-Shipping.exe,48 8B ??)\n[DISABLE]',
       executable: false,
     }],
