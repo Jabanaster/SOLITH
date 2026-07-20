@@ -1,7 +1,13 @@
 import { parseStringPromise } from 'xml2js';
 import { slugifyGameId } from '../trainer-catalog/types.js';
 import { analyzeAaScript } from './aa-script-analyzer.js';
-import type { AaScriptAnalysis, CtScriptResearchReport } from './types.js';
+import type {
+  AaScriptAnalysis,
+  CtRawScriptCatalog,
+  CtRawScriptCatalogEntry,
+  CtRawScriptType,
+  CtScriptResearchReport,
+} from './types.js';
 
 function textValue(field: unknown): string {
   if (field == null) return '';
@@ -19,6 +25,22 @@ function scriptFromEntry(record: Record<string, unknown>): string {
     textValue(record.AutoAssemblerScript) ||
     textValue(record.LuaScript)
   ).trim();
+}
+
+function rawScriptFromEntry(record: Record<string, unknown>): { content: string; type: CtRawScriptType } | null {
+  const cheatScript = textValue(record.CheatScript).trim();
+  if (cheatScript) return { content: cheatScript, type: 'CheatScript_Metadata' };
+
+  const assemblerScript = (
+    textValue(record.AssemblerScript) ||
+    textValue(record.AutoAssemblerScript)
+  ).trim();
+  if (assemblerScript) return { content: assemblerScript, type: 'AutoAssembler_Script' };
+
+  const luaScript = textValue(record.LuaScript).trim();
+  if (luaScript) return { content: luaScript, type: 'Lua_Script' };
+
+  return null;
 }
 
 function walkScripts(
@@ -43,6 +65,38 @@ function walkScripts(
   for (const child of list) {
     walkScripts(child, defaultExecutable, pathLabel ? `${pathLabel} > ${desc}` : desc, out);
   }
+}
+
+function walkRawScriptCatalog(
+  node: unknown,
+  pathLabel = '',
+  out: CtRawScriptCatalogEntry[] = [],
+): CtRawScriptCatalogEntry[] {
+  if (!node || typeof node !== 'object') return out;
+  const record = node as Record<string, unknown>;
+  const desc = textValue(record.Description).replace(/^"|"$/g, '').trim();
+  const currentPath = desc ? (pathLabel ? `${pathLabel} > ${desc}` : desc) : pathLabel;
+  const raw = rawScriptFromEntry(record);
+
+  if (raw && desc) {
+    out.push({
+      name: desc,
+      path: currentPath,
+      type: raw.type,
+      raw_script_content: raw.content,
+      executable: false,
+    });
+  }
+
+  const children = record.CheatEntry;
+  if (children) {
+    const list = Array.isArray(children) ? children : [children];
+    for (const child of list) walkRawScriptCatalog(child, currentPath, out);
+  }
+
+  if (record.CheatEntries) walkRawScriptCatalog(record.CheatEntries, currentPath, out);
+
+  return out;
 }
 
 function guessExecutable(title: string): string {
@@ -88,6 +142,34 @@ export async function analyzeCheatTableScripts(
     scripts,
     allSymbols,
     notes,
+  };
+}
+
+export async function extractCheatTableRawScriptCatalog(
+  xmlText: string,
+  options: { title?: string; sourceNote?: string } = {},
+): Promise<CtRawScriptCatalog> {
+  const parsed = (await parseStringPromise(xmlText, { explicitArray: false, trim: true })) as Record<
+    string,
+    unknown
+  >;
+  const table = (parsed.CheatTable ?? parsed.cheatTable) as Record<string, unknown> | undefined;
+  const title =
+    options.title ??
+    (textValue(table?.CheatTableTitle) ||
+      textValue(table?.Title) ||
+      'Cheat Table Script Catalog');
+  const catalogGameId = slugifyGameId(title);
+  const scripts: CtRawScriptCatalogEntry[] = [];
+  if (table?.CheatEntries) walkRawScriptCatalog(table.CheatEntries, '', scripts);
+
+  return {
+    title,
+    catalogGameId,
+    sourceNote:
+      options.sourceNote ??
+      'Raw Cheat Engine script text extracted as inert Solith metadata. Scripts are never executed.',
+    scripts,
   };
 }
 

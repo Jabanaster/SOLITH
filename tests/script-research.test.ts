@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeAaScript, normalizeCeAobPattern } from '../src/core/script-research/aa-script-analyzer.ts';
-import { analyzeCheatTableScripts } from '../src/core/script-research/ct-script-research.ts';
+import {
+  analyzeCheatTableScripts,
+  extractCheatTableRawScriptCatalog,
+} from '../src/core/script-research/ct-script-research.ts';
 import { mergeDumpspaceWithScriptResearch } from '../src/core/ue-research/research-merge.ts';
 import { buildDumpspaceImportSummary } from '../src/core/ue-research/dumpspace-import.ts';
 import { buildSchemaDraftFromCandidates } from '../src/core/trainer-research/schema-draft.ts';
@@ -55,6 +58,39 @@ describe('script-research analyzer', () => {
     const friendship = report.scripts.find((s) => /Fast friendship/i.test(s.cheatName));
     assert.ok(friendship);
     assert.ok(friendship!.aobScans.length > 0);
+  });
+
+  test('extracts nested raw CT scripts as inert metadata', async () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<CheatTable>
+  <CheatTableTitle>Avowed Research</CheatTableTitle>
+  <CheatEntries>
+    <CheatEntry>
+      <Description>"[ENABLE] Steam 2.1"</Description>
+      <CheatEntries>
+        <CheatEntry>
+          <Description>"Create Console"</Description>
+          <CheatScript>[ENABLE]
+aobscanmodule(console,Avowed-Win64-Shipping.exe,48 8B ?? ??)
+[DISABLE]</CheatScript>
+        </CheatEntry>
+        <CheatEntry>
+          <Description>"Lua helper"</Description>
+          <LuaScript>print('metadata only')</LuaScript>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+</CheatTable>`;
+    const catalog = await extractCheatTableRawScriptCatalog(xml, { title: 'Avowed' });
+    assert.equal(catalog.catalogGameId, 'avowed');
+    assert.equal(catalog.scripts.length, 2);
+    assert.equal(catalog.scripts[0]?.name, 'Create Console');
+    assert.equal(catalog.scripts[0]?.type, 'CheatScript_Metadata');
+    assert.equal(catalog.scripts[0]?.executable, false);
+    assert.match(catalog.scripts[0]?.raw_script_content ?? '', /aobscanmodule/);
+    assert.equal(catalog.scripts[1]?.type, 'Lua_Script');
+    assert.match(catalog.scripts[1]?.path ?? '', /\[ENABLE\] Steam 2\.1 > Lua helper/);
   });
 
   test('merges UEDumper members with script cheat names', async () => {

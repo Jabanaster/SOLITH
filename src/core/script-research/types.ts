@@ -37,6 +37,23 @@ export interface CtScriptResearchReport {
   notes: string[];
 }
 
+export type CtRawScriptType = 'AutoAssembler_Script' | 'Lua_Script' | 'CheatScript_Metadata';
+
+export interface CtRawScriptCatalogEntry {
+  name: string;
+  path: string;
+  type: CtRawScriptType;
+  raw_script_content: string;
+  executable: false;
+}
+
+export interface CtRawScriptCatalog {
+  title: string;
+  catalogGameId: string;
+  sourceNote: string;
+  scripts: CtRawScriptCatalogEntry[];
+}
+
 export interface MergedUeScriptHint {
   cheatName: string;
   scriptStrategy: ScriptReplicationStrategy;
