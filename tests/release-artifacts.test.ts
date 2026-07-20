@@ -17,12 +17,12 @@ function makeRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-release-artifacts-'));
 }
 
-test('release artifact paths follow package productName (Solith 2.0.0)', () => {
+test('release artifact paths follow package productName and package version', () => {
   const root = makeRoot();
   const pkg = readPackageMetadata(findRepoRoot(import.meta.url));
   const paths = releaseArtifactPaths(root, pkg);
 
-  assert.equal(path.basename(paths.installer), 'Solith Setup 2.0.0.exe');
+  assert.equal(path.basename(paths.installer), `${pkg.build.productName} Setup ${pkg.version}.exe`);
   assert.equal(path.basename(paths.executable), 'Solith.exe');
   assert.equal(paths.unpackedHost.endsWith(path.join('app.asar.unpacked', 'dist-electron', 'host-entry.js')), true);
 
