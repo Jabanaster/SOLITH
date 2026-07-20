@@ -93,7 +93,7 @@ function buildRegistryAobSignatures(scripts: CtRawScriptCatalog): RegistryAobSig
       signature.lineNumber,
     ].join('|');
 
-    return {
+    const registrySignature: RegistryAobSignature = {
       id: `aob-${slugId(signature.symbol, 'signature')}-${fnv1a32(idSeed)}`,
       symbol: signature.symbol,
       scanType: signature.scanType,
@@ -106,10 +106,12 @@ function buildRegistryAobSignatures(scripts: CtRawScriptCatalog): RegistryAobSig
       lineNumber: signature.lineNumber,
       executable: false,
       warnings: signature.warnings,
-      duplicateOf: signature.duplicateOf,
       completeness: signature.completeness,
       sourcePath: signature.sourcePath,
     };
+
+    if (signature.duplicateOf) registrySignature.duplicateOf = signature.duplicateOf;
+    return registrySignature;
   });
 }
 
