@@ -4,7 +4,11 @@
 
 You are an autonomous coding assistant working on **Solith**.
 
-Solith is a local-only, offline-only, single-player trainer/save-editor application.
+Solith is a local-first, single-player trainer/save-editor application.
+"**Offline-only**" / `OFFLINE_ONLY` means **offline gameplay enforcement** for live
+memory targeting (online-session guard fail-closed) — not "the app makes zero
+network requests." Opt-in hub sync, community listing metadata, and Steam CDN
+use may exist; they must never enable online/multiplayer game targeting.
 
 Project root:
 ```
@@ -16,17 +20,24 @@ Repository:
 https://github.com/Jabanaster/ResourceForge.git
 ```
 
-Current accepted branch:
+Current working branch (active development — not an accepted milestone lock):
 ```
-feature/milestone-e-controls-wip
+cursor/phase3-hub-sync-trust-ui
 ```
 
-Current accepted remote lock:
+Post-Alpha / Zero-Input work mode is authorized on this branch (and related
+feature branches). Do not treat this branch tip as a Milestone J remote lock.
+
+Historical Milestone J accepted lock (tag still valid; do not retag/move):
 ```
-Milestone J accepted and pushed.
-Commit: c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
 Tag: v1-milestone-j-control-workflow-accepted
+Peeled commit: c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
+Historical branch at acceptance: feature/milestone-e-controls-wip
 ```
+
+Honest live-memory stance (align with `ROADMAP.md`): most bundled memory
+features remain **L0** Discovery-required; **Atomfall** ammo is the **L3**
+exception; **Avowed** remains **L0** until stronger live evidence.
 
 ---
 
@@ -307,24 +318,30 @@ Use real values. Only use `UNKNOWN` if a command was actually attempted and fail
 
 ---
 
-## Current Accepted Milestone Lock
+## Milestone J Accepted Lock (Historical — Tag Still Valid)
+
+Milestone J remains an accepted historical lock via tag. Active development is
+ahead on post-Alpha / Zero-Input branches (e.g. `cursor/phase3-hub-sync-trust-ui`).
+Do **not** invent newer accepted milestone tags or claim remote branch locks for
+the current working tip unless the user explicitly accepts and tags them.
 
 ```
 MILESTONE_J_STATUS=ACCEPTED_AND_PUSHED
 COMMIT=c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
 TAG=v1-milestone-j-control-workflow-accepted
-REMOTE_BRANCH_LOCK=YES
 REMOTE_TAG_LOCK=YES
+CURRENT_WORKING_BRANCH=cursor/phase3-hub-sync-trust-ui
+CURRENT_WORKING_TIP_IS_MILESTONE_J_LOCK=NO
 ```
 
-Remote branch:
-```
-feature/milestone-e-controls-wip -> c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
-```
-
-Remote tag peeled commit:
+Remote tag peeled commit (verify with `git rev-parse` / `git ls-remote` when needed):
 ```
 v1-milestone-j-control-workflow-accepted^{} -> c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
+```
+
+Historical acceptance branch tip at Milestone J (not the current working branch):
+```
+feature/milestone-e-controls-wip @ c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
 ```
 
 ---
@@ -442,13 +459,15 @@ online or multiplayer targeting (online guard remains fail-closed)
 scraping or auto-installing third-party trainer binaries (remote listing sites, etc.)
 ```
 
-**Quarantined exception (Milestone M in-process pilot — OFF by default):**
+**Quarantined in-process pilots — OFF by default:**
 ```
 inProcessScriptExecutionEnabled defaults false
-pilot executable only: CrimsonDesert.exe
+current approved pilot executable: CrimsonDesert.exe
 opt-in hooks / code-cave / injector helpers under charter gates
 user-facing charter: Docs/IN_PROCESS_PILOT_SAFETY_CHARTER.md
-never expand to other executables without explicit user authorization
+additional pilots may be added only when the user explicitly names and approves each offline,
+single-player executable; every added pilot must retain the charter gates, remain opt-in and
+off by default, and receive game-specific safety tests before executable use
 ```
 
 **Milestone N (USER AUTHORIZED) adds:**
@@ -475,9 +494,15 @@ Decisions locked: `OFFLINE_ONLY` + `CHARTER_THEN_PRODUCT`.
 
 Architecture blueprint: `Docs/Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md`
 
+**`OFFLINE_ONLY` meaning (honest):** Enforce offline/single-player **gameplay** for
+live-memory attach/write (fail-closed online-session guard). It does **not** mean
+the Solith application makes zero network requests. Hub sync / community listing
+metadata / Steam CDN may be opt-in or non-gameplay network use; they must never
+target online multiplayer sessions or weaken the guard.
+
 **Hard constraints (mainstream path):**
 ```
-OFFLINE_ONLY — online-session guard remains fail-closed
+OFFLINE_ONLY — online-session guard remains fail-closed for live memory targeting
 user-mode only — ReadProcessMemory / WriteProcessMemory / VirtualProtectEx; no kernel drivers
 no malware paths — no remote trainer binary download/exec; no unverified code injection
 ```
@@ -497,7 +522,7 @@ sandboxed local scripting later (no network sockets, no inject APIs)
 kernel drivers
 packet capture
 auto-download/install third-party trainer binaries
-expanding in-process pilot beyond CrimsonDesert.exe without new authorization
+adding an in-process pilot for an executable the user has not explicitly named and approved
 online / multiplayer targeting
 anti-cheat bypass / stealth / debugger attachment for bypass
 ```
@@ -511,7 +536,8 @@ Do not add, modify, enable, or suggest executable support for:
 online or multiplayer support
 anti-cheat interaction
 packet capture
-DLL injection (except quarantined Crimson Desert in-process pilot)
+DLL/code injection except explicitly named, user-approved offline pilots governed by the
+in-process safety charter and disabled by default
 kernel drivers
 debugger attachment
 stealth behavior
@@ -529,7 +555,8 @@ verified per-game health/stamina/inventory/currency controls in catalog
 local audit logging and local crash reports
 ```
 
-Do not add outside verified catalog without explicit per-control verification:
+Research and non-executable catalog drafting for unverified controls is allowed. Do not enable
+execution outside the verified catalog without explicit per-control verification:
 ```
 God Mode execution (unverified)
 Aim Assist execution
@@ -545,10 +572,9 @@ unverified Stardew skill XP controls
 unverified game-specific controls
 ```
 
-Do not edit:
-```
-src/core/ai/index.ts
-```
+Editing `src/core/ai/index.ts` is allowed when the user's scoped task requires it. Preserve the
+local-first/offline-gameplay boundaries and do not introduce Ollama, remote model execution,
+telemetry, or AI settings unless separately authorized.
 
 Do not add:
 ```
@@ -612,7 +638,7 @@ kernel drivers
 packet capture
 anti-cheat bypass / online targeting
 remote trainer binary ingestion / auto-exec
-expanding in-process pilot beyond CrimsonDesert.exe without authorization
+adding an in-process pilot for an executable the user has not explicitly named and approved
 committing without COMMIT IT
 tagging without TAG IT
 pushing without PUSH IT

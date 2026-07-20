@@ -1895,10 +1895,12 @@ export const AVOWED_CONFIG: GameConfig = {
     { id: 'weapons', name: 'Weapons' },
   ],
   cheats: avowedCheats,
-  connectionBaseline: 0,
+  // Measured 2026-07-20 solo WinGDK: 3 non-loopback ESTABLISHED (HTTPS/443 Xbox services).
+  // Evidence: Docs/Baselines/AVOWED_CONNECTION_BASELINE_2026-07-20.md
+  connectionBaseline: 3,
   description:
     'Obsidian RPG — L0 scan-required memory features only (Steam + Xbox PC Game Pass WinGDK). No verified AOBs yet.',
-  lastUpdated: new Date('2026-07-18'),
+  lastUpdated: new Date('2026-07-20'),
   images: steamImages(2457220),
   pinnedCheatIds: ['infinite-health', 'infinite-stamina', 'infinite-essence'],
 };

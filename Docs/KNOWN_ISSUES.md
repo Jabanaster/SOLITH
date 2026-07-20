@@ -82,10 +82,29 @@ implemented yet:
 No default has been changed; this is documented for a deliberate decision,
 not silently patched around.
 
-**Pending baseline measurement (strict default = 0 until measured):**
-`Avowed.exe`, `Dredge.exe`, `CrimsonDesert.exe` — bundled memory-scan trainers
-use the strict guard until a live solo-session connection count is recorded in
-`game-connection-baselines.ts` with evidence.
+**Partial mitigation in tree (not a full solve):** reviewed per-game
+`acceptedConnectionBaseline` / `connectionBaseline` entries (e.g. Stardew,
+Atomfall, Avowed WinGDK) raise the count ceiling for measured platform
+overhead. The guard remains a **count-only ceiling**.
+
+**Residual risk (count-only — do not overclaim):**
+The guard does **not** validate remote endpoints, peer identities, or session
+ownership. It only compares `remoteConnectionCount` to the reviewed baseline.
+A multiplayer (or other unsafe) connection that **replaces** platform
+telemetry/CDN chatter without raising the ESTABLISHED count can still pass.
+This is an intentional honesty limit of the current design, not a claim that
+multiplayer replacement-of-telemetry is solved.
+
+**Baseline evidence quality varies:** some titles (e.g. Avowed WinGDK = 3)
+are measured from a single process/session/version/machine — useful vs default
+0 for attach, but **not** a strong permanence claim until re-measured across
+launches, gameplay states, disconnected-net, version bumps, and known unsafe
+states. See `Docs/Baselines/AVOWED_CONNECTION_BASELINE_2026-07-20.md`.
+
+**Pending / weak baseline coverage:**
+`Dredge.exe`, `CrimsonDesert.exe` — still strict default 0 until measured.
+Avowed WinGDK has a measured baseline of 3 with explicit evidence limitations
+(above); treat as provisional, not a hardened safety boundary.
 
 ### KI-016: Gate 13 electron-e2e "Full Demo Workflow" fails in this build environment (pre-existing, not caused by Live Memory Trainer work)
 

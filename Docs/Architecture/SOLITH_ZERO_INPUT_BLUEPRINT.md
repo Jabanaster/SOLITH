@@ -11,7 +11,7 @@
 
 | Constraint | Rule |
 |---|---|
-| **OFFLINE_ONLY** | Online-session guard is fail-closed. Remote connections above the reviewed per-game baseline → safe abort. No online/multiplayer targeting. |
+| **OFFLINE_ONLY** | **Offline gameplay enforcement** for live memory: online-session guard is fail-closed. Remote connections above the reviewed per-game baseline → safe abort. No online/multiplayer **game** targeting. This does **not** mean the Solith app makes zero network requests (opt-in hub sync / community listing metadata / Steam CDN may exist as non-gameplay network use). |
 | **User-mode only** | Memory ops via `ReadProcessMemory` / `WriteProcessMemory` / `VirtualProtectEx` only. **No kernel drivers.** |
 | **No malware paths** | No remote trainer binary download/exec. No unverified code injection on the mainstream path. |
 | **Transparency** | Every live memory read/write is append-logged locally. Crashes write `crash_report.txt` locally — never phone home. |

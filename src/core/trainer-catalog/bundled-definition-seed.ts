@@ -139,6 +139,8 @@ const AVOWED_L0_DEFINITION: SolithDefinitionV1 = {
     executables: ['Avowed.exe', 'Avowed-WinGDK-Shipping.exe'],
     arch: 'x64',
   },
+  // Measured 2026-07-20 solo WinGDK — Docs/Baselines/AVOWED_CONNECTION_BASELINE_2026-07-20.md
+  connectionBaseline: 3,
   certificationLevel: 'L0',
   memoryFeatures: [
     {
@@ -149,7 +151,7 @@ const AVOWED_L0_DEFINITION: SolithDefinitionV1 = {
       dataType: 'int32',
       defaultValue: 9999,
       certificationLevel: 'L0',
-      resolution: { moduleName: 'Avowed.exe' },
+      resolution: { moduleName: 'Avowed-WinGDK-Shipping.exe' },
     },
     {
       id: 'infinite-stamina',
@@ -159,7 +161,7 @@ const AVOWED_L0_DEFINITION: SolithDefinitionV1 = {
       dataType: 'int32',
       defaultValue: 9999,
       certificationLevel: 'L0',
-      resolution: { moduleName: 'Avowed.exe' },
+      resolution: { moduleName: 'Avowed-WinGDK-Shipping.exe' },
     },
     {
       id: 'infinite-essence',
@@ -169,7 +171,7 @@ const AVOWED_L0_DEFINITION: SolithDefinitionV1 = {
       dataType: 'int32',
       defaultValue: 9999,
       certificationLevel: 'L0',
-      resolution: { moduleName: 'Avowed.exe' },
+      resolution: { moduleName: 'Avowed-WinGDK-Shipping.exe' },
     },
   ],
 };

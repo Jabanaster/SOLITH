@@ -1,6 +1,8 @@
 # Solith - Local AI Game Trainer & Save Editor
 
-Solith is a local/offline-only trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
+Solith is a local-first, single-player trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
+
+"**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
 
 Solith is strictly designed for single-player, offline games or applications that you own or have permission to modify.
 
@@ -44,9 +46,9 @@ Solith includes a **discovery-first live trainer** for curated titles plus a **s
 
 ### **Safety Architecture:**
 
-- **Fail-closed guard**: Writes blocked if game has active network connections
-- **User confirmation required**: Explicit checkbox for offline-only mode  
-- **Connection baseline**: Per-game (Palworld: 4 connections = Steamworks overhead)
+- **Fail-closed guard**: Live writes blocked if remote-connection count is above the game's reviewed baseline (or evidence unavailable)
+- **User confirmation required**: Explicit checkbox for offline-only gameplay mode  
+- **Connection baseline**: Per-game count ceiling for platform overhead (provisional where evidence is thin — see KI-017 / Avowed baseline docs)
 - **Type validation**: All memory operations validated before native calls
 - **Graceful errors**: Invalid addresses/handles rejected before reaching native layer
 
