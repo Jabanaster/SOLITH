@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { parseCheatTableXml, type CtImportResult } from '../definitions/ct-import.js';
 import { extractAOBsFromCatalog } from '../script-research/aob-parser.js';
@@ -7,6 +8,8 @@ import {
   type CtRawScriptCatalog,
 } from '../script-research/ct-script-research.js';
 import type { ExtractedAobSignature } from '../script-research/types.js';
+import { REGISTRY_SCHEMA_VERSION, type RegistryArtifactMetadata } from './schema.js';
+import { assertValidRegistryArtifact } from './validate-registry.js';
 
 export interface RegistryAobSignature {
   id: string;
@@ -28,6 +31,7 @@ export interface RegistryAobSignature {
 
 export interface SolithUnifiedCtRegistry {
   schemaVersion: '1.0.0';
+  artifact: RegistryArtifactMetadata;
   game: string;
   sourceFile: string;
   compiledAt: string;
@@ -121,6 +125,8 @@ export async function compileSolithCtRegistry(
 ): Promise<SolithUnifiedCtRegistry> {
   const xmlText = await fs.readFile(ctFilePath, 'utf8');
   const sourceFile = path.basename(ctFilePath);
+  const sourcePath = path.resolve(ctFilePath);
+  const sourceSha256 = crypto.createHash('sha256').update(xmlText, 'utf8').digest('hex');
   const game = options.game ?? options.title ?? path.basename(ctFilePath, path.extname(ctFilePath));
   const title = options.title ?? game;
 
@@ -133,12 +139,30 @@ export async function compileSolithCtRegistry(
     }),
   ]);
   const aobSignatures = buildRegistryAobSignatures(scripts);
+  const compiledAt = options.compiledAt ?? new Date().toISOString();
 
   const registry: SolithUnifiedCtRegistry = {
     schemaVersion: '1.0.0',
+    artifact: {
+      schemaVersion: REGISTRY_SCHEMA_VERSION,
+      generatedAt: compiledAt,
+      source: {
+        path: sourcePath,
+        filename: sourceFile,
+        sha256: sourceSha256,
+      },
+      counts: {
+        pointers: pointers.accepted.length,
+        scripts: scripts.scripts.length,
+        aobSignatures: aobSignatures.length,
+        rejections: pointers.rejected.length,
+        warnings: aobSignatures.reduce((count, signature) => count + signature.warnings.length, 0),
+        duplicates: aobSignatures.filter((signature) => signature.duplicateOf).length,
+      },
+    },
     game,
     sourceFile,
-    compiledAt: options.compiledAt ?? new Date().toISOString(),
+    compiledAt,
     metadata: {
       totalPointers: pointers.accepted.length,
       totalScripts: scripts.scripts.length,
@@ -153,6 +177,8 @@ export async function compileSolithCtRegistry(
     aobSignatures,
     rejections: pointers.rejected,
   };
+
+  assertValidRegistryArtifact(registry);
 
   if (options.outputJsonPath) {
     await fs.mkdir(path.dirname(options.outputJsonPath), { recursive: true });

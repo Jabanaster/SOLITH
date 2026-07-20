@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import type { SolithUnifiedCtRegistry } from './compile-ct-registry.js';
+import { assertValidRegistryArtifact } from './validate-registry.js';
 
 export type CompiledCtRegistry = SolithUnifiedCtRegistry;
 
@@ -42,6 +43,7 @@ export function validateLoadedRegistry(value: unknown): CompiledCtRegistry {
   if (!isRecord(value.scripts)) throw new Error('Registry artifact is missing scripts.');
   if (!Array.isArray(value.aobSignatures)) throw new Error('Registry artifact is missing aobSignatures.');
   if (!Array.isArray(value.rejections)) throw new Error('Registry artifact is missing rejections.');
+  assertValidRegistryArtifact(value);
 
   const pointers = value.pointers;
   if (!Array.isArray(pointers.accepted)) throw new Error('Registry pointers.accepted must be an array.');
