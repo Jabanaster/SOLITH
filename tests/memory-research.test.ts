@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { BufferMemoryReader } from '../src/core/runtime/memory-reader.ts';
 import { readMemoryView } from '../src/core/runtime/memory-viewer.ts';
 import { captureMemorySnapshot, diffMemorySnapshots } from '../src/core/runtime/memory-snapshot.ts';
+import { analyzePointerCandidates } from '../src/core/runtime/pointer-candidates.ts';
 
 const moduleInfo = { name: 'Game.exe', baseAddress: 0x1000n, size: 8 };
 
@@ -38,5 +39,16 @@ describe('read-only memory research tools', () => {
       { offset: 1, before: 2, after: 9 },
       { offset: 3, before: 4, after: 8 },
     ]);
+  });
+
+  test('derives read-only pointer candidates from observed addresses', () => {
+    const candidates = analyzePointerCandidates({
+      modules: [{ name: 'Game.exe', baseAddress: 0x1000n, size: 0x1000 }],
+      observedAddress: 0x1800n,
+    });
+
+    assert.equal(candidates[0]?.moduleName, 'Game.exe');
+    assert.equal(candidates[0]?.baseOffset, '0x800');
+    assert.equal(candidates[0]?.confidence, 'medium');
   });
 });
