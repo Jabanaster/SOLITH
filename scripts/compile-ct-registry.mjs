@@ -19,5 +19,5 @@ const registry = await compileSolithCtRegistry(ctFilePath, {
 
 console.log(`[Solith Registry] Compiled ${registry.sourceFile} -> ${outputJsonPath}`);
 console.log(
-  `[Solith Registry] pointers=${registry.metadata.totalPointers} scripts=${registry.metadata.totalScripts} rejected=${registry.metadata.rejectedPointers}`,
+  `[Solith Registry] pointers=${registry.metadata.totalPointers} scripts=${registry.metadata.totalScripts} aobSignatures=${registry.metadata.totalAobSignatures} rejected=${registry.metadata.rejectedPointers} aobWarnings=${registry.metadata.aobWarnings} aobDuplicates=${registry.metadata.duplicateAobSignatures}`,
 );
