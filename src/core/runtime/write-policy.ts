@@ -16,6 +16,11 @@ export interface WriteFeatureDeclaration {
   restoreAvailable: boolean;
   executableHashMatched: boolean;
   ambiguousAobMatches: boolean;
+  explicitProcessSelected: boolean;
+  offlineGuardPassed: boolean;
+  userApprovalCaptured: boolean;
+  certifiedOrGated: boolean;
+  auditLogWritten: boolean;
   userExplicitlyActivated: boolean;
   enabledByDefault: false;
   backgroundAutoActivation: false;
@@ -30,6 +35,11 @@ export interface WritePolicyValidation {
 
 export function validateWriteFeatureDeclaration(feature: WriteFeatureDeclaration): WritePolicyValidation {
   const blockers: string[] = [];
+  if (!feature.explicitProcessSelected) blockers.push('Game process was not explicitly selected.');
+  if (!feature.offlineGuardPassed) blockers.push('Offline guard did not pass.');
+  if (!feature.userApprovalCaptured) blockers.push('User approval was not captured.');
+  if (!feature.certifiedOrGated) blockers.push('Feature is not certified or gated for write-capable use.');
+  if (!feature.auditLogWritten) blockers.push('Audit log entry was not written.');
   if (!feature.userExplicitlyActivated) blockers.push('User did not explicitly activate the write-capable feature.');
   if (!feature.originalValueCaptured) blockers.push('Original value was not captured.');
   if (!feature.restoreAvailable) blockers.push('Restore path is not available.');

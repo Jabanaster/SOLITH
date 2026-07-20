@@ -11,6 +11,11 @@ const safeDeclaration = {
   restoreAvailable: true,
   executableHashMatched: true,
   ambiguousAobMatches: false,
+  explicitProcessSelected: true,
+  offlineGuardPassed: true,
+  userApprovalCaptured: true,
+  certifiedOrGated: true,
+  auditLogWritten: true,
   userExplicitlyActivated: true,
   enabledByDefault: false as const,
   backgroundAutoActivation: false as const,
@@ -27,6 +32,11 @@ describe('write-capable runtime policy declarations', () => {
     const result = validateWriteFeatureDeclaration({
       ...safeDeclaration,
       ambiguousAobMatches: true,
+      explicitProcessSelected: false,
+      offlineGuardPassed: false,
+      userApprovalCaptured: false,
+      certifiedOrGated: false,
+      auditLogWritten: false,
       userExplicitlyActivated: false,
       originalValueCaptured: false,
     });
@@ -35,5 +45,10 @@ describe('write-capable runtime policy declarations', () => {
     assert.match(result.blockers.join('\n'), /explicitly activate/);
     assert.match(result.blockers.join('\n'), /Original value/);
     assert.match(result.blockers.join('\n'), /Ambiguous AOB/);
+    assert.match(result.blockers.join('\n'), /explicitly selected/);
+    assert.match(result.blockers.join('\n'), /Offline guard/);
+    assert.match(result.blockers.join('\n'), /User approval/);
+    assert.match(result.blockers.join('\n'), /certified or gated/);
+    assert.match(result.blockers.join('\n'), /Audit log/);
   });
 });

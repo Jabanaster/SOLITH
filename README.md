@@ -31,9 +31,99 @@ Solith includes a **discovery-first live trainer** for curated titles plus a **s
 - F1–F12 hotkeys / overlay when live-memory mode is enabled in settings  
 - Stardew Valley **save-field** writes via TrainerHost with approval / backup  
 
-### Quick Start:
+## Safety and support contract
 
-1. **Setup antivirus whitelist** (prevents false positives):
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
-   ```
+The profile catalog is local/offline. Imported profiles are review-required and do not automatically create executable write support. Save diff is advisory: it helps identify likely editable values, but a diff result is not proof that a write is safe or durable.
+
+Support matrix reports are evidence-based. They describe what was inspected, what evidence exists, and what remains blocked or unverified. Rollback dashboard is visibility/verification only: it reports backup and restore evidence and does not perform silent restore. Unsupported writes remain blocked. No remote calls are used for local profile review, save diff, rollback visibility, or support matrix generation.
+
+## Certification levels
+
+- **L0** — discovery or metadata only. Values may be session-local, unverified, or imported from CT/community metadata. User discovery is required.
+- **L1/L2** — locally observed evidence exists, but restart stability or executable/build matching is incomplete.
+- **L3** — restart-stable pointer/signature evidence exists for a specific executable/build.
+- **L4** — release-grade verified support with repeatable tests, version fingerprints, and rollback/safety evidence.
+
+Unless explicitly marked L3+, Solith treats live-memory controls as L0 and requires discovery.
+
+## Not supported
+
+Solith does not support online/multiplayer targeting, anti-cheat bypass, stealth, debugger bypass, kernel drivers, packet capture, remote trainer-binary execution, or unverified third-party executable cheats.
+
+## Prerequisites
+
+- Windows 10/11
+- Node.js compatible with the project toolchain; CI uses Node 22
+- npm
+- Visual Studio Build Tools with "Desktop development with C++" for native modules
+- Python available to node-gyp
+- Playwright browsers for E2E/smoke tests when running Playwright suites
+
+## Clean setup
+
+From a fresh clone on Windows:
+
+```powershell
+npm ci
+npm run build
+npm test
+npm run test:electron-smoke
+```
+
+The app must launch without hidden local files, old `dist` output, local CT data, or machine-specific paths. Local generated data under `data/` is ignored and must be regenerated when needed.
+
+## Development
+
+```powershell
+npm run dev
+```
+
+Useful focused commands:
+
+```powershell
+npm run build:vite
+npm run build:electron
+npm run test:live-memory
+npm run test:trainer-catalog
+npm run test:electron-smoke
+```
+
+## Packaging
+
+```powershell
+npm run build
+```
+
+This builds the renderer, bundles Electron main/preload/TrainerHost, verifies Electron output, and runs `electron-builder` to produce the Windows installer. Until signing is configured and verified, installers should be treated as unsigned development artifacts.
+
+## CT Library import
+
+Solith treats Cheat Engine `.CT` files as metadata-only research inputs. Raw Auto Assembler/Lua text is preserved inertly; Solith does not execute CT scripts.
+
+```powershell
+npm run ct-library:import -- "G:\Downloads\Combined-CheatEngine-Tables.zip" --no-registry-index --library-out data/ct-library/personal-ct-library.summary.json --shards-dir data/ct-library/personal-ct-library-shards
+```
+
+The generated `data/ct-library/` files are local artifacts and are ignored by git.
+
+## Native memoryjs troubleshooting
+
+Solith uses a vendored `memoryjs` native addon for Windows process memory work. If live-memory commands fail to load the addon:
+
+```powershell
+npm ci
+npx electron-rebuild
+```
+
+Confirm Visual Studio Build Tools and Python are installed. Read-only runtime validation must use explicit process selection and read/query process permissions only.
+
+## Release readiness
+
+Do not cut a release unless:
+
+- `npm ci` works from a clean clone.
+- `npm run build` succeeds.
+- `npm test` succeeds with no known failures.
+- `npm run test:electron-smoke` succeeds.
+- Key E2E flows pass: add/scan game, save detection, save preview/write/backup/rollback, trainer catalog search, CT Library import/search/display, read-only AOB scan against a harmless process, settings persistence, crash recovery, and installer install/launch/uninstall.
+- Known limitations are documented in release notes.
