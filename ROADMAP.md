@@ -248,7 +248,7 @@ Fixes included:
 * Added self-contained Milestone E packaged-app prerequisites.
 
   * `npm run test:milestone-e` builds the packaged app first.
-  * Prevents clean clones from failing on missing `dist/win-unpacked/ResourceForge.exe`.
+  * Prevents clean clones from failing on missing `dist/win-unpacked/Solith.exe`.
 
 Known note:
 

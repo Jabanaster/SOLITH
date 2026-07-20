@@ -13,7 +13,7 @@ G:\GAME TRAINER
 
 Repository:
 ```
-https://github.com/Jabanaster/ResourceForge.git
+https://github.com/Jabanaster/SOLITH.git
 ```
 
 Current accepted branch:

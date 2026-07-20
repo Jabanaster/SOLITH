@@ -46,7 +46,7 @@ Reference: `Docs/Certification/LEVELS.md`.
 5. Capture connection baseline:
 
 ```powershell
-cd "G:\ACTIVE_PROJECTS\ResourceForge"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 node scripts/measure-connection-baseline.mjs
 ```
 

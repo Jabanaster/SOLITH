@@ -4,7 +4,7 @@ Offline-first documentation for `schema.v1` feature / pack certification.
 
 Script:
 ```powershell
-cd "G:\ACTIVE_PROJECTS\ResourceForge"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 npx tsx scripts/certify-cheat.mjs --catalog-game-id stardew-valley --level L1
 npx tsx scripts/certify-cheat.mjs --file path\to\definition.json --level L1
 ```

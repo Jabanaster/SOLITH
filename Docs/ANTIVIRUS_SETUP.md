@@ -30,7 +30,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-antivirus-whitelist.ps1
 1. Open **Bitdefender Total Security** → Settings → Protection → Exclusions
 2. Click **Add exclusion** → Select the **Solith installation directory**
 3. Add process names:
-   - `ResourceForge.exe`
+   - `Solith.exe`
    - `memoryjs`
 4. Click **Apply**
 
@@ -39,7 +39,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-antivirus-whitelist.ps1
 Settings → Protection → Exclusions
 Add: C:\Users\[YourUsername]\AppData\Local\Programs\Solith\
 Add: [Your Project Directory]\Solith\dist-electron\
-Process names: ResourceForge.exe, memoryjs
+Process names: Solith.exe, memoryjs
 ```
 
 ---
@@ -167,7 +167,7 @@ If you believe Solith is being flagged as a false positive:
 
 ### **For Windows Defender:**
 1. [Submit to Microsoft Defender Research](https://www.microsoft.com/en-us/wdsi/submission)
-2. Upload `ResourceForge.exe` and provide context
+2. Upload `Solith.exe` and provide context
 
 ### **For Bitdefender:**
 1. [Submit to Bitdefender Labs](https://www.bitdefender.com/submit/)
@@ -217,7 +217,7 @@ Theoretically, yes — any whitelisted application could be malicious. But:
    - Paste into the antivirus exclusion settings
 
 2. **Try a broader exclusion:**
-   - Instead of: `C:\Users\User\AppData\Local\Programs\Solith\ResourceForge.exe`
+   - Instead of: `C:\Users\User\AppData\Local\Programs\Solith\Solith.exe`
    - Try: `C:\Users\User\AppData\Local\Programs\Solith\` (whole directory)
 
 3. **Restart the antivirus or system:**
@@ -267,10 +267,10 @@ If distributing Solith to others, consider **code-signing** the executable to el
 ### **Implementation:**
 ```bash
 # Sign the executable
-signtool sign /f cert.pfx /p password /t http://timestamp.server ResourceForge.exe
+signtool sign /f cert.pfx /p password /t http://timestamp.server Solith.exe
 
 # Verify signature
-signtool verify /v ResourceForge.exe
+signtool verify /v Solith.exe
 ```
 
 ---

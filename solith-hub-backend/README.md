@@ -17,7 +17,7 @@ wired to this service yet.
 ## Local development
 
 ```powershell
-cd "G:\ACTIVE_PROJECTS\ResourceForge\solith-hub-backend"
+cd "G:\ACTIVE_PROJECTS\SOLITH\solith-hub-backend"
 npm install
 Copy-Item ".dev.vars.example" ".dev.vars"
 ```
