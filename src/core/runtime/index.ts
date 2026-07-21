@@ -5,6 +5,7 @@ export * from './memory-reader.js';
 export * from './signature-scanner.js';
 export * from './address-resolver.js';
 export * from './signature-validation.js';
+export * from './signature-resolution.js';
 export * from './memory-viewer.js';
 export * from './memory-snapshot.js';
 export * from './pointer-candidates.js';
