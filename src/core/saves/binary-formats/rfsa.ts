@@ -1,5 +1,5 @@
 /**
- * RFSA — ResourceForge Structured Save Archive (format #1)
+ * RFSA — Solith Structured Save Archive (format #1)
  *
  * Documented little-endian layout for demo + test harness.
  * Magic: "RFSA" | Version: 1 | Fields at fixed offsets | XOR checksum tail.

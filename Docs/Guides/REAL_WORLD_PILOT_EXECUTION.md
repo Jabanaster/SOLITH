@@ -1,6 +1,6 @@
 # Real-World Pilot Execution Guide
 
-How a writable real-world sandbox pilot is executed safely in ResourceForge,
+How a writable real-world sandbox pilot is executed safely in Solith,
 using the Drill Core `master_volume` pilot as the reference example.
 
 ## Principles

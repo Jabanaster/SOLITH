@@ -12,7 +12,7 @@ import { assessRisk, classifyFile } from '../src/core/safety/index.ts';
 import { compareSaves, calculateScore } from '../src/core/discovery/index.ts';
 import { verifyRecipeSafety } from '../src/core/recipes/index.ts';
 
-describe('ResourceForge Core Modules Tests', () => {
+describe('Solith Core Modules Tests', () => {
   
   test('1. Scanner & Save Detection Checks', () => {
     // Save detection extensions and folders list

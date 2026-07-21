@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import GameLibrary from './routes/GameLibrary';
 import TrainerPage from './pages/TrainerPage';
 import SaveEditor from './pages/SaveEditor';
@@ -15,6 +15,8 @@ import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import TrainerLibraryPage from './pages/TrainerLibraryPage';
 import TrainerDeckPage from './pages/TrainerDeckPage';
 import CatalogTrainerControlsPage from './pages/CatalogTrainerControlsPage';
+import RegistryExplorerPage from './pages/RegistryExplorerPage';
+import CtLibraryExplorerPage from './pages/CtLibraryExplorerPage';
 import { ProcessDetectToast } from './components/ProcessDetectToast.js';
 import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode } from './components/LibraryLaunchDialog.js';
 import { Icon, type IconName } from './components/icons/index.js';
@@ -22,7 +24,9 @@ import { solithBranding } from './assets/branding/index.js';
 import { BrandingArtwork } from './components/BrandingArtwork.js';
 import { SolithTopBanner } from './components/SolithTopBanner.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
+import { OpeningCinematic } from './components/OpeningCinematic.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
+import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -55,7 +59,7 @@ type View =
   | 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'trainer-research'
   | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
   | 'session-monitor' | 'controls' | 'live-memory' | 'trainer-library'
-  | 'catalog-save-controls' | 'trainer-deck';
+  | 'catalog-save-controls' | 'trainer-deck' | 'registry-explorer' | 'ct-library';
 
 type NavItem = {
   id: View;
@@ -124,6 +128,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'discovery', label: 'Discovery Lab', icon: 'discovery' },
       { id: 'trainer-research', label: 'Trainer Research Lab', icon: 'search' },
+      { id: 'ct-library', label: 'CT Library', icon: 'database' },
+      { id: 'registry-explorer', label: 'Registry Explorer', icon: 'database' },
       { id: 'data', label: 'Data Editor', icon: 'database' },
       { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
       { id: 'recipes', label: 'Recipes', icon: 'apply' },
@@ -143,6 +149,9 @@ const SIDEBAR_COLLAPSED_KEY = 'solith-sidebar-collapsed';
 
 const App: React.FC = () => {
   const e2eTrainerState = (window as any).electronAPI?.e2eTrainerState as string | null;
+  const [showOpeningCinematic, setShowOpeningCinematic] = useState(
+    () => !navigator.webdriver && !e2eTrainerState,
+  );
   const [currentView, setCurrentView] = useState<View>(e2eTrainerState ? 'trainer' : 'library');
   const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(
     e2eTrainerState ? { id: 'e2e-renderer-state-fixture', name: 'Renderer State Fixture' } : null
@@ -165,9 +174,14 @@ const App: React.FC = () => {
     displayName: string;
     pid: number;
     executable: string;
+    prepareReady?: boolean;
+    blockReason?: string;
   } | null>(null);
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const finishOpeningCinematic = useCallback(() => {
+    setShowOpeningCinematic(false);
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -294,6 +308,10 @@ const App: React.FC = () => {
         return <DiscoveryLab gameId={selectedGame?.id ?? null} />;
       case 'trainer-research':
         return <ExternalTrainerResearchLab />;
+      case 'registry-explorer':
+        return <RegistryExplorerPage />;
+      case 'ct-library':
+        return <CtLibraryExplorerPage />;
       case 'recipes':
         return <Recipes gameId={selectedGame?.id ?? null} />;
       case 'backups':
@@ -489,8 +507,17 @@ const App: React.FC = () => {
         <ProcessDetectToast
           displayName={processToast.displayName}
           executable={processToast.executable}
+          prepareReady={processToast.prepareReady}
+          blockReason={processToast.blockReason}
           onOpenDeck={openDeckFromToast}
           onDismiss={() => setProcessToast(null)}
+        />
+      )}
+
+      {showOpeningCinematic && (
+        <OpeningCinematic
+          source={openingCinematicUrl}
+          onComplete={finishOpeningCinematic}
         />
       )}
     </div>

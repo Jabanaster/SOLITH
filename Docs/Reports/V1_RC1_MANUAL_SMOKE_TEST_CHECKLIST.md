@@ -1,4 +1,4 @@
-# ResourceForge V1.0.0 RC1 Manual Smoke Test Checklist
+# Solith V1.0.0 RC1 Manual Smoke Test Checklist
 
 RC1 commit: `e11d95e869bfaede6311d396eeab0c0a0d7b2da5`
 RC1 tag: `v1.0.0-rc.1`
@@ -37,7 +37,7 @@ Current diagnostic run in this turn:
 Points verified:
 - [x] 01 packaged exe exists at dist/win-unpacked/ResourceForge.exe
 - [x] 02 app launches and first window appears
-- [x] 03 window title contains ResourceForge
+- [x] 03 window title contains Solith
 - [x] 04 window reaches domcontentloaded state
 - [x] 05 React root mounts (#root > * present)
 - [x] 06 contextIsolation active: require not in renderer
@@ -63,10 +63,10 @@ Points verified:
 ## Root Cause: Prior "Quick Exit" Was Not a Crash
 
 An earlier manual launch of the exe failed with:
-  `[ResourceForge] Another instance is already running. Focusing it and exiting.`
+  `[Solith] Another instance is already running. Focusing it and exiting.`
 
 This is intentional single-instance behavior (`app.requestSingleInstanceLock()` in main.ts:57).
-The production instance was already running in `%APPDATA%\ResourceForge`. The manual launch
+The production instance was already running in `%APPDATA%\Solith`. The manual launch
 detected the lock in that same directory and exited with code 0 — correct behavior, not a bug.
 
 The automated test bypasses this by setting `ELECTRON_USER_DATA_PATH` to a per-run temp dir.

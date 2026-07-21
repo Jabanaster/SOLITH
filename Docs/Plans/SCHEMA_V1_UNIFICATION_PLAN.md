@@ -12,7 +12,7 @@ UNIFICATION_TRACK=COMPLETE (pending commit/push of Phase 4+5)
 
 ## 1. Problem
 
-ResourceForge currently has **five parallel “what can this game do?” sources**. UI and IPC already partially route through `schema.v1`, but several surfaces still treat other catalogs as authoritative. That produces duplicate cheat lists, divergent verification flags, and unclear Save Edit vs Live Memory vs Injection boundaries.
+Solith currently has **five parallel “what can this game do?” sources**. UI and IPC already partially route through `schema.v1`, but several surfaces still treat other catalogs as authoritative. That produces duplicate cheat lists, divergent verification flags, and unclear Save Edit vs Live Memory vs Injection boundaries.
 
 ---
 

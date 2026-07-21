@@ -2,7 +2,7 @@
 
 > **ARCHIVED supplement** — See `ROADMAP.md` and `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` for current status.
 
-This document tracks the implementation and verification status of ResourceForge core modules and security hardening requirements.
+This document tracks the implementation and verification status of Solith core modules and security hardening requirements.
 
 ## V1 Trainer UX + Compatibility Pilot — Current Status
 
@@ -43,7 +43,7 @@ Non-user-data closeout: **COMPLETE (post-change verified)** — see `Docs/Report
 
 | Item | Status | Notes |
 | ---- | ------ | ----- |
-| Online-session guard | **VERIFIED (unit + real games)** | Fail-closed: requires user offline confirmation AND remote-connection count at/under the game's reviewed baseline (default 0 for any unreviewed game); evidence overrides confirmation. 13/13 unit tests including the per-game baseline exception. Verified live against Stardew Valley.exe and Atomfall_dx12.exe — see KI-017. |
+| Online-session guard | **Trust Shift (2026-07-20)** | Write/freeze/attach consent uses `evaluateWriteConsent` (waiver). `evaluateOnlineGuard` remains advisory/diagnostic. Unit tests cover both. See KI-017. |
 | Per-game connection baselines | **VERIFIED (real games)** | `game-connection-baselines.ts` — evidence-based, reviewed exception list (default 0/strict for any unlisted game): Stardew Valley.exe (5, Steamworks background activity) and Atomfall_dx12.exe (2, Xbox Live background activity), both measured live against real running processes. 4/4 unit tests. |
 | Remote-connection observer | **VERIFIED (real game), Windows only** | Rewritten from full `netstat -ano` parsing to a PID-scoped `Get-NetTCPConnection -OwningProcess <pid> -State Established` query after real-machine testing showed the netstat approach exceeded the shared 32KB command-output cap and made the guard fail closed on `output_size_exceeded` regardless of actual state (KI-017). 10/10 unit tests. Not yet implemented for macOS/Linux. |
 | LiveMemorySession orchestration | **VERIFIED (unit, fake driver + real games)** | attach/propose/confirm/rollback/detach; guard rechecked immediately before every write. 8/8 tests, plus real end-to-end attach verified against both Stardew Valley.exe and Atomfall_dx12.exe. |
@@ -63,7 +63,7 @@ See `PROJECT_SPEC.md` Section 3.1 / 42.1 for the safety contract this feature mu
 | Feature Area | Status | Notes |
 | ------------ | ------ | ----- |
 | Multi-format Save Parsers | **VERIFIED** | Supports JSON, XML, INI, CSV, TXT, Lua. Validated in unit tests. |
-| In-Memory Database (sql.js) | **VERIFIED** | Persisted to `data/resourceforge.db` on disk. |
+| In-Memory Database (sql.js) | **VERIFIED** | Persisted to `data/solith.db` on disk. |
 | Save File Comparison | **VERIFIED** | Discovery lab comparison and confidence scoring. |
 | Recipe CRUD & Validations | **VERIFIED** | Strict Zod schema validation, safety filters checking for arbitrary JS/SQL/shell/IPC, conflict detection, and validated slider/dropdown control configuration. |
 | Proposals Engine | **VERIFIED** | pending, approved, rejected state transitions. |

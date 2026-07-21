@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "solith-hub-backend",
+  "main": "src/index.ts",
+  "workers_dev": true,
+  "compatibility_date": "2026-07-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "solith-hub-db",
+      "database_id": "42fe759f-8b01-4ec0-abe3-57647342d218",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

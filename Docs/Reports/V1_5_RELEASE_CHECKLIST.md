@@ -1,4 +1,4 @@
-# ResourceForge V1.5 Release Checklist
+# Solith V1.5 Release Checklist
 
 ## Source Gates
 
@@ -49,7 +49,7 @@ Record:
 
 ## Release
 
-- Create annotated tag: `git tag -a v1.5.0 -m "ResourceForge v1.5.0"`
+- Create annotated tag: `git tag -a v1.5.0 -m "Solith v1.5.0"`
 - Push `master`
 - Push `v1.5.0`
 - Verify remote `master`
@@ -58,5 +58,5 @@ Record:
 
 ## Safety Lock
 
-ResourceForge V1.5 remains local-only, offline-first, single-player only, save/data-file focused, backup/rollback protected, and blocked from unsupported write execution. No telemetry, updater, cloud dependency, online cheating, multiplayer manipulation, anti-cheat bypass, process injection, debugger attachment, memory scanning, or live memory writing is part of V1.5.
+Solith V1.5 remains local-only, offline-first, single-player only, save/data-file focused, backup/rollback protected, and blocked from unsupported write execution. No telemetry, updater, cloud dependency, online cheating, multiplayer manipulation, anti-cheat bypass, process injection, debugger attachment, memory scanning, or live memory writing is part of V1.5.
 

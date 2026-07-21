@@ -93,7 +93,7 @@ The process ID changed from `32148` to `32732`, and the resolved heap address ch
 resolved successfully and supported a verified `97 -> 999 -> 97` read/write/restore cycle.
 
 This proves the definition is not tied to a session-local absolute address. The
-`atomfall-current-weapon-ammo` feature meets ResourceForge L3 restart-stability requirements
+`atomfall-current-weapon-ammo` feature meets Solith L3 restart-stability requirements
 for the tested Atomfall build and is formally tagged `certificationLevel: 'L3'`.
 
 ## Safety notes

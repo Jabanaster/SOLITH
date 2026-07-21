@@ -1,7 +1,7 @@
 # Electron Runtime Verification Report
 
 **Date:** 2026-06-23  
-**Session:** ResourceForge Milestone — Electron Runtime and Package Verification
+**Session:** Solith Milestone — Electron Runtime and Package Verification
 
 ## Build Pipeline Verification
 
@@ -66,7 +66,7 @@ app.on('second-instance', () => {
 });
 ```
 
-Only the ResourceForge process is affected. No `taskkill /IM electron.exe` — unrelated Electron applications are never touched.
+Only the Solith process is affected. No `taskkill /IM electron.exe` — unrelated Electron applications are never touched.
 
 ## Security Settings
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-ResourceForge uses **tsup** to bundle Electron main and preload processes. This replaced the original `tsc + fix-esm-imports` approach.
+Solith uses **tsup** to bundle Electron main and preload processes. This replaced the original `tsc + fix-esm-imports` approach.
 
 ## Why tsup was chosen
 

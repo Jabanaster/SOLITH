@@ -3,7 +3,7 @@ import { CheatToggleGetAllSchema, CheatToggleSetSchema, CheatToggleClearSchema }
 
 /**
  * Persisted cheat toggle state (Multi-Game Live Trainer) — lets a cheat that
- * was enabled/confirmed before ResourceForge closes come back armed on the
+ * was enabled/confirmed before Solith closes come back armed on the
  * next launch, instead of forcing the user to redo discovery from scratch.
  * Not feature-flag-gated the way live-memory IPC is — this only reads/writes
  * a small local table, no process memory access happens here.

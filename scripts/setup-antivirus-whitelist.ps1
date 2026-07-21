@@ -1,13 +1,13 @@
 ﻿#
-# ResourceForge Antivirus Whitelist Setup
+# Solith Antivirus Whitelist Setup
 #
 # This script automatically configures Windows Defender and Bitdefender
-# to whitelist ResourceForge and its native modules (memoryjs).
+# to whitelist Solith and its native modules (memoryjs).
 #
 # Two modes:
-#   1. Installed-app mode (default) - whitelists an installed ResourceForge.exe
-#      and its containing directory. This is what you want after running the
-#      full installer.
+#   1. Installed-app mode (default) - whitelists an installed Solith.exe
+#      (or legacy ResourceForge.exe) and its containing directory. This is what
+#      you want after running the full installer.
 #   2. Dev/build-output mode - whitelists only the pre-package build output
 #      folders (dist, dist-electron) used while developing/building locally,
 #      before an installer exists. Use this if electron-builder's packaging
@@ -31,20 +31,20 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     exit 1
 }
 
-Write-Host "ResourceForge Antivirus Whitelist Setup" -ForegroundColor Cyan
+Write-Host "Solith Antivirus Whitelist Setup" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ============================================================================
 # Mode selection
 # ============================================================================
-# $mode is either "installed" (whitelist a real ResourceForge.exe + its
-# directory) or "devbuild" (whitelist only this repo's dist/dist-electron
-# build-output folders, narrowly, before an installer exists).
+# $mode is either "installed" (whitelist a real Solith.exe / legacy
+# ResourceForge.exe + its directory) or "devbuild" (whitelist only this repo's
+# dist/dist-electron build-output folders, narrowly, before an installer exists).
 
 $mode = $null
 $installPath = $null
-$resourceForgeDir = $null
+$solithDir = $null
 $distElectronDir = $null
 
 # The two build-output folders this repo's build actually writes to.
@@ -59,14 +59,17 @@ if ($DevBuildOutput) {
     # Non-interactive: caller explicitly asked for dev/build-output mode.
     $mode = "devbuild"
 } else {
-    # Detect an installed ResourceForge.exe first (existing behavior, preserved).
-    $resourceForgePaths = @(
+    # Detect an installed Solith.exe (or legacy ResourceForge.exe) first.
+    $solithPaths = @(
+        "$env:LOCALAPPDATA\Programs\Solith\Solith.exe",
         "$env:LOCALAPPDATA\Programs\ResourceForge\ResourceForge.exe",
+        "C:\Program Files\Solith\Solith.exe",
         "C:\Program Files\ResourceForge\ResourceForge.exe",
-        "$PSScriptRoot\..\dist-electron\dist\ResourceForge.exe"
+        "$PSScriptRoot\..\dist\win-unpacked\Solith.exe",
+        "$PSScriptRoot\..\dist\win-unpacked\ResourceForge.exe"
     )
 
-    foreach ($path in $resourceForgePaths) {
+    foreach ($path in $solithPaths) {
         if (Test-Path $path) {
             $installPath = $path
             break
@@ -76,13 +79,13 @@ if ($DevBuildOutput) {
     if ($installPath) {
         $mode = "installed"
     } else {
-        Write-Host "ResourceForge not found in common install locations:" -ForegroundColor Yellow
-        foreach ($path in $resourceForgePaths) {
+        Write-Host "Solith not found in common install locations:" -ForegroundColor Yellow
+        foreach ($path in $solithPaths) {
             Write-Host "  - $path" -ForegroundColor Yellow
         }
         Write-Host ""
         Write-Host "No installed app found. Choose what to whitelist:" -ForegroundColor Cyan
-        Write-Host "  1. Specify a path to ResourceForge.exe (installed-app mode)"
+        Write-Host "  1. Specify a path to Solith.exe (installed-app mode)"
         Write-Host "  2. Whitelist this repo's dev/build-output folders only (dist, dist-electron)"
         Write-Host "  3. Cancel"
         Write-Host ""
@@ -91,7 +94,7 @@ if ($DevBuildOutput) {
         switch ($choice) {
             "1" {
                 Write-Host ""
-                Write-Host "Please specify the path to ResourceForge.exe:" -ForegroundColor Yellow
+                Write-Host "Please specify the path to Solith.exe:" -ForegroundColor Yellow
                 $installPath = Read-Host "Path"
                 if (-not (Test-Path $installPath)) {
                     Write-Host "ERROR: File not found: $installPath" -ForegroundColor Red
@@ -117,22 +120,22 @@ if ($DevBuildOutput) {
 $exclusionPaths = @()
 
 if ($mode -eq "installed") {
-    $resourceForgeDir = Split-Path $installPath -Parent
-    $distElectronDir = Join-Path $resourceForgeDir "dist-electron\dist"
+    $solithDir = Split-Path $installPath -Parent
+    $distElectronDir = Join-Path $solithDir "dist-electron\dist"
 
     Write-Host ""
-    Write-Host "Found ResourceForge at: $installPath" -ForegroundColor Green
+    Write-Host "Found Solith at: $installPath" -ForegroundColor Green
     Write-Host ""
     Write-Host "Configuration Paths (installed-app mode):" -ForegroundColor Cyan
     Write-Host "  - Main executable: $installPath"
-    Write-Host "  - AppData directory: $resourceForgeDir"
+    Write-Host "  - AppData directory: $solithDir"
     if (Test-Path $distElectronDir) {
         Write-Host "  - Build output: $distElectronDir"
     }
     Write-Host ""
 
     $exclusionPaths += $installPath
-    $exclusionPaths += $resourceForgeDir
+    $exclusionPaths += $solithDir
     if (Test-Path $distElectronDir) {
         $exclusionPaths += $distElectronDir
     }
@@ -247,7 +250,8 @@ if ($bitdefenderFound) {
     }
     Write-Host ""
     Write-Host "  4. Toggle 'Advanced Exclusions' and add process names:"
-    Write-Host "     - ResourceForge.exe"
+    Write-Host "     - Solith.exe"
+    Write-Host "     - ResourceForge.exe  (legacy)"
     Write-Host "     - memoryjs"
     Write-Host ""
     Write-Host "  5. Click 'Apply' to save changes"
@@ -293,7 +297,7 @@ if ($defenderAddSucceededCount -gt 0 -and $defenderAddFailedCount -eq 0) {
     Write-Host "==============" -ForegroundColor Cyan
     Write-Host ""
     if ($mode -eq "installed") {
-        Write-Host "The installed ResourceForge application was whitelisted." -ForegroundColor Green
+        Write-Host "The installed Solith application was whitelisted." -ForegroundColor Green
     } else {
         Write-Host "Only this repo's dev/build-output folders (dist, dist-electron) were" -ForegroundColor Green
         Write-Host "whitelisted. The application itself has not been installed or whitelisted." -ForegroundColor Green
@@ -319,7 +323,7 @@ if ($defenderAddSucceededCount -gt 0 -and $defenderAddFailedCount -eq 0) {
 Write-Host ""
 Write-Host "If you're still seeing antivirus warnings:" -ForegroundColor Yellow
 Write-Host "  1. Make sure you've completed the Bitdefender manual steps above"
-Write-Host "  2. Restart ResourceForge (or re-run the build) after adding exclusions"
+Write-Host "  2. Restart Solith (or re-run the build) after adding exclusions"
 Write-Host "  3. If warnings persist, disable real-time scanning temporarily"
 Write-Host ""
 Write-Host "For more information, see: ANTIVIRUS_SETUP.md" -ForegroundColor Cyan

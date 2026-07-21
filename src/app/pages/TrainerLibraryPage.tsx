@@ -8,9 +8,21 @@ import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
+import {
+  COMMUNITY_WARNING_LABEL,
+  requiresCommunityExecutionApproval,
+} from '../../core/trainer-catalog/community-trust.js';
+import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
+import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
+
+function isLocallyAuthoredEntry(entry: TrainerCatalogEntry): boolean {
+  return entry.sources.some(
+    (source) => source.provider === 'user' || source.provider === 'ct-import',
+  );
+}
 
 function dirnameFromPath(filePath: string): string {
   const i = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
@@ -38,6 +50,9 @@ interface TrustMeta {
 const PAGE_SIZE = 120;
 
 function tierHint(entry: TrainerCatalogEntry): string {
+  if (requiresCommunityExecutionApproval(entry.certLevel)) {
+    return 'Community definition — active scan and explicit approval required';
+  }
   if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
   if (entry.verificationStatus === 'community') return 'First session scan may be required';
   return 'Metadata only — sync or import a definition';
@@ -54,6 +69,7 @@ function CatalogCard({
   onThumbUp,
   onRequestVerification,
   onNotify,
+  onPublish,
 }: {
   entry: TrainerCatalogEntry;
   trust?: TrustMeta;
@@ -65,6 +81,7 @@ function CatalogCard({
   onThumbUp: (entry: TrainerCatalogEntry) => void;
   onRequestVerification: (entry: TrainerCatalogEntry) => void;
   onNotify: (entry: TrainerCatalogEntry) => void;
+  onPublish: (entry: TrainerCatalogEntry) => void;
 }) {
   const tagline = getCatalogTagline(entry);
   const coverUrl = resolveCatalogCoverUrl(entry);
@@ -90,6 +107,15 @@ function CatalogCard({
         <span className={styles.badge} title={tierHint(entry)}>
           {entry.verificationStatus}
         </span>
+        {requiresCommunityExecutionApproval(entry.certLevel) && (
+          <span
+            className={styles.communityBadge}
+            aria-label={COMMUNITY_WARNING_LABEL}
+          >
+            <span aria-hidden="true">⚠ </span>
+            {COMMUNITY_WARNING_LABEL}
+          </span>
+        )}
         {installed && (
           <span className={styles.installedBadge} title="Detected on this PC">
             Installed
@@ -158,6 +184,11 @@ function CatalogCard({
               <button type="button" className={styles.secondaryBtn} onClick={() => void onExport(entry)}>
                 Export YAML
               </button>
+              {isLocallyAuthoredEntry(entry) && (
+                <button type="button" className={styles.secondaryBtn} onClick={() => void onPublish(entry)}>
+                  Publish to Hub
+                </button>
+              )}
               {entry.verificationStatus === 'community' && (
                 <>
                   <button type="button" className={styles.secondaryBtn} onClick={() => void onThumbUp(entry)}>
@@ -197,6 +228,10 @@ export default function TrainerLibraryPage({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [hubSyncing, setHubSyncing] = useState(false);
+  const [communitySyncEnabled, setCommunitySyncEnabled] = useState(false);
+  const [overwriteLocalDefs, setOverwriteLocalDefs] = useState(false);
+  const [publishDefinition, setPublishDefinition] = useState<SolithDefinitionV1 | null>(null);
   const [message, setMessage] = useState('');
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [genreFilters, setGenreFilters] = useState<string[]>([]);
@@ -265,6 +300,14 @@ export default function TrainerLibraryPage({
   useEffect(() => {
     void load(query, tierFilter, genreFilters);
   }, [tierFilter, genreFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.getSettings) return;
+    void api.getSettings().then((settings) => {
+      setCommunitySyncEnabled(settings?.communitySyncEnabled === true);
+    });
+  }, []);
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -403,6 +446,77 @@ export default function TrainerLibraryPage({
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleToggleCommunitySync = async (enabled: boolean) => {
+    setCommunitySyncEnabled(enabled);
+    try {
+      await window.electronAPI?.setSetting?.('communitySyncEnabled', enabled);
+      setMessage(
+        enabled
+          ? 'Community Hub sync enabled — main process will poll for definition deltas.'
+          : 'Community Hub sync disabled — no Hub network activity.',
+      );
+    } catch {
+      setCommunitySyncEnabled(!enabled);
+      setMessage('Failed to update Community Hub sync setting.');
+    }
+  };
+
+  const handleHubSync = async () => {
+    if (!window.electronAPI?.trainerCatalogSyncHub) return;
+    if (!communitySyncEnabled) {
+      setMessage('Enable Community Hub sync before syncing definitions.');
+      return;
+    }
+    if (overwriteLocalDefs) {
+      const confirmed = window.confirm(
+        'Overwrite local user/CT definitions with Hub copies? This cannot be undone from Solith.',
+      );
+      if (!confirmed) {
+        setOverwriteLocalDefs(false);
+        return;
+      }
+    }
+    setHubSyncing(true);
+    setMessage('');
+    try {
+      const result = await window.electronAPI.trainerCatalogSyncHub({
+        overwriteUserDefinitions: overwriteLocalDefs,
+      });
+      setOverwriteLocalDefs(false);
+      if (result.success && result.report) {
+        setMessage(
+          `Hub sync: imported ${result.report.imported}, preserved ${result.report.skippedUserDefinitions} local, rejected ${result.report.rejected}.`,
+        );
+        await load(query);
+      } else if (result.report?.status === 'disabled') {
+        setMessage('Hub sync is disabled — enable Community Hub sync first.');
+      } else {
+        setMessage(result.error ?? 'Hub sync failed');
+      }
+    } finally {
+      setHubSyncing(false);
+    }
+  };
+
+  const handlePublish = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogGetDefinition) return;
+    const result = await api.trainerCatalogGetDefinition({ catalogGameId: entry.catalogGameId });
+    if (!result.success || !result.definition) {
+      setMessage(result.error ?? 'No definition payload found to publish.');
+      return;
+    }
+    if (result.canPublish === false) {
+      setMessage('Only locally authored or CT-imported definitions can be published.');
+      return;
+    }
+    if (!communitySyncEnabled) {
+      setMessage('Enable Community Hub sync in the Catalog panel before publishing.');
+      return;
+    }
+    setPublishDefinition(result.definition);
   };
 
   const handleImportYaml = async (file: File) => {
@@ -675,6 +789,44 @@ export default function TrainerLibraryPage({
         }
       />
 
+      <section className={styles.hubPanel} aria-labelledby="community-hub-heading">
+        <div className={styles.hubPanelHeader}>
+          <h2 id="community-hub-heading">Solith Definition Hub</h2>
+          <label className={styles.hubToggle}>
+            <input
+              type="checkbox"
+              checked={communitySyncEnabled}
+              onChange={(e) => void handleToggleCommunitySync(e.target.checked)}
+            />
+            Community sync enabled
+          </label>
+        </div>
+        <p className={styles.hubCopy}>
+          {communitySyncEnabled
+            ? 'Opted in — Solith will delta-fetch JSON definitions from the Hub. L0 stays Scan-Required; Offline Confirm is still required before attach.'
+            : 'Disabled by default — no Hub network requests and no polling interval while off.'}
+        </p>
+        <div className={styles.hubActions}>
+          <button
+            type="button"
+            className={styles.syncBtn}
+            onClick={() => void handleHubSync()}
+            disabled={hubSyncing || !communitySyncEnabled}
+          >
+            {hubSyncing ? 'Syncing Hub…' : 'Sync Hub now'}
+          </button>
+          <label className={styles.hubOverwrite}>
+            <input
+              type="checkbox"
+              checked={overwriteLocalDefs}
+              disabled={!communitySyncEnabled || hubSyncing}
+              onChange={(e) => setOverwriteLocalDefs(e.target.checked)}
+            />
+            Overwrite local definitions (requires confirm)
+          </label>
+        </div>
+      </section>
+
       <form className={styles.searchRow} onSubmit={handleSearch}>
         <input
           type="search"
@@ -804,12 +956,24 @@ export default function TrainerLibraryPage({
               onThumbUp={handleThumbUp}
               onRequestVerification={handleRequestVerification}
               onNotify={handleNotifyWhenVerified}
+              onPublish={handlePublish}
             />
           )}
         />
       )}
 
       {loadingMore && <p className={styles.loading}>Loading more… ({entries.length} / {total})</p>}
+
+      {publishDefinition && (
+        <PublishDefinitionModal
+          definition={publishDefinition}
+          onClose={() => setPublishDefinition(null)}
+          onPublished={(id) => {
+            setPublishDefinition(null);
+            setMessage(`Published to the Solith Hub as L0 Community definition ${id}.`);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@
 
 ## Redesigned Visual Styles
 
-ResourceForge has been updated with a high-fidelity visual layout. The theme renders correctly inside the native Electron BrowserWindow shell.
+Solith has been updated with a high-fidelity visual layout. The theme renders correctly inside the native Electron BrowserWindow shell.
 
 ### Design Elements Verified
 1. **Glassmorphism Backdrop Filters**: Left sidebar and modals use semi-transparent dark layers (`rgba(13, 17, 23, 0.75)`) with a blur filter (`blur(20px)`). Fallbacks render correctly on clean Windows configurations where transparency is restricted.

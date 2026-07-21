@@ -55,6 +55,16 @@ interface Window {
       driftAcknowledged?: boolean;
       catalogGameId?: string;
     }) => Promise<any>;
+    liveMemoryZeroInputPrepare: (payload: {
+      pid: number;
+      executableName: string;
+      catalogGameId: string;
+      userConfirmedOffline: true;
+      executableHashSHA256?: string;
+      driftAcknowledged?: boolean;
+      maxFuzzyDistance?: number;
+      featureHints?: Record<string, string>;
+    }) => Promise<any>;
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
     liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) => Promise<any>;
@@ -174,6 +184,38 @@ interface Window {
     trainerCatalogSyncRemote: () => Promise<{
       success: boolean;
       report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
+      error?: string;
+    }>;
+    trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) => Promise<{
+      success: boolean;
+      report?: {
+        status: 'disabled' | 'synced';
+        imported: number;
+        skippedUserDefinitions: number;
+        rejected: number;
+        pages: number;
+        maxLocalTimestamp: number;
+      };
+      error?: string;
+    }>;
+    trainerCatalogGetDefinition: (payload: { catalogGameId: string }) => Promise<{
+      success: boolean;
+      definition?: import('../core/definitions/schema.v1.js').SolithDefinitionV1;
+      canPublish?: boolean;
+      error?: string;
+    }>;
+    publishToCommunity: (payload: {
+      definition: unknown;
+      executableHash: string;
+    }) => Promise<{
+      success: boolean;
+      published?: {
+        id: string;
+        gameId: string;
+        certLevel: 'L0_Community';
+        createdAt: string;
+        updatedAt: string;
+      };
       error?: string;
     }>;
     trainerCatalogLoadGame: (payload: { catalogGameId: string }) => Promise<{
@@ -308,6 +350,33 @@ interface Window {
       }>;
       error?: string;
     }>;
+    ctLibrarySummary: () => Promise<{
+      success: boolean;
+      available: boolean;
+      summary?: import('../core/ct-library/types.js').CtLibrarySummaryIndex;
+      error?: string;
+    }>;
+    ctLibrarySearch: (payload: {
+      query?: string;
+      gameId?: string;
+      kind?: 'all' | 'pointer' | 'script' | 'aob';
+      limit?: number;
+      offset?: number;
+    }) => Promise<{
+      success: boolean;
+      available: boolean;
+      summary?: import('../core/ct-library/types.js').CtLibrarySummaryIndex;
+      total: number;
+      results: import('../core/ct-library/search.js').CtLibrarySearchResult[];
+      error?: string;
+    }>;
+    ctLibraryGameDetail: (payload: { gameId: string }) => Promise<{
+      success: boolean;
+      available: boolean;
+      game?: import('../core/ct-library/types.js').CtLibraryGameSummary;
+      tables: import('../core/registry/compile-ct-zip.js').CtZipCatalogEntry[];
+      error?: string;
+    }>;
     liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) => Promise<{
       success: boolean;
       result?: {
@@ -322,6 +391,58 @@ interface Window {
       success: boolean;
       found?: boolean;
       address?: string;
+      error?: string;
+    }>;
+    /** Phase 9 — typed reinterpret at one address (read-only). */
+    researchView: (payload: { address: string; types: string[] }) => Promise<{
+      success: boolean;
+      entries?: Array<{ address: string; type: string; value: number | string | null; readable: boolean }>;
+      error?: string;
+    }>;
+    researchHex: (payload: { address: string; size?: number }) => Promise<{
+      success: boolean;
+      window?: {
+        address: string;
+        size: number;
+        hexRows: Array<{ offset: number; hex: string; ascii: string }>;
+        truncated: boolean;
+        readable: boolean;
+        error?: string;
+      };
+      error?: string;
+    }>;
+    researchPointerAnalyze: (payload: {
+      address: string;
+      maxDepth?: number;
+      maxOffsetPerLevel?: number;
+    }) => Promise<{
+      success: boolean;
+      report?: import('../core/live-memory/research/pointer-candidate-analysis.js').PointerCandidateReport;
+      levelsSearched?: number;
+      scansPerformed?: number;
+      error?: string;
+    }>;
+    /** Phase 2 — session-bound path resolve (attached process only). */
+    researchResolvePath: (payload: {
+      moduleName: string;
+      baseOffset: string;
+      pointerChain?: number[];
+    }) => Promise<{ success: boolean; address?: string; error?: string }>;
+    researchSnapshotDiff: (payload: {
+      old: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+      new: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+    }) => Promise<{
+      success: boolean;
+      diff?: import('../core/live-memory/research/session-snapshot.js').SessionSnapshotDiff;
+      error?: string;
+    }>;
+    researchSnapshotSave: (payload: {
+      snapshot: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+      label?: string;
+    }) => Promise<{
+      success: boolean;
+      filePath?: string;
+      snapshot?: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
       error?: string;
     }>;
     inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) => Promise<{
@@ -351,7 +472,28 @@ interface Window {
       error?: string;
     }>;
     onCatalogProcessDetected?: (
-      callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void,
+      callback: (payload: {
+        catalogGameId: string;
+        displayName: string;
+        pid: number;
+        executable: string;
+        planAllowed?: boolean;
+        blockReason?: string;
+        fingerprintStatus?: string;
+        hasDefinition?: boolean;
+        prepareReady?: boolean;
+        executableHashSHA256?: string;
+      }) => void,
+    ) => (() => void) | undefined;
+    onZeroInputReady?: (
+      callback: (payload: {
+        catalogGameId: string;
+        pid: number;
+        executable: string;
+        counts?: { resolved: number; failed: number; scanRequired: number };
+        features?: unknown[];
+        featureHints?: Record<string, string>;
+      }) => void,
     ) => (() => void) | undefined;
 
     installDiscoveryScan: (payload?: {

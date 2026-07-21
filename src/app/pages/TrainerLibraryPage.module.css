@@ -34,6 +34,51 @@
   gap: 0.5rem;
 }
 
+.hubPanel {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(120, 180, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(14, 22, 38, 0.92);
+}
+
+.hubPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.hubPanelHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #e8f0ff;
+}
+
+.hubToggle,
+.hubOverwrite {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #cde0ff;
+  font-size: 0.85rem;
+}
+
+.hubCopy {
+  margin: 0.55rem 0 0.7rem;
+  color: #9eb6dc;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.hubActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+
 .syncBtn {
   padding: 0.55rem 0.9rem;
   border-radius: 8px;
@@ -206,6 +251,22 @@
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.65);
   color: #cde0ff;
+}
+
+.communityBadge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(245, 158, 11, 0.7);
+  border-radius: 6px;
+  background: rgba(43, 31, 8, 0.94);
+  color: #fde68a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: none;
 }
 
 .installedBadge {

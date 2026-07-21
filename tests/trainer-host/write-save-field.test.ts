@@ -85,7 +85,7 @@ describe('proposeWriteField', () => {
   });
 
   test('throws a user-safe unsupported-format error for non-XML proposals', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-private-propose-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-private-propose-'));
     const jsonPath = path.join(tmpDir, 'private-player.bin');
     fs.writeFileSync(jsonPath, '{"SaveGame":{"player":{"money":5000}}}', 'utf-8');
     try {
@@ -106,7 +106,7 @@ describe('proposeWriteField', () => {
   });
 
   test('allows JSON read-only proposal validation with preview', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-propose-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
     try {
@@ -126,7 +126,7 @@ describe('proposeWriteField', () => {
   });
 
   test('rejects JSON proposal type changes for numeric fields', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-type-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-propose-type-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
     try {
@@ -140,7 +140,7 @@ describe('proposeWriteField', () => {
   });
 
   test('rejects JSON proposal paths that traverse arrays', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-array-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-propose-array-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"inventory":[{"count":2}]}', 'utf-8');
     try {
@@ -154,7 +154,7 @@ describe('proposeWriteField', () => {
   });
 
   test('rejects missing JSON proposal fields', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-propose-missing-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-propose-missing-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
     try {
@@ -168,7 +168,7 @@ describe('proposeWriteField', () => {
   });
 
   test('allows INI proposal preview without enabling write execution', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-propose-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ini-propose-'));
     const iniPath = path.join(tmpDir, 'settings.ini');
     fs.writeFileSync(iniPath, '[player]\nmoney=5000\n', 'utf-8');
     try {
@@ -247,7 +247,7 @@ describe('executeWriteField', () => {
   });
 
   test('writes JSON scalar fields with backup and verification', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-execute-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-execute-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
     try {
@@ -268,7 +268,7 @@ describe('executeWriteField', () => {
   });
 
   test('rolls back JSON writes from verified backup', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-rollback-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-rollback-'));
     const jsonPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(jsonPath, '{"player":{"money":5000}}', 'utf-8');
     try {
@@ -291,7 +291,7 @@ describe('executeWriteField', () => {
   });
 
   test('writes INI fields with backup, verification, and rollback', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-execute-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ini-execute-'));
     const iniPath = path.join(tmpDir, 'settings.ini');
     fs.writeFileSync(iniPath, '; player config\n[player]\nmoney=5000\n', 'utf-8');
     try {

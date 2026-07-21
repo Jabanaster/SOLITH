@@ -1,7 +1,7 @@
 import db from '../database/index.js';
 
 /**
- * Persisted cheat toggle state — survives a ResourceForge restart (not a
+ * Persisted cheat toggle state — survives a Solith restart (not a
  * game restart; see PersistedCheatState.confirmedAddress doc below for why
  * that distinction matters). Main-process only: this module reaches through
  * to src/core/database, which uses Node's fs/path/crypto directly. Never

@@ -268,6 +268,22 @@ export const LiveMemoryAttachSchema = z.object({
   catalogGameId: z.string().min(1).max(128).optional(),
 });
 
+/** Zero-Input prepare: plan → attach → SignatureEngine resolve (no cheat writes). */
+export const LiveMemoryZeroInputPrepareSchema = z.object({
+  pid: z.number().int().positive(),
+  executableName: z.string().min(1).max(260),
+  catalogGameId: z.string().min(1).max(128),
+  userConfirmedOffline: z.literal(true),
+  executableHashSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  driftAcknowledged: z.boolean().optional(),
+  maxFuzzyDistance: z.number().int().min(0).max(8).optional(),
+  /** Prior feature addresses (0x-hex) for SignatureEngine hint windows on re-prepare. */
+  featureHints: z.record(
+    z.string().min(1).max(128),
+    z.string().regex(/^0x[0-9a-f]{1,16}$/i),
+  ).optional(),
+});
+
 export const LiveMemoryDetachSchema = z.object({});
 
 export const LiveMemoryReadSchema = z.object({
@@ -402,6 +418,74 @@ export const LiveMemoryPointerScanSchema = z.object({
 export const LiveMemoryScanAobSchema = z.object({
   signature: z.string().min(3).max(512),
   moduleName: z.string().min(1).max(260).optional(),
+});
+
+/** Phase 9 — read-only research view (typed reinterpret at one address). */
+export const ResearchViewSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  types: z
+    .array(z.union([LIVE_VALUE_TYPE, z.literal('string')]))
+    .min(1)
+    .max(8),
+});
+
+/** Phase 9 — hex inspector window. */
+export const ResearchHexSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  size: z.number().int().min(16).max(4096).default(256),
+});
+
+/** Phase 9 — pointer candidate analysis (runs pointer scan then scores). */
+export const ResearchPointerAnalyzeSchema = z.object({
+  address: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  maxDepth: z.number().int().min(1).max(8).optional(),
+  maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
+});
+
+/**
+ * Phase 2 — session-bound pointer path resolve (attached process only; no free PID).
+ */
+export const ResearchResolvePathSchema = z.object({
+  moduleName: z.string().min(1).max(260),
+  baseOffset: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  pointerChain: z.array(z.number().int().nonnegative()).max(32).default([]),
+});
+
+const SnapshotWatchItemSchema = z.object({
+  address: z.string().min(1).max(32),
+  type: z.string().min(1).max(32),
+  lastValue: z.union([z.number(), z.string(), z.null()]),
+  label: z.string().max(200).optional(),
+});
+
+const SnapshotModuleBaseSchema = z.object({
+  name: z.string().min(1).max(260),
+  baseAddress: z.string().min(1).max(32),
+  size: z.number().int().nonnegative(),
+});
+
+const SessionSnapshotSchema = z.object({
+  schemaVersion: z.literal(1),
+  timestamp: z.string().min(1).max(64),
+  pid: z.number().int().nonnegative(),
+  processName: z.string().min(1).max(260),
+  watchlist: z.array(SnapshotWatchItemSchema).max(500),
+  matchSetIds: z.array(z.string().max(128)).max(200),
+  moduleBases: z.array(SnapshotModuleBaseSchema).max(200).optional(),
+  notes: z.string().max(2000).optional(),
+  pointerTarget: z.string().max(32).optional(),
+});
+
+/** Phase 9 — diff two session snapshots (no memory I/O). */
+export const ResearchSnapshotDiffSchema = z.object({
+  old: SessionSnapshotSchema,
+  new: SessionSnapshotSchema,
+});
+
+/** Phase 9 — persist a session snapshot under userData/research-sessions. */
+export const ResearchSnapshotSaveSchema = z.object({
+  snapshot: SessionSnapshotSchema,
+  label: z.string().min(1).max(80).optional(),
 });
 
 export const TrainerResearchAnalyzeExeSchema = z.object({

@@ -69,7 +69,7 @@ export class BinaryAdapter implements TrainerAdapter {
   }
 
   async buildOutput(filePath: string, pathStr: string, newValue: any): Promise<BuildOutputResult> {
-    return { success: false, content: '', error: 'Binary save modification is unsupported in ResourceForge V1.' };
+    return { success: false, content: '', error: 'Binary save modification is unsupported in Solith V1.' };
   }
 
   async validateContent(content: string, filePath: string): Promise<ValidationResult> {

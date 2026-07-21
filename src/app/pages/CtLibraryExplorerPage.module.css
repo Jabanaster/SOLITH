@@ -1,0 +1,151 @@
+.page {
+  padding: 1rem 1.25rem 2rem;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.toolbar,
+.summaryGrid,
+.layout {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.summaryGrid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 1rem 0;
+}
+
+.card,
+.detail,
+.results,
+.toolbar {
+  border: 1px solid rgba(120, 180, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(10, 16, 28, 0.92);
+  padding: 0.9rem;
+}
+
+.card span,
+.meta,
+.safety {
+  color: #94a8cc;
+  font-size: 0.82rem;
+}
+
+.card strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: #edf5ff;
+  font-size: 1.25rem;
+}
+
+.toolbar {
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px) minmax(140px, 180px);
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.toolbar label {
+  display: grid;
+  gap: 0.35rem;
+  color: #bdd0ef;
+  font-size: 0.82rem;
+}
+
+.toolbar input,
+.toolbar select {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: rgba(5, 10, 18, 0.95);
+  color: #eef6ff;
+}
+
+.layout {
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 0.85fr);
+  align-items: start;
+}
+
+.resultList {
+  display: grid;
+  gap: 0.45rem;
+  max-height: calc(100vh - 390px);
+  min-height: 340px;
+  overflow: auto;
+}
+
+.resultRow {
+  display: grid;
+  gap: 0.18rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(120, 180, 255, 0.12);
+  border-radius: 9px;
+  background: rgba(15, 24, 40, 0.84);
+  color: #edf5ff;
+  padding: 0.7rem;
+  cursor: pointer;
+}
+
+.resultRow[aria-pressed='true'] {
+  border-color: rgba(120, 200, 255, 0.58);
+  background: rgba(45, 92, 145, 0.32);
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pill,
+.safetyPill {
+  display: inline-flex;
+  width: max-content;
+  border-radius: 999px;
+  padding: 0.16rem 0.48rem;
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  color: #bdd0ef;
+  font-size: 0.72rem;
+}
+
+.safetyPill {
+  border-color: rgba(106, 214, 162, 0.35);
+  color: #9cf0c2;
+}
+
+.detail h2,
+.results h2 {
+  margin-top: 0;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.45rem 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.kv dt {
+  color: #8fa3c7;
+}
+
+.kv dd {
+  margin: 0;
+  color: #edf5ff;
+  word-break: break-word;
+}
+
+.empty {
+  color: #a9bad9;
+  padding: 1rem;
+}
+
+@media (max-width: 1000px) {
+  .toolbar,
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

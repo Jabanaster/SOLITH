@@ -62,6 +62,20 @@ const BASELINES: PerGameConnectionBaseline[] = [
       'during the tutorial only (not verified during career mode or online matchmaking); re-review ' +
       'if the observed count varies in those states.',
   },
+  {
+    executableName: 'Avowed-WinGDK-Shipping.exe',
+    acceptedConnectionBaseline: 3,
+    reviewedAt: '2026-07-20',
+    evidence:
+      'PROVISIONAL (single session/version/machine): Measured live against Avowed-WinGDK-Shipping.exe ' +
+      'PID 16696 (Xbox PC Game Pass package Microsoft.Avowed_2.258.6997.0_x64__8wekyb3d8bbwe) during ' +
+      'solo single-player with save loaded: 3 ESTABLISHED non-loopback TCP connections, all HTTPS/443 ' +
+      'to Microsoft/Azure-owned ranges (20.109.157.180, 20.201.192.56, 199.46.35.129) — consistent with ' +
+      'Xbox platform chatter in that snapshot; count-only (KI-017 residual risk applies). Launcher ' +
+      'Avowed.exe PID 32640 had 0. Better than default 0 for attach; not a strong permanence claim. ' +
+      'Evidence: Docs/Baselines/AVOWED_CONNECTION_BASELINE_2026-07-20.md. ' +
+      'Harness: node scripts/measure-connection-baseline.mjs --pid 16696.',
+  },
 ];
 
 const BASELINE_BY_EXECUTABLE = new Map<string, number>(

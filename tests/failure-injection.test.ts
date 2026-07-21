@@ -16,8 +16,8 @@ import { createRecipe, validateRecipeSafety } from '../src/core/recipes/index.ts
 import { AddGameSchema, ApplyProposalSchema } from '../electron/ipc-validation.ts';
 import { acquireFileLock, releaseFileLock } from '../src/core/safety/file-lock.ts';
 
-describe('ResourceForge Failure Injection & Security Invariant Tests', () => {
-  const testDir = path.join(os.tmpdir(), 'resourceforge-failure-tests');
+describe('Solith Failure Injection & Security Invariant Tests', () => {
+  const testDir = path.join(os.tmpdir(), 'solith-failure-tests');
   let gameId = '';
 
   before(async () => {

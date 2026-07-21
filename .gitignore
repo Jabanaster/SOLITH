@@ -37,7 +37,7 @@ build/
 *.db-shm
 *.db-wal
 
-# Backups written by ResourceForge
+# Backups written by Solith
 backups/
 *.backup.json
 

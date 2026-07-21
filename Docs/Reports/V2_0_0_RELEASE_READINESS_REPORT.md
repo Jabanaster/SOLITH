@@ -1,8 +1,8 @@
-# ResourceForge V2.0.0 Release Readiness Report
+# Solith V2.0.0 Release Readiness Report
 
 ## Release Identity
 
-- Release: ResourceForge V2.0.0
+- Release: Solith V2.0.0
 - Baseline V2 Bite 6 commit: `3b64751e764c1d5d00583193dcde56ba5af2b1d7`
 - Post-gate stabilization commits:
   - `47d5a15bf96c760d5cc935a24f276b422e9dc009` — stabilize profile catalog fixture validation
@@ -31,9 +31,9 @@ Delivered V2 changes:
 
 - `package.json` version: `2.0.0`
 - `package-lock.json` version: `2.0.0`
-- Product name: `ResourceForge`
-- App ID: `com.resourceforge.app`
-- Windows executable name: `ResourceForge`
+- Product name: `Solith`
+- App ID: `com.solith.app`
+- Windows executable name: `Solith`
 - NSIS installer artifact naming: `ResourceForge Setup ${version}.${ext}`
 - Repository metadata: present (`https://github.com/Jabanaster/ResourceForge.git`)
 - Publish/updater config: absent
@@ -61,7 +61,7 @@ Source checksum output:
 
 ## Local Fresh-Clone Verification (Post-Bump)
 
-- Verification path: `G:\RESOURCEFORGE_V2_LOCAL_VERIFY_4`
+- Verification path: `G:\SOLITH_V2_LOCAL_VERIFY_4`
 - Clone source: local repo `G:\GAME TRAINER`
 - Verified HEAD: `6b5fa26e669379146c09374afdd604406e043178`
 
@@ -93,7 +93,7 @@ fcd3ed99c34716efa20970598998943f9bf96f6e7806b0609e6da4f52bce6196  dist/ResourceF
 
 ## Safety Guarantees Preserved
 
-ResourceForge remains:
+Solith remains:
 
 - Local-only.
 - Offline-first.

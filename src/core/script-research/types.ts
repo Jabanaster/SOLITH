@@ -37,6 +37,58 @@ export interface CtScriptResearchReport {
   notes: string[];
 }
 
+export type CtRawScriptType = 'AutoAssembler_Script' | 'Lua_Script' | 'CheatScript_Metadata';
+
+export interface CtRawScriptCatalogEntry {
+  ctId?: string;
+  name: string;
+  path: string;
+  type: CtRawScriptType;
+  script_excerpt: string;
+  raw_script_content: string;
+  executable: false;
+}
+
+export interface CtRawScriptCatalog {
+  title: string;
+  catalogGameId: string;
+  sourceNote: string;
+  scripts: CtRawScriptCatalogEntry[];
+}
+
+export type AobScanType = 'aobscan' | 'aobscanmodule' | 'aobscanregion';
+
+export type AobCompleteness = 'complete' | 'partial' | 'invalid';
+
+export interface ExtractedAobSignature {
+  symbol: string;
+  module?: string;
+  pattern: string;
+  rawPattern: string;
+  scanType: AobScanType;
+  sourceEntry: string;
+  sourcePath: string;
+  sourceScriptType: CtRawScriptType;
+  lineNumber: number;
+  executable: false;
+  nearbyLabels: string[];
+  nearbyOffsets: string[];
+  registeredSymbols: string[];
+  warnings: string[];
+  completeness: AobCompleteness;
+  duplicateOf?: string;
+}
+
+export interface AobSignatureExtractionReport {
+  sourceTitle: string;
+  extractedAt: string;
+  totalScripts: number;
+  totalSignatures: number;
+  duplicateSignatures: number;
+  signatures: ExtractedAobSignature[];
+  warnings: string[];
+}
+
 export interface MergedUeScriptHint {
   cheatName: string;
   scriptStrategy: ScriptReplicationStrategy;

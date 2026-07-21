@@ -1,8 +1,8 @@
-﻿# Solith / ResourceForge Roadmap
+﻿# Solith / Solith Roadmap
 
 ## Current Baseline (Solith 2.3.0-alpha.1)
 
-Product UI: **Solith** · package `resourceforge@2.3.0-alpha.1`
+Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 
 * Local **`master` @ `528c243`** — `cursor/atomfall-l3-live-cert` fast-forward merged (2026-07-16)
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
@@ -17,7 +17,7 @@ Product UI: **Solith** · package `resourceforge@2.3.0-alpha.1`
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
 | CI pipeline green (`npm test` / Electron output verifier) | **RESOLVED** — local Alpha gate **667/667** + Electron **19/19** @ `528c243` |
-| Injection contained (mainstream path RPM/WPM only; Milestone M pilot OFF by default) | **RESOLVED** — charter + gates unchanged |
+| Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 
 ### Stability lock
@@ -32,7 +32,7 @@ Product UI: **Solith** · package `resourceforge@2.3.0-alpha.1`
 
 ### Accepted capability stack
 
-```
+```text
 schema.v1.yml → compile → SQLite payloadJson
          ↑ export                    ↓ lazy load
    Discovery Lab              Trainer Library
@@ -40,10 +40,8 @@ schema.v1.yml → compile → SQLite payloadJson
                                     ├─ Trainer Deck / install discovery / health
                                     └─ saveEditor.saveFields → TrainerHost (catalog save controls)
 Trainer Research Lab → PE / memory diff / Script Analyzer / Dumpspace (Milestone L)
-In-process pilot → Crimson Desert gated hooks (Milestone M, flag OFF by default)
+Dual-Core Live Engine → Internal (Win32 VEH/Injection) + External (WinGDK RPM) actively routing based on target environment.
 ```
-
-Honest live-memory stance (README): most bundled memory features remain **L0 `scan_unknown` / Discovery-required**. **Exception:** Atomfall `atomfall-current-weapon-ammo` is an **L3** restart-stable verified pointer (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`).
 
 ### Milestone map (recent)
 
@@ -53,12 +51,12 @@ Honest live-memory stance (README): most bundled memory features remain **L0 `sc
 | **M** | In-process pilot — Crimson Desert hooks / trainer spawn | **Accepted** (tag + remote); user charter + default OFF |
 | **M–Q** *(legacy lettering)* | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
 | **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
-| **S** | Connection baselines + restart-stable pointers | **Partial** — Atomfall ammo L3 done; other titles still live-blocked |
+| **S** | Connection baselines + restart-stable pointers | **Partial** — Atomfall ammo L3 done; Avowed L0 packaging Done (live L0→L2+ still next); Dredge / Crimson Desert live-blocked |
 | **T** | 50 bundled + 1000 catalog seed | **Done** |
-| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — offline L0/L1 + Atomfall L3 live evidence; other L2–L4 still live-blocked |
+| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — offline L0/L1 + Atomfall L3; Avowed remains L0 until SOP evidence (`AVOWED_LIVE_VALIDATION_SOP.md`) |
 | **V** | Feedback, promotion, rating prompt | **Done** |
 | **W** | CT import, pointer scan, watch-list, speedhack | **Done** |
-| **X** | Binary save router + research stubs | **Partial** — demo profiles + stub fixture; commercial `canWrite` blocked |
+| **X** | Binary save router + research stubs | **Partial** — demo/stub only; **immediate next** after Avowed live: Terraria `.plr` wave 1 `canWrite` |
 | **Y** | Overlay presets, hotkey rebind, onboarding | **Done** |
 | **Z** | Managed runtime (.NET/Mono) | **Not started** |
 | **AA** | Install discovery (Steam/Epic/GOG) | **Done** |
@@ -89,19 +87,44 @@ Honest live-memory stance (README): most bundled memory features remain **L0 `sc
 | Atomfall L3 live evidence + harness | `528c243` / `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md` |
 | Offline sweep + CI/honesty lock | `20739f5` + `ac43ec6` → **`master`** |
 
+### Post-Alpha architecture — Done (branch tip)
+
+Shipped on `cursor/phase3-hub-sync-trust-ui` (tip `05b5490` and ancestors). These close product/architecture gaps; they do **not** fake live L2+ certs.
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Zero-Input detect → prepare → resolve loop | **Done** | `process-watcher` / feature resolver / memory audit IPC; blueprint `Docs/Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md` |
+| Avowed WinGDK executable packaging (L0) | **Done** | `AVOWED_L0_DEFINITION` + aliases `Avowed-WinGDK-Shipping.exe`; deck stays `scan_unknown` / L0 |
+| WinGDK `wgs` save + Alabama config backup watchers | **Done** | `electron/avowed-wingdk-backup-watch.ts` + `src/core/backups/avowed-wingdk.ts` (READ + COPY only) |
+| Phase 3 Hub Sync Orchestrator & Trust UI | **Done** | Opt-in community sync polling, Catalog trust UI, PII sanitization / L0 quarantine |
+| Core engine hardening | **Done** | Fuzzy AOB drift recovery, local crash reporter, local sandbox scaffold |
+| Solith rebrand + opening cinematic | **Done** | Product rename + UI cinematic integration |
+| Phase 9 Address/Data Research Tools | **Done** | Read-only viewer/hex/pointer/snapshot — `Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md` |
+| Phase 10 Gated Write Architecture | **Done** | `WritePolicyGate` + MemoryManager enforce; researchWriteMode default OFF; Trust Shift waiver replaces connection-count write blocks — `Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md` |
+| Trust Shift + CT→Live Phases 2–4 | **Done** | Waiver consent; `CtLiveResolution`; toggle cards; pointer table / What-Changed; local pack export — `Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md` |
+
+Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** until live AOB/pointer evidence. Live elevation playbook: `Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`.
+
 ### Bundled schema.v1 definitions
 
 All seven curated games (`games.ts`) ship as `schema.v1` payloads via `bundled-definition-seed.ts`:
 Stardew Valley (save-field controls) plus six live-memory titles. Atomfall includes verified
 `atomfall-current-weapon-ammo` at **L3**; other pinned live cheats remain `scan_unknown` until certified.
+Avowed ships Steam + WinGDK executables at **L0** only (no `signature` / `baseOffset` / `pointerChain` yet).
 
 ### Remaining live-session work (do not fake)
 
-1. Connection baselines — Avowed, Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
-2. Restart-verify pointer paths for remaining bundled memory games (beyond Atomfall ammo)
-3. Additional L2–L4 certification runs with in-game evidence for non-Atomfall titles
-4. Commercial binary save writes without sandbox fixtures (Terraria `.plr` wave 1)
-5. Managed-runtime live memory spike (Milestone Z)
+**Immediate next targets (priority order):**
+
+1. **Avowed connection baselines + L0 → L2+ elevation** — Game Pass / WinGDK live session: process detect, `measure-connection-baseline.mjs`, state-delta scan on `Avowed-WinGDK-Shipping.exe`, then restart-verify before any schema promotion (`Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`)
+2. **Milestone X — Terraria `.plr` binary save write path (wave 1)** — commercial binary writes beyond sandbox fixtures (`canWrite` still blocked until certified)
+
+**Still required (after the two above, or when sessions allow):**
+
+3. Connection baselines — Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
+4. Restart-verify pointer paths for remaining bundled memory games (beyond Atomfall ammo)
+5. Additional L2–L4 certification runs with in-game evidence for non-Atomfall / non-elevated-Avowed titles
+6. Managed-runtime live memory spike (Milestone Z) — research only when authorized
 
 ### Can continue offline (post-merge)
 
@@ -110,18 +133,25 @@ Stardew Valley (save-field controls) plus six live-memory titles. Atomfall inclu
 - ~~README L0 honesty + in-process user charter~~ — **on master**
 - ~~schema.v1 Phase 0→5~~ — **on master**
 - ~~Atomfall L3 live baseline~~ — **on master** (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`)
-- Remaining S / U live titles still require game sessions
+- ~~Zero-Input loop / Avowed L0 + WinGDK backups / Hub sync+trust / engine harden / Solith rebrand~~ — **on `cursor/phase3-hub-sync-trust-ui`**
+- ~~Phase 9 address/data research tools (view/hex/pointer report/session snapshot, read-only)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`)
+- ~~Phase 10 gated write architecture (policy scaffold; researchWriteMode default OFF)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`)
+- ~~Trust Shift + CT→Live Phases 2–4 (waiver, promote/toggles, research UX, local packs)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md`)
+- Remaining S / U live titles still require game sessions (Avowed first)
 
 See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.
 Run **`npm run verify:schema-v1-boundaries`** and **`npm run orphan-check`** before merge.  
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
-See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.
+See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.  
+See **`Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`** for Avowed L0 → L2/L3 live elevation.  
+See **`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`** for read-only research IPC/UI.  
+See **`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`** for write policy gate + residual risks.
 
 ---
 
 ## Historical: v1.0.2 baseline
 
-ResourceForge v1.0.2 remains the prior save-editor / Stardew-controls release baseline.
+Solith v1.0.2 remains the prior save-editor / Stardew-controls release baseline.
 
 * Tag: `v1.0.2`
 * Commit: `d84b155a8f6729f8428b5c777f0784853c65d419`
@@ -189,7 +219,7 @@ Current local development state:
 
 Fresh local-clone verification for Bite 2 passed from:
 
-`G:\RESOURCEFORGE_V11_BITE2_VERIFY`
+`G:\SOLITH_V11_BITE2_VERIFY`
 
 Bite 2 verification results:
 
@@ -226,7 +256,7 @@ Fixes included:
 * Added self-contained Milestone E packaged-app prerequisites.
 
   * `npm run test:milestone-e` builds the packaged app first.
-  * Prevents clean clones from failing on missing `dist/win-unpacked/ResourceForge.exe`.
+  * Prevents clean clones from failing on missing `dist/win-unpacked/Solith.exe`.
 
 Known note:
 
@@ -550,7 +580,7 @@ Suggested pilot order:
 
 ## V1.3 Compatibility Pilot Process
 
-V1.3 makes ResourceForge safer for limited compatibility pilots without enabling new executable game controls by default.
+V1.3 makes Solith safer for limited compatibility pilots without enabling new executable game controls by default.
 
 V1.3 scope:
 
@@ -666,7 +696,7 @@ The following must not be altered casually:
 
 ## Explicit Non-Goals
 
-ResourceForge should not support:
+Solith should not support:
 
 * Online game cheating.
 * Multiplayer manipulation.

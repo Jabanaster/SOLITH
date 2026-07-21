@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('electronAPI', {
   // Deterministic renderer-state fixture. This is unavailable in normal builds/runs.
   e2eTrainerState: process.env.NODE_ENV === 'test'
-    ? (process.env.RESOURCEFORGE_E2E_TRAINER_STATE ?? null)
+    ? (process.env.SOLITH_E2E_TRAINER_STATE ?? process.env.RESOURCEFORGE_E2E_TRAINER_STATE ?? null)
     : null,
 
   // Database operations
@@ -76,6 +76,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryListProcesses: () => ipcRenderer.invoke('live-memory-list-processes'),
   liveMemoryAttach: (payload: { pid: number; executableName: string; userConfirmedOffline: true }) =>
     ipcRenderer.invoke('live-memory-attach', payload),
+  liveMemoryZeroInputPrepare: (payload: {
+    pid: number;
+    executableName: string;
+    catalogGameId: string;
+    userConfirmedOffline: true;
+    executableHashSHA256?: string;
+    driftAcknowledged?: boolean;
+    maxFuzzyDistance?: number;
+    featureHints?: Record<string, string>;
+  }) => ipcRenderer.invoke('live-memory-zero-input-prepare', payload),
   liveMemoryDetach: () => ipcRenderer.invoke('live-memory-detach'),
   liveMemoryRead: (payload: { address: string; dataType: string }) =>
     ipcRenderer.invoke('live-memory-read', payload),
@@ -117,7 +127,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryResolveDefinitionFeature: (payload: { catalogGameId: string; featureId: string }) =>
     ipcRenderer.invoke('live-memory-resolve-definition-feature', payload),
 
-  // Persisted cheat toggle state — survives a ResourceForge restart (see
+  // Persisted cheat toggle state — survives a Solith restart (see
   // cheat-toggle-store.ts for why this is scoped to "app restart", not "game restart").
   cheatToggleGetAll: (payload: { gameId: string }) => ipcRenderer.invoke('cheat-toggle-get-all', payload),
   cheatToggleSet: (payload: {
@@ -153,6 +163,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-catalog-get', payload),
   trainerCatalogSeed: () => ipcRenderer.invoke('trainer-catalog-seed'),
   trainerCatalogSyncRemote: () => ipcRenderer.invoke('trainer-catalog-sync-remote'),
+  trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) =>
+    ipcRenderer.invoke('trainer-catalog-sync-hub', payload ?? {}),
+  trainerCatalogGetDefinition: (payload: { catalogGameId: string }) =>
+    ipcRenderer.invoke('trainer-catalog-get-definition', payload),
+  publishToCommunity: (payload: {
+    definition: unknown;
+    executableHash: string;
+  }) => ipcRenderer.invoke('publishToCommunity', payload),
   trainerCatalogLoadGame: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-load-game', payload),
   trainerCatalogGetTrainerControls: (payload: { catalogGameId: string }) =>
@@ -179,6 +197,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogExportDefinition: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-export-definition', payload),
   trainerCatalogPendingQuarantine: () => ipcRenderer.invoke('trainer-catalog-pending-quarantine'),
+  ctLibrarySummary: () => ipcRenderer.invoke('ct-library-summary'),
+  ctLibrarySearch: (payload: {
+    query?: string;
+    gameId?: string;
+    kind?: 'all' | 'pointer' | 'script' | 'aob';
+    limit?: number;
+    offset?: number;
+  }) => ipcRenderer.invoke('ct-library-search', payload),
+  ctLibraryGameDetail: (payload: { gameId: string }) => ipcRenderer.invoke('ct-library-game-detail', payload),
   trainerResearchPickExe: () => ipcRenderer.invoke('trainer-research-pick-exe'),
   trainerResearchAnalyzeExe: (payload: { filePath: string }) =>
     ipcRenderer.invoke('trainer-research-analyze-exe', payload),
@@ -198,6 +225,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
+
+  // Phase 9 — read-only address/data research tools
+  researchView: (payload: { address: string; types: string[] }) =>
+    ipcRenderer.invoke('research:view', payload),
+  researchHex: (payload: { address: string; size?: number }) =>
+    ipcRenderer.invoke('research:hex', payload),
+  researchPointerAnalyze: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
+    ipcRenderer.invoke('research:pointer-analyze', payload),
+  researchResolvePath: (payload: {
+    moduleName: string;
+    baseOffset: string;
+    pointerChain?: number[];
+  }) => ipcRenderer.invoke('research:resolve-path', payload),
+  researchSnapshotDiff: (payload: { old: unknown; new: unknown }) =>
+    ipcRenderer.invoke('research:snapshot-diff', payload),
+  researchSnapshotSave: (payload: { snapshot: unknown; label?: string }) =>
+    ipcRenderer.invoke('research:snapshot-save', payload),
+
   inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-propose-hook', payload),
   inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) =>
@@ -210,10 +255,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('in-process-propose-injector-launch', payload),
   inProcessConfirmInjectorLaunch: (payload: { proposalId: string; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-confirm-injector-launch', payload),
-  onCatalogProcessDetected: (callback: (payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => void) => {
-    const listener = (_event: unknown, payload: { catalogGameId: string; displayName: string; pid: number; executable: string }) => callback(payload);
+  onCatalogProcessDetected: (callback: (payload: {
+    catalogGameId: string;
+    displayName: string;
+    pid: number;
+    executable: string;
+    planAllowed?: boolean;
+    blockReason?: string;
+    fingerprintStatus?: string;
+    hasDefinition?: boolean;
+    prepareReady?: boolean;
+  }) => void) => {
+    const listener = (_event: unknown, payload: {
+      catalogGameId: string;
+      displayName: string;
+      pid: number;
+      executable: string;
+      planAllowed?: boolean;
+      blockReason?: string;
+      fingerprintStatus?: string;
+      hasDefinition?: boolean;
+      prepareReady?: boolean;
+      executableHashSHA256?: string;
+    }) => callback(payload);
     ipcRenderer.on('catalog-process-detected', listener);
     return () => ipcRenderer.removeListener('catalog-process-detected', listener);
+  },
+  onZeroInputReady: (callback: (payload: {
+    catalogGameId: string;
+    pid: number;
+    executable: string;
+    counts?: { resolved: number; failed: number; scanRequired: number };
+    features?: unknown[];
+    featureHints?: Record<string, string>;
+  }) => void) => {
+    const listener = (_event: unknown, payload: {
+      catalogGameId: string;
+      pid: number;
+      executable: string;
+      counts?: { resolved: number; failed: number; scanRequired: number };
+      features?: unknown[];
+      featureHints?: Record<string, string>;
+    }) => callback(payload);
+    ipcRenderer.on('zero-input-ready', listener);
+    return () => ipcRenderer.removeListener('zero-input-ready', listener);
   },
 
   installDiscoveryScan: (payload?: {

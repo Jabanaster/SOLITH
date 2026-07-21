@@ -22,7 +22,7 @@ process::Pair process::openProcess(const char* processName, char** errorMessage)
   for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processes.size(); i++) {
     // Check to see if this is the process we want.
     if (!strcmp(processes[i].szExeFile, processName)) {
-      handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processes[i].th32ProcessID);
+      handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i].th32ProcessID);
       process = processes[i];
       break;
     }
@@ -48,7 +48,7 @@ process::Pair process::openProcess(DWORD processId, char** errorMessage) {
   for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processes.size(); i++) {
     // Check to see if this is the process we want.
     if (processId == processes[i].th32ProcessID) {
-      handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processes[i].th32ProcessID);
+      handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i].th32ProcessID);
       process = processes[i];
       break;
     }

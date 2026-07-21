@@ -11,8 +11,10 @@ import {
   releaseArtifactPaths,
 } from './release-artifact-utils.mjs';
 
-const root = process.env.RESOURCEFORGE_RELEASE_ROOT
-  ? path.resolve(process.env.RESOURCEFORGE_RELEASE_ROOT)
+const root = process.env.SOLITH_RELEASE_ROOT
+  ? path.resolve(process.env.SOLITH_RELEASE_ROOT)
+  : process.env.RESOURCEFORGE_RELEASE_ROOT
+    ? path.resolve(process.env.RESOURCEFORGE_RELEASE_ROOT)
   : findRepoRoot(import.meta.url);
 
 const pkg = readPackageMetadata(root);
@@ -42,7 +44,7 @@ console.log(`Product: ${productName}`);
 
 check('package version is non-empty', typeof pkg.version === 'string' && pkg.version.length > 0, String(pkg.version));
 check('productName is Solith', productName === 'Solith', productName);
-check('appId is stable', pkg.build?.appId === 'com.resourceforge.app', pkg.build?.appId);
+check('appId is stable', pkg.build?.appId === 'com.solith.app', pkg.build?.appId);
 check('publish config is absent', pkg.build?.publish === undefined);
 check('Windows executableName is Solith', pkg.build?.win?.executableName === 'Solith', pkg.build?.win?.executableName);
 check(

@@ -31,7 +31,7 @@ let window: Page;
 
 // Unique temp dir per test run — never reuses data from a previous run
 const RUN_ID       = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const TEMP_USER_DATA = path.join(os.tmpdir(), `resourceforge-smoke-${RUN_ID}`);
+const TEMP_USER_DATA = path.join(os.tmpdir(), `solith-smoke-${RUN_ID}`);
 
 test.beforeAll(async () => {
   // Ensure the bundle exists before trying to launch
@@ -74,9 +74,9 @@ test.afterAll(async () => {
   }
 });
 
-test('window title contains ResourceForge', async () => {
+test('window title contains Solith', async () => {
   const title = await window.title();
-  expect(title).toMatch(/ResourceForge/i);
+  expect(title).toMatch(/Solith/i);
 });
 
 test('app root element renders', async () => {

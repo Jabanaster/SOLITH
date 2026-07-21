@@ -16,8 +16,10 @@ export type ModuleViewId =
   | 'controls'
   | 'live-memory'
   | 'trainer-library'
+  | 'ct-library'
   | 'trainer-deck'
-  | 'catalog-save-controls';
+  | 'catalog-save-controls'
+  | 'registry-explorer';
 
 /**
  * Icon assignment:
@@ -30,6 +32,7 @@ export type ModuleViewId =
 export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtwork>> = {
   library: 'trainerController',
   'trainer-library': 'trainerController',
+  'ct-library': 'hoodedProfile',
   trainer: 'trainerController',
   saves: 'saveTools',
   controls: 'saveTools',
@@ -43,6 +46,7 @@ export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtw
   recipes: 'hoodedProfile',
   'session-monitor': 'advancedDragon',
   'live-memory': 'advancedDragon',
+  'registry-explorer': 'hoodedProfile',
   'catalog-save-controls': 'saveTools',
 };
 

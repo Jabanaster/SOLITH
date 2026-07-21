@@ -1,0 +1,88 @@
+.deck {
+  margin: 1rem 1.25rem 0;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid rgba(212, 168, 85, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(160deg, rgba(42, 36, 28, 0.55), rgba(22, 23, 27, 0.9));
+}
+
+.header {
+  margin-bottom: 0.85rem;
+}
+
+.title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: #f0e6d2;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #b8b0a2;
+}
+
+.subtitle code {
+  font-size: 0.78rem;
+  color: #e8d5a8;
+}
+
+.zeroInput {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  color: #c9c4b8;
+}
+
+.hydrateList {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+}
+
+.hydrateItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.featureName {
+  color: #ddd6c8;
+}
+
+.badge {
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d4c4a0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.badge[data-badge='hydrated'] {
+  color: #9fd4a8;
+  border-color: rgba(120, 180, 130, 0.35);
+}
+
+.badge[data-badge='scanning'] {
+  color: #d4c27a;
+  border-color: rgba(200, 170, 80, 0.4);
+}
+
+.badge[data-badge='error'] {
+  color: #e8a0a0;
+  border-color: rgba(200, 100, 100, 0.4);
+}
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}

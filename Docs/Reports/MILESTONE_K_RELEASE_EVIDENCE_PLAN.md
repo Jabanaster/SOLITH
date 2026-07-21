@@ -2,7 +2,7 @@
 
 Status: documentation preparation only.
 
-Milestone K is a release evidence pack for the accepted ResourceForge V1 work from Milestones E through J. It is not feature work and does not authorize source code changes, new controls, UI work, V2 work, Drill Core live validation, merge, tag, push, or release.
+Milestone K is a release evidence pack for the accepted Solith V1 work from Milestones E through J. It is not feature work and does not authorize source code changes, new controls, UI work, V2 work, Drill Core live validation, merge, tag, push, or release.
 
 ## Repository Lock
 

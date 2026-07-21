@@ -2,7 +2,7 @@
 
 ## Overview
 
-All paths in ResourceForge are resolved through `src/shared/app-paths.ts`. This module is shared between Electron main process code and the test environment.
+All paths in Solith are resolved through `src/shared/app-paths.ts`. This module is shared between Electron main process code and the test environment.
 
 ## Path Categories
 
@@ -13,11 +13,11 @@ When Electron is not available (i.e., running under `tsx` or `node --test`), the
 |------|----------|
 | `appRoot` | Project root (`G:/GAME TRAINER`) |
 | `userDataRoot` | `<project>/data/` |
-| `databasePath` | `<project>/data/resourceforge.db` |
+| `databasePath` | `<project>/data/solith.db` |
 | `demoFixtureRoot` | `<project>/demo-game/` |
 
 ### Packaged / Production paths (Electron)
-When running inside Electron, `app.getPath('userData')` is used for mutable data. This resolves to `%APPDATA%\ResourceForge` on Windows, which is:
+When running inside Electron, `app.getPath('userData')` is used for mutable data. This resolves to `%APPDATA%\Solith` on Windows, which is:
 - Outside the ASAR archive
 - Outside the installation directory
 - Not beside the executable
@@ -27,15 +27,15 @@ When running inside Electron, `app.getPath('userData')` is used for mutable data
 |------|----------|
 | `appRoot` | `app.getAppPath()` (inside ASAR) |
 | `userDataRoot` | `app.getPath('userData')` |
-| `databasePath` | `<userData>/resourceforge.db` |
+| `databasePath` | `<userData>/solith.db` |
 | `demoFixtureRoot` | `<resources>/demo-game/` via `process.resourcesPath` |
 
 ## Mutable Data
 
 ALL mutable data is written to `userDataRoot`:
-- `resourceforge.db` — SQLite database (via sql.js)
+- `solith.db` — SQLite database (via sql.js)
 - Backups — written by `src/core/backups/`
-- Logs — future use
+- Logs — `logs/crash_report.txt` via `src/core/crash/local-crash-reporter.ts` (telemetry-free); `logs/memory-audit.jsonl` via live-memory MemoryAuditLog
 
 **Never** write mutable data into:
 - `dist/` or `dist-electron/` (build outputs, regenerated on each build)

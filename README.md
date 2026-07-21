@@ -1,14 +1,16 @@
-# ResourceForge - Local AI Game Trainer & Save Editor
+# Solith - Local AI Game Trainer & Save Editor
 
-ResourceForge is a local/offline-only trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
+Solith is a local-first, single-player trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
 
-ResourceForge is strictly designed for single-player, offline games or applications that you own or have permission to modify.
+"**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
+
+Solith is strictly designed for single-player, offline games or applications that you own or have permission to modify.
 
 ---
 
 ## Multi-Game Live Trainer & Cheat Hub
 
-ResourceForge includes a **discovery-first live trainer** for curated titles plus a **save-field editor** for Stardew Valley. Memory cheats are **not** shipped as verified pointer packs. Bundled live features are typically **L0 `scan_unknown`**: you must discover (scan → narrow → confirm) addresses each session; addresses are session-local unless separately restart-verified (L3+), which is not claimed here.
+Solith includes a **discovery-first live trainer** for curated titles plus a **save-field editor** for Stardew Valley. Memory cheats are **not** shipped as verified pointer packs. Bundled live features are typically **L0 `scan_unknown`**: you must discover (scan → narrow → confirm) addresses each session; addresses are session-local unless separately restart-verified (L3+), which is not claimed here.
 
 | Game | Cheat defs (approx.) | Backend | Certification / honesty |
 |------|----------------------|---------|-------------------------|
@@ -18,7 +20,7 @@ ResourceForge includes a **discovery-first live trainer** for curated titles plu
 | **Avowed** | 10 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
 | **Dredge** | 10 | Live memory | **L0** — requires Discovery (`scan_unknown`); not a verified pointer pack |
 | **Stardew Valley** | 9 catalogued · 4 executable save fields | Save editor | Accepted save-field controls (money, stamina, XP, max stamina). Console-command catalog is **not** auto-executed |
-| **Crimson Desert** | 8+ (CT metadata) | Live memory (+ optional in-process pilot) | Memory path: **L0** Discovery. In-process hooks: **OFF by default**, `CrimsonDesert.exe` only — see [IN_PROCESS_PILOT_SAFETY_CHARTER.md](Docs/IN_PROCESS_PILOT_SAFETY_CHARTER.md) |
+| **Crimson Desert** | 8+ (CT metadata) | Live memory (Internal) | Memory path: **L0** Discovery. Internal Engine: Win32 VEH/Hooks authorized. |
 
 ### Features (accurate scope)
 
@@ -29,219 +31,99 @@ ResourceForge includes a **discovery-first live trainer** for curated titles plu
 - F1–F12 hotkeys / overlay when live-memory mode is enabled in settings  
 - Stardew Valley **save-field** writes via TrainerHost with approval / backup  
 
-### Quick Start:
+## Safety and support contract
 
-1. **Setup antivirus whitelist** (prevents false positives):
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
-   ```
-   See [ANTIVIRUS_SETUP.md](Docs/ANTIVIRUS_SETUP.md) for detailed instructions.
+The profile catalog is local/offline. Imported profiles are review-required and do not automatically create executable write support. Save diff is advisory: it helps identify likely editable values, but a diff result is not proof that a write is safe or durable.
 
-2. **Open ResourceForge** → Select a game from the cheat menu
-3. **Confirm offline-only mode** (safety checkbox required)
-4. **Toggle cheats** or manually discover values
-5. **Enable freeze** to maintain infinite values
+Support matrix reports are evidence-based. They describe what was inspected, what evidence exists, and what remains blocked or unverified. Rollback dashboard is visibility/verification only: it reports backup and restore evidence and does not perform silent restore. Unsupported writes remain blocked. No remote calls are used for local profile review, save diff, rollback visibility, or support matrix generation.
 
-### **Safety Architecture:**
+## Certification levels
 
-- **Fail-closed guard**: Writes blocked if game has active network connections
-- **User confirmation required**: Explicit checkbox for offline-only mode  
-- **Connection baseline**: Per-game (Palworld: 4 connections = Steamworks overhead)
-- **Type validation**: All memory operations validated before native calls
-- **Graceful errors**: Invalid addresses/handles rejected before reaching native layer
+- **L0** — discovery or metadata only. Values may be session-local, unverified, or imported from CT/community metadata. User discovery is required.
+- **L1/L2** — locally observed evidence exists, but restart stability or executable/build matching is incomplete.
+- **L3** — restart-stable pointer/signature evidence exists for a specific executable/build.
+- **L4** — release-grade verified support with repeatable tests, version fingerprints, and rollback/safety evidence.
 
----
+Unless explicitly marked L3+, Solith treats live-memory controls as L0 and requires discovery.
 
-## 🔁 Trainer UI Migration (Checkpoint `806ba56`)
+## Not supported
 
-The Palworld-specific trainer UI was replaced with a generic, per-game architecture.
-This does not add capability beyond what the memory scan/narrow/write pipeline above
-already covers — it changes which components implement it.
+Solith does not support online/multiplayer targeting, anti-cheat bypass, stealth, debugger bypass, kernel drivers, packet capture, remote trainer-binary execution, or unverified third-party executable cheats.
 
-**Removed as obsolete** (intentional deletion, not a regression):
-- `src/app/components/LiveTrainer.tsx`, `LiveTrainer.module.css`, `LiveTrainer.test.tsx`
-- `src/app/components/PalworldCheatMenu.tsx`, `PalworldCheatMenu.module.css`, `PalworldCheatMenu.test.tsx`
-- `src/app/pages/PalworldTrainerPage.tsx`, `PalworldTrainerPage.module.css`
-- `src/app/hooks/useFreezeValue.ts`, `useLiveTrainerWorkflow.ts`
+## Prerequisites
 
-**Active replacements:**
-- [`LiveWatchPanel`](src/app/components/LiveWatchPanel.tsx) is now the active live-watch UI —
-  it replaces `LiveTrainer.tsx`'s manual address-discovery view with a live-polling candidate
-  table (see the component's own scoring/confidence notes for what it does and does not infer).
-- `GameSpecificCheatMenu` (generic, driven by `src/core/cheat-system/games.ts`) replaces the
-  Palworld-only `PalworldCheatMenu`/`PalworldTrainerPage` pair.
+- Windows 10/11
+- Node.js compatible with the project toolchain; CI uses Node 22
+- npm
+- Visual Studio Build Tools with "Desktop development with C++" for native modules
+- Python available to node-gyp
+- Playwright browsers for E2E/smoke tests when running Playwright suites
 
-**Cheat toggle persistence** now flows through a dedicated chain instead of ad hoc component
-state:
+## Clean setup
 
-```
-UI → useGameCheatSession (src/app/hooks/useGameCheatSession.ts)
-   → preload (electron/preload.ts)
-   → electron/cheat-toggle-ipc.ts
-   → src/core/cheat-system/cheat-toggle-store.ts
-   → cheat_toggle_state table (src/core/database/index.ts)
-```
+From a fresh clone on Windows:
 
-Toggle state (enabled/disabled, last confirmed address, data type) survives a ResourceForge
-restart. It does **not** assume the target game process itself is still running with the same
-address layout — the caller re-verifies before reuse (see `cheat-toggle-store.ts` doc comment).
-
-**Verification for this checkpoint** (commit `806ba568c9ea9c11d1484e879849983074e76afd`):
-
-| Check | Result |
-|---|---|
-| `npx tsc --noEmit` | Pass |
-| `npm run test:trainer-schema` | Pass, 35/35 |
-| `npm run test:live-memory` | Pass, 72/72 |
-| `npm run test:trainer-host` | Pass, 80/80 |
-| `npm test` (standard suite) | Pass, 508/508 |
-
-No remaining source file imports `LiveTrainer`, `PalworldCheatMenu`, `PalworldTrainerPage`,
-`useFreezeValue`, or `useLiveTrainerWorkflow`.
-
-**Known testing gap:** there are no dedicated tests yet for `electron/cheat-toggle-ipc.ts`,
-`src/core/cheat-system/cheat-toggle-store.ts`, or `LiveWatchPanel.tsx`. Existing coverage
-(`test:trainer-schema`, `test:live-memory`, `test:trainer-host`, standard suite) exercises the
-surrounding modified files but not these three directly. This is an open gap, not a claim of
-coverage that doesn't exist.
-
-**Scope reminder:** this migration changes UI wiring only. It does not enable any control that
-was previously blocked, and it does not add new process/memory capability. Unsupported controls
-remain blocked unless explicitly verified and allowed by project safety scope. Support claims in
-this document describe local, single-player, offline use of games/saves the user owns — not
-broad commercial-game live-trainer support, not multiplayer, and not anti-cheat bypass.
-
----
-
-## 🛡️ Safety Policy & Scope Limits
-
-To prevent accidental data loss, anti-cheat flags, or system instability, ResourceForge enforces strict scope gates:
-
-### **Allowed Actions (Safe & File-Backed — default path)**
-- Save file editing (JSON, XML, INI, CSV, TSV, key/value text, Lua tables).
-- Config file editing (.cfg, .conf, .ini).
-- JSON/XML/CSV data tweaking.
-- Save comparison and discovery.
-- Offline rule-based or local AI explanations.
-- Automatic backups and one-click rollback/restore.
-
-### **⚠️ Gated Actions (Live Memory — off by default, scoped, verified)**
-- Live memory read/scan/write, limited to the pre-declared per-game control catalog
-  (`src/core/cheat-system/games.ts`), behind the `v2LiveModeEnabled` setting, a per-session
-  offline-confirmation checkbox, and a fail-closed online guard. See
-  [`Docs/safety-architecture.md`](Docs/safety-architecture.md) → "Live-Memory Subsystem — Gated &
-  Scoped" for the full constraint list. This is not a general RAM-editing feature and does not
-  extend to unsupported games or controls outside the catalog.
-
-### **🚫 STRICTLY BLOCKED Actions**
-- Process injection or DLL injection.
-- Kernel drivers.
-- Anti-cheat bypass or stealth behaviors.
-- DRM bypass.
-- Executable patching (.exe, .dll, .sys, .drv modification).
-- Online/multiplayer game support.
-- Live memory access outside the gated, catalogued subsystem above (no freeform address entry,
-  no unsupported-game targeting).
-
-**Not blocked in Solith 2.0 (when live-memory mode is enabled and offline-confirmed):** trainer overlay
-sync and F1–F12 hotkey listening for catalogued cheats. These remain gated behind offline confirmation
-and the online-session guard — they are not available for arbitrary games or unverified controls.
-
----
-
-## 🧾 V2 Safe Support Workflow (UI + Report Model)
-
-ResourceForge V2 surfaces support state as **reviewable evidence**, not implicit execution capability:
-
-- **Profile catalog is local/offline** and bundled for deterministic review.
-- **Imported profiles are review-required** before any supported claim.
-- **Save diff is advisory** and does not grant executable write support.
-- **Support matrix reports are evidence-based** (fixture coverage, blocked reasons, rollback readiness).
-- **Rollback dashboard is visibility/verification only** and does not perform silent restore.
-- **Unsupported writes remain blocked** even when discovery finds candidate paths.
-
-Execution scope remains narrow:
-
-- JSON, XML, and INI save-field writes use the propose → approve → backup → verify → rollback workflow when the game profile declares the format supported.
-- Discovery findings remain advisory unless mapped to existing supported write paths.
-- Executable writes remain limited to accepted supported XML controls with approval + backup/rollback safeguards.
-
-Generate the support matrix report locally:
-
-```bash
-node scripts/generate-support-matrix.mjs --format markdown
-node scripts/generate-support-matrix.mjs --format json --output reports/support-matrix.json
-```
-
-No remote calls are used for this workflow.
-
----
-
-## 📂 Supported File Types & Parsers
-
-ResourceForge scans directories and automatically parses the following formats to extract values, categories, and safety ratings:
-
-1. **JSON**: Standard JSON and JSON with Comments (comments are safely stripped before parsing).
-2. **INI / CFG / CONF**: Supports standard configurations, sections, comments (`;` or `#`), and root-level keys.
-3. **XML**: Element text, attributes, and structured nodes.
-4. **CSV / TSV**: Delimiter-based tables.
-5. **Plain Text**: Standard `key = value` or `key: value` lines.
-6. **Lua Tables**: Safely parses simple key-value Lua tables (e.g. `{ hp = 100 }`) via safe regex mapping without executing code.
-7. **Binary Files (.sav, .dat, .bin)**: Unknown binary files are parsed as **read-only**. ResourceForge supports string extraction (printable ASCII >= 4 characters) and byte-diffing candidates between two saves. **Blind binary writing is strictly blocked.**
-
----
-
-## 💾 Save Discovery & External Scanning Policy
-
-ResourceForge scans directories for saves. To protect user privacy and system folders:
-- **Default Scans**: Scans are local to the selected game folder only.
-- **External Scans**: Scans can check `Documents`, `Documents/My Games`, `AppData/Local`, `AppData/LocalLow`, `AppData/Roaming`, `Saved Games`, and Steam userdata folders.
-- **Approval Requirement**: External save location scanning is **disabled by default**. It must be explicitly approved/enabled by checking the "Enable External Save Scan" checkbox in the UI, which writes `externalSaveScanEnabled = true` to settings.
-
----
-
-## 🧠 Value Classification & Confidence Scoring
-
-When comparing saves in the **Discovery Lab**, ResourceForge applies a confidence scoring pass to help you identify gameplay variables (like gold or health) while ignoring system metadata:
-
-- **Boosts (+10 to +25)**: Matches safe gameplay keywords (`health`, `gold`, `xp`, `stamina`, `level`), numeric changes, or exact old/new value matches.
-- **Penalties (-20 to -30)**: Matches risky keywords (`id`, `uuid`, `quest`), stats paths (`total_gold_earned`), or timestamps/session/autosave metadata.
-- **Blocks (Score = 0)**: Matches security words (`checksum`, `hash`, `signature`, `crc`, `key`) - these are blocked from modification.
-- **Noise Suppression**: Timestamps, session IDs, and autosave counters are filtered out of candidates automatically to suppress clutter.
-
----
-
-## ⚡ Recipe Staleness & Broken Safety
-
-Trainer recipes are compiled configurations. To prevent corrupting saves when games update:
-- When a recipe is created, the target file hash and game fingerprint are stored.
-- **Needs Rescan**: If the target save file changes (hash mismatch), the recipe is marked as `Needs Rescan`.
-- **Broken**: If the target file path or the key inside the file no longer exists, the recipe is marked as `Broken`.
-- If the old value stored in the recipe no longer matches, a dry run is executed, and user confirmation is required.
-
----
-
-## 🛠️ Development Setup & Verification
-
-ResourceForge is built on **Electron**, **React**, and **TypeScript** with an offline-first **sql.js** persistent database.
-
-### **Install Dependencies**
-```bash
-npm install
-```
-
-### **Run Tests**
-Uses Node.js's built-in test runner via `tsx` (zero-dependency runner):
-```bash
+```powershell
+npm ci
+npm run build
 npm test
+npm run test:electron-smoke
 ```
 
-### **Run Dev Server**
-```bash
+The app must launch without hidden local files, old `dist` output, local CT data, or machine-specific paths. Local generated data under `data/` is ignored and must be regenerated when needed.
+
+## Development
+
+```powershell
 npm run dev
 ```
 
-### **Build Installer**
-```bash
+Useful focused commands:
+
+```powershell
+npm run build:vite
+npm run build:electron
+npm run test:live-memory
+npm run test:trainer-catalog
+npm run test:electron-smoke
+```
+
+## Packaging
+
+```powershell
 npm run build
 ```
+
+This builds the renderer, bundles Electron main/preload/TrainerHost, verifies Electron output, and runs `electron-builder` to produce the Windows installer. Until signing is configured and verified, installers should be treated as unsigned development artifacts.
+
+## CT Library import
+
+Solith treats Cheat Engine `.CT` files as metadata-only research inputs. Raw Auto Assembler/Lua text is preserved inertly; Solith does not execute CT scripts.
+
+```powershell
+npm run ct-library:import -- "G:\Downloads\Combined-CheatEngine-Tables.zip" --no-registry-index --library-out data/ct-library/personal-ct-library.summary.json --shards-dir data/ct-library/personal-ct-library-shards
+```
+
+The generated `data/ct-library/` files are local artifacts and are ignored by git.
+
+## Native memoryjs troubleshooting
+
+Solith uses a vendored `memoryjs` native addon for Windows process memory work. If live-memory commands fail to load the addon:
+
+```powershell
+npm ci
+npx electron-rebuild
+```
+
+Confirm Visual Studio Build Tools and Python are installed. Read-only runtime validation must use explicit process selection and read/query process permissions only.
+
+## Release readiness
+
+Do not cut a release unless:
+
+- `npm ci` works from a clean clone.
+- `npm run build` succeeds.
+- `npm test` succeeds with no known failures.
+- `npm run test:electron-smoke` succeeds.
+- Key E2E flows pass: add/scan game, save detection, save preview/write/backup/rollback, trainer catalog search, CT Library import/search/display, read-only AOB scan against a harmless process, settings persistence, crash recovery, and installer install/launch/uninstall.
+- Known limitations are documented in release notes.

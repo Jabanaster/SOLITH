@@ -1,7 +1,7 @@
 # Real-World Pilot Intake Guide
 
 **Version:** 1.0  
-**Applies to:** ResourceForge V1 compatibility pilot  
+**Applies to:** Solith V1 compatibility pilot  
 
 ---
 
@@ -123,7 +123,7 @@ If the game uses cloud sync (Steam Cloud, GOG Galaxy, Xbox GamePass, etc.):
 - Re-enable cloud sync only after restoring the original save
 - Set `cloudSyncRisk: "high"` in the intake form if you cannot disable it
 
-The workspace copy is isolated from cloud sync. The original save in the game's save directory is not touched by ResourceForge.
+The workspace copy is isolated from cloud sync. The original save in the game's save directory is not touched by Solith.
 
 ---
 

@@ -87,7 +87,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <code> v2LiveModeEnabled</code> and <code>v2FreeformMemoryEnabled</code> in settings.
             </p>
             <p className={styles.note}>
-              You must confirm offline play; writes block if the process has active remote connections.
+              You must accept the single-player / private-play waiver before live writes. Connection
+              counts may be shown as advisory info after Trust Shift.
             </p>
           </>
         )}

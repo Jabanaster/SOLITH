@@ -13,7 +13,7 @@ export function readPackageMetadata(root) {
 }
 
 export function packagedProductName(pkg) {
-  return pkg.build?.productName ?? 'ResourceForge';
+  return pkg.build?.productName ?? 'Solith';
 }
 
 export function packagedExecutableBaseName(pkg) {
@@ -80,7 +80,7 @@ export function findProductSetupArtifacts(root, pkg = readPackageMetadata(root))
 }
 
 /** @deprecated Use findProductSetupArtifacts */
-export function findResourceForgeSetupArtifacts(root) {
+export function findSolithSetupArtifacts(root) {
   const distDir = path.join(root, 'dist');
   if (!fs.existsSync(distDir)) return [];
 
@@ -88,5 +88,5 @@ export function findResourceForgeSetupArtifacts(root) {
   return entries
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
-    .filter((name) => /^(ResourceForge|Solith) Setup .*\.exe(?:\.blockmap)?$/.test(name));
+    .filter((name) => /^(Solith|Solith) Setup .*\.exe(?:\.blockmap)?$/.test(name));
 }

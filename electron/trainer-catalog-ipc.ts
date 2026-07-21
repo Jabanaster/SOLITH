@@ -6,11 +6,17 @@ import {
   searchCatalog,
   countCatalogEntries,
   getCatalogEntry,
+  getDefinitionPayload,
   getRecentSyncLogs,
+  hasUserAuthoredDefinition,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
 import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.js';
 import { syncAllTrainerSources } from '../src/core/trainer-catalog/sync/index.js';
+import {
+  publishCommunityDefinition,
+  syncCommunityDefinitions,
+} from '../src/core/trainer-catalog/sync/hub-client.js';
 import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-loader.js';
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
 import { getSetting } from '../src/core/settings/index.js';
@@ -34,6 +40,7 @@ import {
 import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-read-save-controls.js';
 import { ensureCatalogGameForSaveAccess } from '../src/core/trainer-catalog/catalog-game-record.js';
 import { addUserSelectedLocation } from '../src/core/saves/locations.js';
+import { SolithDefinitionV1Schema } from '../src/core/definitions/schema.v1.js';
 
 const ApproveSavePathSchema = z.object({
   catalogGameId: z.string().min(1).max(120),
@@ -58,6 +65,15 @@ const CatalogGameIdSchema = z.object({
 const ImportYamlSchema = z.object({
   yamlText: z.string().min(1).max(2_000_000),
 });
+
+const PublishToCommunitySchema = z.object({
+  definition: SolithDefinitionV1Schema,
+  executableHash: z.string().regex(/^[a-f0-9]{64}$/i),
+}).strict();
+
+const SyncHubSchema = z.object({
+  overwriteUserDefinitions: z.boolean().optional().default(false),
+}).strict();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = path.dirname(moduleFilename);
@@ -126,6 +142,44 @@ export function registerTrainerCatalogIpc(): void {
       }
       const report = await syncAllTrainerSources();
       return { success: true, report };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-sync-hub', async (_event, payload: unknown) => {
+    try {
+      const parsed = SyncHubSchema.parse(payload ?? {});
+      const report = await syncCommunityDefinitions({
+        overwriteUserDefinitions: parsed.overwriteUserDefinitions === true,
+      });
+      return { success: report.status === 'synced', report };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-get-definition', async (_event, payload: unknown) => {
+    try {
+      const parsed = CatalogGameIdSchema.parse(payload);
+      const definition = getDefinitionPayload(parsed.catalogGameId);
+      if (!definition) return { success: false, error: 'no_definition' };
+      const validated = SolithDefinitionV1Schema.parse(definition);
+      return {
+        success: true,
+        definition: validated,
+        canPublish: hasUserAuthoredDefinition(parsed.catalogGameId),
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('publishToCommunity', async (_event, payload: unknown) => {
+    try {
+      const parsed = PublishToCommunitySchema.parse(payload);
+      const published = await publishCommunityDefinition(parsed);
+      return { success: true, published };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }
@@ -336,16 +390,21 @@ export async function bootstrapTrainerCatalog(): Promise<void> {
   }
 
   const { getSetting, setSetting } = await import('../src/core/settings/index.js');
-  if (getSetting('v2RemoteCatalogSyncEnabled') === false) return;
-  if (getSetting('trainerRemoteSyncCompleted') === true) return;
-
-  try {
-    await syncAllTrainerSources();
-    setSetting('trainerRemoteSyncCompleted', true);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn('[trainer-catalog] Remote sync skipped:', error);
+  if (
+    getSetting('v2RemoteCatalogSyncEnabled') !== false &&
+    getSetting('trainerRemoteSyncCompleted') !== true
+  ) {
+    try {
+      await syncAllTrainerSources();
+      setSetting('trainerRemoteSyncCompleted', true);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[trainer-catalog] Remote sync skipped:', error);
+    }
   }
+
+  // Automatic Hub polling is owned by electron/community-sync-orchestrator.ts
+  // (opt-in via communitySyncEnabled). Do not fetch here.
 }
 
 function sanitize(error: unknown): string {

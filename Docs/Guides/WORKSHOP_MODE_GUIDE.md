@@ -25,7 +25,7 @@ Compare two save states to find which fields changed. Use this to discover new t
 5. Promote candidates to recipes
 
 ### Save Locations
-Manage which directories ResourceForge can read from. Locations must be approved before save files in them can be parsed or edited.
+Manage which directories Solith can read from. Locations must be approved before save files in them can be parsed or edited.
 
 ### Recipes
 View and manage the recipe database. Recipes are the source of Trainer Mode cards. Delete stale recipes here.

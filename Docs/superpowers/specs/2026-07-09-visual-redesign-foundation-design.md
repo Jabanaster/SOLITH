@@ -1,4 +1,4 @@
-# ResourceForge Visual Redesign — Foundation Pass
+# Solith Visual Redesign — Foundation Pass
 
 **Status:** Approved, pending implementation plan
 **Date:** 2026-07-09

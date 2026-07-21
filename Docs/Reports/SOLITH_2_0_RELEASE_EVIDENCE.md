@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-12  
 **Branch:** `master`  
-**Package:** `resourceforge@2.0.0`  
+**Package:** `solith@2.0.0`  
 **Product:** Solith  
 
 ## Milestones delivered (M–Q)

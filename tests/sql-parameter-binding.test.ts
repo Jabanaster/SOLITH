@@ -31,7 +31,7 @@ import {
 describe('SQL Parameter Binding — Hostile Value Tests', () => {
   const baseGameId = randomUUID();
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const tempRoot = path.join(os.tmpdir(), `resourceforge-sql-binding-${runId}`);
+  const tempRoot = path.join(os.tmpdir(), `solith-sql-binding-${runId}`);
   const tempDb = path.join(tempRoot, 'test.db');
 
   function seedGame(gameId: string, gameName: string): void {

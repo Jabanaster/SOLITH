@@ -201,7 +201,7 @@ export async function applyProposal(proposal: Proposal): Promise<{ success: bool
     transitionOperation(operationId, 'AWAITING_APPROVAL');
     
     // 6. Create backup
-    const backupDir = path.join(process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'), 'ResourceForge', 'backups');
+    const backupDir = path.join(process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'), 'Solith', 'backups');
     backup = createBackup(proposal.gameId, proposal.targetFile, backupDir, proposal.recipeId || undefined, proposal.id, operationId);
     
     // Save backupId to operation

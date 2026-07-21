@@ -19,6 +19,14 @@ import type { OnlineGuardInput, OnlineGuardResult } from './types.js';
  *
  * Evidence overrides confirmation: unavailable evidence, or a count above
  * baseline, blocks the write even when the user has confirmed offline play.
+ *
+ * LIMITATION (count-only ceiling — do not overclaim):
+ * This guard is a **connection-COUNT ceiling** versus a reviewed baseline.
+ * It does **not** validate remote endpoints, peer identities, or session
+ * ownership. A multiplayer (or other unsafe) connection that **replaces**
+ * platform telemetry without raising the ESTABLISHED count can pass this
+ * check — residual risk; see Docs/KNOWN_ISSUES.md KI-017. This is not a
+ * solved multiplayer-detection problem.
  */
 export function evaluateOnlineGuard(input: OnlineGuardInput): OnlineGuardResult {
   if (!input.userConfirmedOffline) {

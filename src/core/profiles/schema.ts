@@ -3,11 +3,11 @@ import { z } from 'zod';
 /**
  * Compatibility Profile Schema
  *
- * A versioned profile captures everything ResourceForge knows about a game's
+ * A versioned profile captures everything Solith knows about a game's
  * compatibility, save format, and validation history. Profiles are never mutated
  * in-place; updates always create new versions.
  *
- * Constraint: schemaVersion must always match the running version of ResourceForge
+ * Constraint: schemaVersion must always match the running version of Solith
  * to prevent drift. Recipes link to profiles via gameId + fingerprintHash to detect
  * when the game's executable or save structure has changed.
  */

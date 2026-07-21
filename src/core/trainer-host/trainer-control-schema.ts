@@ -1,7 +1,7 @@
 /**
  * Trainer Control Schema — Milestone E
  *
- * Defines the data model for every control that appears in the ResourceForge
+ * Defines the data model for every control that appears in the Solith
  * trainer panel. Controls are pure data; the panel component interprets them.
  *
  * Safety rules enforced here:

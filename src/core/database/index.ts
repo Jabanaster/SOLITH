@@ -679,9 +679,33 @@ function applySchema(): void {
       verificationStatus TEXT NOT NULL,
       sourceProvider TEXT NOT NULL,
       syncedAt TEXT NOT NULL,
+      cert_level TEXT NOT NULL DEFAULT 'L3_Certified',
+      updated_at INTEGER NOT NULL DEFAULT 0,
       updatedAt TEXT DEFAULT (datetime('now'))
     )
   `);
+
+  const trainerModPackColumns = rawDb!.exec('PRAGMA table_info(trainer_mod_packs)')[0];
+  const trainerModPackColumnNames = new Set(
+    (trainerModPackColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  if (!trainerModPackColumnNames.has('cert_level')) {
+    rawDb!.run(
+      "ALTER TABLE trainer_mod_packs ADD COLUMN cert_level TEXT NOT NULL DEFAULT 'L3_Certified'",
+    );
+    rawDb!.run(
+      `UPDATE trainer_mod_packs
+          SET cert_level = CASE
+            WHEN sourceProvider = 'bundled' THEN 'L3_Certified'
+            ELSE 'L0_Community'
+          END`,
+    );
+  }
+  if (!trainerModPackColumnNames.has('updated_at')) {
+    rawDb!.run(
+      'ALTER TABLE trainer_mod_packs ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0',
+    );
+  }
 
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS trainer_sync_log (
@@ -698,7 +722,7 @@ function applySchema(): void {
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_mod_packs_game ON trainer_mod_packs(catalogGameId)');
 
   // Persisted cheat toggle state (Multi-Game Live Trainer) — remembers which cheats were
-  // enabled and their confirmed address so a ResourceForge restart (not a game restart) can
+  // enabled and their confirmed address so a Solith restart (not a game restart) can
   // re-arm them automatically instead of forcing the user to redo discovery from scratch.
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS cheat_toggle_state (
@@ -835,6 +859,7 @@ function applySchema(): void {
     { key: 'v2FreeformMemoryEnabled', value: 'true' },
     { key: 'v2RemoteCatalogSyncEnabled', value: 'true' },
     { key: 'trainerRemoteSyncCompleted', value: 'false' },
+    { key: 'communitySyncEnabled', value: 'false' },
     { key: 'trainerCapabilitiesUnlocked', value: 'false' },
     { key: 'installDiscoveryEnabled', value: 'true' },
     { key: 'installDiscoveryLastScan', value: '' }

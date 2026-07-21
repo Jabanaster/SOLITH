@@ -13,7 +13,7 @@
 
 export type LiveValueType = 'int32' | 'uint32' | 'float' | 'double' | 'int64' | 'byte';
 
-/** Identifies the OS process ResourceForge is attached to. */
+/** Identifies the OS process Solith is attached to. */
 export interface LiveProcessTarget {
   pid: number;
   executableName: string;

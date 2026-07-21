@@ -46,10 +46,19 @@ import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
+import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
+import {
+  reconcileCommunitySyncPolling,
+  stopCommunitySyncPolling,
+} from './community-sync-orchestrator.js';
+import {
+  installLocalCrashHandlers,
+  installElectronAppCrashHooks,
+} from '../src/core/crash/local-crash-reporter.js';
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
@@ -59,6 +68,7 @@ registerLiveMemoryIpc();
 registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();
+registerCtLibraryIpc();
 registerInstallDiscoveryIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();
@@ -74,12 +84,23 @@ if (process.env.ELECTRON_USER_DATA_PATH) {
   app.setPath('userData', process.env.ELECTRON_USER_DATA_PATH);
 }
 
+// Telemetry-free local crash_report.txt under userData/logs (Zero-Input resilience).
+const crashLogsDir = path.join(app.getPath('userData'), 'logs');
+installLocalCrashHandlers({
+  logsDir: crashLogsDir,
+  appVersion: app.getVersion(),
+});
+installElectronAppCrashHooks(app, {
+  logsDir: crashLogsDir,
+  appVersion: app.getVersion(),
+});
+
 // ── Single-instance lock ─────────────────────────────────────────────────────
-// Prevents multiple ResourceForge dev instances from stacking up.
+// Prevents multiple Solith dev instances from stacking up.
 // Only terminates OUR second instance — never touches unrelated Electron apps.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
-  console.log('[ResourceForge] Another instance is already running. Focusing it and exiting.');
+  console.log('[Solith] Another instance is already running. Focusing it and exiting.');
   app.quit();
   process.exit(0);
 }
@@ -115,6 +136,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      autoplayPolicy: 'no-user-gesture-required',
       // tsup bundles preload.ts as CJS into dist-electron/preload.cjs
       // (CJS is required for sandbox:true + contextIsolation:true to work)
       preload: path.join(moduleDirectory, 'preload.cjs')
@@ -127,7 +149,10 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setMenu(null);
 
-  const isDev = process.argv.includes('--dev') || process.env.RESOURCEFORGE_DEV === '1';
+  const isDev =
+    process.argv.includes('--dev') ||
+    process.env.SOLITH_DEV === '1' ||
+    process.env.RESOURCEFORGE_DEV === '1';
   const isCompatTest = process.argv.includes('--compat-test');
 
   if (isCompatTest) {
@@ -166,6 +191,7 @@ app.whenReady().then(async () => {
 
     try {
       await bootstrapTrainerCatalog();
+      await reconcileCommunitySyncPolling();
       await startCatalogProcessWatch();
     } catch (error) {
       console.error('Trainer catalog bootstrap failed:', error);
@@ -201,6 +227,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   unregisterTrainerHotkeys();
   destroyTrainerOverlay();
+  stopCommunitySyncPolling();
 });
 
 // Remove the app-level 'before-quit' listener installed by lifecycle wiring.
@@ -375,6 +402,11 @@ ipcMain.handle('set-setting', async (event, key: any, value: any) => {
     // immediately in the main process — do not rely solely on renderer cleanup.
     if (parsed.key === 'v2SessionMonitorEnabled' && parsed.value === false && lifecycleWiring) {
       lifecycleWiring.notifyFeatureChanged(false);
+    }
+
+    // Community Hub poller must mount/unmount immediately with the opt-in flag.
+    if (parsed.key === 'communitySyncEnabled') {
+      void reconcileCommunitySyncPolling();
     }
 
     return { success: true };

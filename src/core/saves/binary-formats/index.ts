@@ -52,7 +52,7 @@ const PROFILES: BinarySaveFormatProfile[] = [
     maxFileBytes: 64 * 1024,
     fields: CORE_FIELDS,
     evidence:
-      'Documented ResourceForge RFSA v1 layout (Docs/BinaryFormats/RFSA_v1.md). Demo file: demo-game/save/player.rfsa.',
+      'Documented Solith RFSA v1 layout (Docs/BinaryFormats/RFSA_v1.md). Demo file: demo-game/save/player.rfsa.',
     canWrite: true,
   },
   {

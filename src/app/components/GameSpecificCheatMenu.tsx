@@ -4,7 +4,13 @@ import { useGameCheatSession } from '../hooks/useGameCheatSession.js';
 import { LiveWatchPanel } from './LiveWatchPanel.js';
 import { FingerprintDriftDialog } from './FingerprintDriftDialog.js';
 import { DefinitionRatingPrompt } from './DefinitionRatingPrompt.js';
+import { CommunityExecutionDialog } from './CommunityExecutionDialog.js';
+import { AvowedCheatDeck } from './AvowedCheatDeck.js';
 import type { GameConfig, CheatDefinition } from '../../core/cheat-system/types.js';
+import {
+  COMMUNITY_WARNING_LABEL,
+  requiresCommunityExecutionApproval,
+} from '../../core/trainer-catalog/community-trust.js';
 
 interface GameSpecificCheatMenuProps {
   game: GameConfig;
@@ -118,6 +124,19 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
   function hotkeyLabel(cheatId: string): string | null {
     const slot = hotkeySlotByCheatId.get(cheatId);
     return slot != null && slot <= 12 ? `F${slot}` : null;
+  }
+
+  function communityBadge(cheat: CheatDefinition) {
+    if (!requiresCommunityExecutionApproval(cheat.certLevel)) return null;
+    return (
+      <span
+        className={styles['community-warning-badge']}
+        aria-label={COMMUNITY_WARNING_LABEL}
+      >
+        <span aria-hidden="true">⚠ </span>
+        {COMMUNITY_WARNING_LABEL}
+      </span>
+    );
   }
 
   function renderDiscoveryPanel(cheat: CheatDefinition) {
@@ -344,6 +363,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           <div className={styles['cheat-row-main']}>
             <span className={styles['bolt-icon']}>⚡</span>
             <span className={styles['cheat-row-name']}>{cheat.name}</span>
+            {communityBadge(cheat)}
             {hotkeyLabel(cheat.id) && (
               <span className={styles['hotkey-tag']} title="Global hotkey when offline is confirmed">
                 {hotkeyLabel(cheat.id)}
@@ -367,6 +387,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
               className={`${styles['off-on-toggle']} ${state.enabled ? styles['is-on'] : ''}`}
               disabled={disabled}
               onClick={() => session.toggleCheat(cheat, !state.enabled)}
+              aria-label={`${state.enabled ? 'Disable' : 'Enable'} ${cheat.name}`}
             >
               <span className={styles['toggle-off-label']}>Off</span>
               <span className={styles['toggle-on-label']}>On</span>
@@ -377,6 +398,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
                 className={`${styles['freeze-icon-btn']} ${state.isFrozen ? styles['active'] : ''}`}
                 onClick={() => session.toggleFreeze(cheat, !state.isFrozen)}
                 title="Freeze value (continuous re-write every 200ms)"
+                aria-label={`${state.isFrozen ? 'Unfreeze' : 'Freeze'} ${cheat.name}`}
                 disabled={disabled}
               >
                 ❄
@@ -410,6 +432,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           <div className={styles['cheat-row-main']}>
             <span className={styles['bolt-icon']}>⚡</span>
             <span className={styles['cheat-row-name']}>{cheat.name}</span>
+            {communityBadge(cheat)}
             {hotkeyLabel(cheat.id) && (
               <span className={styles['hotkey-tag']} title="Global hotkey when offline is confirmed">
                 {hotkeyLabel(cheat.id)}
@@ -439,6 +462,11 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
               disabled={disabled}
               onClick={() => session.applyValue(cheat, currentValue || Number(cheat.defaultValue ?? min))}
               title={state.confirmedAddress ? 'Apply value' : 'Discover address'}
+              aria-label={
+                state.confirmedAddress
+                  ? `Apply value for ${cheat.name}`
+                  : `Discover address for ${cheat.name}`
+              }
             >
               ✓
             </button>
@@ -462,6 +490,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           <div className={styles['cheat-row-main']}>
             <span className={styles['bolt-icon']}>⚡</span>
             <span className={styles['cheat-row-name']}>{cheat.name}</span>
+            {communityBadge(cheat)}
             {hotkeyLabel(cheat.id) && (
               <span className={styles['hotkey-tag']} title="Global hotkey when offline is confirmed">
                 {hotkeyLabel(cheat.id)}
@@ -474,6 +503,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
             <button
               className={styles['discovery-btn']}
               disabled={disabled}
+              aria-label={`Apply ${cheat.name}`}
               onClick={() => {
                 if (state.confirmedAddress) {
                   session.applyValue(cheat, Number(cheat.infiniteValue ?? 1));
@@ -529,6 +559,36 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
         </div>
       )}
 
+      {game.gameId !== 'avowed' &&
+        userConfirmedOffline &&
+        session.zeroInputStatus.phase !== 'idle' && (
+        <div
+          className={styles['offline-warning']}
+          role="status"
+          aria-live="polite"
+          data-zero-input-phase={session.zeroInputStatus.phase}
+        >
+          {session.zeroInputStatus.phase === 'preparing' && (session.zeroInputStatus.message ?? 'Zero-Input preparing…')}
+          {session.zeroInputStatus.phase === 'ready' && (
+            <>
+              {session.zeroInputStatus.message ?? 'Zero-Input ready'}
+              {session.zeroInputStatus.counts
+                ? ` — resolved ${session.zeroInputStatus.counts.resolved}, scan-required ${session.zeroInputStatus.counts.scanRequired}, failed ${session.zeroInputStatus.counts.failed}`
+                : null}
+            </>
+          )}
+          {session.zeroInputStatus.phase === 'error' && (session.zeroInputStatus.message ?? 'Zero-Input error')}
+        </div>
+      )}
+
+      {game.cheats.some((cheat) => requiresCommunityExecutionApproval(cheat.certLevel)) && (
+        <div className={styles['community-warning']} role="status">
+          <span aria-hidden="true">⚠ </span>
+          {COMMUNITY_WARNING_LABEL} — each feature requires explicit approval before scanning or
+          writing memory.
+        </div>
+      )}
+
       {game.cheatDiscoveryType === 'console-command' && (
         <div className={styles['offline-warning']}>
           ℹ️ {game.name} cheats use in-game console commands, not memory scanning. Toggles here are reference-only
@@ -536,7 +596,16 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
         </div>
       )}
 
-      {pinnedCheats.length > 0 && (
+      {game.gameId === 'avowed' && pinnedCheats.length > 0 && (
+        <AvowedCheatDeck
+          features={pinnedCheats}
+          zeroInputStatus={session.zeroInputStatus}
+          getState={session.getState}
+          renderFeature={renderCheatRow}
+        />
+      )}
+
+      {game.gameId !== 'avowed' && pinnedCheats.length > 0 && (
         <section className={styles['cheat-section']}>
           <h2 className={styles['section-title']}>📌 Pinned</h2>
           <div className={styles['cheat-list']}>
@@ -548,12 +617,18 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
       {game.categories.map((category) => {
         const cheats = cheatsByCategory.get(category.name) ?? cheatsByCategory.get(category.id) ?? [];
         if (cheats.length === 0) return null;
+        // Avowed L0 pins are shown in AvowedCheatDeck — skip duplicates in category lists.
+        const visible =
+          game.gameId === 'avowed'
+            ? cheats.filter((c) => !pinnedCheats.some((p) => p.id === c.id))
+            : cheats;
+        if (visible.length === 0) return null;
 
         return (
           <section key={category.id} className={styles['cheat-section']}>
             <h2 className={styles['section-title']}>{category.name}</h2>
             <div className={styles['cheat-list']}>
-              {cheats.map((cheat) => renderCheatRow(cheat))}
+              {visible.map((cheat) => renderCheatRow(cheat))}
             </div>
           </section>
         );
@@ -574,6 +649,14 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
           warning={session.driftPrompt.warning}
           onProceed={() => session.resolveDriftPrompt(true)}
           onCancel={() => session.resolveDriftPrompt(false)}
+        />
+      )}
+
+      {session.communityPrompt && (
+        <CommunityExecutionDialog
+          cheatName={session.communityPrompt.cheatName}
+          onProceed={() => session.resolveCommunityPrompt(true)}
+          onCancel={() => session.resolveCommunityPrompt(false)}
         />
       )}
 

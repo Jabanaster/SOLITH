@@ -11,6 +11,7 @@ export function getSettings(): Settings {
     'v2LiveModeEnabled', 'v2HotkeysEnabled', 'v2OverlayEnabled',
     'v2SessionMonitorEnabled', 'trainerCapabilitiesUnlocked',
     'v2FreeformMemoryEnabled', 'v2RemoteCatalogSyncEnabled', 'trainerRemoteSyncCompleted',
+    'communitySyncEnabled',
     'installDiscoveryEnabled', 'installDiscoveryLastScan',
     'inProcessScriptExecutionEnabled',
   ];
@@ -47,6 +48,7 @@ export function getSettings(): Settings {
     v2FreeformMemoryEnabled: settings.v2FreeformMemoryEnabled ?? true,
     v2RemoteCatalogSyncEnabled: settings.v2RemoteCatalogSyncEnabled ?? true,
     trainerRemoteSyncCompleted: settings.trainerRemoteSyncCompleted ?? false,
+    communitySyncEnabled: settings.communitySyncEnabled ?? false,
     installDiscoveryEnabled: settings.installDiscoveryEnabled ?? true,
     installDiscoveryLastScan: settings.installDiscoveryLastScan ?? '',
     inProcessScriptExecutionEnabled: settings.inProcessScriptExecutionEnabled ?? false,
@@ -68,7 +70,7 @@ export function setSetting(key: keyof Settings, value: string | number | boolean
       updated_at = CURRENT_TIMESTAMP
   `);
   
-  stmt.run(key, value);
+  stmt.run(key, String(value));
 }
 
 export function getSetting(key: keyof Settings): string | number | boolean | undefined {

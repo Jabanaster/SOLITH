@@ -1,8 +1,8 @@
-# ResourceForge V1.5.0 Release Readiness Report
+# Solith V1.5.0 Release Readiness Report
 
 ## Release Identity
 
-- Release: ResourceForge V1.5.0
+- Release: Solith V1.5.0
 - Starting locked release: v1.4.0
 - Starting locked commit: e5696f77aa067ea22d222dca5f1c5555ce3be159
 - V1.5 packaging hardening commit: b21df9fdec1bd8383677fe51a5199c8cce452840
@@ -16,7 +16,7 @@ V1.5 is a packaging and distribution readiness release. It does not expand train
 Changes made:
 
 - Updated package metadata from `1.0.0` to `1.5.0`.
-- Hardened Windows installer metadata for ResourceForge naming.
+- Hardened Windows installer metadata for Solith naming.
 - Added deterministic release artifact path helpers.
 - Added release artifact verification for installer, unpacked executable, packaged app assets, packaged TrainerHost, metadata, and stale release naming.
 - Added SHA-256 checksum generation for built release artifacts.
@@ -39,9 +39,9 @@ Files changed before this report:
 
 - `package.json` version: `1.5.0`
 - `package-lock.json` version: `1.5.0`
-- Product name: `ResourceForge`
-- App ID: `com.resourceforge.app`
-- Windows executable name: `ResourceForge`
+- Product name: `Solith`
+- App ID: `com.solith.app`
+- Windows executable name: `Solith`
 - NSIS installer artifact name: `ResourceForge Setup ${version}.${ext}`
 - Publish/updater configuration: absent
 
@@ -62,7 +62,7 @@ df1ad4a2e47c7241461cec99fe2c29ee63ca6068d940713c9036c7414c3a8b60  dist/ResourceF
 a58f96b726e6a4782e9d455ade9fb806146cfd5c40c602d6b4d39de911aee73e  dist/ResourceForge Setup 1.5.0.exe.blockmap
 ```
 
-Checksum output from local fresh-clone verification at `G:\RESOURCEFORGE_V15_LOCAL_VERIFY`:
+Checksum output from local fresh-clone verification at `G:\SOLITH_V15_LOCAL_VERIFY`:
 
 ```text
 97eae807a9c272afe4a8cc8740602f693bdfb0a621aae2712a438b6bfa7d52dd  dist/ResourceForge Setup 1.5.0.exe
@@ -106,7 +106,7 @@ Post-implementation source verification passed:
 
 Local fresh-clone verification passed:
 
-- Path: `G:\RESOURCEFORGE_V15_LOCAL_VERIFY`
+- Path: `G:\SOLITH_V15_LOCAL_VERIFY`
 - HEAD: b21df9fdec1bd8383677fe51a5199c8cce452840
 - `npm ci` passed.
 - TypeScript compile passed.
@@ -125,21 +125,21 @@ Local fresh-clone verification passed:
 
 Artifact verification passed:
 
-- ResourceForge installer exists.
-- ResourceForge installer blockmap exists.
-- ResourceForge unpacked executable exists.
+- Solith installer exists.
+- Solith installer blockmap exists.
+- Solith unpacked executable exists.
 - Packaged app archive exists.
 - Packaged TrainerHost exists in the unpacked ASAR area.
 - Built renderer asset directory exists before packaging.
 - Compiled Electron main, preload, and host bundles exist.
 - Installer name includes `1.5.0`.
 - Installer name does not include `1.4.0`.
-- ResourceForge installer artifact names do not include old internal project names.
+- Solith installer artifact names do not include old internal project names.
 - No publish/updater configuration is present.
 
 ## Safety Guarantees Preserved
 
-ResourceForge remains:
+Solith remains:
 
 - Local-only.
 - Offline-first.
@@ -178,5 +178,5 @@ After final gates pass:
 2. Create annotated `v1.5.0`.
 3. Push `master`.
 4. Push `v1.5.0`.
-5. Clone from the configured remote into a new `G:\RESOURCEFORGE_V15_REMOTE_VERIFY` path.
+5. Clone from the configured remote into a new `G:\SOLITH_V15_REMOTE_VERIFY` path.
 6. Run the full source, build, artifact, packaged host, orphan, and checksum gates from that remote clone.

@@ -260,8 +260,8 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
     // Hash source-after (immutable — must equal source-before)
     const sourceAfter = hashFile(sourceFile);
 
-    // Verify no ResourceForge temp files remain in game directory
-    const tempFilesRemaining = fs.readdirSync(gameDir).filter(f => f.includes('.resourceforge'));
+    // Verify no Solith temp files remain in game directory
+    const tempFilesRemaining = fs.readdirSync(gameDir).filter(f => f.includes('.solith'));
 
     result = {
       runLabel,
@@ -360,7 +360,7 @@ test.describe('Gate 13 — Full Demo Workflow', () => {
     expect(run1.journalEventTypes, 'journal must contain apply event').toContain('apply');
     expect(run1.journalEventTypes, 'journal must contain rollback event').toContain('rollback');
 
-    expect(run1.tempFilesRemaining.length, 'no ResourceForge temp files must remain in game dir').toBe(0);
+    expect(run1.tempFilesRemaining.length, 'no Solith temp files must remain in game dir').toBe(0);
 
     expect(run1.ipcChannelsUsed, 'must use window.electronAPI (not direct imports)').toEqual(
       expect.arrayContaining([

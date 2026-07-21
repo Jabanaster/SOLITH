@@ -3,14 +3,21 @@ import type { MemoryDataType, MemoryFeatureV1, SolithDefinitionV1 } from './sche
 import { SOLITH_DEFINITION_SCHEMA_VERSION, validateSolithDefinitionV1 } from './schema.v1.js';
 import { slugifyGameId } from '../trainer-catalog/types.js';
 
+export type CtLiveResolutionQuality = 'resolvable' | 'absolute_only' | 'incomplete';
+
 export interface CtImportEntry {
   id: string;
+  ctId?: string;
   name: string;
   category: string;
   dataType: MemoryDataType;
   moduleName: string;
+  rawAddress: string;
   baseOffset?: string;
   pointerChain: number[];
+  showAsHex: boolean;
+  /** Phase 2 — quality for Promote / freeze eligibility. */
+  liveResolution: CtLiveResolutionQuality;
   rejectedReason?: string;
 }
 
@@ -23,7 +30,40 @@ export interface CtImportResult {
   errors: string[];
 }
 
+/**
+ * Classify how far a CT pointer entry can go in Solith live (no AA/scripts).
+ * - resolvable: module + baseOffset → Promote + freeze eligible
+ * - absolute_only: raw absolute / unknown module — watch/read only, never freeze
+ * - incomplete: missing pieces for live resolution
+ */
+export function classifyCtLiveResolution(input: {
+  moduleName: string;
+  baseOffset?: string;
+  pointerChain?: number[];
+  rawAddress?: string;
+}): CtLiveResolutionQuality {
+  const moduleName = input.moduleName.trim();
+  const hasRealModule = moduleName.length > 0 && moduleName.toLowerCase() !== 'unknown-module.exe';
+  const hasOffset = Boolean(input.baseOffset && /^0x[0-9a-f]+$/i.test(input.baseOffset));
+  if (hasRealModule && hasOffset) return 'resolvable';
+  const raw = (input.rawAddress ?? '').trim();
+  if (/^0x[0-9a-f]+$/i.test(raw) || (!hasRealModule && !hasOffset)) {
+    return 'absolute_only';
+  }
+  return 'incomplete';
+}
+
+export function featureTypeForCtLiveResolution(
+  quality: CtLiveResolutionQuality,
+  hasPointerOrOffset: boolean,
+): 'freeze' | 'scan_unknown' {
+  // absolute_only never freezes — session-only absolute addresses are unsafe to lock.
+  if (quality === 'resolvable' && hasPointerOrOffset) return 'freeze';
+  return 'scan_unknown';
+}
+
 const REJECTED_CHILD_TAGS = [
+  'CheatScript',
   'AutoAssemblerScript',
   'AssemblerScript',
   'LuaScript',
@@ -69,6 +109,7 @@ function hasRejectedScript(entry: Record<string, unknown>): string | null {
     if (tag === 'CheatEntry') continue;
     if (entry[tag]) return `${tag} not supported`;
   }
+  if (entry.CheatScript && String(entry.CheatScript).trim()) return 'CheatScript not supported';
   if (entry.LuaScript && String(entry.LuaScript).trim()) return 'LuaScript not supported';
   if (entry.AutoAssemblerScript && String(entry.AutoAssemblerScript).trim()) return 'AutoAssembler not supported';
   return null;
@@ -169,22 +210,34 @@ export async function parseCheatTableXml(xmlText: string, options: { title?: str
       return;
     }
 
-    accepted.push({
+    const acceptedEntry: CtImportEntry = {
       id: slugId(name, index),
       name,
       category: 'Imported',
       dataType,
       moduleName: address.moduleName,
+      rawAddress: textValue(entry.Address).trim(),
       baseOffset: address.baseOffset,
       pointerChain: parseOffsets(entry),
-    });
+      showAsHex: /^1|true$/i.test(textValue(entry.ShowAsHex).trim()),
+      liveResolution: 'incomplete',
+    };
+    const ctId = textValue(entry.ID).trim();
+    if (ctId) {
+      acceptedEntry.ctId = ctId;
+    }
+    acceptedEntry.liveResolution = classifyCtLiveResolution(acceptedEntry);
+    accepted.push(acceptedEntry);
   });
 
   const memoryFeatures: MemoryFeatureV1[] = accepted.map((e) => ({
     id: e.id,
     name: e.name,
     category: e.category,
-    type: e.baseOffset || e.pointerChain.length > 0 ? 'freeze' : 'scan_unknown',
+    type: featureTypeForCtLiveResolution(
+      e.liveResolution,
+      Boolean(e.baseOffset || e.pointerChain.length > 0),
+    ),
     dataType: e.dataType,
     defaultValue: e.dataType === 'float' || e.dataType === 'double' ? 100 : 9999,
     certificationLevel: 'L0',

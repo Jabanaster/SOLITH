@@ -7,7 +7,7 @@ import os from 'os';
 // Each invocation of this test file gets a unique temp root so that
 // consecutive runs (npm test && npm test) never share state.
 const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const TEMP_ROOT = path.join(os.tmpdir(), `resourceforge-discovery-${RUN_ID}`);
+const TEMP_ROOT = path.join(os.tmpdir(), `solith-discovery-${RUN_ID}`);
 const TEMP_DB   = path.join(TEMP_ROOT, 'test.db');
 
 import { resetForTesting } from '../src/core/database/index.ts';
@@ -37,7 +37,7 @@ function setupTestGame() {
   `).run(MOCK_GAME_ID, 'Test RPG Game', path.join(TEMP_ROOT, 'game'));
 }
 
-describe('ResourceForge Save Discovery, Locations, and Discovery Engine Tests', () => {
+describe('Solith Save Discovery, Locations, and Discovery Engine Tests', () => {
   before(async () => {
     // Fully isolated database — never touches production data
     await resetForTesting(TEMP_DB);
@@ -357,7 +357,7 @@ describe('ResourceForge Save Discovery, Locations, and Discovery Engine Tests', 
 // ── Regression: two consecutive runs must not conflict ────────────────────────
 describe('Discovery Suite — Consecutive-Run Isolation Regression', () => {
   const RUN2_ID   = `${Date.now()}-${Math.random().toString(36).slice(2)}-run2`;
-  const TEMP2     = path.join(os.tmpdir(), `resourceforge-discovery-${RUN2_ID}`);
+  const TEMP2     = path.join(os.tmpdir(), `solith-discovery-${RUN2_ID}`);
   const TEMP2_DB  = path.join(TEMP2, 'test.db');
   const GAME2_ID  = `discovery-test-game-${RUN2_ID}`;
 

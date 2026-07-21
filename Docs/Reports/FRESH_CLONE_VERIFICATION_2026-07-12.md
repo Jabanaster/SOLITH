@@ -36,7 +36,7 @@ This batch adds shell polish follow-ups (onboarding E2E skip, branding masters, 
 ### Packaged-smoke notes
 
 - **Point 17 (sidebar collapse): PASS** — onboarding overlay no longer intercepts clicks when `NODE_ENV=test`.
-- **Point 03 / 13: FAIL (pre-existing)** — window title is `Solith` (test expects `ResourceForge`); `parseSave` IPC returns null in packaged path. Not introduced by this batch.
+- **Point 03 / 13: FAIL (pre-existing)** — window title is `Solith` (test expects `Solith`); `parseSave` IPC returns null in packaged path. Not introduced by this batch.
 
 ## Batch deliverables verified offline
 

@@ -1,8 +1,8 @@
-# ResourceForge V1.5 Distribution Guide
+# Solith V1.5 Distribution Guide
 
 ## Scope
 
-ResourceForge V1.5 is a local-only, offline-first, single-player save/data-file tool. It does not provide online cheating, multiplayer manipulation, anti-cheat bypass, telemetry, cloud sync, process injection, debugger attachment, memory scanning, or live memory writing.
+Solith V1.5 is a local-only, offline-first, single-player save/data-file tool. It does not provide online cheating, multiplayer manipulation, anti-cheat bypass, telemetry, cloud sync, process injection, debugger attachment, memory scanning, or live memory writing.
 
 ## Build Artifacts
 
@@ -31,17 +31,17 @@ node scripts/orphan-check.mjs
 node scripts/generate-release-checksums.mjs
 ```
 
-`verify-release-artifacts.mjs` checks ResourceForge package metadata, installer naming, unpacked executable layout, packaged host files, renderer asset presence, and absence of stale ResourceForge installer names for other versions.
+`verify-release-artifacts.mjs` checks Solith package metadata, installer naming, unpacked executable layout, packaged host files, renderer asset presence, and absence of stale Solith installer names for other versions.
 
 `generate-release-checksums.mjs` prints SHA-256 checksums for release artifacts. Keep checksum output in release notes or the release report; generated checksum files are not tracked by default.
 
 ## Installation
 
 1. Run `dist\ResourceForge Setup 1.5.0.exe`.
-2. Launch ResourceForge from the Start Menu shortcut or installed executable.
-3. Use ResourceForge only with local single-player games or local data files you own or have permission to modify.
+2. Launch Solith from the Start Menu shortcut or installed executable.
+3. Use Solith only with local single-player games or local data files you own or have permission to modify.
 
-ResourceForge stores local app data in the normal Electron user-data location for the current Windows user. The packaged smoke tests use isolated temporary user-data paths and do not touch production app data.
+Solith stores local app data in the normal Electron user-data location for the current Windows user. The packaged smoke tests use isolated temporary user-data paths and do not touch production app data.
 
 ## Safe Use
 
@@ -53,5 +53,5 @@ ResourceForge stores local app data in the normal Electron user-data location fo
 
 ## Uninstall
 
-Use Windows Apps & Features or the ResourceForge uninstaller created by the installer. Uninstalling the app does not imply game save cleanup; review any local app-data or backup folders intentionally before removing them.
+Use Windows Apps & Features or the Solith uninstaller created by the installer. Uninstalling the app does not imply game save cleanup; review any local app-data or backup folders intentionally before removing them.
 

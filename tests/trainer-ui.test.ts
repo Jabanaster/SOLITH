@@ -363,7 +363,7 @@ describe('Save edit risk messaging', () => {
   });
 
   test('42. displayed error detail strips full filesystem paths', () => {
-    const source = 'ENOENT C:\\Users\\private\\AppData\\Roaming\\ResourceForge\\backups\\manifest.json /tmp/private/save.json';
+    const source = 'ENOENT C:\\Users\\private\\AppData\\Roaming\\Solith\\backups\\manifest.json /tmp/private/save.json';
     const safe = stripFilesystemPaths(source);
     assert.equal(safe.includes('C:\\Users\\private'), false);
     assert.equal(safe.includes('/tmp/private'), false);

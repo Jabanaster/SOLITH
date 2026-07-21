@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   LifecycleState,
   LifecycleStateSnapshot,
   MonitorConfig,
@@ -19,7 +19,7 @@ const MIN_POLL_INTERVAL_MS = 2000;
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_MAX_DURATION_MS = 3600 * 1000; // 1 hour
 
-// ── Injectable interfaces ────────────────────────────────────────────────────
+// â”€â”€ Injectable interfaces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Observer functions injected into the monitor. Defaults use real OS calls. */
 export interface ObserverSet {
@@ -46,7 +46,7 @@ const DEFAULT_SCHEDULER: PollScheduler = {
   cancel: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
-// ── Public status type ───────────────────────────────────────────────────────
+// â”€â”€ Public status type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface MonitorStatus {
   state: LifecycleState;
@@ -57,7 +57,7 @@ export interface MonitorStatus {
   timelineEntryCount: number;
 }
 
-// ── SessionMonitorService ────────────────────────────────────────────────────
+// â”€â”€ SessionMonitorService â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Singleton session monitor. Only one game can be monitored at a time. */
 class SessionMonitorService {
@@ -85,7 +85,7 @@ class SessionMonitorService {
   private observers: ObserverSet = { ...DEFAULT_OBSERVERS };
   private scheduler: PollScheduler = { ...DEFAULT_SCHEDULER };
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   start(config: MonitorConfig): { success: boolean; error?: string } {
     if (this.isMonitoring) {
@@ -122,7 +122,7 @@ class SessionMonitorService {
     }, maxDuration);
 
     // Fire initial poll immediately; subsequent polls are scheduled recursively
-    // from inside poll() only after the previous one completes — guaranteeing
+    // from inside poll() only after the previous one completes â€” guaranteeing
     // at most one poll in-flight and exactly one pending timer per generation.
     void this.poll(this.generation);
 
@@ -186,7 +186,7 @@ class SessionMonitorService {
 
   exportDiagnostics(): object {
     return {
-      resourceForgeVersion: '1.0.0',
+      solithVersion: '1.0.0',
       platform: process.platform,
       featureFlag: 'v2SessionMonitorEnabled',
       configuredGame: this.config
@@ -205,7 +205,7 @@ class SessionMonitorService {
     };
   }
 
-  // ── Testing seams ──────────────────────────────────────────────────────────
+  // â”€â”€ Testing seams â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   _injectObservers(observers: ObserverSet): void {
     this.observers = observers;
@@ -220,7 +220,7 @@ class SessionMonitorService {
     this.scheduler = { ...DEFAULT_SCHEDULER };
   }
 
-  // ── Private poll loop ──────────────────────────────────────────────────────
+  // â”€â”€ Private poll loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private async poll(expectedGeneration: number): Promise<void> {
     // Guard 1: skip overlapping ticks (only one poll in-flight per generation).
@@ -305,7 +305,7 @@ class SessionMonitorService {
   }
 }
 
-// ── Module-level singleton ───────────────────────────────────────────────────
+// â”€â”€ Module-level singleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let _instance: SessionMonitorService | null = null;
 

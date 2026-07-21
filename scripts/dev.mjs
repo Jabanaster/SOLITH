@@ -2,7 +2,7 @@
 /**
  * scripts/dev.mjs
  *
- * Unified development launcher for ResourceForge.
+ * Unified development launcher for Solith.
  *
  * Starts:
  *   1. Vite dev server  (renderer)
@@ -15,7 +15,7 @@
  *   - When the developer presses Ctrl+C the launcher kills its own children and exits.
  *
  * Environment:
- *   - RESOURCEFORGE_DEV=1 is set for every child so main.ts loads the Vite URL.
+ *   - SOLITH_DEV=1 is set for every child so main.ts loads the Vite URL.
  */
 
 import { spawn } from 'child_process';
@@ -43,7 +43,7 @@ const children = new Map(); // name → ChildProcess
 function spawnChild(name, cmd, args, opts = {}) {
   const child = spawn(cmd, args, {
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, RESOURCEFORGE_DEV: '1', FORCE_COLOR: '1' },
+    env: { ...process.env, SOLITH_DEV: '1', FORCE_COLOR: '1' },
     shell: process.platform === 'win32',
     ...opts,
   });
@@ -116,7 +116,7 @@ function pollVite(timeout) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log(bold(cyan('\n  ResourceForge — Development Mode\n')));
+  console.log(bold(cyan('\n  Solith — Development Mode\n')));
 
   // 1. Start Vite
   spawnChild('vite', 'npx', ['vite', '--port', String(VITE_PORT)]);
@@ -141,7 +141,7 @@ async function main() {
 
   // ── Graceful shutdown ────────────────────────────────────────────────────
   const shutdown = () => {
-    console.log(dim('\n[dev] Shutting down ResourceForge dev…'));
+    console.log(dim('\n[dev] Shutting down Solith dev…'));
     killAll();
     // Give children a moment to exit before the host process does
     setTimeout(() => process.exit(0), 800);

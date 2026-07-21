@@ -5,4 +5,4 @@
  * can import from either location without duplication.
  */
 export { getAppPaths, getDevPaths } from '../src/shared/app-paths.js';
-export type { ResourceForgeAppPaths } from '../src/shared/app-paths.js';
+export type { SolithAppPaths } from '../src/shared/app-paths.js';

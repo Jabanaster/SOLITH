@@ -7,6 +7,7 @@ describe('sidebar module artwork mapping', () => {
     assert.deepEqual(NAV_MODULE_ARTWORK, {
       library: 'trainerController',
       'trainer-library': 'trainerController',
+      'ct-library': 'hoodedProfile',
       trainer: 'trainerController',
       saves: 'saveTools',
       controls: 'saveTools',
@@ -20,6 +21,7 @@ describe('sidebar module artwork mapping', () => {
       recipes: 'hoodedProfile',
       'session-monitor': 'advancedDragon',
       'live-memory': 'advancedDragon',
+      'registry-explorer': 'hoodedProfile',
       'catalog-save-controls': 'saveTools',
     });
   });

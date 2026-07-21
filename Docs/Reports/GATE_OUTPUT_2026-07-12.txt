@@ -1,4 +1,4 @@
-ResourceForge / Solith — gate output 2026-07-12 (offline batch)
+Solith / Solith — gate output 2026-07-12 (offline batch)
 HEAD (committed): 56b8487364e0b8c8d66542971d4f253cd84f712f
 Working tree: dirty (batch WIP — see FRESH_CLONE_VERIFICATION_2026-07-12.md)
 
@@ -19,7 +19,7 @@ PASS (vite + electron-builder; Solith Setup 2.0.0.exe)
 
 ── npm run test:packaged-smoke ──
 PARTIAL 20/22 passed
-  FAIL point 03 — window title expects ResourceForge; product title is Solith (pre-existing)
+  FAIL point 03 — window title expects Solith; product title is Solith (pre-existing)
   FAIL point 13 — parseSave IPC null (pre-existing)
   PASS point 17 — sidebar collapse (onboarding no longer intercepts)
 

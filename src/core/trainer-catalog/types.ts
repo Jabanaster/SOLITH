@@ -8,6 +8,7 @@ export type ModPackSourceProvider =
   | 'remote-listing'
   | 'fearless'
   | 'community'
+  | 'solith-hub'
   | 'user'
   | 'ct-import';
 
@@ -37,6 +38,7 @@ export interface ModPackCheat {
   valueType: string;
   requiresDiscovery: boolean;
   verified: boolean;
+  certificationLevel?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
   pointerPath?: LivePointerPath;
   infiniteValue?: number;
   defaultValue?: number;
@@ -67,6 +69,7 @@ export interface TrainerCatalogEntry {
   coverUrl?: string;
   iconUrl?: string;
   verificationStatus: VerificationStatus;
+  certLevel?: 'L0_Community' | 'L3_Certified';
   sources: Array<{ provider: ModPackSourceProvider; url: string; lastSyncedAt?: string }>;
   hasModPack: boolean;
   modPackId?: string;

@@ -1,0 +1,29 @@
+{
+  "name": "solith-hub-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Solith Definition Hub API on Cloudflare Workers and D1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create solith-hub-db",
+    "db:migrate:local": "wrangler d1 migrations apply solith-hub-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply solith-hub-db --remote",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.12.30",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260717.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.111.0"
+  }
+}

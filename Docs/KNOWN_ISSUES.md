@@ -50,42 +50,29 @@ a real, restart-verified control (`live-control-catalog.ts`:
 `atomfall-current-weapon-ammo`) — the technique works as designed for
 native-engine games; the managed-runtime gap above remains open.
 
-### KI-017: Online-session guard blocks virtually all Steam-integrated single-player games (real-machine finding, policy not yet decided)
+### KI-017: Online-session guard / Trust Shift (connection-count policy)
 
-Verified live against a real, running commercial game (Stardew Valley 1.6,
-solo/offline farm, pid found via `listLiveMemoryProcesses()`): even with no
-multiplayer session active, the game process held 5 ESTABLISHED non-loopback
-TCP connections (`2a04:4e42:5::497` — Fastly CDN range — and
-`91.222.185.230`), almost certainly Steamworks background activity (cloud
-saves, friends/presence, telemetry) bundled into the game's own process
-rather than actual multiplayer traffic. `evaluateOnlineGuard()` correctly
-blocked the attach per its documented "any remote connection blocks,
-evidence overrides confirmation" design (`src/core/live-memory/online-guard.ts`).
+**Historical finding:** Verified live against Stardew Valley (solo/offline farm): even with no
+multiplayer session active, the game process held ~5 ESTABLISHED non-loopback TCP connections
+(platform Steamworks / CDN chatter). The original `evaluateOnlineGuard()` blocked attach/writes
+per "any remote connection blocks" design — making live writes rare for platform-integrated SP games.
 
-This is working as designed and is the safe default, but it means the
-current guard will likely block live writes for most/all Steam (and
-probably Epic/Xbox app) single-player games at all times, not just during
-genuine online sessions — the platform's own background networking looks
-identical to in-game network activity from a `netstat`/`Get-NetTCPConnection`
-vantage point. Options if this needs to be more usable in practice, none
-implemented yet:
+**Policy decision (Trust Shift, 2026-07-20):** Automated connection-count enforcement was **removed
+from write / freeze / attach consent paths**. Those paths use `evaluateWriteConsent` (single-player /
+private-play waiver). `evaluateOnlineGuard` remains for advisory diagnostics and baseline history.
 
-1. Keep the strict policy (safest; live writes stay rare/inert for
-   platform-integrated games).
-2. Per-game profile declares a "known background connection" baseline
-   (matching this project's existing evidence-based, manually-reviewed
-   per-game profile model) so the guard only blocks connections above it.
-3. Maintain an allowlist of known platform-infrastructure IP/ASN ranges to
-   exclude from the count — higher risk of getting wrong (an actual game
-   server could plausibly sit in a CDN range too).
+**Reviewed baselines** (`acceptedConnectionBaseline` / `connectionBaseline`) remain useful as
+**advisory / documentation** of measured platform overhead (Stardew, Atomfall, Avowed WinGDK, etc.).
 
-No default has been changed; this is documented for a deliberate decision,
-not silently patched around.
+**Residual risk (do not overclaim):**
+The waiver is **manual responsibility**, not network proof. Endpoint identity is not validated.
+A multiplayer session can still be active when the operator accepts the waiver. Solith does not
+claim multiplayer safety.
 
-**Pending baseline measurement (strict default = 0 until measured):**
-`Avowed.exe`, `Dredge.exe`, `CrimsonDesert.exe` — bundled memory-scan trainers
-use the strict guard until a live solo-session connection count is recorded in
-`game-connection-baselines.ts` with evidence.
+**Pending / weak baseline coverage (advisory only):**
+`Dredge.exe`, `CrimsonDesert.exe` — still undocumented until measured.
+Avowed WinGDK baseline = 3 with evidence limitations — see
+`Docs/Baselines/AVOWED_CONNECTION_BASELINE_2026-07-20.md`.
 
 ### KI-016: Gate 13 electron-e2e "Full Demo Workflow" fails in this build environment (pre-existing, not caused by Live Memory Trainer work)
 

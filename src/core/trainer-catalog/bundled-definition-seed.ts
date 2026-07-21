@@ -118,6 +118,64 @@ function enrichCuratedDefinition(definition: SolithDefinitionV1): SolithDefiniti
   return { ...definition, memoryFeatures: features };
 }
 
+/**
+ * Avowed L0 scaffold — Steam + Xbox PC Game Pass (WinGDK).
+ * Intentionally empty resolution paths (no signature / baseOffset / pointerChain).
+ * Every feature is scan_unknown + L0 until live evidence certifies pointers/AOBs.
+ */
+const AVOWED_L0_DEFINITION: SolithDefinitionV1 = {
+  schemaVersion: 1,
+  id: 'avowed',
+  title: 'Avowed',
+  gameVersion: '*',
+  executableHashPrefixes: [],
+  author: 'bundled',
+  safety: {
+    requiresApproval: true,
+    requiresOfflineConfirm: true,
+    verificationStatus: 'unverified',
+  },
+  target: {
+    executables: ['Avowed.exe', 'Avowed-WinGDK-Shipping.exe'],
+    arch: 'x64',
+  },
+  // Measured 2026-07-20 solo WinGDK — Docs/Baselines/AVOWED_CONNECTION_BASELINE_2026-07-20.md
+  connectionBaseline: 3,
+  certificationLevel: 'L0',
+  memoryFeatures: [
+    {
+      id: 'infinite-health',
+      name: 'Infinite Health',
+      category: 'player',
+      type: 'scan_unknown',
+      dataType: 'int32',
+      defaultValue: 9999,
+      certificationLevel: 'L0',
+      resolution: { moduleName: 'Avowed-WinGDK-Shipping.exe' },
+    },
+    {
+      id: 'infinite-stamina',
+      name: 'Infinite Stamina',
+      category: 'player',
+      type: 'scan_unknown',
+      dataType: 'int32',
+      defaultValue: 9999,
+      certificationLevel: 'L0',
+      resolution: { moduleName: 'Avowed-WinGDK-Shipping.exe' },
+    },
+    {
+      id: 'infinite-essence',
+      name: 'Infinite Essence',
+      category: 'player',
+      type: 'scan_unknown',
+      dataType: 'int32',
+      defaultValue: 9999,
+      certificationLevel: 'L0',
+      resolution: { moduleName: 'Avowed-WinGDK-Shipping.exe' },
+    },
+  ],
+};
+
 const STARDEW_DEFINITION: SolithDefinitionV1 = {
   schemaVersion: 1,
   id: 'stardew-valley',
@@ -234,11 +292,15 @@ function communityDefinitionFromGame(game: BundledCommunityGame): SolithDefiniti
  */
 function buildBundledDefinitions(): SolithDefinitionV1[] {
   const memoryGames = ALL_GAMES.filter(
-    (game) => game.cheatDiscoveryType === 'memory-scan' || game.cheatDiscoveryType === 'hybrid',
+    (game) =>
+      (game.cheatDiscoveryType === 'memory-scan' || game.cheatDiscoveryType === 'hybrid') &&
+      game.gameId !== 'avowed',
   );
-  const curated = [STARDEW_DEFINITION, ...memoryGames.map(memoryDefinitionFromGame)].map(
-    enrichCuratedDefinition,
-  );
+  const curated = [
+    STARDEW_DEFINITION,
+    AVOWED_L0_DEFINITION,
+    ...memoryGames.map(memoryDefinitionFromGame),
+  ].map(enrichCuratedDefinition);
   const community = BUNDLED_COMMUNITY_GAMES.map(communityDefinitionFromGame);
   return [...curated, ...community];
 }

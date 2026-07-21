@@ -75,7 +75,7 @@ describe('readSaveField', () => {
   });
 
   test('throws a user-safe unsupported-format error for non-XML save-field reads', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-private-read-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-private-read-'));
     const tmpPath = path.join(tmpDir, 'private-player.bin');
     fs.writeFileSync(tmpPath, '{"SaveGame":{"player":{"money":5000}}}', 'utf-8');
     try {
@@ -96,7 +96,7 @@ describe('readSaveField', () => {
   });
 
   test('reads a simple field from JSON saves', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-read-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-read-'));
     const tmpPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(tmpPath, '{"player":{"money":5000},"stats":{"level":7}}', 'utf-8');
     try {
@@ -109,7 +109,7 @@ describe('readSaveField', () => {
   });
 
   test('returns found=false for missing JSON fields', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-missing-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-missing-'));
     const tmpPath = path.join(tmpDir, 'player.json');
     fs.writeFileSync(tmpPath, '{"player":{"money":5000}}', 'utf-8');
     try {
@@ -122,7 +122,7 @@ describe('readSaveField', () => {
   });
 
   test('throws a safe malformed JSON error without full path leakage', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-malformed-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-malformed-'));
     const tmpPath = path.join(tmpDir, 'private-player.json');
     fs.writeFileSync(tmpPath, '{"player":', 'utf-8');
     try {
@@ -141,7 +141,7 @@ describe('readSaveField', () => {
   });
 
   test('rejects oversized JSON before parse with sanitized error', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-json-oversize-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-json-oversize-'));
     const tmpPath = path.join(tmpDir, 'private-player.json');
     fs.writeFileSync(tmpPath, Buffer.alloc((8 * 1024 * 1024) + 1, 0x7b));
     try {
@@ -160,7 +160,7 @@ describe('readSaveField', () => {
   });
 
   test('reads simple section.key values from INI saves', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-read-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ini-read-'));
     const tmpPath = path.join(tmpDir, 'settings.ini');
     fs.writeFileSync(tmpPath, '[player]\nmoney=5000\nlevel = 7\n', 'utf-8');
     try {
@@ -173,7 +173,7 @@ describe('readSaveField', () => {
   });
 
   test('returns found=false for missing INI fields', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-missing-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ini-missing-'));
     const tmpPath = path.join(tmpDir, 'settings.ini');
     fs.writeFileSync(tmpPath, '[player]\nmoney=5000\n', 'utf-8');
     try {
@@ -186,7 +186,7 @@ describe('readSaveField', () => {
   });
 
   test('throws a safe malformed INI error without full path leakage', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resourceforge-ini-malformed-'));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ini-malformed-'));
     const tmpPath = path.join(tmpDir, 'private-settings.ini');
     fs.writeFileSync(tmpPath, '[player]\nnot-a-key-value\n', 'utf-8');
     try {

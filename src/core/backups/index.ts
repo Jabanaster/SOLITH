@@ -274,7 +274,7 @@ export function restoreBackup(backup: Backup): boolean {
     // Restore through a sibling temp file and atomic replacement.
     tmpPath = path.join(
       path.dirname(targetPath),
-      `${path.basename(targetPath)}.resourceforge-restore-${backup.id}.tmp`
+      `${path.basename(targetPath)}.solith-restore-${backup.id}.tmp`
     );
     fs.copyFileSync(backupPath, tmpPath);
     if (targetExists) {

@@ -28,7 +28,7 @@ npm run test:packaged-smoke
 ### Packaged Smoke Run Output
 - `win-unpacked/ResourceForge.exe exists` — **PASS**
 - `app launches and window appears` — **PASS**
-- `window title contains ResourceForge` — **PASS**
+- `window title contains Solith` — **PASS**
 - `React root mounts (#root)` — **PASS**
 - `window.electronAPI is exposed` — **PASS**
 - `IPC getGames returns array` — **PASS**

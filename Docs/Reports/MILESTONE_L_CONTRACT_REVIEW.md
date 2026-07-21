@@ -1,6 +1,6 @@
 # Milestone L Contract Review
 
-This historical review covered the ResourceForge V1 Stardew trainer contract at HEAD 3738ecba925d6a43325af781856e7b5656ee6404.
+This historical review covered the Solith V1 Stardew trainer contract at HEAD 3738ecba925d6a43325af781856e7b5656ee6404.
 
 Current release-readiness evidence is recorded in `Docs/Reports/V1_0_0_TAG_READINESS_REPORT.md` at HEAD `6d4b806724baa3ddb2d1c10eb03fca7dc93fdce2`.
 

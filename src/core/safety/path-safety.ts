@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 
 /**
- * Centralized Path Safety Service for ResourceForge.
+ * Centralized Path Safety Service for Solith.
  * Validates, normalizes, and contains file operations to approved directories.
  */
 
@@ -78,10 +78,10 @@ export function validatePathSafety(
       return { safe: false, reason: 'Operations directly on the User Profile root are blocked.' };
     }
     
-    // 4. Reject ResourceForge installation directory targets
+    // 4. Reject Solith installation directory targets
     const appDir = path.resolve(process.cwd()).toLowerCase();
     if (canonicalTarget.startsWith(appDir + path.sep) || canonicalTarget === appDir) {
-      return { safe: false, reason: 'Operations within the ResourceForge installation directory are blocked.' };
+      return { safe: false, reason: 'Operations within the Solith installation directory are blocked.' };
     }
     
     // 5. Detect symbolic links or junctions at the target path itself

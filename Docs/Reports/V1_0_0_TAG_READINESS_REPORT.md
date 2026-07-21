@@ -1,4 +1,4 @@
-# ResourceForge v1.0.0 Release Readiness Report
+# Solith v1.0.0 Release Readiness Report
 
 ## Scope
 
@@ -57,7 +57,7 @@ The shipped profile does not include `memory_write`, `future_feature`, disabled,
 
 ## Known Remaining Limitations
 
-- ResourceForge remains local-only, offline-only, and single-player only.
+- Solith remains local-only, offline-only, and single-player only.
 - No online or multiplayer support is accepted.
 - No runtime memory editing, process injection, DLL injection, debugger attachment, memory scanning, or live process writes are accepted.
 - Unknown binary saves remain read-only unless a safe parser/serializer and integrity model are proven.
