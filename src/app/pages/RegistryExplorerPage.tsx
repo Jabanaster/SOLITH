@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { CompiledCtRegistry } from '../../core/registry/load-registry.js';
+import { validateLoadedRegistry } from '../../core/registry/load-registry.js';
 import type { RegistryResultType, RegistrySearchResult } from '../../core/registry/query-registry.js';
 import { searchRegistry } from '../../core/registry/query-registry.js';
 
@@ -32,6 +33,11 @@ function DetailPanel({ result, query }: { result: RegistrySearchResult | null; q
       ? result.entry.raw_script_content
       : null;
 
+  const rejectionReason =
+    result.type === 'rejection' && result.entry && typeof result.entry === 'object' && 'reason' in result.entry
+      ? String((result.entry as { reason?: string }).reason ?? result.description)
+      : null;
+
   return (
     <section className="panel-card" aria-label="Registry detail">
       <h3>{result.title}</h3>
@@ -43,10 +49,18 @@ function DetailPanel({ result, query }: { result: RegistrySearchResult | null; q
         <dd>{result.module ?? '—'}</dd>
         <dt>Scan type</dt>
         <dd>{result.scanType ?? '—'}</dd>
+        <dt>Value type</dt>
+        <dd>{result.valueType ?? '—'}</dd>
         <dt>Line</dt>
         <dd>{result.source.lineNumber ?? '—'}</dd>
         <dt>Warnings</dt>
         <dd>{result.warnings.length ? result.warnings.join('; ') : 'none'}</dd>
+        {result.duplicateOf ? (
+          <>
+            <dt>Duplicate of</dt>
+            <dd>{result.duplicateOf}</dd>
+          </>
+        ) : null}
       </dl>
       {result.pattern && (
         <>
@@ -56,7 +70,15 @@ function DetailPanel({ result, query }: { result: RegistrySearchResult | null; q
           <code>{result.normalizedPattern}</code>
         </>
       )}
-      <p className="safety-note">Imported CE scripts and AOB metadata are displayed only; Solith does not execute Auto Assembler text here.</p>
+      {rejectionReason && (
+        <>
+          <h4>Rejection reason</h4>
+          <p>{rejectionReason}</p>
+        </>
+      )}
+      <p className="safety-note">
+        Imported CE scripts and AOB metadata are displayed only; Solith does not execute Auto Assembler text here.
+      </p>
       {scriptText && (
         <>
           <h4>Original inert script excerpt</h4>
@@ -67,9 +89,12 @@ function DetailPanel({ result, query }: { result: RegistrySearchResult | null; q
   );
 }
 
-const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry = null }) => {
+const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry: initialRegistry = null }) => {
+  const [registry, setRegistry] = useState<CompiledCtRegistry | null>(initialRegistry);
+  const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const [type, setType] = useState<'all' | RegistryResultType>('all');
+  const [excludeRejected, setExcludeRejected] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const results = useMemo(() => {
@@ -77,11 +102,32 @@ const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry = 
     return searchRegistry(registry, {
       text: query || undefined,
       type: type === 'all' ? undefined : type,
+      excludeRejected: excludeRejected || undefined,
     });
-  }, [query, registry, type]);
+  }, [excludeRejected, query, registry, type]);
 
   const selected = results.find((result) => result.id === selectedId) ?? results[0] ?? null;
   const counts = registry?.artifact.counts;
+
+  const onPickRegistryFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? ''));
+        const loaded = validateLoadedRegistry(parsed);
+        setRegistry(loaded);
+        setSelectedId(null);
+      } catch (error) {
+        setRegistry(null);
+        setLoadError(error instanceof Error ? error.message : String(error));
+      }
+    };
+    reader.onerror = () => setLoadError('Could not read the selected registry file.');
+    reader.readAsText(file);
+  };
 
   return (
     <main className="page registry-explorer-page">
@@ -91,33 +137,94 @@ const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry = 
         <p>Search compiled CT registry artifacts without executing scripts, attaching to a process, or writing memory.</p>
       </header>
 
+      <section className="panel-card" aria-label="Load registry">
+        <label>
+          Load compiled registry JSON
+          <input type="file" accept="application/json,.json" onChange={onPickRegistryFile} />
+        </label>
+        <p className="safety-note">
+          Local file only — schemas are validated in-renderer. Scripts remain inert (<code>executable=false</code>).
+        </p>
+        {loadError && (
+          <p className="v2-session-ended-notice" role="alert">
+            {loadError}
+          </p>
+        )}
+      </section>
+
       {!registry ? (
         <section className="panel-card" role="status">
           <h3>No registry loaded</h3>
-          <p>Compile a CT registry first, then connect this page to the upcoming file-picker/IPC loader.</p>
+          <p>
+            Compile with <code>npm run registry:compile -- path/to/table.CT out.json</code>, then load the JSON here.
+          </p>
           <p className="safety-note">Phase 4 is display-only. It does not execute Auto Assembler scripts.</p>
         </section>
       ) : (
         <>
           <section className="panel-grid" aria-label="Registry overview">
-            <div className="panel-card"><span>Source</span><strong>{registry.artifact.source.filename}</strong></div>
-            <div className="panel-card"><span>Schema</span><strong>{registry.artifact.schemaVersion}</strong></div>
-            <div className="panel-card"><span>Pointers</span><strong>{counts?.pointers ?? 0}</strong></div>
-            <div className="panel-card"><span>Scripts</span><strong>{counts?.scripts ?? 0}</strong></div>
-            <div className="panel-card"><span>AOBs</span><strong>{counts?.aobSignatures ?? 0}</strong></div>
-            <div className="panel-card"><span>Warnings</span><strong>{counts?.warnings ?? 0}</strong></div>
+            <div className="panel-card">
+              <span>Source</span>
+              <strong>{registry.artifact.source.filename}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Schema</span>
+              <strong>{registry.artifact.schemaVersion}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Generated</span>
+              <strong>{registry.artifact.generatedAt}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Pointers</span>
+              <strong>{counts?.pointers ?? 0}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Scripts</span>
+              <strong>{counts?.scripts ?? 0}</strong>
+            </div>
+            <div className="panel-card">
+              <span>AOBs</span>
+              <strong>{counts?.aobSignatures ?? 0}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Rejections</span>
+              <strong>{counts?.rejections ?? 0}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Warnings</span>
+              <strong>{counts?.warnings ?? 0}</strong>
+            </div>
+            <div className="panel-card">
+              <span>Duplicates</span>
+              <strong>{counts?.duplicates ?? 0}</strong>
+            </div>
           </section>
 
           <section className="panel-card">
             <label>
               Search registry
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="health, Avowed-Win64, 48 8B..." />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="health, Avowed-Win64, 48 8B..."
+              />
             </label>
             <label>
               Type
               <select value={type} onChange={(event) => setType(event.target.value as typeof type)}>
-                {TYPE_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                {TYPE_OPTIONS.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
               </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={excludeRejected}
+                onChange={(event) => setExcludeRejected(event.target.checked)}
+              />{' '}
+              Exclude rejections
             </label>
           </section>
 

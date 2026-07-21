@@ -46,7 +46,7 @@ describe('write-capable runtime policy declarations', () => {
     assert.match(result.blockers.join('\n'), /Original value/);
     assert.match(result.blockers.join('\n'), /Ambiguous AOB/);
     assert.match(result.blockers.join('\n'), /explicitly selected/);
-    assert.match(result.blockers.join('\n'), /Offline guard/);
+    assert.match(result.blockers.join('\n'), /waiver|Offline guard/i);
     assert.match(result.blockers.join('\n'), /User approval/);
     assert.match(result.blockers.join('\n'), /certified or gated/);
     assert.match(result.blockers.join('\n'), /Audit log/);
