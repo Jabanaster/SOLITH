@@ -21,6 +21,7 @@ describe('sidebar module artwork mapping', () => {
       recipes: 'hoodedProfile',
       'session-monitor': 'advancedDragon',
       'live-memory': 'advancedDragon',
+      'registry-explorer': 'hoodedProfile',
       'catalog-save-controls': 'saveTools',
     });
   });
