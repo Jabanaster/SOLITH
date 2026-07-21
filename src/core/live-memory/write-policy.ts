@@ -1,21 +1,21 @@
 /**
- * Phase 10 — fail-closed write policy gate.
+ * Phase 10 — fail-closed write policy gate (Trust Shift).
  *
- * Trainer writes (default product path) require offline confirmation + approval.
- * Research probe writes additionally require researchWriteMode + session snapshot backup.
+ * Trainer / research writes require explicit user approval + single-player waiver.
+ * Research probes additionally require researchWriteMode + session snapshot backup.
+ * Automated connection-count OnlineGuard is NOT used here (see evaluateWriteConsent).
  * Injection / code-exec requests are structurally absent; INJECT_FORBIDDEN is reserved.
- *
- * Does NOT replace LiveMemorySession's online-guard recheck — it is an additional
- * policy layer. Online guard remains count-ceiling only (KI-017 residual risk).
  */
 
 export type WriteGateCode =
-  | 'ONLINE'
+  | 'NO_CONSENT'
   | 'NO_BACKUP'
   | 'NO_APPROVAL'
   | 'RESEARCH_MODE_OFF'
   | 'READONLY_MODE'
-  | 'INJECT_FORBIDDEN';
+  | 'INJECT_FORBIDDEN'
+  /** @deprecated Trust Shift — connection-count no longer blocks; mapped to NO_CONSENT if seen */
+  | 'ONLINE';
 
 export type WriteGateDecision =
   | { allow: true; reasons: string[] }
@@ -26,8 +26,8 @@ export type WriteClass = 'trainer' | 'research_probe';
 export interface WritePolicyContext {
   /** trainer = catalog/live trainer path; research_probe = Discovery/Research Lab probes */
   writeClass: WriteClass;
-  /** True when online-session guard would allow (count ≤ baseline + user offline confirm). */
-  isOffline: boolean;
+  /** Single-player / private-play waiver accepted (replaces connection-count isOffline). */
+  singlePlayerWaiverAccepted: boolean;
   /** Research sessions must checkpoint a session snapshot before first probe write. */
   hasBackupSnapshot: boolean;
   /** Explicit user confirmation for this write/proposal. */
@@ -36,9 +36,19 @@ export interface WritePolicyContext {
   researchWriteModeEnabled: boolean;
   /** Hard kill switch — blocks all writes when true. */
   readOnlyMode?: boolean;
+  /**
+   * @deprecated Trust Shift — ignored for allow/deny. Prefer singlePlayerWaiverAccepted.
+   * Kept so older callers compiling against isOffline still type-check during migration.
+   */
+  isOffline?: boolean;
 }
 
 export class WritePolicyGate {
+  /**
+   * Trust Shift migration: `isOffline:true` still satisfies the waiver when
+   * `singlePlayerWaiverAccepted` was omitted by a legacy caller. Explicit
+   * `singlePlayerWaiverAccepted:false` always denies.
+   */
   evaluate(context: WritePolicyContext): WriteGateDecision {
     if (context.readOnlyMode) {
       return {
@@ -47,11 +57,16 @@ export class WritePolicyGate {
         reasons: ['Read-only mode is enabled; all writes blocked.'],
       };
     }
-    if (!context.isOffline) {
+
+    const waiverOk =
+      context.singlePlayerWaiverAccepted === true ||
+      (context.isOffline === true && context.singlePlayerWaiverAccepted !== false);
+
+    if (!waiverOk) {
       return {
         allow: false,
-        code: 'ONLINE',
-        reasons: ['Online-session guard / offline confirm failed. Writes blocked.'],
+        code: 'NO_CONSENT',
+        reasons: ['Single-player / private-play waiver not accepted.'],
       };
     }
     if (!context.userApproved) {
@@ -81,24 +96,36 @@ export class WritePolicyGate {
 
     return {
       allow: true,
-      reasons: ['All write-policy preconditions passed.'],
+      reasons: ['Write-policy preconditions passed (waiver + approval).'],
     };
   }
+}
+
+function applyLegacyOfflineOverride(
+  base: WritePolicyContext,
+  overrides: Partial<WritePolicyContext>,
+): WritePolicyContext {
+  // Legacy callers that only set isOffline map it onto the waiver flag.
+  if (overrides.singlePlayerWaiverAccepted === undefined && overrides.isOffline !== undefined) {
+    return { ...base, singlePlayerWaiverAccepted: overrides.isOffline === true };
+  }
+  return base;
 }
 
 /** Default context for existing trainer MemoryManager paths (research mode N/A). */
 export function defaultTrainerWritePolicyContext(
   overrides: Partial<WritePolicyContext> = {},
 ): WritePolicyContext {
-  return {
+  const base: WritePolicyContext = {
     writeClass: 'trainer',
-    isOffline: true,
+    singlePlayerWaiverAccepted: true,
     hasBackupSnapshot: true,
     userApproved: true,
     researchWriteModeEnabled: false,
     readOnlyMode: false,
     ...overrides,
   };
+  return applyLegacyOfflineOverride(base, overrides);
 }
 
 /**
@@ -109,13 +136,14 @@ export function defaultTrainerWritePolicyContext(
 export function researchProbeWritePolicyContext(
   overrides: Partial<WritePolicyContext> = {},
 ): WritePolicyContext {
-  return {
+  const base: WritePolicyContext = {
     writeClass: 'research_probe',
-    isOffline: true,
+    singlePlayerWaiverAccepted: true,
     hasBackupSnapshot: false,
     userApproved: true,
     researchWriteModeEnabled: false,
     readOnlyMode: false,
     ...overrides,
   };
+  return applyLegacyOfflineOverride(base, overrides);
 }

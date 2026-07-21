@@ -11,7 +11,7 @@
 
 | Constraint | Rule |
 |---|---|
-| **OFFLINE_ONLY** | **Offline gameplay enforcement** for live memory: online-session guard is fail-closed. Remote connections above the reviewed per-game baseline → safe abort. No online/multiplayer **game** targeting. This does **not** mean the Solith app makes zero network requests (opt-in hub sync / community listing metadata / Steam CDN may exist as non-gameplay network use). |
+| **OFFLINE_ONLY** | **Offline / private-play consent** for live memory (Trust Shift): single-player waiver required. Connection-count OnlineGuard is advisory for writes/freeze (see KI-017). No online/multiplayer **game** targeting as a product claim. This does **not** mean the Solith app makes zero network requests (opt-in hub sync / community listing metadata / Steam CDN may exist as non-gameplay network use). |
 | **User-mode only** | Memory ops via `ReadProcessMemory` / `WriteProcessMemory` / `VirtualProtectEx` only. **No kernel drivers.** |
 | **No malware paths** | No remote trainer binary download/exec. No unverified code injection on the mainstream path. |
 | **Transparency** | Every live memory read/write is append-logged locally. Crashes write `crash_report.txt` locally — never phone home. |
@@ -49,7 +49,8 @@ src/core/live-memory/
   aob-resolver.ts          # exact AOB (exists)
   pointer-resolver.ts      # pointer chains (exists)
   feature-resolver.ts      # resolve order + SessionAddressCache (exists)
-  online-guard.ts          # OFFLINE_ONLY (exists)
+  online-guard.ts          # advisory connection policy (exists; not write-blocking after Trust Shift)
+  write-consent.ts         # single-player waiver gate for attach/write/freeze
   native-memory-driver.ts  # RPM/WPM (exists)
   live-memory-session.ts   # attach / write / freeze (exists)
 
@@ -98,7 +99,7 @@ Results feed `SessionAddressCache` so activation does not re-scan every toggle.
 
 **Role:** Safe-write wrapper + audit.
 
-1. Recheck online guard immediately before write.
+1. Recheck write consent (single-player waiver) immediately before write.
 2. Pre-read current value (state validation).
 3. Write via `LiveMemorySession.proposeWrite` → `confirmWrite`.
 4. Verify readback when applicable.

@@ -422,6 +422,12 @@ interface Window {
       scansPerformed?: number;
       error?: string;
     }>;
+    /** Phase 2 — session-bound path resolve (attached process only). */
+    researchResolvePath: (payload: {
+      moduleName: string;
+      baseOffset: string;
+      pointerChain?: number[];
+    }) => Promise<{ success: boolean; address?: string; error?: string }>;
     researchSnapshotDiff: (payload: {
       old: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
       new: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;

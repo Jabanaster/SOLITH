@@ -19,6 +19,11 @@ export interface MemoryAuditEntry {
   reason?: string;
   pid?: number;
   executableName?: string;
+  /**
+   * Trust Shift: when true, the operator had accepted the single-player /
+   * private-play waiver and assumed local responsibility for the modification.
+   */
+  waiverAssumed?: boolean;
 }
 
 export interface MemoryAuditLogOptions {

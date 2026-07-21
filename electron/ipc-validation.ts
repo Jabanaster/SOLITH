@@ -442,6 +442,15 @@ export const ResearchPointerAnalyzeSchema = z.object({
   maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
 });
 
+/**
+ * Phase 2 — session-bound pointer path resolve (attached process only; no free PID).
+ */
+export const ResearchResolvePathSchema = z.object({
+  moduleName: z.string().min(1).max(260),
+  baseOffset: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  pointerChain: z.array(z.number().int().nonnegative()).max(32).default([]),
+});
+
 const SnapshotWatchItemSchema = z.object({
   address: z.string().min(1).max(32),
   type: z.string().min(1).max(32),

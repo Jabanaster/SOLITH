@@ -25,6 +25,7 @@ import {
   ResearchViewSchema,
   ResearchHexSchema,
   ResearchPointerAnalyzeSchema,
+  ResearchResolvePathSchema,
   ResearchSnapshotDiffSchema,
   ResearchSnapshotSaveSchema,
   InProcessProposeHookSchema,
@@ -53,9 +54,9 @@ import {
  * in the IPC payload — one renderer sender owns at most one attached session.
  *
  * No memory access of any kind occurs unless the feature flag is enabled AND
- * the caller explicitly confirms offline play AND the online-session guard
- * passes (rechecked before every write, not just at attach — see
- * LiveMemorySession). Nothing here bypasses that guard.
+ * the caller explicitly confirms the single-player / private-play waiver
+ * (Trust Shift — connection counts are advisory only; see evaluateWriteConsent).
+ * Writes still go through MemoryManager / WritePolicyGate where configured.
  */
 
 let liveMemoryModule: any = null;
@@ -681,6 +682,39 @@ export function registerLiveMemoryIpc(): void {
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'research_pointer_analyze_failed') };
+    }
+  });
+
+  /** Phase 2 — resolve module+offset[+chain] on the attached session only. */
+  ipcMain.handle('research:resolve-path', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = ResearchResolvePathSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const mod = await getLiveMemoryModule();
+      const { driver, handle } = bundle.session.getMemoryAccessOrThrow();
+      const moduleOffset = Number.parseInt(parsed.baseOffset.slice(2), 16);
+      if (!Number.isFinite(moduleOffset)) {
+        return { success: false, error: 'invalid_base_offset' };
+      }
+      const address = mod.resolvePointerPath(driver, handle, {
+        moduleName: parsed.moduleName,
+        moduleOffset,
+        offsets: parsed.pointerChain,
+      });
+      const hex = `0x${address.toString(16)}`;
+      bundle.audit.append({
+        op: 'resolve',
+        address: hex,
+        reason: `research:resolve-path:${parsed.moduleName}+${parsed.baseOffset}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+        waiverAssumed: bundle.session.isOfflineConfirmed(),
+      });
+      return { success: true, address: hex };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'research_resolve_path_failed') };
     }
   });
 

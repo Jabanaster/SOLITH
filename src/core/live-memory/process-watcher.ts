@@ -11,7 +11,7 @@ import {
   type FingerprintVerifyResult,
 } from '../definitions/fingerprint-verify.js';
 import type { MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.v1.js';
-import { evaluateOnlineGuard } from './online-guard.js';
+import { evaluateWriteConsent } from './write-consent.js';
 import type { LiveProcessListEntry } from './native-memory-driver.js';
 import type { OnlineGuardInput, OnlineGuardResult } from './types.js';
 import { resolveSignature, type FuzzyScanOptions, type SignatureMatch } from './signature-engine.js';
@@ -128,11 +128,9 @@ export function buildZeroInputAttachPlan(input: BuildAttachPlanInput): ZeroInput
     };
   }
 
-  const baseline = definition.connectionBaseline ?? 0;
-  const guard = evaluateOnlineGuard({
+  const guard = evaluateWriteConsent({
     userConfirmedOffline: input.userConfirmedOffline,
     remoteConnections: input.remoteConnections,
-    acceptedConnectionBaseline: baseline,
   });
 
   if (!guard.allowed) {

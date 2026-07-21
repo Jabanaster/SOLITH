@@ -46,14 +46,15 @@ describe('LiveMemorySession', () => {
     assert.equal(session.isAttached(), false);
   });
 
-  test('attach fails when remote connections are present', async () => {
+  test('attach succeeds when remote connections are present if waiver accepted (Trust Shift)', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
     const session = makeSession(driver, [ONLINE_EVIDENCE]);
 
     const result = await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
 
-    assert.equal(result.success, false);
-    assert.equal(driver.isOpen(), false);
+    assert.equal(result.success, true);
+    assert.equal(driver.isOpen(), true);
+    assert.match(result.guard.reason, /advisory/i);
   });
 
   test('attach succeeds with confirmation and clean evidence', async () => {
@@ -84,17 +85,18 @@ describe('LiveMemorySession', () => {
     assert.equal(result.manifest?.valueAfter, 9999);
   });
 
-  test('confirmWrite is blocked and does not write if guard flips online between propose and confirm', async () => {
+  test('confirmWrite proceeds when connection count rises between propose and confirm (Trust Shift)', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
-    // First call (attach) clean, second call (confirmWrite) online.
+    // First call (attach) clean, second call (confirmWrite) online — still allowed with waiver.
     const session = makeSession(driver, [CLEAN_EVIDENCE, ONLINE_EVIDENCE]);
     await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
 
     const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
     const result = await session.confirmWrite(proposal.proposalId);
 
-    assert.equal(result.success, false);
-    assert.equal(driver.getValue(0x1000n), 100, 'value must remain unchanged when guard blocks at write time');
+    assert.equal(result.success, true);
+    assert.equal(driver.getValue(0x1000n), 9999);
+    assert.match(result.guard?.reason ?? '', /advisory/i);
   });
 
   test('confirmWrite is blocked if the OS executable name no longer matches the attached target', async () => {
@@ -248,9 +250,9 @@ describe('LiveMemorySession freeze', () => {
     assert.equal(session.getFreezeStatus().tickCount, 2);
   });
 
-  test('freeze stops itself when the online guard blocks mid-freeze, without writing that tick', async () => {
+  test('freeze continues when connection count rises mid-freeze (Trust Shift advisory only)', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
-    // First tick (inside startFreeze) clean; second tick (scheduled) online.
+    // First tick clean; second tick online — freeze must keep writing with waiver.
     const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, ONLINE_EVIDENCE]);
     const { scheduler, fireNext, pendingCount } = makeFakeFreezeScheduler();
     session._injectFreezeScheduler(scheduler);
@@ -263,10 +265,11 @@ describe('LiveMemorySession freeze', () => {
     await fireNext();
 
     const status = session.getFreezeStatus();
-    assert.equal(status.active, false);
-    assert.equal(status.stopReason, 'guard_blocked');
-    assert.equal(driver.getValue(0x1000n), 42, 'blocked tick must not write');
-    assert.equal(pendingCount(), 0, 'no further ticks should be scheduled after a guard block');
+    assert.equal(status.active, true);
+    assert.equal(driver.getValue(0x1000n), 9999, 'advisory online tick must still write');
+    assert.equal(status.tickCount, 2);
+    assert.ok(pendingCount() >= 1);
+    assert.match(status.lastGuard?.reason ?? '', /advisory/i);
   });
 
   test('stopFreeze halts scheduling and reports user_stopped', async () => {

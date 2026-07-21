@@ -100,7 +100,8 @@ Shipped on `cursor/phase3-hub-sync-trust-ui` (tip `05b5490` and ancestors). Thes
 | Core engine hardening | **Done** | Fuzzy AOB drift recovery, local crash reporter, local sandbox scaffold |
 | Solith rebrand + opening cinematic | **Done** | Product rename + UI cinematic integration |
 | Phase 9 Address/Data Research Tools | **Done** | Read-only viewer/hex/pointer/snapshot — `Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md` |
-| Phase 10 Gated Write Architecture | **Done** | `WritePolicyGate` + MemoryManager enforce; researchWriteMode default OFF; `Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md` |
+| Phase 10 Gated Write Architecture | **Done** | `WritePolicyGate` + MemoryManager enforce; researchWriteMode default OFF; Trust Shift waiver replaces connection-count write blocks — `Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md` |
+| Trust Shift + CT→Live Phases 2–4 | **Done** | Waiver consent; `CtLiveResolution`; toggle cards; pointer table / What-Changed; local pack export — `Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md` |
 
 Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** until live AOB/pointer evidence. Live elevation playbook: `Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`.
 
@@ -135,6 +136,7 @@ Avowed ships Steam + WinGDK executables at **L0** only (no `signature` / `baseOf
 - ~~Zero-Input loop / Avowed L0 + WinGDK backups / Hub sync+trust / engine harden / Solith rebrand~~ — **on `cursor/phase3-hub-sync-trust-ui`**
 - ~~Phase 9 address/data research tools (view/hex/pointer report/session snapshot, read-only)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`)
 - ~~Phase 10 gated write architecture (policy scaffold; researchWriteMode default OFF)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`)
+- ~~Trust Shift + CT→Live Phases 2–4 (waiver, promote/toggles, research UX, local packs)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md`)
 - Remaining S / U live titles still require game sessions (Avowed first)
 
 See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.

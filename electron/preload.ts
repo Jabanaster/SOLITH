@@ -233,6 +233,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('research:hex', payload),
   researchPointerAnalyze: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
     ipcRenderer.invoke('research:pointer-analyze', payload),
+  researchResolvePath: (payload: {
+    moduleName: string;
+    baseOffset: string;
+    pointerChain?: number[];
+  }) => ipcRenderer.invoke('research:resolve-path', payload),
   researchSnapshotDiff: (payload: { old: unknown; new: unknown }) =>
     ipcRenderer.invoke('research:snapshot-diff', payload),
   researchSnapshotSave: (payload: { snapshot: unknown; label?: string }) =>

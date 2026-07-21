@@ -9,8 +9,8 @@ This document describes the core design and safety guarantees built into **Solit
 ## 1. Safety Boundaries (Strict Constraints)
 Solith's default and primary edit path is safe, offline, file-backed save/config editing. It strictly enforces the following security principles:
 * **File-Backed Editing Is the Safer, Default Path**: Save and configuration file editing (Sections 2–6 below) covers the large majority of Solith's supported use cases and carries the lowest risk. Prefer it whenever a game's data is file-backed.
-* **Live Memory Access Is Gated, Not Blanket-Permitted**: Solith also ships a scoped live-memory subsystem (see Section 1a). This is not a general RAM-editing capability — it operates only against the explicit, catalogued controls for supported games, behind an off-by-default feature flag, an online/offline confirmation gate, and a fail-closed connection guard. Unsupported games and unsupported controls remain blocked.
-* **Offline gameplay enforcement (not "zero network")**: Live-memory targeting is gated for single-player/offline sessions. The online-session guard fail-closes when the game process shows remote connections above its reviewed baseline (see Section 1a / KI-017). This does **not** claim the Solith application makes zero network requests (opt-in hub sync / community listing metadata may exist). File-backed editing remains local. Solith does not bypass online anti-cheat systems.
+* **Live Memory Access Is Gated, Not Blanket-Permitted**: Solith also ships a scoped live-memory subsystem (see Section 1a). This is not a general RAM-editing capability — it operates only against the explicit, catalogued controls for supported games, behind an off-by-default feature flag, a single-player / private-play waiver, and WritePolicyGate. Unsupported games and unsupported controls remain blocked.
+* **Offline / private-play consent (not "zero network")**: Live-memory targeting requires the operator to accept the single-player / private-play waiver (Trust Shift). Connection counts may be observed as advisory (see KI-017) and do not automatically block writes after consent. This does **not** claim the Solith application makes zero network requests (opt-in hub sync / community listing metadata may exist). File-backed editing remains local. Solith does not bypass online anti-cheat systems.
 * **No Executable Modification**: Modifies only save/configuration files and, within the gated live-memory subsystem, in-memory values of a running game's own process — never the executable, libraries, or system files on disk. `.exe`, `.dll`, `.sys`, and `.drv` file modification is completely blocked.
 * **No Anti-Cheat Bypass, No Multiplayer/Commercial-Trainer Claim**: Neither the file-backed path nor the live-memory subsystem is designed to defeat, evade, or interact with anti-cheat systems, and neither is scoped for multiplayer or general commercial-game live-trainer use. Support is limited to catalogued, single-player, offline use of games/saves the user owns.
 
@@ -26,19 +26,15 @@ document.
 
 * **Off by default**: Gated behind the `v2LiveModeEnabled` setting. The UI (`MultiGameTrainerPage`)
   shows a feature-gate banner and requires an explicit opt-in before any scan/read/write is possible.
-* **Explicit per-session confirmation**: A "single-player/offline only" checkbox must be checked by
-  the user for the *current* game session before any control becomes usable. This confirmation does
-  not carry over between games — switching games resets it.
-* **Fail-closed online guard**: Writes are blocked if the target process's
-  ESTABLISHED non-loopback **connection count** is above its declared per-game
-  baseline, or if connection evidence is unavailable. The guard fails closed,
-  not open, on missing or ambiguous evidence. It is a **count ceiling only** —
-  it does not validate endpoints/identities; a multiplayer conn that replaces
-  telemetry without raising count remains a residual risk (KI-017).
+* **Explicit per-session waiver**: A single-player / private-play acknowledgement must be accepted
+  before attach / writes / freeze (sticky locally per game scope after Trust Shift). This is consent,
+  not network proof — Solith does not claim multiplayer safety.
+* **Advisory connection observe**: `evaluateOnlineGuard` / connection baselines remain available for
+  transparency UIs. They no longer hard-block write or freeze paths (see KI-017 Trust Shift). A
+  multiplayer session can still be active when the operator accepts the waiver — residual risk.
 * **Catalog-bound, not freeform**: Only pre-declared controls in the per-game catalog
-  (`src/core/cheat-system/games.ts`, `src/core/live-memory/live-control-catalog.ts`) are reachable.
-  There is no arbitrary address/offset entry path exposed to the renderer.
-* **Schema-validated IPC boundary**: Every live-memory and cheat-toggle IPC call is validated by Zod
+  (`src/core/cheat-system/games.ts`, `src/core/live-memory/live-control-catalog.ts`) are reachable
+  on the trainer deck path. Advanced Scan Mode is a separate, feature-flagged research surface.* **Schema-validated IPC boundary**: Every live-memory and cheat-toggle IPC call is validated by Zod
   schemas (`electron/ipc-validation.ts`) before it reaches process-memory or persistence code.
 * **Persistence does not grant execution authority**: Cheat toggle persistence
   (`src/core/cheat-system/cheat-toggle-store.ts`, `cheat_toggle_state` table) remembers which toggles

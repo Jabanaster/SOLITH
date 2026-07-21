@@ -9,6 +9,15 @@ import {
   type WatchListBookmark,
 } from '../live-memory/watch-list-bookmarks.js';
 import AddressDataResearchPanel from '../components/AddressDataResearchPanel.js';
+import LiveToggleCardsPanel from '../components/LiveToggleCardsPanel.js';
+import SinglePlayerWaiverModal from '../components/SinglePlayerWaiverModal.js';
+import {
+  buildLiveToggleCards,
+  RESEARCH_PROMOTE_SEED_KEY,
+  type LiveToggleCard,
+  type ResearchPromoteSeed,
+} from '../../core/live-memory/ct-promote.js';
+import { SinglePlayerWaiverStore } from '../../core/live-memory/single-player-waiver.js';
 
 interface ProcessEntry {
   pid: number;
@@ -100,6 +109,34 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
 
   const [savedControls, setSavedControls] = useState<SavedControl[]>([]);
   const [controlsChecked, setControlsChecked] = useState(false);
+  const [waiverModalOpen, setWaiverModalOpen] = useState(false);
+  const [toggleCards, setToggleCards] = useState<LiveToggleCard[]>([]);
+  const [waiverStore] = useState(() => new SinglePlayerWaiverStore());
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RESEARCH_PROMOTE_SEED_KEY);
+      if (!raw) return;
+      const seed = JSON.parse(raw) as ResearchPromoteSeed;
+      if (!seed.moduleName || !seed.baseOffset) return;
+      const cards = buildLiveToggleCards([
+        {
+          id: `promote-${seed.label ?? 'seed'}`,
+          label: seed.label ?? 'Promoted path',
+          dataType: 'float',
+          moduleName: seed.moduleName,
+          baseOffset: seed.baseOffset,
+          pointerChain: seed.pointerChain ?? [],
+          liveResolution: seed.liveResolution ?? 'resolvable',
+          defaultValue: 100,
+          source: 'research',
+        },
+      ]);
+      setToggleCards(cards);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     setWatchBookmarks(listWatchListBookmarks());
@@ -182,7 +219,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
       const result: AttachResult = await api.liveMemoryAttach({
         pid: selectedPid,
         executableName: proc.name,
-        userConfirmedOffline: true,
+        userConfirmedOffline,
       });
       setLastGuard(result.guard ?? null);
       if (result.success) {
@@ -481,9 +518,9 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
           <p className="v2-safety-notice">
             When enabled, this reads and writes a target process's memory using standard
             ReadProcessMemory/WriteProcessMemory only — no DLL injection, no kernel drivers,
-            no anti-cheat interaction. Every attach and every write requires you to confirm the
-            session is single-player/offline, and is automatically blocked if the target process
-            has active non-loopback network connections, even if you confirmed offline play.
+            no anti-cheat interaction. Every attach and every write requires the single-player /
+            private-play waiver. Connection counts may be shown as advisory info and do not
+            automatically block writes after you accept responsibility.
           </p>
         </div>
       </div>
@@ -523,10 +560,21 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
           <input
             type="checkbox"
             checked={userConfirmedOffline}
-            onChange={e => setUserConfirmedOffline(e.target.checked)}
+            onChange={(e) => {
+              if (e.target.checked) {
+                const scope = processes.find((p) => p.pid === selectedPid)?.name ?? 'global';
+                if (waiverStore.isAccepted(scope)) {
+                  setUserConfirmedOffline(true);
+                } else {
+                  setWaiverModalOpen(true);
+                }
+              } else {
+                setUserConfirmedOffline(false);
+              }
+            }}
             disabled={attached}
           />
-          {' '}I confirm this process is running single-player/offline, not connected to an online match.
+          {' '}I accept the single-player / private-play waiver (memory manipulation is my responsibility).
         </label>
 
         <div className="v2-controls-row">
@@ -849,21 +897,79 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
       )}
 
       {attached && (
-        <AddressDataResearchPanel
-          attached={attached}
-          processName={attachedExecutable || 'unknown'}
-          pid={selectedPid}
-        />
+        <>
+          <LiveToggleCardsPanel
+            attached={attached}
+            cards={toggleCards}
+            freezeActive={Boolean(freezeStatus?.active)}
+            onResolve={async (card) => {
+              const result = await api.researchResolvePath?.({
+                moduleName: card.moduleName,
+                baseOffset: card.baseOffset,
+                pointerChain: card.pointerChain,
+              });
+              if (!result?.success || !result.address) {
+                setMessage(result?.error ?? 'resolve failed');
+                return null;
+              }
+              return result.address;
+            }}
+            onFreeze={async (addr, value, type) => {
+              const result = await api.liveMemoryFreezeStart({
+                address: addr,
+                dataType: type,
+                value,
+                intervalMs: Number(freezeIntervalMs) || 200,
+              });
+              if (!result?.success) setMessage(result?.error ?? 'freeze failed');
+              else {
+                setFreezeStatus({
+                  active: true,
+                  tickCount: 0,
+                  target: { address: { address: addr, dataType: type }, value },
+                  lastGuard: null,
+                });
+                setMessage(`Freeze started @ ${addr}`);
+              }
+            }}
+            onStopFreeze={async () => {
+              await api.liveMemoryFreezeStop();
+              setFreezeStatus({
+                active: false,
+                tickCount: freezeStatus?.tickCount ?? 0,
+                stopReason: 'user_stopped',
+                target: null,
+                lastGuard: null,
+              });
+            }}
+          />
+          <AddressDataResearchPanel
+            attached={attached}
+            processName={attachedExecutable || 'unknown'}
+            pid={selectedPid}
+          />
+        </>
       )}
 
       {message && <p className="v2-message" role="status">{message}</p>}
 
+      <SinglePlayerWaiverModal
+        open={waiverModalOpen}
+        scopeKey={processes.find((p) => p.pid === selectedPid)?.name ?? 'global'}
+        store={waiverStore}
+        onCancel={() => setWaiverModalOpen(false)}
+        onAccept={() => {
+          setUserConfirmedOffline(true);
+          setWaiverModalOpen(false);
+        }}
+      />
+
       <section className="v2-monitor-section v2-safety-section" aria-label="Safety information">
         <p className="v2-safety-notice">
-          <strong>Safety:</strong> Attach and every write recheck that this session is confirmed
-          single-player/offline and that the target process has no active non-loopback network
-          connections. If either check fails, the operation is blocked — confirmation alone is
-          never sufficient. No DLL injection, no kernel drivers, no anti-cheat interaction.
+          <strong>Safety:</strong> Attach and writes require the single-player / private-play waiver.
+          Connection observations are advisory after Trust Shift — you assume local responsibility.
+          No DLL injection, no kernel drivers, no anti-cheat interaction. Audit log records
+          <code> waiverAssumed</code> on modifications.
         </p>
       </section>
     </div>

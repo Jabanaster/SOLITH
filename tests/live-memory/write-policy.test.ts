@@ -37,13 +37,23 @@ describe('WritePolicyGate', () => {
     }
   });
 
-  test('denies when online / offline confirm failed', () => {
+  test('denies when single-player waiver not accepted', () => {
+    const decision = gate.evaluate(
+      defaultTrainerWritePolicyContext({ singlePlayerWaiverAccepted: false }),
+    );
+    assert.equal(decision.allow, false);
+    if (!decision.allow) {
+      assert.equal(decision.code, 'NO_CONSENT');
+    }
+  });
+
+  test('legacy isOffline:false maps to NO_CONSENT', () => {
     const decision = gate.evaluate(
       defaultTrainerWritePolicyContext({ isOffline: false }),
     );
     assert.equal(decision.allow, false);
     if (!decision.allow) {
-      assert.equal(decision.code, 'ONLINE');
+      assert.equal(decision.code, 'NO_CONSENT');
     }
   });
 
@@ -78,23 +88,23 @@ describe('WritePolicyGate', () => {
     }
   });
 
-  test('research_probe allows when mode on, backup present, offline, approved', () => {
+  test('research_probe allows when mode on, backup present, waiver, approved', () => {
     const decision = gate.evaluate(
       researchProbeWritePolicyContext({
         researchWriteModeEnabled: true,
         hasBackupSnapshot: true,
-        isOffline: true,
+        singlePlayerWaiverAccepted: true,
         userApproved: true,
       }),
     );
     assert.equal(decision.allow, true);
   });
 
-  test('fail-closed order: readOnly wins before online', () => {
+  test('fail-closed order: readOnly wins before consent', () => {
     const decision = gate.evaluate(
       defaultTrainerWritePolicyContext({
         readOnlyMode: true,
-        isOffline: false,
+        singlePlayerWaiverAccepted: false,
         userApproved: false,
       }),
     );

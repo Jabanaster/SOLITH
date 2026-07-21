@@ -111,7 +111,7 @@ describe('process-watcher', () => {
     assert.equal(plan.guard.allowed, true);
   });
 
-  test('buildZeroInputAttachPlan blocks when online guard fails', () => {
+  test('buildZeroInputAttachPlan allows with waiver when remote connections present (Trust Shift)', () => {
     const plan = buildZeroInputAttachPlan({
       detection: {
         catalogGameId: 'demo-game',
@@ -128,6 +128,7 @@ describe('process-watcher', () => {
         observedAt: new Date().toISOString(),
       },
     });
-    assert.equal(plan.allowed, false);
+    assert.equal(plan.allowed, true);
+    assert.match(plan.guard.reason, /advisory/i);
   });
 });

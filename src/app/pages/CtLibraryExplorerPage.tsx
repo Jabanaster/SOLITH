@@ -3,6 +3,7 @@ import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type { CtLibraryGameSummary, CtLibrarySummaryIndex } from '../../core/ct-library/types.js';
 import type { CtLibrarySearchResult } from '../../core/ct-library/search.js';
 import type { CtZipCatalogEntry } from '../../core/registry/compile-ct-zip.js';
+import { RESEARCH_PROMOTE_SEED_KEY, type ResearchPromoteSeed } from '../../core/live-memory/ct-promote.js';
 import styles from './CtLibraryExplorerPage.module.css';
 
 type KindFilter = 'all' | 'pointer' | 'script' | 'aob';
@@ -36,9 +37,11 @@ function tableForResult(tables: CtZipCatalogEntry[], result: CtLibrarySearchResu
 function DetailPanel({
   result,
   detail,
+  onPromote,
 }: {
   result: CtLibrarySearchResult | null;
   detail: DetailResponse | null;
+  onPromote: (result: CtLibrarySearchResult) => void;
 }) {
   const table = tableForResult(detail?.tables ?? [], result);
 
@@ -80,8 +83,16 @@ function DetailPanel({
         <dt>Warnings</dt>
         <dd>{formatNumber(table?.counts.warnings)}</dd>
       </dl>
+      {result.type === 'pointer' && (
+        <p>
+          <button type="button" className="btn-primary" onClick={() => onPromote(result)}>
+            Promote to Live Watch seed
+          </button>
+        </p>
+      )}
       <p className={styles.safety}>
         This explorer does not attach to a process, run Auto Assembler, download trainers, or write memory.
+        Promote seeds Research Lab / Live Toggle Cards after you attach with the single-player waiver.
       </p>
     </section>
   );
@@ -98,6 +109,17 @@ export default function CtLibraryExplorerPage() {
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  const handlePromote = useCallback((result: CtLibrarySearchResult) => {
+    const seed: ResearchPromoteSeed = {
+      label: result.title,
+      liveResolution: 'incomplete',
+      addressHint: undefined,
+    };
+    // Metadata-only promote: seed label for Research Lab; full path comes from CT import.
+    localStorage.setItem(RESEARCH_PROMOTE_SEED_KEY, JSON.stringify(seed));
+    setMessage(`Promoted “${result.title}” seed — open Advanced Scan Mode / Research panel after attach.`);
+  }, []);
 
   const selected = useMemo(
     () => results.find((result) => result.id === selectedId) ?? results[0] ?? null,
@@ -225,7 +247,7 @@ export default function CtLibraryExplorerPage() {
             )}
           </div>
         </section>
-        <DetailPanel result={selected} detail={detail} />
+        <DetailPanel result={selected} detail={detail} onPromote={handlePromote} />
       </div>
     </main>
   );

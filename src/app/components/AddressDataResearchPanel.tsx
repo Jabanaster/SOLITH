@@ -1,6 +1,10 @@
-import React, { useCallback, useState } from 'react';
-import type { SessionSnapshot } from '../../core/live-memory/research/session-snapshot.js';
+import React, { useCallback, useEffect, useState } from 'react';
+import type { SessionSnapshot, SessionSnapshotDiff } from '../../core/live-memory/research/session-snapshot.js';
 import type { PointerCandidateReport } from '../../core/live-memory/research/pointer-candidate-analysis.js';
+import {
+  RESEARCH_PROMOTE_SEED_KEY,
+  type ResearchPromoteSeed,
+} from '../../core/live-memory/ct-promote.js';
 
 const VIEW_TYPES = ['int32', 'uint32', 'float', 'double', 'int64', 'byte', 'string'] as const;
 
@@ -11,7 +15,7 @@ export interface AddressDataResearchPanelProps {
 }
 
 /**
- * Phase 9 — read-only address / hex / pointer / snapshot tools.
+ * Phase 9 + Phase 3 — read-only address / hex / pointer table / snapshot What-Changed.
  * Requires an attached live-memory session. Never proposes writes.
  */
 export const AddressDataResearchPanel: React.FC<AddressDataResearchPanelProps> = ({
@@ -29,8 +33,25 @@ export const AddressDataResearchPanel: React.FC<AddressDataResearchPanelProps> =
   >([]);
   const [hexRows, setHexRows] = useState<Array<{ offset: number; hex: string; ascii: string }>>([]);
   const [pointerReport, setPointerReport] = useState<PointerCandidateReport | null>(null);
-  const [lastSnapshot, setLastSnapshot] = useState<SessionSnapshot | null>(null);
-  const [diffSummary, setDiffSummary] = useState('');
+  const [snapshotA, setSnapshotA] = useState<SessionSnapshot | null>(null);
+  const [snapshotB, setSnapshotB] = useState<SessionSnapshot | null>(null);
+  const [whatChanged, setWhatChanged] = useState<SessionSnapshotDiff | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RESEARCH_PROMOTE_SEED_KEY);
+      if (!raw) return;
+      const seed = JSON.parse(raw) as ResearchPromoteSeed;
+      if (seed.addressHint) setAddress(seed.addressHint);
+      else if (seed.baseOffset && seed.moduleName) {
+        setAddress(`${seed.moduleName}+${seed.baseOffset}`);
+      }
+      if (seed.label) setMessage(`Seeded from promote: ${seed.label}`);
+      localStorage.removeItem(RESEARCH_PROMOTE_SEED_KEY);
+    } catch {
+      // ignore bad seed
+    }
+  }, []);
 
   const run = useCallback(
     async (fn: () => Promise<void>) => {
@@ -93,47 +114,84 @@ export const AddressDataResearchPanel: React.FC<AddressDataResearchPanelProps> =
       );
     });
 
-  const handleSaveSnapshot = () =>
+  const buildSnapshotFromView = (label: string): SessionSnapshot => {
+    const watchlist = viewEntries
+      .filter((e) => e.readable)
+      .map((e) => ({
+        address: e.address,
+        type: e.type,
+        lastValue: e.value,
+        label,
+      }));
+    return {
+      schemaVersion: 1,
+      timestamp: new Date().toISOString(),
+      pid: pid ?? 0,
+      processName,
+      watchlist,
+      matchSetIds: pointerReport ? [`ptr:${pointerReport.targetAddress}`] : [],
+      notes: label,
+      pointerTarget: address.trim(),
+    };
+  };
+
+  const handleSnapshotA = () =>
     run(async () => {
-      const watchlist = viewEntries
-        .filter((e) => e.readable)
-        .map((e) => ({
-          address: e.address,
-          type: e.type,
-          lastValue: e.value,
-        }));
-      const snapshot: SessionSnapshot = {
-        schemaVersion: 1,
-        timestamp: new Date().toISOString(),
-        pid: pid ?? 0,
-        processName,
-        watchlist,
-        matchSetIds: pointerReport ? [`ptr:${pointerReport.targetAddress}`] : [],
-        notes: 'Phase 9 research panel',
-        pointerTarget: address.trim(),
-      };
-      const result = await api!.researchSnapshotSave!({ snapshot });
+      const snapshot = buildSnapshotFromView('Snapshot A');
+      const result = await api!.researchSnapshotSave!({ snapshot, label: 'A' });
       if (!result.success) {
-        setMessage(result.error ?? 'snapshot save failed');
+        setMessage(result.error ?? 'snapshot A save failed');
         return;
       }
-      if (lastSnapshot && result.snapshot) {
-        const diff = await api!.researchSnapshotDiff!({ old: lastSnapshot, new: result.snapshot });
+      setSnapshotA(result.snapshot ?? snapshot);
+      setWhatChanged(null);
+      setMessage(`Snapshot A saved (${(result.snapshot ?? snapshot).watchlist.length} watches)`);
+    });
+
+  const handleSnapshotB = () =>
+    run(async () => {
+      const snapshot = buildSnapshotFromView('Snapshot B');
+      const result = await api!.researchSnapshotSave!({ snapshot, label: 'B' });
+      if (!result.success) {
+        setMessage(result.error ?? 'snapshot B save failed');
+        return;
+      }
+      const saved = result.snapshot ?? snapshot;
+      setSnapshotB(saved);
+      if (snapshotA) {
+        const diff = await api!.researchSnapshotDiff!({ old: snapshotA, new: saved });
         if (diff.success && diff.diff) {
-          setDiffSummary(
-            `diff +${diff.diff.added.length} / -${diff.diff.removed.length} / ~${diff.diff.changed.length}`,
+          setWhatChanged(diff.diff);
+          setMessage(
+            `What Changed? +${diff.diff.added.length} / -${diff.diff.removed.length} / ~${diff.diff.changed.length}`,
           );
+          return;
         }
       }
-      setLastSnapshot(result.snapshot ?? snapshot);
-      setMessage(`Snapshot saved: ${result.filePath ?? 'ok'}`);
+      setMessage('Snapshot B saved — capture Snapshot A first to diff.');
     });
+
+  const handlePromoteBestPath = () => {
+    if (!pointerReport?.bestPath) {
+      setMessage('Run pointer analyze first.');
+      return;
+    }
+    const seed: ResearchPromoteSeed = {
+      moduleName: pointerReport.bestPath.moduleName,
+      baseOffset: pointerReport.bestPath.moduleOffset,
+      pointerChain: pointerReport.bestPath.offsets,
+      label: 'best-pointer-path',
+      liveResolution: pointerReport.moduleRootOk ? 'resolvable' : 'incomplete',
+    };
+    localStorage.setItem(RESEARCH_PROMOTE_SEED_KEY, JSON.stringify(seed));
+    setMessage('Best path promoted to live-watch seed (local). Open Live Toggle Cards after re-import if needed.');
+  };
 
   return (
     <section className="v2-monitor-section" aria-label="Phase 9 address and data research">
       <h3>Address &amp; Data Research (read-only)</h3>
       <p className="v2-meta">
-        Phase 9 tools — RPM inspect only. No writes. Pointer analysis may take minutes on large heaps.
+        Phase 9/3 tools — RPM inspect only. No writes. Pointer analysis may take minutes on large heaps.
       </p>
       <div className="v2-form-row">
         <label htmlFor="research-addr">Address</label>
@@ -165,14 +223,16 @@ export const AddressDataResearchPanel: React.FC<AddressDataResearchPanelProps> =
         <button className="btn-secondary" type="button" onClick={handlePointer} disabled={!attached || busy}>
           Pointer analyze
         </button>
-        <button className="btn-secondary" type="button" onClick={handleSaveSnapshot} disabled={!attached || busy}>
-          Save snapshot
+        <button className="btn-secondary" type="button" onClick={handleSnapshotA} disabled={!attached || busy}>
+          Snapshot A
+        </button>
+        <button className="btn-secondary" type="button" onClick={handleSnapshotB} disabled={!attached || busy}>
+          Snapshot B · What Changed?
         </button>
       </div>
       {message && (
         <p className="v2-message" role="status">
           {message}
-          {diffSummary ? ` · ${diffSummary}` : ''}
         </p>
       )}
       {viewEntries.length > 0 && (
@@ -202,9 +262,69 @@ export const AddressDataResearchPanel: React.FC<AddressDataResearchPanelProps> =
               <code>
                 {pointerReport.bestPath.moduleName}+{pointerReport.bestPath.moduleOffset} → [
                 {pointerReport.bestPath.offsets.join(', ')}]
-              </code>
+              </code>{' '}
+              <button type="button" className="btn-secondary" onClick={handlePromoteBestPath}>
+                Promote to Live Watch seed
+              </button>
             </p>
           )}
+          {pointerReport.ranked && pointerReport.ranked.length > 0 && (
+            <div style={{ overflowX: 'auto', marginTop: 8 }}>
+              <table aria-label="Pointer candidates" style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th align="left">Score</th>
+                    <th align="left">Depth</th>
+                    <th align="left">Module</th>
+                    <th align="left">Offset</th>
+                    <th align="left">Chain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pointerReport.ranked.slice(0, 40).map((p, i) => (
+                    <tr key={`${p.moduleName}-${p.moduleOffset}-${i}`}>
+                      <td>{p.score}{p.moduleRoot ? ' · root' : ''}</td>
+                      <td>{p.depth}</td>
+                      <td>
+                        <code>{p.moduleName}</code>
+                      </td>
+                      <td>
+                        <code>{p.moduleOffset}</code>
+                      </td>
+                      <td>
+                        <code>[{p.offsets.join(', ')}]</code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+      {whatChanged && (
+        <div aria-label="What changed diff" style={{ marginTop: 12 }}>
+          <h4>What Changed?</h4>
+          <p className="v2-meta">
+            A={snapshotA?.timestamp ?? '—'} · B={snapshotB?.timestamp ?? '—'}
+          </p>
+          <ul>
+            {whatChanged.changed.slice(0, 30).map((c) => (
+              <li key={`chg-${c.address}-${c.type}`}>
+                ~ <code>{c.address}</code> {c.type}: {String(c.old)} → {String(c.new)}
+              </li>
+            ))}
+            {whatChanged.added.slice(0, 15).map((a) => (
+              <li key={`add-${a.address}-${a.type}`}>
+                + <code>{a.address}</code> {a.type}: {String(a.lastValue)}
+              </li>
+            ))}
+            {whatChanged.removed.slice(0, 15).map((r) => (
+              <li key={`rem-${r.address}-${r.type}`}>
+                − <code>{r.address}</code> {r.type}: {String(r.lastValue)}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </section>

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { evaluateOnlineGuard } from './online-guard.js';
+import { evaluateWriteConsent } from './write-consent.js';
 import { observeRemoteConnections } from './remote-connection-observer.js';
 import { getConnectionBaseline } from './game-connection-baselines.js';
 import {
@@ -161,15 +162,32 @@ export class LiveMemorySession {
     return this.userConfirmedOffline;
   }
 
+  /**
+   * Advisory connection observe (KI-017 history). Does not gate writes —
+   * use evaluateWriteConsent / isOfflineConfirmed for allow/deny.
+   */
   async recheckOnlineGuard(): Promise<OnlineGuardResult> {
     if (!this.target) {
       return { allowed: false, reason: 'No process attached.' };
     }
     const evidence = await this.remoteConnectionObserver(this.target.pid);
+    // Diagnostic path still uses connection-count policy for transparency UIs.
     return evaluateOnlineGuard({
       userConfirmedOffline: this.userConfirmedOffline,
       remoteConnections: evidence,
       acceptedConnectionBaseline: this.acceptedConnectionBaseline,
+    });
+  }
+
+  /** Write/attach consent: waiver only; connection counts are advisory in the reason. */
+  async recheckWriteConsent(): Promise<OnlineGuardResult> {
+    if (!this.target) {
+      return { allowed: false, reason: 'No process attached.' };
+    }
+    const evidence = await this.remoteConnectionObserver(this.target.pid);
+    return evaluateWriteConsent({
+      userConfirmedOffline: this.userConfirmedOffline,
+      remoteConnections: evidence,
     });
   }
 
@@ -212,7 +230,8 @@ export class LiveMemorySession {
     const acceptedConnectionBaseline =
       fingerprint?.connectionBaseline ?? getConnectionBaseline(target.executableName);
     const evidence = await this.remoteConnectionObserver(target.pid);
-    const guard = evaluateOnlineGuard({ userConfirmedOffline, remoteConnections: evidence, acceptedConnectionBaseline });
+    // Trust Shift: attach requires single-player waiver only (connection count advisory).
+    const guard = evaluateWriteConsent({ userConfirmedOffline, remoteConnections: evidence });
 
     if (!guard.allowed) {
       return { success: false, guard };
@@ -427,7 +446,7 @@ export class LiveMemorySession {
     return proposal;
   }
 
-  /** Re-checks the online guard, then executes a previously staged proposal. */
+  /** Re-checks write consent (waiver), then executes a previously staged proposal. */
   async confirmWrite(proposalId: string): Promise<ConfirmWriteResult> {
     if (!this.handle || !this.target) {
       return { success: false, error: 'No process attached.' };
@@ -439,12 +458,13 @@ export class LiveMemorySession {
     }
 
     const evidence = await this.remoteConnectionObserver(this.target.pid);
-    const guard = evaluateOnlineGuard({ userConfirmedOffline: this.userConfirmedOffline, remoteConnections: evidence, acceptedConnectionBaseline: this.acceptedConnectionBaseline });
+    const guard = evaluateWriteConsent({
+      userConfirmedOffline: this.userConfirmedOffline,
+      remoteConnections: evidence,
+    });
 
     if (!guard.allowed) {
-      // Guard flipped between propose() and confirm() — reject this write but
-      // keep the session attached; the caller may retry once conditions clear.
-      return { success: false, guard, error: 'Blocked by online-session guard at write time.' };
+      return { success: false, guard, error: 'Blocked by write consent at write time.' };
     }
 
     const identityError = this.verifyAttachedProcessIdentity();
@@ -470,17 +490,20 @@ export class LiveMemorySession {
     return { success: true, manifest, guard };
   }
 
-  /** Restores the value captured before a prior confirmed write. Re-checks the guard, same as any write. */
+  /** Restores the value captured before a prior confirmed write. Re-checks write consent. */
   async rollback(manifest: LiveWriteManifest): Promise<RollbackResult> {
     if (!this.handle || !this.target) {
       return { success: false, error: 'No process attached.' };
     }
 
     const evidence = await this.remoteConnectionObserver(this.target.pid);
-    const guard = evaluateOnlineGuard({ userConfirmedOffline: this.userConfirmedOffline, remoteConnections: evidence, acceptedConnectionBaseline: this.acceptedConnectionBaseline });
+    const guard = evaluateWriteConsent({
+      userConfirmedOffline: this.userConfirmedOffline,
+      remoteConnections: evidence,
+    });
 
     if (!guard.allowed) {
-      return { success: false, guard, error: 'Blocked by online-session guard at rollback time.' };
+      return { success: false, guard, error: 'Blocked by write consent at rollback time.' };
     }
 
     const identityError = this.verifyAttachedProcessIdentity();
@@ -500,10 +523,9 @@ export class LiveMemorySession {
   /**
    * Starts continuously re-writing `value` to `address` on an interval —
    * mirrors mainstream "Infinite Health"/"Infinite Ammo" toggles. Every
-   * tick re-runs the online-session guard before writing (same recheck
-   * principle as confirmWrite/rollback); the first guard failure stops the
-   * freeze outright rather than silently retrying, so a session that goes
-   * online while frozen doesn't keep writing in the background.
+   * tick re-checks write consent (single-player waiver). Connection counts
+   * are advisory only and do not stop the freeze. Waiver loss or identity
+   * mismatch stops the freeze.
    */
   startFreeze(address: LiveMemoryAddress, value: number, intervalMs = DEFAULT_FREEZE_INTERVAL_MS): StartFreezeResult {
     if (!this.handle || !this.target) {
@@ -528,7 +550,10 @@ export class LiveMemorySession {
       if (generation !== this.freezeGeneration || !this.freeze?.active || !this.handle || !this.target) return;
 
       const evidence = await this.remoteConnectionObserver(this.target.pid);
-      const guard = evaluateOnlineGuard({ userConfirmedOffline: this.userConfirmedOffline, remoteConnections: evidence, acceptedConnectionBaseline: this.acceptedConnectionBaseline });
+      const guard = evaluateWriteConsent({
+        userConfirmedOffline: this.userConfirmedOffline,
+        remoteConnections: evidence,
+      });
 
       // Stale: stopped/replaced while awaiting the guard check.
       if (generation !== this.freezeGeneration || !this.freeze?.active) return;

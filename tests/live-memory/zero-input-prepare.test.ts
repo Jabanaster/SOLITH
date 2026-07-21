@@ -112,27 +112,34 @@ describe('zero-input-prepare', () => {
     assert.equal(session.isAttached(), false);
   });
 
-  test('prepareZeroInputSession blocks online guard', async () => {
+  test('prepareZeroInputSession allows with waiver even when remote connections present (Trust Shift)', async () => {
     const driver = new FakeMemoryDriver({ '4352': 50 });
     driver.setProcessExecutableName(1234, 'Demo.exe');
+    driver.addModule('Demo.exe', 0x1000n, 0x1000);
     const session = new LiveMemorySession(driver);
     session._injectRemoteConnectionObserver(async () => ONLINE);
+    const audit = new MemoryAuditLog();
 
-    const result = await prepareZeroInputSession(session, {
-      detection: {
-        catalogGameId: 'demo',
-        displayName: 'Demo',
-        pid: 1234,
-        executable: 'Demo.exe',
+    const result = await prepareZeroInputSession(
+      session,
+      {
+        detection: {
+          catalogGameId: 'demo',
+          displayName: 'Demo',
+          pid: 1234,
+          executable: 'Demo.exe',
+        },
+        definition: makeDefinition(),
+        userConfirmedOffline: true,
+        remoteConnections: ONLINE,
+        executableHashSHA256: 'abcd' + '1'.repeat(60),
       },
-      definition: makeDefinition(),
-      userConfirmedOffline: true,
-      remoteConnections: ONLINE,
-      executableHashSHA256: 'abcd' + '1'.repeat(60),
-    });
+      audit,
+    );
 
-    assert.equal(result.success, false);
-    assert.match(result.error ?? '', /online|connection|guard|remote/i);
+    assert.equal(result.success, true);
+    assert.equal(session.isAttached(), true);
+    assert.match(result.plan.guard.reason, /advisory/i);
   });
 
   test('prepareZeroInputSession attaches and resolves pointer + marks scan_required', async () => {

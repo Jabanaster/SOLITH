@@ -1,5 +1,11 @@
 export * from './types.js';
 export { evaluateOnlineGuard } from './online-guard.js';
+export { evaluateWriteConsent } from './write-consent.js';
+export {
+  SinglePlayerWaiverStore,
+  SINGLE_PLAYER_WAIVER_COPY,
+} from './single-player-waiver.js';
+export type { WaiverRecord, WaiverStoreFile } from './single-player-waiver.js';
 export { observeRemoteConnections } from './remote-connection-observer.js';
 export { nativeMemoryDriver, listLiveMemoryProcesses } from './native-memory-driver.js';
 export type { LiveProcessListEntry } from './native-memory-driver.js';
@@ -112,3 +118,21 @@ export type {
   WritePolicyContext,
   WriteClass,
 } from './write-policy.js';
+export {
+  promoteCandidateFromCtEntry,
+  promoteCandidateFromFeature,
+  buildLiveToggleCards,
+  RESEARCH_PROMOTE_SEED_KEY,
+} from './ct-promote.js';
+export type {
+  CtPromoteCandidate,
+  LiveToggleCard,
+  ResearchPromoteSeed,
+} from './ct-promote.js';
+export {
+  buildLocalTrainerPack,
+  serializeLocalTrainerPack,
+  parseLocalTrainerPack,
+  LOCAL_PACK_SCHEMA_VERSION,
+} from './local-pack-export.js';
+export type { LocalTrainerPack } from './local-pack-export.js';

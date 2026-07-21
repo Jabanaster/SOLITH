@@ -52,12 +52,18 @@ export class MemoryManager {
     return this.writePolicyContext ?? defaultTrainerWritePolicyContext();
   }
 
+  private waiverAssumedForAudit(): boolean {
+    const ctx = this.getWritePolicyContext();
+    return ctx.singlePlayerWaiverAccepted === true || ctx.isOffline === true;
+  }
+
   private enforceWritePolicy(reason: string): { ok: true } | { ok: false; error: string; code: string } {
     const decision = this.writeGate.evaluate(this.getWritePolicyContext());
     if (decision.allow) return { ok: true };
     this.audit.append({
       op: 'abort',
       reason: `write_policy:${decision.code}:${reason}:${decision.reasons.join(';')}`,
+      waiverAssumed: this.waiverAssumedForAudit(),
     });
     return { ok: false, error: `write_policy_denied:${decision.code}`, code: decision.code };
   }
@@ -112,6 +118,7 @@ export class MemoryManager {
       valueBefore: proposal.currentValue,
       valueAfter: proposal.requestedValue,
       reason: `${options.reason ?? 'propose'}:proposed`,
+      waiverAssumed: true,
     });
     return proposal;
   }
@@ -143,6 +150,7 @@ export class MemoryManager {
       valueBefore: confirm.manifest?.valueBefore,
       valueAfter: confirm.manifest?.valueAfter,
       reason: `${options.reason ?? 'confirm'}:confirmed`,
+      waiverAssumed: true,
     });
     this.emitSnapshot({ featureId: options.featureId, reason: options.reason ?? 'confirm' });
     return confirm;
@@ -184,6 +192,7 @@ export class MemoryManager {
       valueBefore: proposal.currentValue,
       valueAfter: proposal.requestedValue,
       reason: `${reason}:proposed`,
+      waiverAssumed: true,
     });
 
     const confirm = await this.session.confirmWrite(proposal.proposalId);
@@ -196,6 +205,7 @@ export class MemoryManager {
         valueBefore: proposal.currentValue,
         valueAfter: proposal.requestedValue,
         reason: confirm.error ?? 'confirm_failed',
+        waiverAssumed: this.waiverAssumedForAudit(),
       });
       return { success: false, proposal, confirm, error: confirm.error };
     }
@@ -208,6 +218,7 @@ export class MemoryManager {
       valueBefore: confirm.manifest?.valueBefore,
       valueAfter: confirm.manifest?.valueAfter,
       reason: `${reason}:confirmed`,
+      waiverAssumed: true,
     });
     this.emitSnapshot({ featureId: options.featureId, reason });
 
@@ -251,6 +262,7 @@ export class MemoryManager {
       valueBefore: manifest.valueAfter,
       valueAfter: manifest.valueBefore,
       reason: result.success ? 'rollback_ok' : (result.error ?? 'rollback_failed'),
+      waiverAssumed: result.success ? true : this.waiverAssumedForAudit(),
     });
     return result;
   }

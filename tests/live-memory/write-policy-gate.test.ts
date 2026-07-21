@@ -15,7 +15,7 @@ describe('Phase 10 WritePolicyGate', () => {
     const gate = new WritePolicyGate();
     const decision = gate.evaluate({
       writeClass: 'research_probe',
-      isOffline: true,
+      singlePlayerWaiverAccepted: true,
       hasBackupSnapshot: true,
       userApproved: true,
       researchWriteModeEnabled: false,
@@ -28,7 +28,7 @@ describe('Phase 10 WritePolicyGate', () => {
     const gate = new WritePolicyGate();
     const decision = gate.evaluate({
       writeClass: 'research_probe',
-      isOffline: true,
+      singlePlayerWaiverAccepted: true,
       hasBackupSnapshot: false,
       userApproved: true,
       researchWriteModeEnabled: true,
@@ -43,10 +43,10 @@ describe('Phase 10 WritePolicyGate', () => {
     assert.equal(decision.allow, true);
   });
 
-  test('denies online / no approval / read-only', () => {
+  test('denies research / no approval / read-only / no waiver', () => {
     const gate = new WritePolicyGate();
     assert.equal(
-      gate.evaluate(defaultTrainerWritePolicyContext({ isOffline: false })).allow,
+      gate.evaluate(defaultTrainerWritePolicyContext({ singlePlayerWaiverAccepted: false })).allow,
       false,
     );
     assert.equal(
@@ -74,7 +74,7 @@ describe('Phase 10 WritePolicyGate', () => {
     const manager = new MemoryManager(session, audit);
     manager.setWritePolicyContext({
       writeClass: 'research_probe',
-      isOffline: true,
+      singlePlayerWaiverAccepted: true,
       hasBackupSnapshot: false,
       userApproved: true,
       researchWriteModeEnabled: true,
