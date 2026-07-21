@@ -8,6 +8,7 @@ import {
   removeWatchListBookmark,
   type WatchListBookmark,
 } from '../live-memory/watch-list-bookmarks.js';
+import AddressDataResearchPanel from '../components/AddressDataResearchPanel.js';
 
 interface ProcessEntry {
   pid: number;
@@ -845,6 +846,14 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
             </p>
           )}
         </section>
+      )}
+
+      {attached && (
+        <AddressDataResearchPanel
+          attached={attached}
+          processName={attachedExecutable || 'unknown'}
+          pid={selectedPid}
+        />
       )}
 
       {message && <p className="v2-message" role="status">{message}</p>}

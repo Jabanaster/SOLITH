@@ -18,6 +18,7 @@ import type {
 } from '../../core/in-process-script/types.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
+import AddressDataResearchPanel from '../components/AddressDataResearchPanel.js';
 
 interface ProcessEntry {
   pid: number;
@@ -885,6 +886,16 @@ const ExternalTrainerResearchLab: React.FC = () => {
               Attach
             </button>
           </div>
+        </div>
+      )}
+
+      {attached && (
+        <div className="glass" style={{ padding: '20px', marginBottom: '16px', border: '1px solid #2d3a5c' }}>
+          <AddressDataResearchPanel
+            attached={attached}
+            processName={attachedExecutable || 'unknown'}
+            pid={selectedPid}
+          />
         </div>
       )}
 

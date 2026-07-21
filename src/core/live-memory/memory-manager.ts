@@ -1,5 +1,6 @@
 /**
  * MemoryManager — safe-write facade over LiveMemorySession + local audit log.
+ * Phase 10: optional WritePolicyGate checked before propose/confirm/safeWrite.
  */
 
 import type { MemoryAuditLog } from './audit-log.js';
@@ -9,6 +10,11 @@ import type {
   RollbackResult,
 } from './live-memory-session.js';
 import type { LiveMemoryAddress, LiveWriteManifest, LiveWriteProposal } from './types.js';
+import {
+  WritePolicyGate,
+  defaultTrainerWritePolicyContext,
+  type WritePolicyContext,
+} from './write-policy.js';
 
 export interface SafeWriteResult {
   success: boolean;
@@ -17,6 +23,7 @@ export interface SafeWriteResult {
   verified?: boolean;
   readbackValue?: number;
   error?: string;
+  policyCode?: string;
 }
 
 /** Optional hook after a confirmed process write (e.g. Avowed WinGDK save snapshot). */
@@ -27,11 +34,33 @@ export type MemoryManagerSnapshotListener = (info: {
 
 export class MemoryManager {
   private snapshotListener: MemoryManagerSnapshotListener | null = null;
+  private readonly writeGate = new WritePolicyGate();
+  /** When null, trainer default context is used (existing product path). */
+  private writePolicyContext: WritePolicyContext | null = null;
 
   constructor(
     private readonly session: LiveMemorySession,
     private readonly audit: MemoryAuditLog,
   ) {}
+
+  /** Override write policy (e.g. research_probe). Null restores trainer defaults. */
+  setWritePolicyContext(context: WritePolicyContext | null): void {
+    this.writePolicyContext = context;
+  }
+
+  getWritePolicyContext(): WritePolicyContext {
+    return this.writePolicyContext ?? defaultTrainerWritePolicyContext();
+  }
+
+  private enforceWritePolicy(reason: string): { ok: true } | { ok: false; error: string; code: string } {
+    const decision = this.writeGate.evaluate(this.getWritePolicyContext());
+    if (decision.allow) return { ok: true };
+    this.audit.append({
+      op: 'abort',
+      reason: `write_policy:${decision.code}:${reason}:${decision.reasons.join(';')}`,
+    });
+    return { ok: false, error: `write_policy_denied:${decision.code}`, code: decision.code };
+  }
 
   getAuditLog(): MemoryAuditLog {
     return this.audit;
@@ -70,6 +99,10 @@ export class MemoryManager {
     requestedValue: number,
     options: { featureId?: string; reason?: string } = {},
   ): LiveWriteProposal {
+    const gate = this.enforceWritePolicy(options.reason ?? 'propose');
+    if (!gate.ok) {
+      throw new Error(gate.error);
+    }
     const proposal = this.session.proposeWrite(address, requestedValue);
     this.audit.append({
       op: 'write',
@@ -87,6 +120,10 @@ export class MemoryManager {
     proposalId: string,
     options: { featureId?: string; reason?: string } = {},
   ): Promise<ConfirmWriteResult> {
+    const gate = this.enforceWritePolicy(options.reason ?? 'confirm');
+    if (!gate.ok) {
+      return { success: false, error: gate.error };
+    }
     const confirm = await this.session.confirmWrite(proposalId);
     if (!confirm.success) {
       this.audit.append({
@@ -120,6 +157,10 @@ export class MemoryManager {
     options: { featureId?: string; reason?: string; verifyReadback?: boolean } = {},
   ): Promise<SafeWriteResult> {
     const reason = options.reason ?? 'safe_write';
+    const gate = this.enforceWritePolicy(reason);
+    if (!gate.ok) {
+      return { success: false, error: gate.error, policyCode: gate.code };
+    }
     let proposal: LiveWriteProposal;
     try {
       proposal = this.session.proposeWrite(address, requestedValue);

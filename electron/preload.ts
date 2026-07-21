@@ -225,6 +225,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
+
+  // Phase 9 — read-only address/data research tools
+  researchView: (payload: { address: string; types: string[] }) =>
+    ipcRenderer.invoke('research:view', payload),
+  researchHex: (payload: { address: string; size?: number }) =>
+    ipcRenderer.invoke('research:hex', payload),
+  researchPointerAnalyze: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
+    ipcRenderer.invoke('research:pointer-analyze', payload),
+  researchSnapshotDiff: (payload: { old: unknown; new: unknown }) =>
+    ipcRenderer.invoke('research:snapshot-diff', payload),
+  researchSnapshotSave: (payload: { snapshot: unknown; label?: string }) =>
+    ipcRenderer.invoke('research:snapshot-save', payload),
+
   inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-propose-hook', payload),
   inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) =>

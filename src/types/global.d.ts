@@ -393,6 +393,52 @@ interface Window {
       address?: string;
       error?: string;
     }>;
+    /** Phase 9 — typed reinterpret at one address (read-only). */
+    researchView: (payload: { address: string; types: string[] }) => Promise<{
+      success: boolean;
+      entries?: Array<{ address: string; type: string; value: number | string | null; readable: boolean }>;
+      error?: string;
+    }>;
+    researchHex: (payload: { address: string; size?: number }) => Promise<{
+      success: boolean;
+      window?: {
+        address: string;
+        size: number;
+        hexRows: Array<{ offset: number; hex: string; ascii: string }>;
+        truncated: boolean;
+        readable: boolean;
+        error?: string;
+      };
+      error?: string;
+    }>;
+    researchPointerAnalyze: (payload: {
+      address: string;
+      maxDepth?: number;
+      maxOffsetPerLevel?: number;
+    }) => Promise<{
+      success: boolean;
+      report?: import('../core/live-memory/research/pointer-candidate-analysis.js').PointerCandidateReport;
+      levelsSearched?: number;
+      scansPerformed?: number;
+      error?: string;
+    }>;
+    researchSnapshotDiff: (payload: {
+      old: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+      new: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+    }) => Promise<{
+      success: boolean;
+      diff?: import('../core/live-memory/research/session-snapshot.js').SessionSnapshotDiff;
+      error?: string;
+    }>;
+    researchSnapshotSave: (payload: {
+      snapshot: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+      label?: string;
+    }) => Promise<{
+      success: boolean;
+      filePath?: string;
+      snapshot?: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
+      error?: string;
+    }>;
     inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) => Promise<{
       success: boolean;
       proposal?: import('../core/in-process-script/types.js').HookInstallProposal;

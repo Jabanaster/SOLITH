@@ -22,6 +22,11 @@ import {
   LiveMemoryResolveDefinitionFeatureSchema,
   LiveMemoryPointerScanSchema,
   LiveMemoryScanAobSchema,
+  ResearchViewSchema,
+  ResearchHexSchema,
+  ResearchPointerAnalyzeSchema,
+  ResearchSnapshotDiffSchema,
+  ResearchSnapshotSaveSchema,
   InProcessProposeHookSchema,
   InProcessConfirmHookSchema,
   InProcessProposeInjectorSchema,
@@ -595,6 +600,137 @@ export function registerLiveMemoryIpc(): void {
       return { success: true, found: true, address: result.address };
     } catch (error) {
       return { success: false, error: sanitize(error, 'aob_scan_failed') };
+    }
+  });
+
+  // ── Phase 9 research tools (read-only) ─────────────────────────────────────
+
+  ipcMain.handle('research:view', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = ResearchViewSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const mod = await getLiveMemoryModule();
+      const { driver, handle } = bundle.session.getMemoryAccessOrThrow();
+      const viewer = new mod.MemoryViewer(driver);
+      const entries = viewer.readTypedValues(handle, parsed.address, parsed.types);
+      bundle.audit.append({
+        op: 'read',
+        address: parsed.address,
+        reason: 'research:view',
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, entries };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'research_view_failed') };
+    }
+  });
+
+  ipcMain.handle('research:hex', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = ResearchHexSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const mod = await getLiveMemoryModule();
+      const { driver, handle } = bundle.session.getMemoryAccessOrThrow();
+      const inspector = new mod.HexInspector(driver);
+      const window = inspector.inspect(handle, parsed.address, parsed.size);
+      bundle.audit.append({
+        op: 'read',
+        address: parsed.address,
+        reason: `research:hex:size=${window.size}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, window };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'research_hex_failed') };
+    }
+  });
+
+  ipcMain.handle('research:pointer-analyze', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = ResearchPointerAnalyzeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const mod = await getLiveMemoryModule();
+      const scanResult = bundle.session.pointerScan(BigInt(parsed.address), {
+        maxDepth: parsed.maxDepth,
+        maxOffsetPerLevel: parsed.maxOffsetPerLevel,
+      });
+      const analyzer = new mod.PointerCandidateAnalyzer();
+      const report = analyzer.analyze(parsed.address, scanResult.candidates, {
+        truncated: scanResult.truncated,
+      });
+      bundle.audit.append({
+        op: 'scan',
+        address: parsed.address,
+        reason: `research:pointer-analyze:candidates=${report.candidateCount}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return {
+        success: true,
+        report,
+        levelsSearched: scanResult.levelsSearched,
+        scansPerformed: scanResult.scansPerformed,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'research_pointer_analyze_failed') };
+    }
+  });
+
+  ipcMain.handle('research:snapshot-diff', async (event, payload: unknown) => {
+    try {
+      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const parsed = ResearchSnapshotDiffSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const mod = await getLiveMemoryModule();
+      const mgr = new mod.SessionSnapshotManager();
+      const diff = mgr.diff(parsed.old, parsed.new);
+      return { success: true, diff };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'research_snapshot_diff_failed') };
+    }
+  });
+
+  ipcMain.handle('research:snapshot-save', async (event, payload: unknown) => {
+    try {
+      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const parsed = ResearchSnapshotSaveSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const sessionsRoot = path.join(app.getPath('userData'), 'research-sessions');
+      const mod = await getLiveMemoryModule();
+      const mgr = new mod.SessionSnapshotManager();
+      const snap = mgr.create({
+        pid: parsed.snapshot.pid,
+        processName: parsed.snapshot.processName,
+        watchlist: parsed.snapshot.watchlist,
+        matchSetIds: parsed.snapshot.matchSetIds,
+        moduleBases: parsed.snapshot.moduleBases,
+        notes: parsed.snapshot.notes,
+        pointerTarget: parsed.snapshot.pointerTarget,
+        timestamp: parsed.snapshot.timestamp,
+      });
+      const filePath = mgr.saveToDirectory(sessionsRoot, snap, parsed.label);
+      const attached = sessions.get(event.sender.id);
+      if (attached?.session.isAttached()) {
+        attached.audit.append({
+          op: 'read',
+          reason: `research:snapshot-save:${path.basename(filePath)}`,
+          pid: attached.session.getAttachedPid() ?? snap.pid,
+          executableName: attached.session.getAttachedExecutableName() ?? snap.processName,
+        });
+      }
+      return { success: true, filePath, snapshot: snap };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'research_snapshot_save_failed') };
     }
   });
 

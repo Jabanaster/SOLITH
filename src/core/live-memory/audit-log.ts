@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export type MemoryAuditOp = 'read' | 'write' | 'rollback' | 'resolve' | 'attach' | 'abort';
+export type MemoryAuditOp = 'read' | 'write' | 'rollback' | 'resolve' | 'attach' | 'abort' | 'scan';
 
 export interface MemoryAuditEntry {
   at: string;

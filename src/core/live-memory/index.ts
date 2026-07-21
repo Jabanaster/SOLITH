@@ -79,3 +79,36 @@ export type {
   DualReadLiveResolveResult,
   LiveControlSource,
 } from './dual-read-controls.js';
+export {
+  MemoryViewer,
+  HexInspector,
+  PointerCandidateAnalyzer,
+  SessionSnapshotManager,
+  parseResearchAddress,
+} from './research/index.js';
+export type {
+  ResearchDataType,
+  MemoryViewEntry,
+  MemoryRegionSummary,
+  MemoryRegionList,
+  HexWindow,
+  HexRow,
+  PointerCandidateReport,
+  PointerConfidence,
+  ScoredPointerPath,
+  SessionSnapshot,
+  SnapshotWatchItem,
+  SnapshotModuleBase,
+  SessionSnapshotDiff,
+} from './research/index.js';
+export {
+  WritePolicyGate,
+  defaultTrainerWritePolicyContext,
+  researchProbeWritePolicyContext,
+} from './write-policy.js';
+export type {
+  WriteGateDecision,
+  WriteGateCode,
+  WritePolicyContext,
+  WriteClass,
+} from './write-policy.js';

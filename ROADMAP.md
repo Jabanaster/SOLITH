@@ -99,6 +99,8 @@ Shipped on `cursor/phase3-hub-sync-trust-ui` (tip `05b5490` and ancestors). Thes
 | Phase 3 Hub Sync Orchestrator & Trust UI | **Done** | Opt-in community sync polling, Catalog trust UI, PII sanitization / L0 quarantine |
 | Core engine hardening | **Done** | Fuzzy AOB drift recovery, local crash reporter, local sandbox scaffold |
 | Solith rebrand + opening cinematic | **Done** | Product rename + UI cinematic integration |
+| Phase 9 Address/Data Research Tools | **Done** | Read-only viewer/hex/pointer/snapshot — `Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md` |
+| Phase 10 Gated Write Architecture | **Done** | `WritePolicyGate` + MemoryManager enforce; researchWriteMode default OFF; `Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md` |
 
 Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** until live AOB/pointer evidence. Live elevation playbook: `Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`.
 
@@ -131,13 +133,17 @@ Avowed ships Steam + WinGDK executables at **L0** only (no `signature` / `baseOf
 - ~~schema.v1 Phase 0→5~~ — **on master**
 - ~~Atomfall L3 live baseline~~ — **on master** (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`)
 - ~~Zero-Input loop / Avowed L0 + WinGDK backups / Hub sync+trust / engine harden / Solith rebrand~~ — **on `cursor/phase3-hub-sync-trust-ui`**
+- ~~Phase 9 address/data research tools (view/hex/pointer report/session snapshot, read-only)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`)
+- ~~Phase 10 gated write architecture (policy scaffold; researchWriteMode default OFF)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`)
 - Remaining S / U live titles still require game sessions (Avowed first)
 
 See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.
 Run **`npm run verify:schema-v1-boundaries`** and **`npm run orphan-check`** before merge.  
 See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
 See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.  
-See **`Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`** for Avowed L0 → L2/L3 live elevation.
+See **`Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`** for Avowed L0 → L2/L3 live elevation.  
+See **`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`** for read-only research IPC/UI.  
+See **`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`** for write policy gate + residual risks.
 
 ---
 
