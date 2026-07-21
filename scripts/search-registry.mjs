@@ -75,10 +75,12 @@ const results = searchRegistry(registry, {
   module: arg('module'),
   valueType: arg('value-type'),
   source: arg('source'),
+  symbol: arg('symbol'),
   scanType: arg('scan-type'),
   pattern: arg('pattern'),
   warnings: has('warnings') ? true : undefined,
   duplicate: has('duplicates') ? true : undefined,
+  excludeRejected: has('exclude-rejected') ? true : undefined,
 });
 
 output(results, arg('format', 'text'));

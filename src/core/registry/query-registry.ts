@@ -14,10 +14,14 @@ export interface RegistrySearchQuery {
   module?: string;
   valueType?: string;
   source?: string;
+  /** Partial / case-insensitive match against AOB symbol or pointer title. */
+  symbol?: string;
   scanType?: string;
   pattern?: string;
   warnings?: boolean;
   duplicate?: boolean;
+  /** When true, omit rejection-type results from the result set. */
+  excludeRejected?: boolean;
 }
 
 export interface RegistrySourceLink {
@@ -211,6 +215,15 @@ function matches(result: RegistrySearchResult, query: RegistrySearchQuery): bool
   ];
 
   if (!includesText(textFields, query.text)) return false;
+  if (query.symbol) {
+    const symbolHaystack =
+      result.type === 'aob'
+        ? result.title
+        : result.type === 'pointer'
+          ? result.title
+          : `${result.title} ${result.description}`;
+    if (!lower(symbolHaystack).includes(lower(query.symbol))) return false;
+  }
   if (query.module && lower(result.module) !== lower(query.module)) return false;
   if (query.valueType && lower(result.valueType) !== lower(query.valueType)) return false;
   if (query.source && !includesText([result.source.sourceEntryDescription, result.source.sourcePath], query.source)) return false;
@@ -232,6 +245,7 @@ export function searchRegistry(
   const types = requestedTypes(query);
   return allResults(registry)
     .filter((result) => types.has(result.type))
+    .filter((result) => !(query.excludeRejected && result.type === 'rejection'))
     .filter((result) => matches(result, query))
     .sort((a, b) => {
       const typeOrder: Record<RegistryResultType, number> = { pointer: 0, aob: 1, script: 2, rejection: 3 };

@@ -87,12 +87,19 @@ describe('registry query layer', () => {
     assert.match(moduleless?.warnings.join('\n') ?? '', /does not declare a module/);
   });
 
-  test('filters rejected entries and resolves entries by id with source linkage', async () => {
+  test('filters by symbol and can exclude rejections', async () => {
     const { registry } = await makeRegistry();
+
+    assert.equal(searchRegistry(registry, { symbol: 'playerHea', type: 'aob' })[0]?.title, 'playerHealth');
+    assert.equal(searchRegistry(registry, { symbol: 'Player Health', type: 'pointer' }).length, 1);
+    const withRejections = searchRegistry(registry, { text: 'Malformed' });
+    assert.ok(withRejections.some((r) => r.type === 'rejection'));
+    const withoutRejections = searchRegistry(registry, { text: 'Malformed', excludeRejected: true });
+    assert.ok(withoutRejections.every((r) => r.type !== 'rejection'));
+    assert.ok(withoutRejections.length < withRejections.length);
 
     const rejection = searchRegistry(registry, { type: 'rejection', text: 'Malformed Script' })[0];
     assert.equal(rejection?.source.sourceEntryDescription, 'Malformed Script');
-
     const aob = searchRegistry(registry, { type: 'aob', text: 'playerHealth' })[0];
     assert.ok(aob);
     assert.equal(getRegistryEntry(registry, aob!.id)?.source.sourceEntryDescription, 'Health Script');

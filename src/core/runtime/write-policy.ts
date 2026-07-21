@@ -17,7 +17,13 @@ export interface WriteFeatureDeclaration {
   executableHashMatched: boolean;
   ambiguousAobMatches: boolean;
   explicitProcessSelected: boolean;
-  offlineGuardPassed: boolean;
+  /**
+   * Trust Shift: single-player / private-play waiver accepted.
+   * Legacy name `offlineGuardPassed` remains accepted as an alias in validateWriteFeatureDeclaration.
+   */
+  singlePlayerWaiverAccepted?: boolean;
+  /** @deprecated Prefer singlePlayerWaiverAccepted */
+  offlineGuardPassed?: boolean;
   userApprovalCaptured: boolean;
   certifiedOrGated: boolean;
   auditLogWritten: boolean;
@@ -36,7 +42,9 @@ export interface WritePolicyValidation {
 export function validateWriteFeatureDeclaration(feature: WriteFeatureDeclaration): WritePolicyValidation {
   const blockers: string[] = [];
   if (!feature.explicitProcessSelected) blockers.push('Game process was not explicitly selected.');
-  if (!feature.offlineGuardPassed) blockers.push('Offline guard did not pass.');
+  const waiverOk =
+    feature.singlePlayerWaiverAccepted === true || feature.offlineGuardPassed === true;
+  if (!waiverOk) blockers.push('Single-player / private-play waiver was not accepted.');
   if (!feature.userApprovalCaptured) blockers.push('User approval was not captured.');
   if (!feature.certifiedOrGated) blockers.push('Feature is not certified or gated for write-capable use.');
   if (!feature.auditLogWritten) blockers.push('Audit log entry was not written.');

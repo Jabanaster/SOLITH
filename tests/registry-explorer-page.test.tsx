@@ -69,10 +69,11 @@ describe('RegistryExplorerPage', () => {
     assert.match(html, /Solith does not execute Auto Assembler text here/);
   });
 
-  test('renders no-registry empty state', () => {
+  test('renders no-registry empty state with load affordance', () => {
     const html = renderToStaticMarkup(<RegistryExplorerPage />);
 
     assert.match(html, /No registry loaded/);
+    assert.match(html, /Load compiled registry JSON/);
     assert.match(html, /display-only|does not execute/i);
   });
 });

@@ -101,6 +101,7 @@ Shipped on `cursor/phase3-hub-sync-trust-ui` (tip `05b5490` and ancestors). Thes
 | Solith rebrand + opening cinematic | **Done** | Product rename + UI cinematic integration |
 | Phase 9 Address/Data Research Tools | **Done** | Read-only viewer/hex/pointer/snapshot — `Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md` |
 | Phase 10 Gated Write Architecture | **Done** | `WritePolicyGate` + MemoryManager enforce; researchWriteMode default OFF; Trust Shift waiver replaces connection-count write blocks — `Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md` |
+| Inert CT Registry Framework (Phases 1–10) | **Done** | Query/schema/CLI/UI + static research + read-only runtime + gated writes — `Docs/Architecture/INERT_CT_REGISTRY_BLUEPRINT.md` |
 | Trust Shift + CT→Live Phases 2–4 | **Done** | Waiver consent; `CtLiveResolution`; toggle cards; pointer table / What-Changed; local pack export — `Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md` |
 
 Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** until live AOB/pointer evidence. Live elevation playbook: `Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`.

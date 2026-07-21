@@ -6,6 +6,8 @@ export interface OffsetReference { expression: string; symbol?: string; offset: 
 export interface EnableDisableSummary { hasEnable: boolean; hasDisable: boolean; enableLine?: number; disableLine?: number; balanced: boolean }
 
 export interface AobResearchRecord {
+  /** Blueprint alias for the inert script catalog id. */
+  signatureId: string;
   scriptId: string;
   scriptName: string;
   allocations: AllocationRecord[];
@@ -97,6 +99,7 @@ export function enrichCeScript(entry: CtRawScriptCatalogEntry, index = 0): AobRe
   }
 
   return {
+    signatureId: scriptId(entry, index),
     scriptId: scriptId(entry, index),
     scriptName: entry.name,
     allocations,
