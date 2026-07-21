@@ -3,6 +3,8 @@ export interface RuntimeProcessSummary {
   executableName: string;
   executablePath?: string;
   selectedByUser: boolean;
+  /** Optional override; defaults to host process platform in adapters. */
+  platform?: NodeJS.Platform;
 }
 
 export function assertExplicitProcessSelection(process: RuntimeProcessSummary): void {

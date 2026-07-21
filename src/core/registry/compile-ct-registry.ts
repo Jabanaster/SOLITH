@@ -3,11 +3,8 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { parseCheatTableXml, type CtImportResult } from '../definitions/ct-import.js';
 import { extractAOBsFromCatalog } from '../script-research/aob-parser.js';
-import {
-  extractCheatTableRawScriptCatalog,
-  type CtRawScriptCatalog,
-} from '../script-research/ct-script-research.js';
-import type { ExtractedAobSignature } from '../script-research/types.js';
+import { extractCheatTableRawScriptCatalog } from '../script-research/ct-script-research.js';
+import type { CtRawScriptCatalog, ExtractedAobSignature } from '../script-research/types.js';
 import { REGISTRY_SCHEMA_VERSION, type RegistryArtifactMetadata } from './schema.js';
 import { assertValidRegistryArtifact } from './validate-registry.js';
 

@@ -189,7 +189,9 @@ function allResults(registry: CompiledCtRegistry): RegistrySearchResult[] {
   return [
     ...registry.pointers.accepted.map((pointer) => pointerResult(registry, pointer)),
     ...registry.aobSignatures.map((signature) => aobResult(registry, signature)),
-    ...registry.scripts.scripts.map((script, index) => scriptResult(registry, script, index)),
+    ...registry.scripts.scripts.map((script: CtRawScriptCatalogEntry, index: number) =>
+      scriptResult(registry, script, index),
+    ),
     ...registry.rejections.map((rejection, index) => rejectionResult(registry, rejection, index)),
   ];
 }

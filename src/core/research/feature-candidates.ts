@@ -1,4 +1,5 @@
 import type { CompiledCtRegistry } from '../registry/load-registry.js';
+import type { CtRawScriptCatalogEntry } from '../script-research/types.js';
 
 export type FeatureCandidateConfidence = 'low' | 'medium' | 'high';
 export type FeatureCandidateStatus = 'unreviewed' | 'reviewed' | 'rejected' | 'confirmed';
@@ -48,7 +49,7 @@ export function deriveFeatureCandidates(registry: CompiledCtRegistry): FeatureCa
         hasTerm(`${signature.symbol} ${signature.sourceEntryDescription} ${signature.sourcePath}`, term),
       ),
     );
-    const scriptMatches = registry.scripts.scripts.filter((script) =>
+    const scriptMatches = registry.scripts.scripts.filter((script: CtRawScriptCatalogEntry) =>
       feature.terms.some((term) => hasTerm(`${script.name} ${script.path}`, term)),
     );
 
@@ -57,13 +58,13 @@ export function deriveFeatureCandidates(registry: CompiledCtRegistry): FeatureCa
     const sourceEntryIds = [
       ...new Set([
         ...aobMatches.map((signature) => signature.sourceEntryId).filter((id): id is string => Boolean(id)),
-        ...scriptMatches.map((script, index) => `ct-script-${index}-${slug(script.path)}`),
+        ...scriptMatches.map((script: CtRawScriptCatalogEntry, index: number) => `ct-script-${index}-${slug(script.path)}`),
       ]),
     ];
     const evidence = [
       ...pointerMatches.map((pointer) => `Pointer row matched "${pointer.name}".`),
       ...aobMatches.map((signature) => `AOB symbol/source matched "${signature.symbol}" from "${signature.sourceEntryDescription}".`),
-      ...scriptMatches.map((script) => `Script entry matched "${script.name}".`),
+      ...scriptMatches.map((script: CtRawScriptCatalogEntry) => `Script entry matched "${script.name}".`),
     ];
     const confidence: FeatureCandidateConfidence =
       pointerMatches.length + aobMatches.length >= 2

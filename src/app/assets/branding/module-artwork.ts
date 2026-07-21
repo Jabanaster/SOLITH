@@ -18,7 +18,8 @@ export type ModuleViewId =
   | 'trainer-library'
   | 'ct-library'
   | 'trainer-deck'
-  | 'catalog-save-controls';
+  | 'catalog-save-controls'
+  | 'registry-explorer';
 
 /**
  * Icon assignment:
@@ -45,6 +46,7 @@ export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtw
   recipes: 'hoodedProfile',
   'session-monitor': 'advancedDragon',
   'live-memory': 'advancedDragon',
+  'registry-explorer': 'hoodedProfile',
   'catalog-save-controls': 'saveTools',
 };
 
