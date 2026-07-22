@@ -104,6 +104,8 @@ describe('RegistryExplorerPage', () => {
     assert.match(html, /executable=false/);
     assert.match(html, /Zero-trust governance/);
     assert.match(html, /Quarantined script catalog/);
+    assert.match(html, /Run Read-Only Verification/);
+    assert.match(html, /Restart comparison/);
     assert.match(html, /cannot promote rows into Live Watch/);
     assert.match(html, /Solith does not execute Auto Assembler text here/);
   });

@@ -206,6 +206,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     offset?: number;
   }) => ipcRenderer.invoke('ct-library-search', payload),
   ctLibraryGameDetail: (payload: { gameId: string }) => ipcRenderer.invoke('ct-library-game-detail', payload),
+  registryRunReadOnlyVerification: (payload: {
+    registry: unknown;
+    pid: number;
+    executableName: string;
+    executablePath?: string;
+    timeoutMs?: number;
+  }) => ipcRenderer.invoke('registry-run-readonly-verification', payload),
+  registryCompareRestartArtifacts: (payload: { previous: unknown; current: unknown }) =>
+    ipcRenderer.invoke('registry-compare-restart-artifacts', payload),
   trainerResearchPickExe: () => ipcRenderer.invoke('trainer-research-pick-exe'),
   trainerResearchAnalyzeExe: (payload: { filePath: string }) =>
     ipcRenderer.invoke('trainer-research-analyze-exe', payload),

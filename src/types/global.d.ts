@@ -377,6 +377,23 @@ interface Window {
       tables: import('../core/registry/compile-ct-zip.js').CtZipCatalogEntry[];
       error?: string;
     }>;
+    registryRunReadOnlyVerification: (payload: {
+      registry: unknown;
+      pid: number;
+      executableName: string;
+      executablePath?: string;
+      timeoutMs?: number;
+    }) => Promise<{
+      success: boolean;
+      artifact?: import('../core/runtime/headless-verification.js').HeadlessVerificationArtifact;
+      artifactPath?: string;
+      error?: string;
+    }>;
+    registryCompareRestartArtifacts: (payload: { previous: unknown; current: unknown }) => Promise<{
+      success: boolean;
+      comparison?: import('../core/runtime/restart-validation.js').RestartValidationArtifact;
+      error?: string;
+    }>;
     liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) => Promise<{
       success: boolean;
       result?: {

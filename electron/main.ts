@@ -47,6 +47,7 @@ import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotk
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
+import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
@@ -80,6 +81,7 @@ registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();
 registerCtLibraryIpc();
+registerRegistryVerificationIpc();
 registerInstallDiscoveryIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();

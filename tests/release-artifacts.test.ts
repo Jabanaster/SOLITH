@@ -26,6 +26,7 @@ test('release artifact paths follow package productName and version', () => {
   assert.equal(path.basename(paths.installer), `Solith Setup ${pkg.version}.exe`);
   assert.equal(path.basename(paths.executable), 'Solith.exe');
   assert.equal(paths.unpackedHost.endsWith(path.join('app.asar.unpacked', 'dist-electron', 'host-entry.js')), true);
+  assert.ok(pkg.build.asarUnpack.includes('dist-electron/headless-verification-worker.js'));
 
   fs.rmSync(root, { recursive: true, force: true });
 });

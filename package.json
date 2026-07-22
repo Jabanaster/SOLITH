@@ -96,7 +96,8 @@
     "asarUnpack": [
       "node_modules/better-sqlite3/**",
       "node_modules/sql.js/**",
-      "dist-electron/host-entry.js"
+      "dist-electron/host-entry.js",
+      "dist-electron/headless-verification-worker.js"
     ],
     "extraResources": [
       {

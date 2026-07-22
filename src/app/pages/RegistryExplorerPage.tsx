@@ -11,6 +11,38 @@ interface RegistryExplorerPageProps {
 
 const TYPE_OPTIONS: Array<'all' | RegistryResultType> = ['all', 'pointer', 'aob', 'script', 'rejection'];
 
+interface RegistryVerificationArtifactView {
+  requestId: string;
+  readOnly: true;
+  executable: false;
+  process: { pid: number; executableName: string };
+  summary: {
+    aobSignatures: {
+      byStatus: {
+        unique_match: number;
+        multiple_matches: number;
+        no_match: number;
+      };
+    };
+    pointers: {
+      root_in_module_range: number;
+      root_out_of_module_range: number;
+    };
+  };
+}
+
+interface RestartComparisonView {
+  previousSessionId: string;
+  currentSessionId: string;
+  summary: {
+    restart_stable_unique: number;
+    hash_changed: number;
+    address_or_offset_changed: number;
+    missing: number;
+    not_unique: number;
+  };
+}
+
 function excerpt(text: string, needle: string, size = 360): string {
   if (!needle) return text.slice(0, size);
   const index = text.toLowerCase().indexOf(needle.toLowerCase());
@@ -90,7 +122,100 @@ function DetailPanel({ result, query }: { result: RegistrySearchResult | null; q
   );
 }
 
-function GovernanceDashboard({ pipeline }: { pipeline?: CtCompilerPipelineRegistry }) {
+function GovernanceDashboard({
+  pipeline,
+  registry,
+}: {
+  pipeline?: CtCompilerPipelineRegistry;
+  registry: CompiledCtRegistry;
+}) {
+  const [pidText, setPidText] = useState('');
+  const [executableName, setExecutableName] = useState('');
+  const [running, setRunning] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
+  const [artifact, setArtifact] = useState<RegistryVerificationArtifactView | null>(null);
+  const [artifactPath, setArtifactPath] = useState('');
+  const [previousArtifact, setPreviousArtifact] = useState<unknown | null>(null);
+  const [restartComparison, setRestartComparison] = useState<RestartComparisonView | null>(null);
+
+  const runVerification = async () => {
+    setVerificationError('');
+    setRestartComparison(null);
+    const pid = Number(pidText);
+    if (!Number.isInteger(pid) || pid <= 0) {
+      setVerificationError('Enter the explicitly selected process PID.');
+      return;
+    }
+    if (!executableName.trim()) {
+      setVerificationError('Enter the executable name for the selected PID.');
+      return;
+    }
+    if (!window.electronAPI?.registryRunReadOnlyVerification) {
+      setVerificationError('Read-only registry verification is only available inside Electron.');
+      return;
+    }
+
+    setRunning(true);
+    try {
+      const response = await window.electronAPI.registryRunReadOnlyVerification({
+        registry,
+        pid,
+        executableName: executableName.trim(),
+        timeoutMs: 30_000,
+      });
+      if (!response.success || !response.artifact) {
+        setVerificationError(response.error ?? 'Read-only verification failed.');
+        return;
+      }
+      setArtifact(response.artifact);
+      setArtifactPath(response.artifactPath ?? '');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const onLoadPreviousArtifact = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? ''));
+        setPreviousArtifact(parsed);
+        setRestartComparison(null);
+        setVerificationError('');
+      } catch (error) {
+        setPreviousArtifact(null);
+        setVerificationError(error instanceof Error ? error.message : String(error));
+      }
+    };
+    reader.onerror = () => setVerificationError('Could not read the previous verification artifact.');
+    reader.readAsText(file);
+  };
+
+  const compareRestart = async () => {
+    setVerificationError('');
+    if (!previousArtifact || !artifact) {
+      setVerificationError('Load a previous artifact and run a current verification before comparing restart stability.');
+      return;
+    }
+    if (!window.electronAPI?.registryCompareRestartArtifacts) {
+      setVerificationError('Restart comparison is only available inside Electron.');
+      return;
+    }
+    const response = await window.electronAPI.registryCompareRestartArtifacts({
+      previous: previousArtifact,
+      current: artifact,
+    });
+    if (!response.success || !response.comparison) {
+      setVerificationError(response.error ?? 'Restart comparison failed.');
+      return;
+    }
+    setRestartComparison(response.comparison);
+  };
+
+  const verificationSummary = artifact?.summary.aobSignatures.byStatus;
+
   if (!pipeline) {
     return (
       <section className="panel-card" aria-label="Governance dashboard">
@@ -187,6 +312,91 @@ function GovernanceDashboard({ pipeline }: { pipeline?: CtCompilerPipelineRegist
       <p className="safety-note">
         This dashboard is a read-only governance view. It cannot promote rows into Live Watch, enable scripts, or authorize memory writes.
       </p>
+
+      <section className="registry-verification-box" aria-label="Read-only verification controls">
+        <h4>Run Read-Only Verification</h4>
+        <p className="muted">
+          Explicit PID only. Solith opens a read/query-only process session in a background worker,
+          checks AOB signatures, performs pointer-root module-bound preflight, and writes a JSON artifact.
+        </p>
+        <div className="registry-verification-form">
+          <label>
+            Selected PID
+            <input
+              inputMode="numeric"
+              value={pidText}
+              onChange={(event) => setPidText(event.target.value)}
+              placeholder="12345"
+            />
+          </label>
+          <label>
+            Executable name
+            <input
+              value={executableName}
+              onChange={(event) => setExecutableName(event.target.value)}
+              placeholder="Game-Win64-Shipping.exe"
+            />
+          </label>
+          <button className="btn-primary" type="button" onClick={runVerification} disabled={running}>
+            {running ? 'Verifying…' : 'Run Read-Only Verification'}
+          </button>
+        </div>
+
+        {verificationError && (
+          <p className="v2-session-ended-notice" role="alert">
+            {verificationError}
+          </p>
+        )}
+
+        {artifact && verificationSummary && (
+          <div className="verification-result">
+            <h4>Latest artifact</h4>
+            <dl className="kv-grid">
+              <dt>Saved path</dt>
+              <dd>{artifactPath || 'not exported'}</dd>
+              <dt>Process</dt>
+              <dd>{artifact.process.executableName} · PID {artifact.process.pid}</dd>
+              <dt>Unique AOBs</dt>
+              <dd>{verificationSummary.unique_match}</dd>
+              <dt>Multiple AOBs</dt>
+              <dd>{verificationSummary.multiple_matches}</dd>
+              <dt>No match</dt>
+              <dd>{verificationSummary.no_match}</dd>
+              <dt>Pointer roots in module</dt>
+              <dd>{artifact.summary.pointers.root_in_module_range}</dd>
+              <dt>Pointer roots out of range</dt>
+              <dd>{artifact.summary.pointers.root_out_of_module_range}</dd>
+            </dl>
+          </div>
+        )}
+
+        <div className="restart-compare-box">
+          <h4>Restart comparison</h4>
+          <label>
+            Load previous verification artifact
+            <input type="file" accept="application/json,.json" onChange={onLoadPreviousArtifact} />
+          </label>
+          <button className="btn-secondary" type="button" onClick={compareRestart} disabled={!artifact || !previousArtifact}>
+            Compare Previous vs Current
+          </button>
+          {restartComparison && (
+            <dl className="kv-grid">
+              <dt>Previous session</dt>
+              <dd>{restartComparison.previousSessionId}</dd>
+              <dt>Current session</dt>
+              <dd>{restartComparison.currentSessionId}</dd>
+              <dt>L3 candidates</dt>
+              <dd>{restartComparison.summary.restart_stable_unique}</dd>
+              <dt>Hash changed</dt>
+              <dd>{restartComparison.summary.hash_changed}</dd>
+              <dt>Address changed</dt>
+              <dd>{restartComparison.summary.address_or_offset_changed}</dd>
+              <dt>Missing/not unique</dt>
+              <dd>{restartComparison.summary.missing + restartComparison.summary.not_unique}</dd>
+            </dl>
+          )}
+        </div>
+      </section>
     </section>
   );
 }
@@ -303,7 +513,7 @@ const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry: i
             </div>
           </section>
 
-          <GovernanceDashboard pipeline={registry.pipeline} />
+          <GovernanceDashboard pipeline={registry.pipeline} registry={registry} />
 
           <section className="panel-card">
             <label>
