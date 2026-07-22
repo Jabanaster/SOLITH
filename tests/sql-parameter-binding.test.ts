@@ -17,7 +17,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { resetForTesting } from '../src/core/database/index.ts';
+import { closeDatabaseSafely, resetForTesting } from '../src/core/database/index.ts';
 import db from '../src/core/database/index.ts';
 import {
   createProfile,
@@ -47,13 +47,14 @@ describe('SQL Parameter Binding — Hostile Value Tests', () => {
     seedGame(baseGameId, 'Base SQL Binding Game');
   });
 
-  after(() => {
+  after(async () => {
+    await closeDatabaseSafely();
     try {
       if (fs.existsSync(tempRoot)) {
         fs.rmSync(tempRoot, { recursive: true, force: true });
       }
-    } catch {
-      // ignore cleanup failures in test teardown
+    } catch (error) {
+      console.error('SQL binding test teardown cleanup failed:', error);
     }
   });
 

@@ -51,7 +51,9 @@ export class LuaAdapter implements TrainerAdapter {
         const content = fs.readFileSync(filePath, 'utf-8').trim();
         return content.startsWith('{') && content.includes('=');
       }
-    } catch {}
+    } catch (error) {
+      console.error(`Lua adapter support probe failed for "${filePath}":`, error);
+    }
     return false;
   }
 

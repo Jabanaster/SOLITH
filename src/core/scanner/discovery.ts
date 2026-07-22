@@ -95,7 +95,9 @@ export async function discoverSaveLocations(gameId: string): Promise<DiscoveredS
         }
       }
     }
-  } catch {}
+  } catch (error) {
+    console.error(`Failed to inspect install-path save folders for ${ctx.installPath}:`, error);
+  }
 
   // Bounded scan under common windows directories
   for (const root of roots) {
@@ -139,7 +141,9 @@ export async function discoverSaveLocations(gameId: string): Promise<DiscoveredS
                 saveFilesCount++;
               }
             });
-          } catch {}
+          } catch (error) {
+            console.error(`Failed to inspect save-like files under ${fullPath}:`, error);
+          }
 
           if (saveFilesCount > 0) {
             confidence = Math.min(100, confidence + 10);
@@ -165,7 +169,9 @@ export async function discoverSaveLocations(gameId: string): Promise<DiscoveredS
           });
         }
       }
-    } catch {}
+    } catch (error) {
+      console.error(`Failed to scan save discovery root ${root.path}:`, error);
+    }
   }
 
   // Deduplicate discovered folders based on canonicalPath

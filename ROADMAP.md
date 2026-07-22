@@ -4,7 +4,7 @@
 
 Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 
-* Local **`master` @ `528c243`** — `cursor/atomfall-l3-live-cert` fast-forward merged (2026-07-16)
+* Local **`master` @ `774ff7e`** — current local tree is dirty while hygiene / docs / test stabilization work is in progress
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -16,7 +16,7 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 | Blocker | Status |
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`npm test` / Electron output verifier) | **RESOLVED** — local Alpha gate **667/667** + Electron **19/19** @ `528c243` |
+| CI pipeline green (`npm test` / Electron output verifier) | **NEEDS RECHECK** — prior local Alpha gate evidence was updated to `774ff7e`, but current dirty tree requires a fresh full-suite run |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 
@@ -25,8 +25,8 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npm test` (Alpha tip) | **667/667 PASS** @ `528c243` |
-| Local `npm run build:electron` (Alpha tip) | **19/19 PASS** @ `528c243` |
+| Local `npm test` (Alpha tip) | **Needs fresh verification** @ `774ff7e` + current dirty tree |
+| Local `npm run build:electron` (Alpha tip) | **Needs fresh verification** @ `774ff7e` + current dirty tree |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
 | Atomfall L3 live cert branch | **Merged** `cursor/atomfall-l3-live-cert` → `master` |
 
@@ -84,12 +84,12 @@ Dual-Core Live Engine → Internal (Win32 VEH/Injection) + External (WinGDK RPM)
 | Save UX + live-memory/catalog harden | `a9483f6` |
 | Shell polish acceptance | tag `v2.1-shell-polish` → `0928d29` |
 | AG smoke + matrix + overlay bounds | `6ddefb8` / tag `v2.2-wemod-adoption` |
-| Atomfall L3 live evidence + harness | `528c243` / `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md` |
+| Atomfall L3 live evidence + harness | captured before current `774ff7e` baseline / `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md` |
 | Offline sweep + CI/honesty lock | `20739f5` + `ac43ec6` → **`master`** |
 
 ### Post-Alpha architecture — Done (branch tip)
 
-Shipped on `cursor/phase3-hub-sync-trust-ui` (tip `05b5490` and ancestors). These close product/architecture gaps; they do **not** fake live L2+ certs.
+Shipped on `master` before the current `774ff7e` baseline. These close product/architecture gaps; they do **not** fake live L2+ certs.
 
 | Item | Status | Evidence |
 |------|--------|----------|
@@ -134,10 +134,11 @@ Avowed ships Steam + WinGDK executables at **L0** only (no `signature` / `baseOf
 - ~~README L0 honesty + in-process user charter~~ — **on master**
 - ~~schema.v1 Phase 0→5~~ — **on master**
 - ~~Atomfall L3 live baseline~~ — **on master** (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`)
-- ~~Zero-Input loop / Avowed L0 + WinGDK backups / Hub sync+trust / engine harden / Solith rebrand~~ — **on `cursor/phase3-hub-sync-trust-ui`**
-- ~~Phase 9 address/data research tools (view/hex/pointer report/session snapshot, read-only)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`)
-- ~~Phase 10 gated write architecture (policy scaffold; researchWriteMode default OFF)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`)
-- ~~Trust Shift + CT→Live Phases 2–4 (waiver, promote/toggles, research UX, local packs)~~ — **on `cursor/phase3-hub-sync-trust-ui`** (`Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md`)
+- ~~Zero-Input loop / Avowed L0 + WinGDK backups / Hub sync+trust / engine harden / Solith rebrand~~ — **on `master`**
+- ~~Phase 9 address/data research tools (view/hex/pointer report/session snapshot, read-only)~~ — **on `master`** (`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`)
+- ~~Phase 10 gated write architecture (policy scaffold; researchWriteMode default OFF)~~ — **on `master`** (`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`)
+- ~~Trust Shift + CT→Live Phases 2–4 (waiver, promote/toggles, research UX, local packs)~~ — **on `master`** (`Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md`)
+- ~~Inert CT Registry Framework (Phases 1–10)~~ — **on `master`** via PR #4 (`Docs/Architecture/INERT_CT_REGISTRY_BLUEPRINT.md`)
 - Remaining S / U live titles still require game sessions (Avowed first)
 
 See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.

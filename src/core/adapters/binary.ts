@@ -18,7 +18,9 @@ export class BinaryAdapter implements TrainerAdapter {
         const buffer = fs.readFileSync(filePath);
         return buffer.slice(0, 1024).includes(0x00);
       }
-    } catch {}
+    } catch (error) {
+      console.error(`Binary adapter support probe failed for "${filePath}":`, error);
+    }
     return false;
   }
 

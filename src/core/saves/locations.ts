@@ -55,7 +55,9 @@ export function approveSaveLocation(locationId: string): boolean {
       // Check if directory is writable by attempting a temp write or checking modes
       writable = (stat.mode & 0o200) !== 0 ? 1 : 0;
     }
-  } catch {}
+  } catch (error) {
+    console.error(`Failed to probe save location approval path "${canonical}":`, error);
+  }
 
   const stmt = db.prepare(`
     UPDATE save_locations
@@ -105,7 +107,9 @@ export function addUserSelectedLocation(gameId: string, rawPath: string): { succ
       const stat = fs.statSync(canonical);
       writable = (stat.mode & 0o200) !== 0 ? 1 : 0;
     }
-  } catch {}
+  } catch (error) {
+    console.error(`Failed to probe user-selected save location "${canonical}":`, error);
+  }
 
   const id = generateId();
   const loc: SaveLocation = {
@@ -177,7 +181,8 @@ export function isPathApproved(filePath: string, gameId: string): boolean {
     }
 
     return false;
-  } catch {
+  } catch (error) {
+    console.error(`Failed to evaluate approved path "${filePath}" for game "${gameId}":`, error);
     return false;
   }
 }

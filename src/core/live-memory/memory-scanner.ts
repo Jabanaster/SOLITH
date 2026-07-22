@@ -185,6 +185,72 @@ export function scanFirst(
 }
 
 /**
+ * First scan for every aligned cell whose decoded value lies in `[min, max]`
+ * (inclusive). Use for HUD rounding ambiguity (e.g. displayed 61 may be
+ * 60.7–61.3 in memory) without committing to a single exact bit pattern.
+ *
+ * Same region / byte / match bounds as {@link scanFirst}. Read-only.
+ */
+export function scanFirstRange(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  dataType: LiveValueType,
+  min: number,
+  max: number,
+  bounds?: ScanBounds,
+): ScanResult {
+  if (!(min <= max)) {
+    throw new Error(`scanFirstRange requires min <= max (got min=${min}, max=${max})`);
+  }
+
+  const maxRegionBytes = bounds?.maxRegionBytes ?? DEFAULT_MAX_REGION_BYTES;
+  const maxTotalBytes = bounds?.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
+  const maxMatches = bounds?.maxMatches ?? DEFAULT_MAX_MATCHES;
+  const step = valueSize(dataType);
+
+  const regions = driver
+    .getRegions(handle)
+    .filter((r) => r.writable && r.size > 0 && r.size <= maxRegionBytes);
+
+  const matches: ScanMatch[] = [];
+  let bytesScanned = 0;
+  let regionsScanned = 0;
+  let truncated = false;
+
+  for (const region of regions) {
+    if (bytesScanned + region.size > maxTotalBytes) {
+      truncated = true;
+      break;
+    }
+
+    let buf: Buffer;
+    try {
+      buf = driver.readBuffer(handle, region.baseAddress, region.size);
+    } catch {
+      continue;
+    }
+
+    bytesScanned += region.size;
+    regionsScanned += 1;
+
+    for (let offset = 0; offset + step <= buf.length; offset += step) {
+      const value = decodeValue(dataType, buf, offset);
+      if (value >= min && value <= max && Number.isFinite(value)) {
+        matches.push({ address: region.baseAddress + BigInt(offset), value });
+        if (matches.length >= maxMatches) {
+          truncated = true;
+          break;
+        }
+      }
+    }
+
+    if (truncated) break;
+  }
+
+  return { matches, regionsScanned, bytesScanned, truncated };
+}
+
+/**
  * Next scan: re-reads each address from a prior scan's candidate set (via
  * driver.readMemory, not a fresh region sweep — this is what makes narrowing
  * cheap) and keeps only the ones matching `comparison` against their own

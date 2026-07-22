@@ -1,6 +1,11 @@
 # ── Local research clones (UEDumper, etc.) ───────────────────────────────────
 .research/
 
+# ── Live research artifacts and ad hoc scanner scripts ──────────────────────
+Docs/Research/sessions/
+scripts/avowed-multilane-session.mts
+scripts/explore-avowed-*.mts
+
 # ── Node ─────────────────────────────────────────────────────────────────────
 node_modules/
 

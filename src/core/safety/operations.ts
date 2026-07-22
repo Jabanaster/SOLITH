@@ -133,6 +133,14 @@ function parseTypedValue(valStr: string | null): any {
   }
 }
 
+function removeRecoveryTempFile(tmpPath: string, operationId: string): void {
+  try {
+    fs.unlinkSync(tmpPath);
+  } catch (error) {
+    console.error(`[Crash Recovery] Failed to remove temp file for operation ${operationId}: ${tmpPath}`, error);
+  }
+}
+
 /**
  * Startup Crash Recovery routine.
  * Detects operations interrupted in critical states and recovers them automatically if possible.
@@ -172,7 +180,7 @@ export async function recoverInterruptedOperations(): Promise<void> {
         console.log(`[Crash Recovery] Case E: Operation interrupted without recorded backup.`);
         db.prepare("UPDATE operations SET status = 'FAILED', failureReason = 'Interrupted without recorded backup' WHERE id = ?").run(opId);
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
         continue;
       }
@@ -183,7 +191,7 @@ export async function recoverInterruptedOperations(): Promise<void> {
         console.log(`[Crash Recovery] Case E: Backup record not found in database.`);
         db.prepare("UPDATE operations SET status = 'RESTORE_FAILED', failureReason = 'Backup record not found in database' WHERE id = ?").run(opId);
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
         continue;
       }
@@ -200,7 +208,7 @@ export async function recoverInterruptedOperations(): Promise<void> {
         console.log(`[Crash Recovery] Case E: Physical backup file is invalid or missing.`);
         db.prepare("UPDATE operations SET status = 'RESTORE_FAILED', failureReason = 'Backup is invalid or unavailable for recovery' WHERE id = ?").run(opId);
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
         continue;
       }
@@ -224,7 +232,7 @@ export async function recoverInterruptedOperations(): Promise<void> {
         console.log(`[Crash Recovery] Case A: Current target matches original hash. Original was not replaced.`);
         db.prepare("UPDATE operations SET status = 'FAILED', failureReason = 'Interrupted prior to file replacement' WHERE id = ?").run(opId);
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
       } else if (targetExists && expectedFinalHash !== null && currentHash === expectedFinalHash) {
         // Case B: Target matches expected final hash
@@ -249,14 +257,14 @@ export async function recoverInterruptedOperations(): Promise<void> {
           db.prepare("UPDATE operations SET status = ? WHERE id = ?").run(restored ? 'RESTORED' : 'RESTORE_FAILED', opId);
         }
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
       } else if (expectedFinalHash === null && currentHash !== originalHash) {
         // Case D: Ambiguous state
         console.log(`[Crash Recovery] Case D: Ambiguous target state (proposal missing or expected final hash uncomputable).`);
         db.prepare("UPDATE operations SET status = 'FAILED', failureReason = 'Ambiguous target state: requires recovery review' WHERE id = ?").run(opId);
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
       } else {
         // Case C: Target is invalid (or missing) and verified backup exists
@@ -278,7 +286,7 @@ export async function recoverInterruptedOperations(): Promise<void> {
           db.prepare("UPDATE operations SET status = 'RESTORE_FAILED', failureReason = 'Restoration failed during recovery' WHERE id = ?").run(opId);
         }
         if (tmpExists) {
-          try { fs.unlinkSync(tmpPath); } catch {}
+          removeRecoveryTempFile(tmpPath, opId);
         }
       }
     }

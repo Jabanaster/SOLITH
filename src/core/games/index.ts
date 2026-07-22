@@ -293,7 +293,7 @@ export function scanGame(gameId: string): { success: boolean; result?: any; erro
             }
           });
         } catch (err) {
-          // Skip inaccessible folders
+          console.error(`Skipping inaccessible folder during game scan: ${dir}`, err);
         }
       }
       
@@ -336,7 +336,9 @@ export function scanGame(gameId: string): { success: boolean; result?: any; erro
     try {
       db.prepare('UPDATE scans SET status = ?, details = ? WHERE id = ?')
         .run(finalStatus, String(error), scanId);
-    } catch {}
+    } catch (updateError) {
+      console.error(`Failed to mark scan ${scanId} as ${finalStatus}:`, updateError);
+    }
     
     return { success: false, error: String(error) };
   }

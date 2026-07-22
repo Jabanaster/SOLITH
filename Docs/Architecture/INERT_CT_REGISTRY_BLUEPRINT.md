@@ -1,7 +1,7 @@
 # Inert Cheat Table Registry & Safe Research Framework — Status
 
-**Status:** Complete (Phases 1–10 implemented in tree)  
-**Branch tip:** `cursor/phase3-hub-sync-trust-ui`  
+**Status:** Active implementation baseline; phases 1-10 are present, but current dirty-tree work still requires verification before release claims.
+**Master tip:** `774ff7e`
 **Safety stance:** Never execute CE Auto Assembler / Lua; never auto-attach; writes remain gated + Trust Shift waiver.
 
 ```

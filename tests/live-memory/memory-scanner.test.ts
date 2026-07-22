@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FakeMemoryDriver } from '../fixtures/fake-memory-driver.js';
-import { scanFirst, scanNext } from '../../src/core/live-memory/memory-scanner.js';
+import { scanFirst, scanFirstRange, scanNext } from '../../src/core/live-memory/memory-scanner.js';
 
 const HANDLE = { pid: 1234, opaque: { fake: true } };
 
@@ -207,4 +207,122 @@ test('scanNext drops addresses that fail to read instead of throwing', () => {
 
   assert.equal(result.length, 1);
   assert.equal(result[0].address, 0x100n);
+});
+
+test('scanFirstRange keeps aligned floats inside an inclusive window', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(32);
+  region.writeFloatLE(60.7, 0);
+  region.writeFloatLE(61.0, 4);
+  region.writeFloatLE(62.5, 8);
+  driver.addRegion(0x2000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 2);
+  assert.deepEqual(
+    result.matches.map((m) => m.address).sort(),
+    [0x2000n, 0x2004n],
+  );
+});
+
+test('scanFirstRange ignores unaligned values at memory boundaries', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(9, 0);
+  region.writeFloatLE(61.0, 1);
+  driver.addRegion(0x3000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, false);
+});
+
+test('scanFirstRange does not read past short region ends', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(6, 0);
+  region.writeInt32LE(100, 0);
+  driver.addRegion(0x4000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'double', 99, 101);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, false);
+});
+
+test('scanFirstRange includes exact min and max edge values', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(24, 0);
+  region.writeInt32LE(10, 0);
+  region.writeInt32LE(15, 4);
+  region.writeInt32LE(20, 8);
+  region.writeInt32LE(21, 12);
+  driver.addRegion(0x5000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'int32', 10, 20);
+
+  assert.deepEqual(
+    result.matches.map((m) => m.address),
+    [0x5000n, 0x5004n, 0x5008n],
+  );
+});
+
+test('scanFirstRange rejects inverted ranges before reading memory', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(16);
+  driver.addRegion(0x6000n, region, true);
+
+  assert.throws(
+    () => scanFirstRange(driver, HANDLE, 'int32', 20, 10),
+    /scanFirstRange requires min <= max/,
+  );
+});
+
+test('scanFirstRange stops and reports truncated when total byte budget is exceeded', () => {
+  const driver = new FakeMemoryDriver();
+  const regionA = filledBuffer(16, 0);
+  const regionB = filledBuffer(16, 0);
+  regionA.writeInt32LE(7, 0);
+  regionB.writeInt32LE(7, 0);
+  driver.addRegion(0x7000n, regionA, true);
+  driver.addRegion(0x8000n, regionB, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'int32', 7, 7, { maxTotalBytes: 16 });
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x7000n);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange stops and reports truncated when maxMatches is reached', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(32, 0);
+  for (let offset = 0; offset < 32; offset += 4) {
+    region.writeInt32LE(3, offset);
+  }
+  driver.addRegion(0x9000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'int32', 3, 3, { maxMatches: 2 });
+
+  assert.equal(result.matches.length, 2);
+  assert.deepEqual(result.matches.map((m) => m.address), [0x9000n, 0x9004n]);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange skips unreadable regions without aborting later matches', () => {
+  const driver = new FakeMemoryDriver();
+  const good = filledBuffer(16, 0);
+  good.writeFloatLE(61.0, 0);
+  driver.addUnreadableRegion(0xa000n, 16, true);
+  driver.addRegion(0xb000n, good, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0xb000n);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, false);
 });

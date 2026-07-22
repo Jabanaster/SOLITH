@@ -19,7 +19,7 @@ export type {
   FreezeScheduler,
   StartFreezeResult,
 } from './live-memory-session.js';
-export { scanFirst, scanNext } from './memory-scanner.js';
+export { scanFirst, scanFirstRange, scanNext } from './memory-scanner.js';
 export type { ScanResult } from './memory-scanner.js';
 export { RealtimeScanner } from './real-time-scanner.js';
 export type {
