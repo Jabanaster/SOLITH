@@ -1149,6 +1149,18 @@ button, input, select, textarea {
   background: transparent;
 }
 
+.w-6 {
+  width: 1.5rem;
+}
+
+.h-6 {
+  height: 1.5rem;
+}
+
+.object-contain {
+  object-fit: contain;
+}
+
 .empty-state h3 {
   font-size: 18px;
   font-weight: 700;

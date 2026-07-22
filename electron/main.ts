@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   AddGameSchema,
   ScanGameSchema,
@@ -59,6 +59,17 @@ import {
   installLocalCrashHandlers,
   installElectronAppCrashHooks,
 } from '../src/core/crash/local-crash-reporter.js';
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'solith-asset',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+    },
+  },
+]);
 
 // Live Memory Trainer IPC — feature-flagged (v2LiveModeEnabled, off by
 // default), single-player/offline only (PROJECT_SPEC.md Section 3.1).
@@ -124,6 +135,65 @@ let trainerHostSupervisor: TrainerHostSupervisor | null = null;
 // Tracks the webContentsId that owns the current TrainerHost session.
 let trainerHostOwner: number | null = null;
 
+function isPathInside(candidatePath: string, rootPath: string): boolean {
+  const relative = path.relative(rootPath, candidatePath);
+  return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function resolveSolithAssetRequestUrl(requestUrl: string): string {
+  const url = new URL(requestUrl);
+  if (url.protocol !== 'solith-asset:' || url.hostname !== 'local') {
+    throw new Error('Unsupported Solith asset URL');
+  }
+
+  const encodedTarget = url.pathname.replace(/^\/+/, '');
+  if (!encodedTarget) throw new Error('Missing Solith asset target');
+
+  const requested = decodeURIComponent(encodedTarget);
+  const requestedPath = requested.startsWith('file://')
+    ? fileURLToPath(requested)
+    : requested;
+
+  if (!path.isAbsolute(requestedPath)) {
+    throw new Error('Solith asset target must be an absolute path');
+  }
+
+  if (!fs.existsSync(requestedPath)) {
+    throw new Error('Solith asset target does not exist');
+  }
+
+  const resolvedPath = fs.realpathSync.native(requestedPath);
+  if (!fs.statSync(resolvedPath).isFile()) {
+    throw new Error('Solith asset target must be a file');
+  }
+
+  const allowedRoots = [
+    app.getPath('userData'),
+    path.join(moduleDirectory, 'dist', 'assets'),
+  ]
+    .filter((root) => fs.existsSync(root))
+    .map((root) => fs.realpathSync.native(root));
+
+  const allowed = allowedRoots.some((root) => resolvedPath === root || isPathInside(resolvedPath, root));
+  if (!allowed) {
+    throw new Error('Solith asset request denied outside approved roots');
+  }
+
+  return pathToFileURL(resolvedPath).toString();
+}
+
+function registerSolithAssetProtocol(): void {
+  protocol.handle('solith-asset', async (request) => {
+    try {
+      const fileUrl = resolveSolithAssetRequestUrl(request.url);
+      return net.fetch(fileUrl);
+    } catch (error) {
+      console.error('[Solith Asset] Rejected local asset request:', error);
+      return new Response('Not found', { status: 404 });
+    }
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -181,6 +251,8 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  registerSolithAssetProtocol();
+
   try {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();

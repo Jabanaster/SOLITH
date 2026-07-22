@@ -9,6 +9,7 @@ import {
 import { remoteTrainerToModPack, remoteTrainerToCatalogEntry } from '../src/core/trainer-catalog/sync/remote-sync.js';
 import { seedRecordToEntry } from '../src/core/trainer-catalog/seed.js';
 import { buildSearchableText, validateModPack } from '../src/core/trainer-catalog/types.js';
+import { resolveCatalogCoverUrl, toSolithAssetUrl } from '../src/core/trainer-catalog/cover-url.js';
 import { FLING_TRAINER_PAGES } from '../src/core/cheat-system/trainer-reference.js';
 
 describe('trainer catalog HTML parsers', () => {
@@ -94,5 +95,24 @@ describe('seed catalog entries', () => {
     assert.equal(entry.verificationStatus, 'metadata-only');
     assert.ok(entry.coverUrl?.includes('1245620'));
     assert.ok(buildSearchableText(entry).includes('elden ring'));
+  });
+});
+
+describe('catalog cover URL safety', () => {
+  it('routes absolute Windows cover files through the guarded Solith asset protocol', () => {
+    const url = toSolithAssetUrl('C:\\Users\\chase\\AppData\\Roaming\\Solith\\covers\\avowed.jpg');
+    assert.equal(
+      url,
+      'solith-asset://local/C%3A%5CUsers%5Cchase%5CAppData%5CRoaming%5CSolith%5Ccovers%5Cavowed.jpg',
+    );
+  });
+
+  it('leaves remote Steam catalog cover URLs unchanged', () => {
+    const entry = seedRecordToEntry({
+      name: 'Elden Ring',
+      steamAppId: 1245620,
+      categories: ['RPG'],
+    });
+    assert.match(resolveCatalogCoverUrl(entry) ?? '', /^https:\/\/cdn\.[a-z]+\.steamstatic\.com\//);
   });
 });

@@ -23,15 +23,18 @@ export type ModuleViewId =
 
 /**
  * Icon assignment:
- * - trainerController: game library, trainer library
+ * - libraryTempleBook: top-level Library section
+ * - gameLibraryControllerMonitors: Game Library
+ * - trainerLibraryStopwatchClipboard: Trainer Library
+ * - trainerController: game trainer context
  * - saveTools: save editor, trainer controls
  * - recoveryPhoenix: backups, save locations, journal
  * - hoodedProfile: discovery, trainer research, data editor, compatibility, recipes
  * - advancedDragon: session monitor, live memory
  */
 export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtwork>> = {
-  library: 'trainerController',
-  'trainer-library': 'trainerController',
+  library: 'gameLibraryControllerMonitors',
+  'trainer-library': 'trainerLibraryStopwatchClipboard',
   'ct-library': 'hoodedProfile',
   trainer: 'trainerController',
   saves: 'saveTools',
@@ -51,7 +54,7 @@ export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtw
 };
 
 export const SECTION_ARTWORK: Partial<Record<string, SolithBrandingArtwork>> = {
-  Library: 'trainerController',
+  Library: 'libraryTempleBook',
   Recovery: 'recoveryPhoenix',
   'Save Tools': 'saveTools',
   Specialized: 'hoodedProfile',

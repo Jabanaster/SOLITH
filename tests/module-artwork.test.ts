@@ -5,8 +5,8 @@ import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from '../src/app/assets/branding/
 describe('sidebar module artwork mapping', () => {
   test('custom nav artwork matches the current nav grouping', () => {
     assert.deepEqual(NAV_MODULE_ARTWORK, {
-      library: 'trainerController',
-      'trainer-library': 'trainerController',
+      library: 'gameLibraryControllerMonitors',
+      'trainer-library': 'trainerLibraryStopwatchClipboard',
       'ct-library': 'hoodedProfile',
       trainer: 'trainerController',
       saves: 'saveTools',
@@ -28,7 +28,7 @@ describe('sidebar module artwork mapping', () => {
 
   test('section artwork matches the current sidebar sections', () => {
     assert.deepEqual(SECTION_ARTWORK, {
-      Library: 'trainerController',
+      Library: 'libraryTempleBook',
       Recovery: 'recoveryPhoenix',
       'Save Tools': 'saveTools',
       Specialized: 'hoodedProfile',

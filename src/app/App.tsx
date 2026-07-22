@@ -412,7 +412,7 @@ const App: React.FC = () => {
                 >
                   <span className={`nav-icon-slot${artwork ? ' nav-icon-slot--artwork' : ''}`}>
                     {artwork ? (
-                      <BrandingArtwork artwork={artwork} size="nav" />
+                      <BrandingArtwork artwork={artwork} size="nav" className="w-6 h-6 object-contain" />
                     ) : (
                       <Icon name={item.icon} size={54} />
                     )}
