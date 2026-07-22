@@ -83,6 +83,23 @@ function DetailPanel({
         <dt>Warnings</dt>
         <dd>{formatNumber(table?.counts.warnings)}</dd>
       </dl>
+      {table?.rejectedEntries && table.rejectedEntries.length > 0 && (
+        <section className={styles.rejectionReport} aria-label="CT rejection report">
+          <h3>Rejection report</h3>
+          <p className={styles.meta}>Rejected entries remain metadata-only and are not promoted to executable controls.</p>
+          <ul>
+            {table.rejectedEntries.slice(0, 6).map((entry, index) => (
+              <li key={`${entry.name}-${index}`}>
+                <strong>{entry.name}</strong>
+                <span>{entry.reason}</span>
+              </li>
+            ))}
+          </ul>
+          {table.rejectedEntries.length > 6 && (
+            <p className={styles.meta}>Showing 6 of {formatNumber(table.rejectedEntries.length)} rejected entries.</p>
+          )}
+        </section>
+      )}
       {result.type === 'pointer' && (
         <p>
           <button type="button" className="btn-primary" onClick={() => onPromote(result)}>

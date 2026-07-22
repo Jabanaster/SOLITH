@@ -1,10 +1,10 @@
 ﻿# Solith / Solith Roadmap
 
-## Current Baseline (Solith 2.3.0-alpha.1)
+## Current Baseline (Solith 2.3.0-alpha.2)
 
-Product UI: **Solith** · package `solith@2.3.0-alpha.1`
+Product UI: **Solith** · package `solith@2.3.0-alpha.2`
 
-* Local **`master` @ `774ff7e`** — current local tree is dirty while hygiene / docs / test stabilization work is in progress
+* Local **`master` @ `60b762b`** — tag `v2.3.0-alpha.2` pushed; current work continues from the clean Vite-boundary / test-stability safe harbor
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -19,14 +19,16 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.1`
 | CI pipeline green (`npm test` / Electron output verifier) | **NEEDS RECHECK** — prior local Alpha gate evidence was updated to `774ff7e`, but current dirty tree requires a fresh full-suite run |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
+| Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
 
 ### Stability lock
 
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npm test` (Alpha tip) | **Needs fresh verification** @ `774ff7e` + current dirty tree |
-| Local `npm run build:electron` (Alpha tip) | **Needs fresh verification** @ `774ff7e` + current dirty tree |
+| Local `npm test` (Alpha tip) | **PASS** — `811/811` at `v2.3.0-alpha.2`; rerun required after this safety-hardening slice |
+| Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build at `v2.3.0-alpha.2`; rerun required after this safety-hardening slice |
+| Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `19/19` after this safety-hardening slice |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
 | Atomfall L3 live cert branch | **Merged** `cursor/atomfall-l3-live-cert` → `master` |
 
@@ -105,6 +107,20 @@ Shipped on `master` before the current `774ff7e` baseline. These close product/a
 | Trust Shift + CT→Live Phases 2–4 | **Done** | Waiver consent; `CtLiveResolution`; toggle cards; pointer table / What-Changed; local pack export — `Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md` |
 
 Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** until live AOB/pointer evidence. Live elevation playbook: `Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`.
+
+### Ordered safety build — Active sequence
+
+| Order | Item | Current status |
+|-------|------|----------------|
+| 1 | Security hardening | **Active / strengthened** — renderer boundary has a static test; Vite remains the enforcement smoke |
+| 2 | Anti-cheat / protected-target blocking | **Active / strengthened** — read-only process adapter fails closed on known protected indicators before returning a session |
+| 3 | Harmless-process smoke tests | **Available** — `npm run smoke:runtime-readonly -- --pid <pid> --name <process.exe>` uses explicit PID selection and bounded module reads |
+| 4 | Offline/single-player support | **Standing rule** — live features require explicit offline/private-play confirmation and guard evidence |
+| 5 | Restart validation + L0–L4 certification | **Active / strengthened** — restart artifact comparison can classify unique stable signatures as L3 candidates only when evidence stays stable |
+| 6 | Metadata-only CT import + inert script preservation | **Done / strengthened** — CT scripts remain `executable=false`; rejection reasons are preserved for review |
+| 7 | Read-only process/module scanning + AOB extraction | **Done / active** — AOB extraction and read-only signature resolution exist; live game validation still requires explicit process selection |
+| 8 | Safe save editing with backup/rollback | **Implemented for accepted save-field paths** — proposal/backup/rollback remains the preferred route where file-backed support exists |
+| 9 | CT Library Explorer + rejection reports | **Active / strengthened** — CT Library detail now surfaces rejection reasons, not just counts |
 
 ### Bundled schema.v1 definitions
 

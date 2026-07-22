@@ -68,6 +68,21 @@ describe('LiveMemorySession', () => {
     assert.equal(session.isAttached(), true);
   });
 
+  test('attach fails closed and closes handle when protected target modules are present', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    driver.addModule('demo.exe', 0x400000n, 0x1000);
+    driver.addModule('EasyAntiCheat_EOS.dll', 0x500000n, 0x1000);
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+
+    const result = await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /Protected target indicator/i);
+    assert.equal(driver.isOpen(), false);
+    assert.equal(driver.closeCallCount, 1);
+    assert.equal(session.isAttached(), false);
+  });
+
   test('propose then confirm writes the new value and produces a manifest', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
     const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE]);

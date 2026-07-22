@@ -138,6 +138,36 @@
   word-break: break-word;
 }
 
+.rejectionReport {
+  margin: 0.9rem 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 190, 120, 0.22);
+  border-radius: 10px;
+  background: rgba(80, 50, 20, 0.18);
+}
+
+.rejectionReport h3 {
+  margin: 0 0 0.35rem;
+  color: #ffd59c;
+}
+
+.rejectionReport ul {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.rejectionReport li {
+  color: #f4dfc2;
+}
+
+.rejectionReport li span {
+  display: block;
+  color: #b8a68c;
+  font-size: 0.82rem;
+}
+
 .empty {
   color: #a9bad9;
   padding: 1rem;

@@ -22,6 +22,10 @@ export interface CtZipCatalogEntry {
     warnings: number;
     duplicates: number;
   };
+  rejectedEntries?: Array<{
+    name: string;
+    reason: string;
+  }>;
   cheats: Array<{
     id: string;
     name: string;
@@ -166,6 +170,10 @@ async function tableEntryFromXml(archivePath: string, xmlText: string): Promise<
       warnings: aobReport.warnings.length,
       duplicates: aobReport.duplicateSignatures,
     },
+    rejectedEntries: pointers.rejected.map((rejection) => ({
+      name: rejection.name,
+      reason: rejection.reason,
+    })),
     cheats,
   };
 }

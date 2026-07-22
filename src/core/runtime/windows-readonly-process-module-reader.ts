@@ -5,6 +5,7 @@ import type { RuntimeModuleInfo } from './module-inspection.js';
 import { assertModuleBounds } from './module-inspection.js';
 import type { RuntimeProcessSummary } from './process-discovery.js';
 import { assertExplicitProcessSelection } from './process-discovery.js';
+import { assessProtectedTarget } from './protected-target-guard.js';
 
 export type WindowsReadOnlyAdapterErrorCode =
   | 'unsupported_platform'
@@ -13,7 +14,8 @@ export type WindowsReadOnlyAdapterErrorCode =
   | 'process_exited'
   | 'module_missing'
   | 'partial_read'
-  | 'invalid_address_range';
+  | 'invalid_address_range'
+  | 'protected_target';
 
 export class WindowsReadOnlyAdapterError extends Error {
   constructor(
@@ -153,6 +155,13 @@ export function openWindowsReadOnlyProcessSession(
       baseAddress: module.baseAddress,
       size: module.size,
     }));
+    const protectedTarget = assessProtectedTarget({
+      process: { ...process, executableName },
+      modules,
+    });
+    if (!protectedTarget.allowed) {
+      throw new WindowsReadOnlyAdapterError('protected_target', protectedTarget.reason);
+    }
     return new WindowsReadOnlyProcessModuleSession(
       { ...process, executableName },
       handle,

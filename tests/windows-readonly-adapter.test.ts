@@ -119,4 +119,18 @@ describe('Windows read-only process module adapter', () => {
     assert.equal('readPointer' in driver, false);
     assert.equal('getRegions' in driver, false);
   });
+
+  test('fails closed when selected process has protected target indicators', () => {
+    const driver = new FakeReadOnlyProcessModuleDriver();
+    driver.modules = [
+      { name: 'Game.exe', baseAddress: 0x1000n, size: 8 },
+      { name: 'EasyAntiCheat_EOS.dll', baseAddress: 0x2000n, size: 8 },
+    ];
+
+    assert.throws(
+      () => openWindowsReadOnlyProcessSession({ pid: 123, executableName: 'Game.exe', selectedByUser: true }, { driver, platform: 'win32' }),
+      (error) => error instanceof WindowsReadOnlyAdapterError && error.code === 'protected_target',
+    );
+    assert.equal(driver.closed, true);
+  });
 });

@@ -70,10 +70,13 @@ async function makeLibraryFixture() {
         pointers: 1,
         scripts: 1,
         aobSignatures: 1,
-        rejections: 0,
+        rejections: 1,
         warnings: 0,
         duplicates: 0,
       },
+      rejectedEntries: [
+        { name: 'Unsafe Missing Address', reason: 'Missing address; retained as rejected metadata.' },
+      ],
       cheats: [
         { id: 'ptr-health', name: 'Health', kind: 'pointer', executable: false, certificationLevel: 'L0' },
         { id: 'script-stamina', name: 'Stamina script', kind: 'script', executable: false, certificationLevel: 'L0' },
@@ -114,5 +117,6 @@ describe('CT Library search', () => {
     assert.equal(detail.available, true);
     assert.equal(detail.game?.displayName, 'Avowed');
     assert.equal(detail.tables[0]?.counts.scripts, 1);
+    assert.equal(detail.tables[0]?.rejectedEntries?.[0]?.reason, 'Missing address; retained as rejected metadata.');
   });
 });

@@ -20,6 +20,7 @@ import {
 } from '../definitions/fingerprint-verify.js';
 import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
 import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
+import { assessProtectedTarget } from '../runtime/protected-target-guard.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
 import type {
   FreezeStatus,
@@ -264,6 +265,22 @@ export class LiveMemorySession {
       this.handle = this.driver.openProcess(target.pid);
     } catch (err) {
       return { success: false, guard, error: `Failed to open process: ${String(err)}` };
+    }
+
+    try {
+      const protectedTarget = assessProtectedTarget({
+        process: { pid: target.pid, executableName: target.executableName, selectedByUser: true },
+        modules: this.driver.getModules(this.handle),
+      });
+      if (!protectedTarget.allowed) {
+        this.driver.closeProcess(this.handle);
+        this.handle = null;
+        return { success: false, guard, error: protectedTarget.reason };
+      }
+    } catch (err) {
+      this.driver.closeProcess(this.handle);
+      this.handle = null;
+      return { success: false, guard, error: `Protected target check failed closed: ${String(err)}` };
     }
 
     this.target = target;
