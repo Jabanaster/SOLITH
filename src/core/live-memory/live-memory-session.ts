@@ -261,8 +261,10 @@ export class LiveMemorySession {
       }
     }
 
+    let openedHandle: LiveProcessHandle;
     try {
-      this.handle = this.driver.openProcess(target.pid);
+      openedHandle = this.driver.openProcess(target.pid);
+      this.handle = openedHandle;
     } catch (err) {
       return { success: false, guard, error: `Failed to open process: ${String(err)}` };
     }
@@ -270,15 +272,15 @@ export class LiveMemorySession {
     try {
       const protectedTarget = assessProtectedTarget({
         process: { pid: target.pid, executableName: target.executableName, selectedByUser: true },
-        modules: this.driver.getModules(this.handle),
+        modules: this.driver.getModules(openedHandle),
       });
       if (!protectedTarget.allowed) {
-        this.driver.closeProcess(this.handle);
+        this.driver.closeProcess(openedHandle);
         this.handle = null;
         return { success: false, guard, error: protectedTarget.reason };
       }
     } catch (err) {
-      this.driver.closeProcess(this.handle);
+      this.driver.closeProcess(openedHandle);
       this.handle = null;
       return { success: false, guard, error: `Protected target check failed closed: ${String(err)}` };
     }
