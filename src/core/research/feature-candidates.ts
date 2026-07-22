@@ -1,4 +1,4 @@
-import type { CompiledCtRegistry } from '../registry/load-registry.js';
+import type { CompiledCtRegistry } from '../registry/loaded-registry.js';
 import type { CtRawScriptCatalogEntry } from '../script-research/types.js';
 
 export type FeatureCandidateConfidence = 'low' | 'medium' | 'high';

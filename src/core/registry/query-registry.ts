@@ -3,7 +3,7 @@ import type {
   CtImportResult,
 } from '../definitions/ct-import.js';
 import type { CtRawScriptCatalogEntry } from '../script-research/types.js';
-import type { CompiledCtRegistry } from './load-registry.js';
+import type { CompiledCtRegistry } from './loaded-registry.js';
 import type { RegistryAobSignature } from './compile-ct-registry.js';
 
 export type RegistryResultType = 'pointer' | 'aob' | 'script' | 'rejection';

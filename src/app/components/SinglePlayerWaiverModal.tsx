@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import {
   SINGLE_PLAYER_WAIVER_COPY,
-  type SinglePlayerWaiverStore,
-} from '../../core/live-memory/single-player-waiver.js';
+  type SinglePlayerWaiverStoreLike,
+} from '../../core/live-memory/single-player-waiver-shared.js';
 
 export interface SinglePlayerWaiverModalProps {
   open: boolean;
   scopeKey: string;
-  store?: SinglePlayerWaiverStore | null;
+  store?: SinglePlayerWaiverStoreLike | null;
   onAccept: () => void;
   onCancel: () => void;
 }

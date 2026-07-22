@@ -4,8 +4,8 @@
  */
 
 import type { MemoryDataType, MemoryFeatureV1 } from '../definitions/schema.v1.js';
-import type { CtImportEntry, CtLiveResolutionQuality } from '../definitions/ct-import.js';
-import { classifyCtLiveResolution } from '../definitions/ct-import.js';
+import type { CtImportEntry } from '../definitions/ct-import.js';
+import { classifyCtLiveResolution, type CtLiveResolutionQuality } from '../definitions/ct-live-resolution.js';
 
 export interface CtPromoteCandidate {
   id: string;

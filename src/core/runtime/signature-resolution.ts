@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { CompiledCtRegistry } from '../registry/load-registry.js';
+import type { CompiledCtRegistry } from '../registry/loaded-registry.js';
 import { loadRegistry } from '../registry/load-registry.js';
 import type { RuntimeProcessSummary } from './process-discovery.js';
 import { assertExplicitProcessSelection } from './process-discovery.js';

@@ -23,6 +23,17 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(moduleDirectory, './index.html')
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+          return undefined;
+        }
       }
     }
   },

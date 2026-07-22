@@ -4,18 +4,22 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  SINGLE_PLAYER_WAIVER_COPY,
+  type SinglePlayerWaiverStoreLike,
+  type WaiverRecord,
+  type WaiverStoreFile,
+} from './single-player-waiver-shared.js';
 
-export interface WaiverRecord {
-  acceptedAt: string;
-  scopeKey: string;
-}
+export {
+  SINGLE_PLAYER_WAIVER_COPY,
+  SessionSinglePlayerWaiverStore,
+  type SinglePlayerWaiverStoreLike,
+  type WaiverRecord,
+  type WaiverStoreFile,
+} from './single-player-waiver-shared.js';
 
-export interface WaiverStoreFile {
-  version: 1;
-  byScope: Record<string, WaiverRecord>;
-}
-
-export class SinglePlayerWaiverStore {
+export class SinglePlayerWaiverStore implements SinglePlayerWaiverStoreLike {
   private sessionAccepted = new Set<string>();
   private file: WaiverStoreFile = { version: 1, byScope: {} };
 
@@ -67,6 +71,3 @@ export class SinglePlayerWaiverStore {
     this.sessionAccepted.add(scopeKey.trim().toLowerCase() || 'global');
   }
 }
-
-export const SINGLE_PLAYER_WAIVER_COPY =
-  'Solith operates via direct memory manipulation. You are responsible for ensuring you are playing offline in single-player or private environments. Enable live modifications?';

@@ -1,4 +1,4 @@
-import type { CompiledCtRegistry } from '../registry/load-registry.js';
+import type { CompiledCtRegistry } from '../registry/loaded-registry.js';
 import type { RuntimeModuleInfo } from './module-inspection.js';
 import { findModule } from './module-inspection.js';
 import type { ReadOnlyMemoryReader } from './memory-reader.js';

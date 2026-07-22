@@ -14,9 +14,11 @@ export {
 export * from './compile-ct-zip.js';
 export {
   loadRegistry,
+} from './load-registry.js';
+export {
   validateLoadedRegistry,
   type CompiledCtRegistry,
-} from './load-registry.js';
+} from './loaded-registry.js';
 export * from './query-registry.js';
 export * from './schema.js';
 export * from './validate-registry.js';

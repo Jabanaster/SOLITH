@@ -1,10 +1,12 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classifyCtLiveResolution,
-  featureTypeForCtLiveResolution,
   parseCheatTableXml,
 } from '../../src/core/definitions/ct-import.js';
+import {
+  classifyCtLiveResolution,
+  featureTypeForCtLiveResolution,
+} from '../../src/core/definitions/ct-live-resolution.js';
 import {
   buildLiveToggleCards,
   promoteCandidateFromCtEntry,

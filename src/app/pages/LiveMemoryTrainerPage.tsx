@@ -17,7 +17,7 @@ import {
   type LiveToggleCard,
   type ResearchPromoteSeed,
 } from '../../core/live-memory/ct-promote.js';
-import { SinglePlayerWaiverStore } from '../../core/live-memory/single-player-waiver.js';
+import { SessionSinglePlayerWaiverStore } from '../../core/live-memory/single-player-waiver-shared.js';
 
 interface ProcessEntry {
   pid: number;
@@ -111,7 +111,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
   const [controlsChecked, setControlsChecked] = useState(false);
   const [waiverModalOpen, setWaiverModalOpen] = useState(false);
   const [toggleCards, setToggleCards] = useState<LiveToggleCard[]>([]);
-  const [waiverStore] = useState(() => new SinglePlayerWaiverStore());
+  const [waiverStore] = useState(() => new SessionSinglePlayerWaiverStore());
 
   useEffect(() => {
     try {

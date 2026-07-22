@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import type { CompiledCtRegistry } from '../../core/registry/load-registry.js';
-import { validateLoadedRegistry } from '../../core/registry/load-registry.js';
+import type { CompiledCtRegistry } from '../../core/registry/loaded-registry.js';
+import { validateLoadedRegistry } from '../../core/registry/loaded-registry.js';
 import type { RegistryResultType, RegistrySearchResult } from '../../core/registry/query-registry.js';
 import { searchRegistry } from '../../core/registry/query-registry.js';
 
