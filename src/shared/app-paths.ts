@@ -9,6 +9,7 @@
 import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -40,9 +41,26 @@ function resolveDatabasePath(userDataRoot: string): string {
   return preferred;
 }
 
+function isTestRuntime(): boolean {
+  return process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT);
+}
+
+function resolveFallbackUserDataRoot(): string {
+  if (process.env.ELECTRON_USER_DATA_PATH) {
+    return process.env.ELECTRON_USER_DATA_PATH;
+  }
+  if (process.env.SOLITH_TEST_USER_DATA_PATH) {
+    return process.env.SOLITH_TEST_USER_DATA_PATH;
+  }
+  if (isTestRuntime()) {
+    return path.join(os.tmpdir(), 'solith-test-runtime', String(process.pid), 'userData');
+  }
+  return path.join(projectRoot, 'data');
+}
+
 export async function getAppPaths(): Promise<SolithAppPaths> {
   let appRoot = projectRoot;
-  let userDataRoot = path.join(projectRoot, 'data');
+  let userDataRoot = resolveFallbackUserDataRoot();
 
   try {
     const { app } = await import('electron');
@@ -70,9 +88,11 @@ export async function getAppPaths(): Promise<SolithAppPaths> {
  * Returns dev/test fallback paths. For production, call getAppPaths() instead.
  */
 export function getDevPaths() {
+  const userDataRoot = resolveFallbackUserDataRoot();
   return {
     appRoot: projectRoot,
-    databasePath: resolveDatabasePath(path.join(projectRoot, 'data')),
+    userDataRoot,
+    databasePath: resolveDatabasePath(userDataRoot),
     demoFixtureRoot: path.resolve(projectRoot, 'demo-game')
   };
 }

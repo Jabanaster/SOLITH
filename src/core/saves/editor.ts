@@ -13,6 +13,7 @@ import { createOperation, transitionOperation } from '../safety/operations';
 import { atomicWrite } from '../safety/atomic-write';
 import { getAdapterForFile } from '../adapters/index';
 import { getRecipeById, validateRecipeSafety } from '../recipes';
+import { getAppPaths } from '../../shared/app-paths.js';
 
 export interface SaveEdit {
   path: string;
@@ -201,7 +202,8 @@ export async function applyProposal(proposal: Proposal): Promise<{ success: bool
     transitionOperation(operationId, 'AWAITING_APPROVAL');
     
     // 6. Create backup
-    const backupDir = path.join(process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'), 'Solith', 'backups');
+    const appPaths = await getAppPaths();
+    const backupDir = path.join(appPaths.userDataRoot, 'backups');
     backup = createBackup(proposal.gameId, proposal.targetFile, backupDir, proposal.recipeId || undefined, proposal.id, operationId);
     
     // Save backupId to operation
