@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { CompiledCtRegistry } from '../../core/registry/loaded-registry.js';
 import { validateLoadedRegistry } from '../../core/registry/loaded-registry.js';
+import type { CtCompilerPipelineRegistry } from '../../core/registry/compile-ct-registry.js';
 import type { RegistryResultType, RegistrySearchResult } from '../../core/registry/query-registry.js';
 import { searchRegistry } from '../../core/registry/query-registry.js';
 
@@ -85,6 +86,107 @@ function DetailPanel({ result, query }: { result: RegistrySearchResult | null; q
           <pre className="script-preview">{excerpt(scriptText, query)}</pre>
         </>
       )}
+    </section>
+  );
+}
+
+function GovernanceDashboard({ pipeline }: { pipeline?: CtCompilerPipelineRegistry }) {
+  if (!pipeline) {
+    return (
+      <section className="panel-card" aria-label="Governance dashboard">
+        <h3>Governance dashboard</h3>
+        <p className="muted">This registry does not include the v1.2 pipeline projection yet.</p>
+        <p className="safety-note">Legacy registries remain searchable, but they cannot claim L2/L3 governance state.</p>
+      </section>
+    );
+  }
+
+  const quarantinedScripts = pipeline.script_catalog_refs.filter((script) => script.rejection_flags.length > 0);
+
+  return (
+    <section className="panel-card" aria-label="Governance dashboard">
+      <div className="split-header">
+        <div>
+          <p className="eyebrow">Zero-trust governance</p>
+          <h3>{pipeline.source.file}</h3>
+          <p className="muted">
+            Provenance: {pipeline.source.kind}
+            {pipeline.source.user_certified ? ' · user-certified intent recorded' : ''}
+          </p>
+        </div>
+        <div>
+          <span className="status-pill">{pipeline.global_status.certification_level}</span>
+          <p className="muted">{pipeline.global_status.verification_cycles_completed} verification cycles</p>
+        </div>
+      </div>
+
+      <dl className="kv-grid">
+        <dt>Pipeline schema</dt>
+        <dd>{pipeline.schema_version}</dd>
+        <dt>Source hash</dt>
+        <dd>{pipeline.source.sha256.slice(0, 16)}…</dd>
+        <dt>Entries</dt>
+        <dd>{pipeline.entries.length}</dd>
+        <dt>AOB signatures</dt>
+        <dd>{pipeline.aob_signatures.length}</dd>
+        <dt>Quarantined scripts</dt>
+        <dd>{quarantinedScripts.length}</dd>
+        <dt>Warnings</dt>
+        <dd>{pipeline.warnings.length}</dd>
+      </dl>
+
+      {pipeline.entries.length > 0 && (
+        <>
+          <h4>Entry gates</h4>
+          <div className="result-stack">
+            {pipeline.entries.slice(0, 8).map((entry) => (
+              <div className="result-row-static" key={entry.ct_entry_id}>
+                <span>{entry.entry_state.current_tier}</span>
+                <strong>{entry.label}</strong>
+                <small>
+                  {entry.address_data.base} · {entry.address_data.pointer_chain.length} pointer offsets · executable=false
+                </small>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {pipeline.aob_signatures.length > 0 && (
+        <>
+          <h4>Read-only AOB research</h4>
+          <div className="result-stack">
+            {pipeline.aob_signatures.slice(0, 8).map((signature) => (
+              <div className="result-row-static" key={signature.aob_id}>
+                <span>{signature.scan_type}</span>
+                <strong>{signature.symbol}</strong>
+                <small>
+                  {signature.module_target ?? 'module-less'} · {signature.pattern}
+                </small>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {quarantinedScripts.length > 0 && (
+        <>
+          <h4>Quarantined script catalog</h4>
+          <div className="result-stack">
+            {quarantinedScripts.slice(0, 8).map((script) => (
+              <div className="result-row-static" key={script.script_id}>
+                <span>rejected</span>
+                <strong>{script.script_id}</strong>
+                <small>{script.rejection_flags.join(', ')} · {script.catalog_storage_key}</small>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p className="safety-note">
+        This dashboard is a read-only governance view. It cannot promote rows into Live Watch, enable scripts, or authorize memory writes.
+      </p>
     </section>
   );
 }
@@ -200,6 +302,8 @@ const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry: i
               <strong>{counts?.duplicates ?? 0}</strong>
             </div>
           </section>
+
+          <GovernanceDashboard pipeline={registry.pipeline} />
 
           <section className="panel-card">
             <label>

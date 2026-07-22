@@ -72,6 +72,34 @@ const __dirname = _pathDirname(__filename);
 `.trim(),
     },
   },
+  // Headless read-only verification worker — isolated from the Electron main
+  // event loop and deliberately emits metadata-only resolution artifacts.
+  {
+    entry: { 'headless-verification-worker': 'src/core/runtime/headless-verification-worker.ts' },
+    outDir: 'dist-electron',
+    format: ['esm'],
+    target: 'node22',
+    platform: 'node',
+    splitting: false,
+    sourcemap: true,
+    clean: false,
+    dts: false,
+    bundle: true,
+    external: [
+      'electron',
+      'better-sqlite3',
+    ],
+    banner: {
+      js: `
+import { createRequire } from 'module';
+import { fileURLToPath as _fileURLToPath } from 'url';
+import { dirname as _pathDirname } from 'path';
+const require = createRequire(import.meta.url);
+const __filename = _fileURLToPath(import.meta.url);
+const __dirname = _pathDirname(__filename);
+`.trim(),
+    },
+  },
   // Preload process bundle — MUST be CJS for Electron sandbox compatibility.
   // Electron's sandboxed preload loader requires CommonJS format when
   // sandbox: true is set. ESM preloads do not reliably expose contextBridge.

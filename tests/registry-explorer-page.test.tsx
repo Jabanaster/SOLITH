@@ -56,6 +56,42 @@ const registry = {
     sourcePath: 'Health Script',
   }],
   rejections: [],
+  pipeline: {
+    $schema: 'https://solith.dev/schemas/ct-compiler-v1.2.0.json',
+    schema_version: '1.2.0',
+    compiled_at: '2026-07-20T00:00:00.000Z',
+    source: {
+      file: 'Avowed.CT',
+      sha256: 'a'.repeat(64),
+      kind: 'ct-file',
+    },
+    global_status: {
+      certification_level: 'L0',
+      verification_cycles_completed: 0,
+      last_monitored_pid: null,
+    },
+    entries: [],
+    aob_signatures: [{
+      aob_id: 'aob-playerhealth',
+      origin: 'ct-script-0-health-script',
+      signature_type: 'script-extracted',
+      pattern: '48 8B ??',
+      module_target: 'Avowed-Win64-Shipping.exe',
+      symbol: 'playerHealth',
+      scan_type: 'aobscanmodule',
+      line_number: 2,
+      warnings: [],
+    }],
+    script_catalog_refs: [{
+      script_id: 'ct-script-0-health-script',
+      type: 'AutoAssembler_Script',
+      catalog_storage_key: 'quarantine::ct-script-0-health-script::inert',
+      excerpt: '[ENABLE]',
+      rejection_flags: ['L0_UNVERIFIED', 'CONTAINS_AA'],
+    }],
+    rejections: [],
+    warnings: [],
+  },
 } satisfies CompiledCtRegistry;
 
 describe('RegistryExplorerPage', () => {
@@ -66,6 +102,9 @@ describe('RegistryExplorerPage', () => {
     assert.match(html, /Avowed\.CT/);
     assert.match(html, /playerHealth/);
     assert.match(html, /executable=false/);
+    assert.match(html, /Zero-trust governance/);
+    assert.match(html, /Quarantined script catalog/);
+    assert.match(html, /cannot promote rows into Live Watch/);
     assert.match(html, /Solith does not execute Auto Assembler text here/);
   });
 

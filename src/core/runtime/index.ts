@@ -13,3 +13,4 @@ export * from './memory-snapshot.js';
 export * from './pointer-candidates.js';
 export * from './write-policy.js';
 export * from './windows-readonly-process-module-reader.js';
+export * from './headless-verification.js';
