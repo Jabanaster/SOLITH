@@ -112,10 +112,13 @@
         "nsis"
       ],
       "executableName": "Solith",
-      "icon": "public/solith-icon.png"
+      "icon": "public/solith-icon.ico"
     },
     "nsis": {
       "artifactName": "Solith Setup ${version}.${ext}",
+      "installerIcon": "public/solith-icon.ico",
+      "uninstallerIcon": "public/solith-icon.ico",
+      "installerHeaderIcon": "public/solith-icon.ico",
       "shortcutName": "Solith",
       "uninstallDisplayName": "Solith"
     }

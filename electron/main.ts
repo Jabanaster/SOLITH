@@ -194,6 +194,14 @@ function registerSolithAssetProtocol(): void {
   });
 }
 
+function resolveWindowIconPath(): string | undefined {
+  const candidates = [
+    path.join(moduleDirectory, 'dist', 'solith-icon.png'),
+    path.join(process.cwd(), 'public', 'solith-icon.png'),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -202,6 +210,7 @@ function createWindow() {
     minHeight: 600,
     title: 'Solith',
     autoHideMenuBar: true,
+    icon: resolveWindowIconPath(),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

@@ -47,11 +47,15 @@ check('productName is Solith', productName === 'Solith', productName);
 check('appId is stable', pkg.build?.appId === 'com.solith.app', pkg.build?.appId);
 check('publish config is absent', pkg.build?.publish === undefined);
 check('Windows executableName is Solith', pkg.build?.win?.executableName === 'Solith', pkg.build?.win?.executableName);
+check('Windows icon points to tracked Solith S icon', pkg.build?.win?.icon === 'public/solith-icon.ico', pkg.build?.win?.icon);
 check(
   'NSIS installer artifactName is versioned',
   pkg.build?.nsis?.artifactName === 'Solith Setup ${version}.${ext}',
   pkg.build?.nsis?.artifactName,
 );
+check('NSIS installerIcon points to Solith S icon', pkg.build?.nsis?.installerIcon === 'public/solith-icon.ico', pkg.build?.nsis?.installerIcon);
+check('NSIS uninstallerIcon points to Solith S icon', pkg.build?.nsis?.uninstallerIcon === 'public/solith-icon.ico', pkg.build?.nsis?.uninstallerIcon);
+check('NSIS installerHeaderIcon points to Solith S icon', pkg.build?.nsis?.installerHeaderIcon === 'public/solith-icon.ico', pkg.build?.nsis?.installerHeaderIcon);
 
 check('installer exists', exists(paths.installer), paths.installer);
 check('installer blockmap exists', exists(paths.installerBlockMap), paths.installerBlockMap);
