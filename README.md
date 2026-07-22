@@ -2,6 +2,8 @@
 
 Solith is a local-first, single-player trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
 
+Current development baseline: `solith@2.4.0-alpha.2`. The latest verified local gate for this baseline is `npx tsc --noEmit` passing with zero errors and `npm test` passing `821/821` tests.
+
 "**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
 
 Solith is strictly designed for single-player, offline games or applications that you own or have permission to modify.
@@ -95,6 +97,10 @@ npm run build
 ```
 
 This builds the renderer, bundles Electron main/preload/TrainerHost, verifies Electron output, and runs `electron-builder` to produce the Windows installer. Until signing is configured and verified, installers should be treated as unsigned development artifacts.
+
+## Bundled assets
+
+The tracked file `SOLITH OPENEING SEQUENCE.mp4` is intentional. It is the Solith first-launch/opening-sequence cinematic imported by `src/app/App.tsx`; its current size is approximately 16.9 MB. Keep it tracked unless the startup cinematic is replaced with an external release-asset strategy.
 
 ## CT Library import
 

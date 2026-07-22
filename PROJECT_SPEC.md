@@ -73,6 +73,10 @@ Required stack:
 - Rule-based fallback when no local model is configured
 - Electron Builder or an equivalent packaging system
 
+Bundled tracked asset:
+
+- `SOLITH OPENEING SEQUENCE.mp4` is an intentional first-launch/opening-sequence cinematic asset used by the Solith renderer. Its current tracked size is approximately 16.9 MB. Treat it as product media, not accidental generated output, unless a later release-asset strategy replaces it.
+
 Do not use:
 
 - Cloud-required services

@@ -1,10 +1,10 @@
 ﻿# Solith / Solith Roadmap
 
-## Current Baseline (Solith 2.3.0-alpha.2)
+## Current Baseline (Solith 2.4.0-alpha.2)
 
-Product UI: **Solith** · package `solith@2.3.0-alpha.2`
+Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 
-* Local **`master` @ `60b762b`** — tag `v2.3.0-alpha.2` pushed; current work continues from the clean Vite-boundary / test-stability safe harbor
+* Local **`master` @ `985609e`** — `v2.4.0-alpha.2` baseline work contains the clean Vite-boundary / test-stability safe harbor plus strict TypeScript and test AppData isolation fixes
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -16,7 +16,7 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.2`
 | Blocker | Status |
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`npm test` / Electron output verifier) | **NEEDS RECHECK** — prior local Alpha gate evidence was updated to `774ff7e`, but current dirty tree requires a fresh full-suite run |
+| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `821/821`; Electron output verifier passes `19/19` |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 | Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
@@ -26,9 +26,10 @@ Product UI: **Solith** · package `solith@2.3.0-alpha.2`
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npm test` (Alpha tip) | **PASS** — `811/811` at `v2.3.0-alpha.2`; rerun required after this safety-hardening slice |
-| Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build at `v2.3.0-alpha.2`; rerun required after this safety-hardening slice |
-| Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `19/19` after this safety-hardening slice |
+| Local `npx tsc --noEmit` (Alpha tip) | **PASS** — zero TypeScript errors at `985609e` |
+| Local `npm test` (Alpha tip) | **PASS** — `821/821` at `985609e` |
+| Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build after renderer/native boundary cleanup |
+| Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `19/19` after safety-hardening |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
 | Atomfall L3 live cert branch | **Merged** `cursor/atomfall-l3-live-cert` → `master` |
 
