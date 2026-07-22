@@ -392,6 +392,7 @@ interface Window {
     registryCompareRestartArtifacts: (payload: { previous: unknown; current: unknown }) => Promise<{
       success: boolean;
       comparison?: import('../core/runtime/restart-validation.js').RestartValidationArtifact;
+      pointerStability?: import('../core/runtime/delta-engine.js').SessionStabilityArtifact;
       error?: string;
     }>;
     liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) => Promise<{

@@ -47,6 +47,22 @@ interface RestartComparisonView {
   };
 }
 
+interface PointerStabilityView {
+  promotedToL3: string[];
+  unstableWarnings: string[];
+  summary: {
+    l3_stability_verified: number;
+    executable_or_registry_changed: number;
+    missing: number;
+    not_l2_resolved: number;
+    signature_changed: number;
+    pointer_hops_changed: number;
+    module_relative_offset_changed: number;
+    resolved_region_changed: number;
+    inconsistent: number;
+  };
+}
+
 function excerpt(text: string, needle: string, size = 360): string {
   if (!needle) return text.slice(0, size);
   const index = text.toLowerCase().indexOf(needle.toLowerCase());
@@ -141,10 +157,12 @@ function GovernanceDashboard({
   const [artifactPath, setArtifactPath] = useState('');
   const [previousArtifact, setPreviousArtifact] = useState<unknown | null>(null);
   const [restartComparison, setRestartComparison] = useState<RestartComparisonView | null>(null);
+  const [pointerStability, setPointerStability] = useState<PointerStabilityView | null>(null);
 
   const runVerification = async () => {
     setVerificationError('');
     setRestartComparison(null);
+    setPointerStability(null);
     const pid = Number(pidText);
     if (!Number.isInteger(pid) || pid <= 0) {
       setVerificationError('Enter the explicitly selected process PID.');
@@ -187,6 +205,7 @@ function GovernanceDashboard({
         const parsed = JSON.parse(String(reader.result ?? ''));
         setPreviousArtifact(parsed);
         setRestartComparison(null);
+        setPointerStability(null);
         setVerificationError('');
       } catch (error) {
         setPreviousArtifact(null);
@@ -216,6 +235,7 @@ function GovernanceDashboard({
       return;
     }
     setRestartComparison(response.comparison);
+    setPointerStability(response.pointerStability ?? null);
   };
 
   const verificationSummary = artifact?.summary.aobSignatures.byStatus;
@@ -382,6 +402,7 @@ function GovernanceDashboard({
 
         <div className="restart-compare-box">
           <h4>Restart comparison</h4>
+          <p className="muted">Compares saved artifacts offline for AOB candidates and Pointer L3 verified telemetry.</p>
           <label>
             Load previous verification artifact
             <input type="file" accept="application/json,.json" onChange={onLoadPreviousArtifact} />
@@ -390,20 +411,32 @@ function GovernanceDashboard({
             Compare Previous vs Current
           </button>
           {restartComparison && (
-            <dl className="kv-grid">
-              <dt>Previous session</dt>
-              <dd>{restartComparison.previousSessionId}</dd>
-              <dt>Current session</dt>
-              <dd>{restartComparison.currentSessionId}</dd>
-              <dt>L3 candidates</dt>
-              <dd>{restartComparison.summary.restart_stable_unique}</dd>
-              <dt>Hash changed</dt>
-              <dd>{restartComparison.summary.hash_changed}</dd>
-              <dt>Address changed</dt>
-              <dd>{restartComparison.summary.address_or_offset_changed}</dd>
-              <dt>Missing/not unique</dt>
-              <dd>{restartComparison.summary.missing + restartComparison.summary.not_unique}</dd>
-            </dl>
+            <>
+              <dl className="kv-grid">
+                <dt>Previous session</dt>
+                <dd>{restartComparison.previousSessionId}</dd>
+                <dt>Current session</dt>
+                <dd>{restartComparison.currentSessionId}</dd>
+                <dt>AOB L3 candidates</dt>
+                <dd>{restartComparison.summary.restart_stable_unique}</dd>
+                <dt>Hash changed</dt>
+                <dd>{restartComparison.summary.hash_changed}</dd>
+                <dt>Address changed</dt>
+                <dd>{restartComparison.summary.address_or_offset_changed}</dd>
+                <dt>Missing/not unique</dt>
+                <dd>{restartComparison.summary.missing + restartComparison.summary.not_unique}</dd>
+                <dt>Pointer L3 verified</dt>
+                <dd>{pointerStability?.summary.l3_stability_verified ?? 0}</dd>
+                <dt>Pointer warnings</dt>
+                <dd>{pointerStability?.unstableWarnings.length ?? 0}</dd>
+              </dl>
+              {(pointerStability?.promotedToL3.length ?? 0) > 0 && (
+                <div className="l3-telemetry" aria-label="L3 stability verified entries">
+                  <span className="status-pill status-pill-green">L3 Stability Verified</span>
+                  <small>{pointerStability?.promotedToL3.slice(0, 6).join(', ')}</small>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

@@ -10,6 +10,7 @@ import {
   type HeadlessVerificationArtifact,
   type HeadlessVerificationResponse,
 } from '../src/core/runtime/headless-verification.js';
+import { evaluateSessionStability } from '../src/core/runtime/delta-engine.js';
 import { compareRestartSignatureArtifacts } from '../src/core/runtime/restart-validation.js';
 import { validateLoadedRegistry } from '../src/core/registry/loaded-registry.js';
 
@@ -153,7 +154,11 @@ export function registerRegistryVerificationIpc(): void {
         previous: parsed.previous.aobResolution,
         current: parsed.current.aobResolution,
       });
-      return { success: true, comparison };
+      const pointerStability = evaluateSessionStability({
+        baseline: parsed.previous,
+        current: parsed.current,
+      });
+      return { success: true, comparison, pointerStability };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

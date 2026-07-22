@@ -54,6 +54,7 @@ export interface HeadlessPointerVerificationResult {
   rawAddress: string;
   rootOffset?: string;
   pointerChainLength: number;
+  linkedAobIds: string[];
   status: HeadlessPointerStatus;
   reason: string;
   finalAddress?: string;
@@ -181,6 +182,7 @@ export function verifyPipelinePointersReadOnly(
         rawAddress: entry.address_data.raw_address,
         rootOffset: entry.address_data.root_offset,
         pointerChainLength: entry.address_data.pointer_chain.length,
+        linkedAobIds: entry.linked_aob_ids,
         status: 'module_missing',
         reason: `Module ${entry.address_data.base} was not loaded in the selected process.`,
       };
@@ -195,6 +197,7 @@ export function verifyPipelinePointersReadOnly(
         rawAddress: entry.address_data.raw_address,
         rootOffset: entry.address_data.root_offset,
         pointerChainLength: entry.address_data.pointer_chain.length,
+        linkedAobIds: entry.linked_aob_ids,
         status: 'invalid_offset',
         reason: `Root offset ${entry.address_data.root_offset ?? entry.address_data.raw_address} is not valid bounded hex.`,
       };
@@ -209,6 +212,7 @@ export function verifyPipelinePointersReadOnly(
       rawAddress: entry.address_data.raw_address,
       rootOffset: entry.address_data.root_offset,
       pointerChainLength: entry.address_data.pointer_chain.length,
+      linkedAobIds: entry.linked_aob_ids,
       status: insideModule ? 'root_in_module_range' : 'root_out_of_module_range',
       reason: insideModule
         ? 'Pointer root offset is inside the verified module range. Pointer dereference remains disabled in this worker.'
@@ -228,6 +232,7 @@ function pointerEntryToHelperUnavailable(
     rawAddress: entry.address_data.raw_address,
     rootOffset: entry.address_data.root_offset,
     pointerChainLength: entry.address_data.pointer_chain.length,
+    linkedAobIds: entry.linked_aob_ids,
     status: 'helper_unavailable',
     reason,
   };
@@ -268,6 +273,7 @@ async function verifyPipelinePointersWithL2Helper(
         return response.pointerResults;
       })();
 
+    const entriesById = new Map(entries.map((entry) => [entry.ct_entry_id, entry]));
     return results.map((result) => ({
       entryId: result.entryId,
       label: result.label,
@@ -275,6 +281,7 @@ async function verifyPipelinePointersWithL2Helper(
       rawAddress: result.rawAddress,
       rootOffset: result.rootOffset,
       pointerChainLength: result.pointerChainLength,
+      linkedAobIds: entriesById.get(result.entryId)?.linked_aob_ids ?? [],
       status: result.status,
       reason: result.reason,
       finalAddress: result.finalAddress,

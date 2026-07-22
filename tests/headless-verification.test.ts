@@ -209,6 +209,7 @@ describe('headless read-only verification', () => {
         rawAddress: entry.address_data.raw_address,
         rootOffset: entry.address_data.root_offset,
         pointerChainLength: entry.address_data.pointer_chain.length,
+        linkedAobIds: entry.linked_aob_ids,
         status: entry.ct_entry_id === 'health' ? 'l2_resolved' : 'l2_unreadable',
         reason: 'test helper validation',
         finalAddress: '0x1234',
