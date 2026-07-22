@@ -30,6 +30,14 @@ test('release artifact paths follow package productName and version', () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('package homepage points to the public project site, not the local app entry file', () => {
+  const pkg = readPackageMetadata(findRepoRoot(import.meta.url));
+  assert.equal(typeof pkg.homepage, 'string');
+  assert.match(pkg.homepage, /^https:\/\/github\.com\/Jabanaster\/SOLITH\/?$/);
+  assert.equal(pkg.homepage.includes('index.html'), false);
+  assert.equal(pkg.homepage.startsWith('file:'), false);
+});
+
 test('release artifact listing finds Solith setup artifacts', () => {
   const root = makeRoot();
   const dist = path.join(root, 'dist');

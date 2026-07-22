@@ -73,6 +73,16 @@ describe('compileSolithCtRegistry', () => {
     });
 
     assert.equal(registry.schemaVersion, '1.0.0');
+    assert.equal(registry.pipeline.schema_version, '1.2.0');
+    assert.equal(registry.pipeline.source.kind, 'ct-file');
+    assert.equal(registry.pipeline.global_status.certification_level, 'L0');
+    assert.equal(registry.pipeline.global_status.verification_cycles_completed, 0);
+    assert.equal(registry.pipeline.entries[0]?.ct_entry_id, registry.pointers.accepted[0]?.id);
+    assert.deepEqual(registry.pipeline.entries[0]?.address_data.pointer_chain, ['0x18']);
+    assert.equal(registry.pipeline.aob_signatures[0]?.origin, 'ct-script-0-create-console');
+    assert.equal(registry.pipeline.aob_signatures[0]?.signature_type, 'script-extracted');
+    assert.equal(registry.pipeline.script_catalog_refs[0]?.catalog_storage_key, 'quarantine::ct-script-0-create-console::inert');
+    assert.ok(registry.pipeline.script_catalog_refs[0]?.rejection_flags.includes('CONTAINS_SCRIPT_METADATA'));
     assert.equal(registry.game, 'Avowed');
     assert.equal(registry.sourceFile, 'Avowed.CT');
     assert.equal(registry.metadata.totalPointers, 1);
@@ -102,8 +112,34 @@ describe('compileSolithCtRegistry', () => {
 
     const written = JSON.parse(fs.readFileSync(outPath, 'utf8')) as typeof registry;
     assert.equal(written.metadata.totalPointers, 1);
+    assert.equal(written.pipeline.schema_version, '1.2.0');
     assert.equal(written.scripts.scripts[0]?.executable, false);
     assert.equal(written.aobSignatures.length, 2);
+  });
+
+  test('records manual-import user trust intent without granting runtime certification', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ct-registry-'));
+    const ctPath = path.join(dir, 'Manual.CT');
+    fs.writeFileSync(ctPath, SAMPLE_CT, 'utf8');
+
+    const registry = await compileSolithCtRegistry(ctPath, {
+      game: 'Manual',
+      title: 'Manual',
+      compiledAt: '2026-07-20T00:00:00.000Z',
+      sourceKind: 'manual-import',
+      userCertified: true,
+      localTrustSignature: 'solith_local_test_signature',
+    });
+
+    assert.equal(registry.pipeline.source.kind, 'manual-import');
+    assert.equal(registry.pipeline.source.user_certified, true);
+    assert.equal(registry.pipeline.global_status.certification_level, 'L0');
+    assert.equal(registry.pipeline.global_status.local_trust_signature, 'solith_local_test_signature');
+    assert.match(
+      registry.pipeline.warnings.join('\n'),
+      /manual_import_declared: still requires bounded read-only verification before L3 and L4 gates/,
+    );
+    assert.ok(registry.pipeline.entries.every((entry) => entry.entry_state.current_tier === 'L0'));
   });
 
   test('produces deterministic AOB IDs across repeated compilation', async () => {

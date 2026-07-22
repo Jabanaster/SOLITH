@@ -36,11 +36,12 @@ describe('production Content Security Policy', () => {
     }
   });
 
-  test('blocks external network origins by default', () => {
+  test('blocks external execution and connection origins by default', () => {
     const csp = readProductionCsp();
     assert.deepStrictEqual(directiveValues(csp, 'default-src'), ["'self'"]);
     assert.deepStrictEqual(directiveValues(csp, 'connect-src'), ["'self'"]);
-    assert.equal(/https?:\/\/(?!localhost(?::|\/)|127\.0\.0\.1(?::|\/))\S+/i.test(csp), false);
+    assert.deepStrictEqual(directiveValues(csp, 'script-src'), ["'self'"]);
+    assert.deepStrictEqual(directiveValues(csp, 'font-src'), ["'self'", 'data:']);
   });
 
   test('keeps required local packaged resources available', () => {
@@ -48,7 +49,13 @@ describe('production Content Security Policy', () => {
     assert.deepStrictEqual(directiveValues(csp, 'script-src'), ["'self'"]);
     assert.deepStrictEqual(directiveValues(csp, 'style-src'), ["'self'", "'unsafe-inline'"]);
     assert.deepStrictEqual(directiveValues(csp, 'font-src'), ["'self'", 'data:']);
-    assert.deepStrictEqual(directiveValues(csp, 'img-src'), ["'self'", 'data:']);
+    assert.deepStrictEqual(directiveValues(csp, 'img-src'), [
+      "'self'",
+      'data:',
+      'solith-asset:',
+      'https://cdn.cloudflare.steamstatic.com',
+      'https://cdn.akamai.steamstatic.com',
+    ]);
     assert.deepStrictEqual(directiveValues(csp, 'frame-src'), ["'none'"]);
     assert.deepStrictEqual(directiveValues(csp, 'object-src'), ["'none'"]);
   });

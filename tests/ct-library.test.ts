@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import yazl from 'yazl';
 import { buildCtLibraryIndex } from '../src/core/ct-library/index.js';
-import { compileCtZipArchive } from '../src/core/registry/compile-ct-zip.js';
+import { compileCtZipArchive, validateZipEntryPath } from '../src/core/registry/compile-ct-zip.js';
 
 function writeZip(zipPath: string, entries: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -75,4 +75,13 @@ test('CT Library imports zip archives as metadata-only game cheat indexes', asyn
     ],
   );
   assert.equal(library.tables[0]?.cheats.every((cheat) => cheat.executable === false), true);
+});
+
+test('CT Library rejects unsafe zip CT entry paths before parsing', () => {
+  assert.equal(validateZipEntryPath('Safe/Game.CT'), null);
+  assert.equal(validateZipEntryPath('../Escape.CT'), 'zip entry path traversal is rejected');
+  assert.equal(validateZipEntryPath('Safe/../Escape.CT'), 'zip entry path traversal is rejected');
+  assert.equal(validateZipEntryPath('/Absolute.CT'), 'absolute zip entry paths are rejected');
+  assert.equal(validateZipEntryPath('C:/Absolute.CT'), 'absolute zip entry paths are rejected');
+  assert.equal(validateZipEntryPath('Bad\u0000Name.CT'), 'zip entry contains NUL byte');
 });

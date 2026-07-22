@@ -6,7 +6,10 @@ import yauzl from 'yauzl';
 import { parseCheatTableXml } from '../definitions/ct-import.js';
 import { extractAOBsFromCatalog } from '../script-research/aob-parser.js';
 import { extractCheatTableRawScriptCatalog } from '../script-research/ct-script-research.js';
-import { compileSolithCtRegistryFromXml } from './compile-ct-registry.js';
+import {
+  DEFAULT_MAX_CT_BYTES,
+  compileSolithCtRegistryFromXml,
+} from './compile-ct-registry.js';
 
 export interface CtZipCatalogEntry {
   archivePath: string;
@@ -85,10 +88,11 @@ export interface CompileCtZipOptions {
   outputRegistriesDir?: string;
   compiledAt?: string;
   maxCtBytes?: number;
+  maxArchiveBytes?: number;
   limit?: number;
 }
 
-const DEFAULT_MAX_CT_BYTES = 50 * 1024 * 1024;
+const DEFAULT_MAX_ARCHIVE_BYTES = 250 * 1024 * 1024;
 
 function slugId(value: string, fallback: string): string {
   const slug = value
@@ -112,6 +116,20 @@ function gameFromArchivePath(archivePath: string): string {
   const parent = parts[parts.length - 2]?.replace(/[_-]+/g, ' ').trim();
   if (!parent || /^(ct-files|cheat-tables-master|ce-examples-master)$/i.test(parent)) return fileTitle;
   return parent;
+}
+
+export function validateZipEntryPath(entryName: string): string | null {
+  const normalized = entryName.replace(/\\/g, '/');
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) {
+    return 'absolute zip entry paths are rejected';
+  }
+  if (normalized.split('/').some((part) => part === '..')) {
+    return 'zip entry path traversal is rejected';
+  }
+  if (normalized.includes('\0')) {
+    return 'zip entry contains NUL byte';
+  }
+  return null;
 }
 
 function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
@@ -226,6 +244,11 @@ export async function compileCtZipArchive(
   options: CompileCtZipOptions = {},
 ): Promise<CtZipCatalogIndex> {
   const sourceArchivePath = path.resolve(zipPath);
+  const archiveStats = await fs.stat(sourceArchivePath);
+  const maxArchiveBytes = options.maxArchiveBytes ?? DEFAULT_MAX_ARCHIVE_BYTES;
+  if (archiveStats.size > maxArchiveBytes) {
+    throw new Error(`CT archive exceeds ${maxArchiveBytes} byte import cap.`);
+  }
   const archiveBytes = await fs.readFile(sourceArchivePath);
   const sourceArchiveSha256 = crypto.createHash('sha256').update(archiveBytes).digest('hex');
   const generatedAt = options.compiledAt ?? new Date().toISOString();
@@ -266,6 +289,13 @@ export async function compileCtZipArchive(
             return;
           }
           index.totals.ctFiles += 1;
+          const unsafePathReason = validateZipEntryPath(entry.fileName);
+          if (unsafePathReason) {
+            index.rejected.push({ archivePath: entry.fileName, reason: unsafePathReason });
+            index.totals.rejectedTables += 1;
+            zipFile.readEntry();
+            return;
+          }
           if (entry.uncompressedSize > maxCtBytes) {
             index.rejected.push({ archivePath: entry.fileName, reason: `CT file exceeds ${maxCtBytes} byte import cap.` });
             index.totals.rejectedTables += 1;
@@ -294,6 +324,8 @@ export async function compileCtZipArchive(
                 title: table.tableName,
                 outputJsonPath: outputPath,
                 compiledAt: generatedAt,
+                maxCtBytes,
+                sourceKind: 'ct-zip-entry',
               });
             }
           } catch (error) {

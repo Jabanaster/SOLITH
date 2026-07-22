@@ -9,6 +9,8 @@ export interface VirtualCatalogGridProps<T> {
   items: T[];
   className?: string;
   gridClassName?: string;
+  backToTopClassName?: string;
+  backToTopLabel?: string;
   getKey: (item: T) => string;
   renderItem: (item: T) => React.ReactNode;
   onEndReached?: () => void;
@@ -22,6 +24,8 @@ export function VirtualCatalogGrid<T>({
   items,
   className,
   gridClassName,
+  backToTopClassName,
+  backToTopLabel = 'Back to top',
   getKey,
   renderItem,
   onEndReached,
@@ -90,8 +94,18 @@ export function VirtualCatalogGrid<T>({
     }
   }, [onEndReached, endReachedThresholdPx]);
 
+  const handleBackToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   return (
-    <div ref={scrollRef} className={className} onScroll={handleScroll}>
+    <div
+      ref={scrollRef}
+      className={className}
+      onScroll={handleScroll}
+      tabIndex={0}
+      aria-label="Trainer catalog results"
+    >
       <div style={{ height: totalHeight, position: 'relative' }}>
         <div
           className={gridClassName}
@@ -112,6 +126,16 @@ export function VirtualCatalogGrid<T>({
           ))}
         </div>
       </div>
+      {scrollTop > 480 && (
+        <button
+          type="button"
+          className={backToTopClassName}
+          onClick={handleBackToTop}
+          aria-label="Back to top of trainer catalog"
+        >
+          ↑ {backToTopLabel}
+        </button>
+      )}
     </div>
   );
 }

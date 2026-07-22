@@ -4,21 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
-      Content Security Policy — LOCAL ONLY
-      Solith is offline-first. Bundled assets load from the local app package.
+      Content Security Policy — LOCAL-FIRST
+      Solith is offline-first. Bundled assets load from the local app package;
+      trainer catalog cover art may load from Steam's image CDN only.
       - default-src 'self': everything must come from the local app bundle
       - style-src 'self' 'unsafe-inline': Vite injects inline styles during HMR
       - font-src 'self' data:: local font files and base64-encoded fonts only
-      - img-src 'self' data:: local images and inline data URIs
+      - img-src 'self' data: solith-asset: Steam CDNs: local images,
+        guarded local asset protocol, inline data URIs, and catalog cover art
       - connect-src 'self': no network origins in production HTML
-      - No remote scripts, no remote fonts, no remote images, no eval
+      - No remote scripts, no remote fonts, no eval
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
       script-src 'self';
       style-src 'self' 'unsafe-inline';
       font-src 'self' data:;
-      img-src 'self' data:;
+      img-src 'self' data: solith-asset: https://cdn.cloudflare.steamstatic.com https://cdn.akamai.steamstatic.com;
       connect-src 'self';
       frame-src 'none';
       object-src 'none';

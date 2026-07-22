@@ -14,6 +14,7 @@ import {
 } from '../../core/trainer-catalog/community-trust.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
+import { solithBranding } from '../assets/branding/index.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
@@ -48,6 +49,10 @@ interface TrustMeta {
 }
 
 const PAGE_SIZE = 120;
+
+function isCommunityScanEntry(entry: TrainerCatalogEntry): boolean {
+  return entry.hasModPack && requiresCommunityExecutionApproval(entry.certLevel);
+}
 
 function tierHint(entry: TrainerCatalogEntry): string {
   if (requiresCommunityExecutionApproval(entry.certLevel)) {
@@ -85,6 +90,7 @@ function CatalogCard({
 }) {
   const tagline = getCatalogTagline(entry);
   const coverUrl = resolveCatalogCoverUrl(entry);
+  const communityScan = isCommunityScanEntry(entry);
   return (
     <article className={styles.card}>
       <div className={styles.coverWrap}>
@@ -102,7 +108,14 @@ function CatalogCard({
           />
         ) : null}
         <div className={styles.coverFallback} style={coverUrl ? { display: 'none' } : undefined}>
-          {entry.displayName.charAt(0)}
+          <img
+            src={solithBranding.gameLibraryControllerMonitors}
+            alt=""
+            aria-hidden="true"
+            className={styles.coverFallbackArtwork}
+          />
+          <span>{entry.displayName}</span>
+          <small>No cover metadata yet</small>
         </div>
         <span className={styles.badge} title={tierHint(entry)}>
           {entry.verificationStatus}
@@ -176,8 +189,13 @@ function CatalogCard({
         )}
         <p className={styles.meta}>{tierHint(entry)}</p>
         <div className={styles.cardActions}>
-          <button type="button" className={styles.launchBtn} onClick={() => void onLaunch(entry)}>
-            {entry.hasModPack ? 'Open Trainer Deck' : 'View'}
+          <button
+            type="button"
+            className={communityScan ? styles.communityScanBtn : styles.launchBtn}
+            onClick={() => void onLaunch(entry)}
+            title={communityScan ? 'Open the scan-required community discovery deck' : undefined}
+          >
+            {communityScan ? 'Community Scan' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
           {entry.hasModPack && (
             <>
@@ -747,7 +765,7 @@ export default function TrainerLibraryPage({
       onDrop={(e) => void handleDropExe(e)}
     >
       <PageModuleHeader
-        artwork="trainerController"
+        artwork="trainerLibraryStopwatchClipboard"
         className={styles.header}
         title="Trainer Library"
         description={`${total.toLocaleString()} games${activeFilterSummary ? ` · ${activeFilterSummary}` : ''} · virtualized grid`}
@@ -941,6 +959,8 @@ export default function TrainerLibraryPage({
         <VirtualCatalogGrid
           className={styles.virtualScroll}
           gridClassName={styles.grid}
+          backToTopClassName={styles.backToTopBtn}
+          backToTopLabel="Back to top"
           items={visible}
           getKey={(entry) => entry.catalogGameId}
           onEndReached={handleLoadMore}

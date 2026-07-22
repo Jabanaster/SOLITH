@@ -202,6 +202,29 @@
   min-height: 420px;
   overflow: auto;
   margin-bottom: 0.5rem;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable both-edges;
+}
+
+.virtualScroll:focus-visible {
+  outline: 2px solid rgba(80, 220, 255, 0.55);
+  outline-offset: 3px;
+}
+
+.virtualScroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.virtualScroll::-webkit-scrollbar-track {
+  background: rgba(4, 10, 20, 0.7);
+  border-radius: 999px;
+}
+
+.virtualScroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(72, 219, 251, 0.55), rgba(139, 92, 246, 0.5));
+  border: 3px solid rgba(4, 10, 20, 0.7);
+  border-radius: 999px;
 }
 
 .tagline {
@@ -234,11 +257,37 @@
 .coverFallback {
   width: 100%;
   height: 100%;
-  display: grid;
-  place-items: center;
-  font-size: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: #6b8cc7;
   background: linear-gradient(145deg, #1a2740, #0d1424);
+}
+
+.coverFallback small {
+  display: block;
+  max-width: 100%;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  border-radius: 999px;
+  color: #9eb6dc;
+  background: rgba(5, 10, 18, 0.45);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.coverFallbackArtwork {
+  width: min(72%, 7rem);
+  height: auto;
+  object-fit: contain;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.28));
 }
 
 .badge {
@@ -371,7 +420,8 @@
   opacity: 0.85;
 }
 
-.launchBtn {
+.launchBtn,
+.communityScanBtn {
   margin-top: 0.55rem;
   width: 100%;
   padding: 0.45rem;
@@ -383,6 +433,14 @@
   font-size: 0.8rem;
 }
 
+.communityScanBtn {
+  border-color: rgba(245, 158, 11, 0.68);
+  background: linear-gradient(135deg, rgba(92, 58, 12, 0.98), rgba(30, 55, 90, 0.95));
+  color: #fff3c4;
+  font-weight: 800;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.18), 0 0 18px rgba(245, 158, 11, 0.1);
+}
+
 .cardActions {
   display: flex;
   flex-direction: column;
@@ -390,7 +448,8 @@
   margin-top: 0.55rem;
 }
 
-.cardActions .launchBtn {
+.cardActions .launchBtn,
+.cardActions .communityScanBtn {
   margin-top: 0;
 }
 
@@ -413,4 +472,26 @@
   border-radius: 8px;
   border: 1px solid rgba(240, 198, 116, 0.35);
   background: rgba(60, 45, 20, 0.35);
+}
+
+.backToTopBtn {
+  position: sticky;
+  left: calc(100% - 8.5rem);
+  bottom: 1rem;
+  z-index: 4;
+  width: 7.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(80, 220, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(10, 20, 36, 0.96);
+  color: #dff7ff;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 18px rgba(80, 220, 255, 0.18);
+}
+
+.backToTopBtn:hover {
+  border-color: rgba(80, 220, 255, 0.7);
+  background: rgba(20, 42, 72, 0.98);
 }

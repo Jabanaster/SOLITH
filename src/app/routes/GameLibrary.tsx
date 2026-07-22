@@ -77,7 +77,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
   return (
     <div className="game-library">
       <PageModuleHeader
-        artwork="trainerController"
+        artwork="gameLibraryControllerMonitors"
         title="Game Library"
         description="Manage local game folders, scan files, and edit saves"
         actions={<button onClick={() => setShowAddModal(true)} className="btn-add">+ Add Game</button>}
@@ -101,7 +101,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       {games.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon-slot">
-            <BrandingArtwork artwork="trainerController" size="empty" />
+            <BrandingArtwork artwork="gameLibraryControllerMonitors" size="empty" />
           </div>
           <h3>No games added yet</h3>
           <p>Add a local game directory to build custom file-backed trainers.</p>

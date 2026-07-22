@@ -2,6 +2,7 @@
   "name": "solith",
   "version": "2.4.0-alpha.2",
   "description": "Local AI Game Trainer + Save Editor + Discovery Lab",
+  "homepage": "https://github.com/Jabanaster/SOLITH",
   "main": "dist-electron/main.js",
   "author": "Solith",
   "license": "MIT",
