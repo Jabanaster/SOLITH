@@ -3,7 +3,6 @@ import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type { CtLibraryGameSummary, CtLibrarySummaryIndex } from '../../core/ct-library/types.js';
 import type { CtLibrarySearchResult } from '../../core/ct-library/search.js';
 import type { CtZipCatalogEntry } from '../../core/registry/compile-ct-zip.js';
-import { RESEARCH_PROMOTE_SEED_KEY, type ResearchPromoteSeed } from '../../core/live-memory/ct-promote.js';
 import styles from './CtLibraryExplorerPage.module.css';
 
 type KindFilter = 'all' | 'pointer' | 'script' | 'aob';
@@ -34,16 +33,23 @@ function tableForResult(tables: CtZipCatalogEntry[], result: CtLibrarySearchResu
   return tables.find((table) => table.sourceSha256 === result.sourceSha256 && table.archivePath === result.archivePath) ?? null;
 }
 
+type CtLibraryCheat = CtZipCatalogEntry['cheats'][number];
+
+function cheatForResult(table: CtZipCatalogEntry | null, result: CtLibrarySearchResult | null): CtLibraryCheat | null {
+  if (!table || !result) return null;
+  return table.cheats.find((cheat) => result.id === `${result.gameId}:${table.sourceSha256}:${cheat.id}`) ?? null;
+}
+
 function DetailPanel({
   result,
   detail,
-  onPromote,
 }: {
   result: CtLibrarySearchResult | null;
   detail: DetailResponse | null;
-  onPromote: (result: CtLibrarySearchResult) => void;
 }) {
   const table = tableForResult(detail?.tables ?? [], result);
+  const cheat = cheatForResult(table, result);
+  const metadata = cheat?.metadata;
 
   if (!result) {
     return (
@@ -91,7 +97,7 @@ function DetailPanel({
             {table.rejectedEntries.slice(0, 6).map((entry, index) => (
               <li key={`${entry.name}-${index}`}>
                 <strong>{entry.name}</strong>
-                <span>{entry.reason}</span>
+                <span>{entry.rejection_reason ?? entry.reason}</span>
               </li>
             ))}
           </ul>
@@ -100,16 +106,58 @@ function DetailPanel({
           )}
         </section>
       )}
-      {result.type === 'pointer' && (
-        <p>
-          <button type="button" className="btn-primary" onClick={() => onPromote(result)}>
-            Promote to Live Watch seed
-          </button>
-        </p>
+      {metadata && (
+        <section className={styles.metadataPanel} aria-label="Read-only CT metadata">
+          <h3>Read-only metadata</h3>
+          {result.type === 'aob' && (
+            <dl className={styles.kv}>
+              <dt>Symbol</dt>
+              <dd>{metadata.symbol ?? result.title}</dd>
+              <dt>Scan type</dt>
+              <dd>{metadata.scanType ?? 'unknown'}</dd>
+              <dt>Module</dt>
+              <dd>{metadata.moduleName ?? 'module-less / process-wide'}</dd>
+              <dt>Pattern</dt>
+              <dd><code>{metadata.pattern ?? 'not available'}</code></dd>
+              <dt>Source entry</dt>
+              <dd>{metadata.sourceEntry ?? 'unknown'}</dd>
+              <dt>Line</dt>
+              <dd>{formatNumber(metadata.lineNumber)}</dd>
+              <dt>Completeness</dt>
+              <dd>{metadata.completeness ?? 'unknown'}</dd>
+              <dt>Warnings</dt>
+              <dd>{metadata.warnings?.length ? metadata.warnings.join('; ') : 'none'}</dd>
+            </dl>
+          )}
+          {result.type === 'pointer' && (
+            <dl className={styles.kv}>
+              <dt>Data type</dt>
+              <dd>{metadata.dataType ?? 'unknown'}</dd>
+              <dt>Module</dt>
+              <dd>{metadata.moduleName ?? 'unknown'}</dd>
+              <dt>Raw address</dt>
+              <dd><code>{metadata.rawAddress ?? 'not available'}</code></dd>
+              <dt>Base offset</dt>
+              <dd><code>{metadata.baseOffset ?? 'not restart-stable'}</code></dd>
+              <dt>Pointer chain</dt>
+              <dd>{metadata.pointerChain?.length ? metadata.pointerChain.map((offset) => `0x${offset.toString(16)}`).join(' → ') : 'none'}</dd>
+              <dt>Resolution</dt>
+              <dd>{metadata.liveResolution ?? 'metadata-only'}</dd>
+            </dl>
+          )}
+          {result.type === 'script' && (
+            <dl className={styles.kv}>
+              <dt>Script type</dt>
+              <dd>{metadata.scriptType ?? 'unknown'}</dd>
+              <dt>Excerpt</dt>
+              <dd><code>{metadata.scriptExcerpt ?? 'not available'}</code></dd>
+            </dl>
+          )}
+        </section>
       )}
       <p className={styles.safety}>
         This explorer does not attach to a process, run Auto Assembler, download trainers, or write memory.
-        Promote seeds Research Lab / Live Toggle Cards after you attach with the single-player waiver.
+        Pointers and AOB signatures shown here are research metadata only and are not bound to LiveWatch execution paths.
       </p>
     </section>
   );
@@ -126,17 +174,6 @@ export default function CtLibraryExplorerPage() {
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-
-  const handlePromote = useCallback((result: CtLibrarySearchResult) => {
-    const seed: ResearchPromoteSeed = {
-      label: result.title,
-      liveResolution: 'incomplete',
-      addressHint: undefined,
-    };
-    // Metadata-only promote: seed label for Research Lab; full path comes from CT import.
-    localStorage.setItem(RESEARCH_PROMOTE_SEED_KEY, JSON.stringify(seed));
-    setMessage(`Promoted “${result.title}” seed — open Advanced Scan Mode / Research panel after attach.`);
-  }, []);
 
   const selected = useMemo(
     () => results.find((result) => result.id === selectedId) ?? results[0] ?? null,
@@ -264,7 +301,7 @@ export default function CtLibraryExplorerPage() {
             )}
           </div>
         </section>
-        <DetailPanel result={selected} detail={detail} onPromote={handlePromote} />
+        <DetailPanel result={selected} detail={detail} />
       </div>
     </main>
   );

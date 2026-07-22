@@ -102,6 +102,10 @@ function entryResults(game: CtLibraryGameSummary, table: CtZipCatalogEntry): CtL
   }));
 }
 
+function cheatForResult(game: CtLibraryGameSummary, table: CtZipCatalogEntry, result: CtLibrarySearchResult): CtZipCatalogEntry['cheats'][number] | null {
+  return table.cheats.find((cheat) => `${game.gameId}:${table.sourceSha256}:${cheat.id}` === result.id) ?? null;
+}
+
 export async function loadCtLibrarySummary(paths: CtLibraryPaths): Promise<CtLibrarySummaryIndex | null> {
   return readJsonFile<CtLibrarySummaryIndex>(paths.summaryPath);
 }
@@ -131,11 +135,18 @@ export async function searchCtLibrary(
       const tableMatchesQuery = includesText([table.tableName, table.archivePath, table.game], query);
       for (const result of entryResults(game, table)) {
         if (kind !== 'all' && result.type !== kind) continue;
+        const cheat = cheatForResult(game, table, result);
         if (
           query &&
           !includesText([game.displayName, game.gameId], query) &&
           !tableMatchesQuery &&
-          !includesText([result.title, result.type], query)
+          !includesText([
+            result.title,
+            result.type,
+            cheat?.metadata?.moduleName,
+            cheat?.metadata?.pattern,
+            cheat?.metadata?.scanType,
+          ], query)
         ) continue;
         all.push(result);
       }

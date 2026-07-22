@@ -78,9 +78,49 @@ async function makeLibraryFixture() {
         { name: 'Unsafe Missing Address', reason: 'Missing address; retained as rejected metadata.' },
       ],
       cheats: [
-        { id: 'ptr-health', name: 'Health', kind: 'pointer', executable: false, certificationLevel: 'L0' },
-        { id: 'script-stamina', name: 'Stamina script', kind: 'script', executable: false, certificationLevel: 'L0' },
-        { id: 'aob-gold', name: 'Gold AOB', kind: 'aob', executable: false, certificationLevel: 'L0' },
+        {
+          id: 'ptr-health',
+          name: 'Health',
+          kind: 'pointer',
+          executable: false,
+          certificationLevel: 'L0',
+          metadata: {
+            dataType: 'float',
+            moduleName: 'Avowed-Win64-Shipping.exe',
+            rawAddress: '"Avowed-Win64-Shipping.exe"+1234',
+            baseOffset: '0x1234',
+            pointerChain: [16, 32],
+            liveResolution: 'resolvable',
+          },
+        },
+        {
+          id: 'script-stamina',
+          name: 'Stamina script',
+          kind: 'script',
+          executable: false,
+          certificationLevel: 'L0',
+          metadata: {
+            scriptType: 'AutoAssembler_Script',
+            scriptExcerpt: '[ENABLE]',
+          },
+        },
+        {
+          id: 'aob-gold',
+          name: 'Gold AOB',
+          kind: 'aob',
+          executable: false,
+          certificationLevel: 'L0',
+          metadata: {
+            symbol: 'goldAob',
+            moduleName: 'Avowed-Win64-Shipping.exe',
+            scanType: 'aobscanmodule',
+            pattern: '48 8B ?? 89',
+            sourceEntry: 'Gold script',
+            lineNumber: 12,
+            warnings: [],
+            completeness: 'complete',
+          },
+        },
       ],
     }],
   }), 'utf8');
@@ -107,6 +147,15 @@ describe('CT Library search', () => {
     assert.equal(result.results[0]?.certificationLevel, 'L0');
   });
 
+  test('searches inert AOB metadata without creating executable records', async () => {
+    const paths = await makeLibraryFixture();
+    const result = await searchCtLibrary(paths, { query: '48 8B ?? 89', kind: 'aob' });
+    assert.equal(result.available, true);
+    assert.equal(result.total, 1);
+    assert.equal(result.results[0]?.title, 'Gold AOB');
+    assert.equal(result.results[0]?.executable, false);
+  });
+
   test('filters by game and exposes table detail for inspection', async () => {
     const paths = await makeLibraryFixture();
     const result = await searchCtLibrary(paths, { gameId: 'avowed' });
@@ -118,5 +167,7 @@ describe('CT Library search', () => {
     assert.equal(detail.game?.displayName, 'Avowed');
     assert.equal(detail.tables[0]?.counts.scripts, 1);
     assert.equal(detail.tables[0]?.rejectedEntries?.[0]?.reason, 'Missing address; retained as rejected metadata.');
+    assert.equal(detail.tables[0]?.cheats.find((cheat) => cheat.kind === 'aob')?.metadata?.pattern, '48 8B ?? 89');
+    assert.equal(detail.tables[0]?.cheats.find((cheat) => cheat.kind === 'pointer')?.metadata?.moduleName, 'Avowed-Win64-Shipping.exe');
   });
 });

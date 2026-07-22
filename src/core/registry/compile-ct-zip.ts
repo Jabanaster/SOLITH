@@ -25,6 +25,7 @@ export interface CtZipCatalogEntry {
   rejectedEntries?: Array<{
     name: string;
     reason: string;
+    rejection_reason?: string;
   }>;
   cheats: Array<{
     id: string;
@@ -32,6 +33,24 @@ export interface CtZipCatalogEntry {
     kind: 'pointer' | 'script' | 'aob';
     executable: false;
     certificationLevel: 'L0';
+    metadata?: {
+      dataType?: string;
+      moduleName?: string;
+      rawAddress?: string;
+      baseOffset?: string;
+      pointerChain?: number[];
+      liveResolution?: string;
+      showAsHex?: boolean;
+      scriptType?: string;
+      scriptExcerpt?: string;
+      symbol?: string;
+      scanType?: string;
+      pattern?: string;
+      sourceEntry?: string;
+      lineNumber?: number;
+      warnings?: string[];
+      completeness?: string;
+    };
   }>;
 }
 
@@ -140,6 +159,15 @@ async function tableEntryFromXml(archivePath: string, xmlText: string): Promise<
     kind: 'pointer' as const,
     executable: false as const,
     certificationLevel: 'L0' as const,
+    metadata: {
+      dataType: pointer.dataType,
+      moduleName: pointer.moduleName,
+      rawAddress: pointer.rawAddress,
+      baseOffset: pointer.baseOffset,
+      pointerChain: pointer.pointerChain,
+      liveResolution: pointer.liveResolution,
+      showAsHex: pointer.showAsHex,
+    },
   }));
   const scriptCheats = scripts.scripts.map((script, index) => ({
     id: `script-${index}-${slugId(script.name, 'script')}`,
@@ -147,6 +175,10 @@ async function tableEntryFromXml(archivePath: string, xmlText: string): Promise<
     kind: 'script' as const,
     executable: false as const,
     certificationLevel: 'L0' as const,
+    metadata: {
+      scriptType: script.type,
+      scriptExcerpt: script.script_excerpt,
+    },
   }));
   const aobCheats = aobReport.signatures.map((signature, index) => ({
     id: `aob-${index}-${slugId(signature.symbol, 'signature')}`,
@@ -154,6 +186,16 @@ async function tableEntryFromXml(archivePath: string, xmlText: string): Promise<
     kind: 'aob' as const,
     executable: false as const,
     certificationLevel: 'L0' as const,
+    metadata: {
+      symbol: signature.symbol,
+      moduleName: signature.module,
+      scanType: signature.scanType,
+      pattern: signature.pattern,
+      sourceEntry: signature.sourceEntry,
+      lineNumber: signature.lineNumber,
+      warnings: signature.warnings,
+      completeness: signature.completeness,
+    },
   }));
   const cheats = [...pointerCheats, ...scriptCheats, ...aobCheats];
   return {
@@ -173,6 +215,7 @@ async function tableEntryFromXml(archivePath: string, xmlText: string): Promise<
     rejectedEntries: pointers.rejected.map((rejection) => ({
       name: rejection.name,
       reason: rejection.reason,
+      rejection_reason: rejection.reason,
     })),
     cheats,
   };

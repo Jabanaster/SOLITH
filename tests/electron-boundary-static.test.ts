@@ -28,6 +28,10 @@ const FORBIDDEN_BACKEND_IMPORTS = [
   /\/core\/live-memory\/single-player-waiver$/i,
 ];
 
+const CT_LIBRARY_FORBIDDEN_IMPORTS = [
+  /\/core\/live-memory\//i,
+];
+
 function listSourceFiles(dir: string): string[] {
   const files: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -68,6 +72,12 @@ describe('Electron renderer boundary', () => {
         }
         if (FORBIDDEN_BACKEND_IMPORTS.some((pattern) => pattern.test(normalized))) {
           violations.push(`${path.relative(ROOT, file)} imports backend module ${specifier}`);
+        }
+        if (
+          path.basename(file) === 'CtLibraryExplorerPage.tsx' &&
+          CT_LIBRARY_FORBIDDEN_IMPORTS.some((pattern) => pattern.test(normalized))
+        ) {
+          violations.push(`${path.relative(ROOT, file)} imports live-memory module ${specifier}`);
         }
       }
     }
