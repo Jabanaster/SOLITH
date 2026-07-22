@@ -20,6 +20,7 @@ dist-electron/
 out/
 build/
 *.tsbuildinfo
+native/**/target/
 
 # ── Electron Builder installer artifacts ─────────────────────────────────────
 *.exe

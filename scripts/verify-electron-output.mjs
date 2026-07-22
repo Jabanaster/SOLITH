@@ -41,6 +41,7 @@ check('main.js exists', fileExists('main.js'));
 check('preload.cjs exists', fileExists('preload.cjs'));
 check('host-entry.js exists (TrainerHost child process)', fileExists('host-entry.js'));
 check('headless-verification-worker.js exists (read-only runtime worker)', fileExists('headless-verification-worker.js'));
+check('solith-readonly-scanner.exe exists (Windows read-only helper)', process.platform !== 'win32' || fileExists('solith-readonly-scanner.exe'));
 
 const mainText  = readBundleText('main.js');
 const preloadText = readBundleText('preload.cjs');
@@ -98,12 +99,15 @@ console.log('\n── Bundle sanity');
 const mainSize = existsSync(join(DIST, 'main.js')) ? statSync(join(DIST, 'main.js')).size : 0;
 const preloadSize = existsSync(join(DIST, 'preload.cjs')) ? statSync(join(DIST, 'preload.cjs')).size : 0;
 const headlessWorkerSize = existsSync(join(DIST, 'headless-verification-worker.js')) ? statSync(join(DIST, 'headless-verification-worker.js')).size : 0;
+const scannerSize = existsSync(join(DIST, 'solith-readonly-scanner.exe')) ? statSync(join(DIST, 'solith-readonly-scanner.exe')).size : 0;
 check('main.js > 10 KB (not empty/stub)',     mainSize > 10_000,    `actual: ${(mainSize/1024).toFixed(1)} KB`);
 check('main.js < 5 MB (not bloated)',         mainSize < 5_000_000, `actual: ${(mainSize/1024).toFixed(1)} KB`);
 check('preload.cjs > 100 bytes (not empty)',  preloadSize > 100,    `actual: ${preloadSize} bytes`);
 check('preload.cjs < 100 KB (not bloated)',   preloadSize < 100_000, `actual: ${preloadSize} bytes`);
 check('headless-verification-worker.js > 1 KB (not empty/stub)', headlessWorkerSize > 1_000, `actual: ${headlessWorkerSize} bytes`);
 check('headless-verification-worker.js < 500 KB (not bloated)', headlessWorkerSize < 500_000, `actual: ${(headlessWorkerSize/1024).toFixed(1)} KB`);
+check('solith-readonly-scanner.exe > 10 KB on Windows (not empty/stub)', process.platform !== 'win32' || scannerSize > 10_000, `actual: ${scannerSize} bytes`);
+check('solith-readonly-scanner.exe < 5 MB on Windows (not bloated)', process.platform !== 'win32' || scannerSize < 5_000_000, `actual: ${(scannerSize/1024).toFixed(1)} KB`);
 
 // ── Result ───────────────────────────────────────────────────────────────────
 console.log(`\n── Summary: ${checks - failures}/${checks} checks passed\n`);

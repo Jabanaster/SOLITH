@@ -10,6 +10,7 @@ import {
 import { BufferMemoryReader } from '../src/core/runtime/memory-reader.ts';
 import type { RuntimeModuleInfo } from '../src/core/runtime/module-inspection.ts';
 import type { RuntimeProcessSummary } from '../src/core/runtime/process-discovery.ts';
+import { pipelineEntriesToScannerPointers } from '../src/core/runtime/readonly-scanner-helper.ts';
 import type { WindowsReadOnlyProcessSession } from '../src/core/runtime/windows-readonly-process-module-reader.ts';
 import type { CompiledCtRegistry } from '../src/core/registry/load-registry.ts';
 
@@ -194,6 +195,33 @@ describe('headless read-only verification', () => {
     );
   });
 
+  test('uses helper-backed L2 pointer validation when a validator is provided', async () => {
+    const session = new FakeReadOnlySession([
+      { name: 'safe.exe', baseAddress: 0x1000n, size: 5, sha256: 'f'.repeat(64) },
+    ]);
+
+    const artifact = await runHeadlessVerificationJob(makeRequest(), {
+      openSession: () => session,
+      pointerL2Validator: async ({ entries }) => entries.map((entry) => ({
+        entryId: entry.ct_entry_id,
+        label: entry.label,
+        module: entry.address_data.base,
+        rawAddress: entry.address_data.raw_address,
+        rootOffset: entry.address_data.root_offset,
+        pointerChainLength: entry.address_data.pointer_chain.length,
+        status: entry.ct_entry_id === 'health' ? 'l2_resolved' : 'l2_unreadable',
+        reason: 'test helper validation',
+        finalAddress: '0x1234',
+        hops: [],
+      })),
+      now: () => '2026-07-22T01:00:00.000Z',
+    });
+
+    assert.equal(artifact.summary.pointers.l2_resolved, 1);
+    assert.equal(artifact.summary.pointers.l2_unreadable, 2);
+    assert.equal(artifact.pointerResults.find((result) => result.entryId === 'health')?.finalAddress, '0x1234');
+  });
+
   test('rejects non-explicit process selection through typed message handling', async () => {
     const response = await handleHeadlessVerificationMessage({
       ...makeRequest(),
@@ -213,5 +241,20 @@ describe('headless read-only verification', () => {
 
     assert.equal(results.length, 3);
     assert.equal(results.every((result) => result.status === 'module_missing'), true);
+  });
+
+  test('maps CT pipeline entries to the standalone scanner protocol without executable fields', () => {
+    const scannerPointers = pipelineEntriesToScannerPointers([...pipeline.entries]);
+
+    assert.deepEqual(scannerPointers[0], {
+      entryId: 'health',
+      label: 'Health',
+      module: 'safe.exe',
+      rawAddress: 'safe.exe+2',
+      rootOffset: '0x2',
+      pointerChain: ['0x18'],
+    });
+    assert.equal('executable' in scannerPointers[0]!, false);
+    assert.equal('write' in scannerPointers[0]!, false);
   });
 });

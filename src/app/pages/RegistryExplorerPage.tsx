@@ -27,6 +27,10 @@ interface RegistryVerificationArtifactView {
     pointers: {
       root_in_module_range: number;
       root_out_of_module_range: number;
+      l2_resolved?: number;
+      l2_unreadable?: number;
+      l2_invalid_chain?: number;
+      helper_unavailable?: number;
     };
   };
 }
@@ -362,10 +366,16 @@ function GovernanceDashboard({
               <dd>{verificationSummary.multiple_matches}</dd>
               <dt>No match</dt>
               <dd>{verificationSummary.no_match}</dd>
+              <dt>L2 pointer chains resolved</dt>
+              <dd>{artifact.summary.pointers.l2_resolved ?? 0}</dd>
+              <dt>L2 unreadable/invalid</dt>
+              <dd>{(artifact.summary.pointers.l2_unreadable ?? 0) + (artifact.summary.pointers.l2_invalid_chain ?? 0)}</dd>
+              <dt>Helper unavailable</dt>
+              <dd>{artifact.summary.pointers.helper_unavailable ?? 0}</dd>
               <dt>Pointer roots in module</dt>
-              <dd>{artifact.summary.pointers.root_in_module_range}</dd>
+              <dd>{artifact.summary.pointers.root_in_module_range ?? 0}</dd>
               <dt>Pointer roots out of range</dt>
-              <dd>{artifact.summary.pointers.root_out_of_module_range}</dd>
+              <dd>{artifact.summary.pointers.root_out_of_module_range ?? 0}</dd>
             </dl>
           </div>
         )}

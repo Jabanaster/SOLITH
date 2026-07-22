@@ -7,6 +7,10 @@ import type { RuntimeModuleInfo } from './module-inspection.js';
 import { findModule } from './module-inspection.js';
 import type { RuntimeProcessSummary } from './process-discovery.js';
 import {
+  validatePointerL2WithScanner,
+  type PointerL2Result,
+} from './readonly-scanner-helper.js';
+import {
   resolveRegistrySignaturesReadOnly,
   type ResolveRegistrySignaturesInput,
   type SignatureResolutionArtifact,
@@ -26,7 +30,11 @@ export type HeadlessPointerStatus =
   | 'module_missing'
   | 'invalid_offset'
   | 'root_in_module_range'
-  | 'root_out_of_module_range';
+  | 'root_out_of_module_range'
+  | 'l2_resolved'
+  | 'l2_unreadable'
+  | 'l2_invalid_chain'
+  | 'helper_unavailable';
 
 export interface HeadlessVerificationRequest {
   protocolVersion: typeof HEADLESS_VERIFICATION_PROTOCOL_VERSION;
@@ -48,6 +56,8 @@ export interface HeadlessPointerVerificationResult {
   pointerChainLength: number;
   status: HeadlessPointerStatus;
   reason: string;
+  finalAddress?: string;
+  hops?: PointerL2Result['hops'];
 }
 
 export interface HeadlessVerificationArtifact {
@@ -92,6 +102,13 @@ export type HeadlessVerificationResponse =
 
 export interface HeadlessVerificationDependencies {
   openSession?: ResolveRegistrySignaturesInput['openSession'];
+  pointerL2Validator?: (input: {
+    requestId: string;
+    process: RuntimeProcessSummary;
+    entries: CtCompilerPipelineEntry[];
+    timeoutMs?: number;
+  }) => Promise<PointerL2Result[]>;
+  scannerPath?: string;
   now?: () => string;
 }
 
@@ -141,6 +158,10 @@ function pointerStatusCounts(): Record<HeadlessPointerStatus, number> {
     invalid_offset: 0,
     root_in_module_range: 0,
     root_out_of_module_range: 0,
+    l2_resolved: 0,
+    l2_unreadable: 0,
+    l2_invalid_chain: 0,
+    helper_unavailable: 0,
   };
 }
 
@@ -196,6 +217,75 @@ export function verifyPipelinePointersReadOnly(
   });
 }
 
+function pointerEntryToHelperUnavailable(
+  entry: CtCompilerPipelineEntry,
+  reason: string,
+): HeadlessPointerVerificationResult {
+  return {
+    entryId: entry.ct_entry_id,
+    label: entry.label,
+    module: entry.address_data.base,
+    rawAddress: entry.address_data.raw_address,
+    rootOffset: entry.address_data.root_offset,
+    pointerChainLength: entry.address_data.pointer_chain.length,
+    status: 'helper_unavailable',
+    reason,
+  };
+}
+
+async function verifyPipelinePointersWithL2Helper(
+  input: {
+    pipeline: CtCompilerPipelineRegistry | undefined;
+    process: RuntimeProcessSummary;
+    requestId: string;
+    timeoutMs?: number;
+    scannerPath?: string;
+    pointerL2Validator?: HeadlessVerificationDependencies['pointerL2Validator'];
+  },
+): Promise<HeadlessPointerVerificationResult[]> {
+  const entries = input.pipeline?.entries ?? [];
+  if (entries.length === 0) return [];
+
+  try {
+    const results = input.pointerL2Validator
+      ? await input.pointerL2Validator({
+        requestId: input.requestId,
+        process: input.process,
+        entries,
+        timeoutMs: input.timeoutMs,
+      })
+      : await (async () => {
+        const response = await validatePointerL2WithScanner({
+          requestId: input.requestId,
+          process: input.process,
+          entries,
+          timeoutMs: input.timeoutMs,
+          scannerPath: input.scannerPath,
+        });
+        if (!response.ok) {
+          throw new Error(`${response.error.code}: ${response.error.message}`);
+        }
+        return response.pointerResults;
+      })();
+
+    return results.map((result) => ({
+      entryId: result.entryId,
+      label: result.label,
+      module: result.module,
+      rawAddress: result.rawAddress,
+      rootOffset: result.rootOffset,
+      pointerChainLength: result.pointerChainLength,
+      status: result.status,
+      reason: result.reason,
+      finalAddress: result.finalAddress,
+      hops: result.hops,
+    }));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return entries.map((entry) => pointerEntryToHelperUnavailable(entry, reason));
+  }
+}
+
 function summarizePointers(results: HeadlessPointerVerificationResult[]): Record<HeadlessPointerStatus, number> {
   const counts = pointerStatusCounts();
   for (const result of results) counts[result.status] += 1;
@@ -241,7 +331,19 @@ export async function runHeadlessVerificationJob(
     request.timeoutMs,
   );
 
-  const pointerResults = verifyPipelinePointersReadOnly(request.registry.pipeline, capturedModules);
+  const pointerResults = dependencies.pointerL2Validator || !dependencies.openSession
+    ? await withTimeout(
+      verifyPipelinePointersWithL2Helper({
+        pipeline: request.registry.pipeline,
+        process: request.process,
+        requestId: request.requestId,
+        timeoutMs: request.timeoutMs,
+        scannerPath: dependencies.scannerPath,
+        pointerL2Validator: dependencies.pointerL2Validator,
+      }),
+      request.timeoutMs,
+    )
+    : verifyPipelinePointersReadOnly(request.registry.pipeline, capturedModules);
   const generatedAt = dependencies.now?.() ?? request.generatedAt ?? new Date().toISOString();
 
   return {

@@ -18,7 +18,8 @@
     "dev:electron:watch": "tsup --config tsup.config.ts --watch",
     "dev:electron:launch": "electron dist-electron/main.js --dev",
     "build:vite": "vite build",
-    "build:electron": "tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs",
+    "build:scanner": "node scripts/build-readonly-scanner.mjs",
+    "build:electron": "npm run build:scanner && tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs",
     "build": "npm run build:vite && npm run build:electron && electron-builder",
     "test:v1": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/save-format.test.ts tests/json-save-field.test.ts tests/ini-save-field.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/electron-boundary-static.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/sql-parameter-binding.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/game-profile-catalog.test.ts tests/game-profile-review.test.ts tests/game-profile-support-matrix.test.ts tests/v2-safe-workflow-copy.test.ts",
     "test:v2-lifecycle": "tsx --test tests/v2-lifecycle.test.ts",
@@ -97,7 +98,8 @@
       "node_modules/better-sqlite3/**",
       "node_modules/sql.js/**",
       "dist-electron/host-entry.js",
-      "dist-electron/headless-verification-worker.js"
+      "dist-electron/headless-verification-worker.js",
+      "dist-electron/solith-readonly-scanner.exe"
     ],
     "extraResources": [
       {
