@@ -125,13 +125,27 @@ async function secureTokenMatch(provided: string, expected: string): Promise<boo
 
 export const app = new Hono<{ Bindings: Bindings }>();
 
-app.get('/health', (c) =>
-  c.json({
-    service: 'solith-hub-backend',
-    status: 'ok',
-    time: new Date().toISOString(),
-  }),
-);
+app.get('/health', async (c) => {
+  try {
+    await c.env.DB.prepare('SELECT 1').first();
+    return c.json({
+      service: 'solith-hub-backend',
+      status: 'healthy',
+      database: 'connected',
+      time: new Date().toISOString(),
+    });
+  } catch {
+    return c.json(
+      {
+        service: 'solith-hub-backend',
+        status: 'unhealthy',
+        database: 'disconnected',
+        time: new Date().toISOString(),
+      },
+      503,
+    );
+  }
+});
 
 app.get('/catalog/sync', async (c) => {
   const parsed = syncQuerySchema.safeParse({ since: c.req.query('since') ?? EPOCH });

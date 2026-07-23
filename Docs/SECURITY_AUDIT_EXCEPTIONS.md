@@ -12,8 +12,7 @@ with a non-breaking package-manager update.
 - Date recorded: 2026-07-20
 
 `npm audit fix` has already been applied. The remaining finding is nested under
-`tsup`, and `tsup` is already pinned to the latest published version available
-to this project (`8.5.1`).
+`tsup` has been resolved in the active release line.
 
 The advisory affects the esbuild development server on Windows. Solith does not
 ship or expose the esbuild development server in packaged releases; it is used
@@ -27,28 +26,29 @@ Required follow-up:
 - Do not use `npm audit --force` to satisfy this exception unless a maintainer
   explicitly accepts the resulting breaking changes.
 
-## Release exclusion: `solith-hub-backend` Cloudflare tooling
+## Historical note: `solith-hub-backend` Cloudflare tooling
 
 - Package scope: `solith-hub-backend`
 - Affected tools: `wrangler -> miniflare -> sharp`
-- Severity currently reported by npm: high
-- Status: excluded from the desktop packaged release gate
+- Prior severity reported by npm: high
+- Status: resolved as of the 2.4.0-rc.1 follow-up line
 - Date recorded: 2026-07-22
+- Date resolved: 2026-07-22
 
-The Solith desktop application does not package or execute the
-`solith-hub-backend` Cloudflare Worker tooling. The hub is a separate service
-track with its own `package.json`, `package-lock.json`, deployment flow, and D1
-database binding.
+The hub backend previously remained outside the desktop release gate while npm
+reported the inherited `sharp`/`libvips` advisory through Miniflare.
 
-`wrangler@4.113.0` and current Workers types were tested, but npm still reports
-the inherited `sharp`/`libvips` advisory through Miniflare. Downgrading to npm's
-suggested `wrangler@4.15.2` also introduces older Wrangler/Undici/ws advisories,
-so forcing the downgrade is not an acceptable release fix.
+Resolution:
 
-Desktop release gates therefore require:
+- `wrangler` remains on the current 4.x line.
+- `miniflare` is explicit in the hub backend dev dependency graph.
+- `sharp` is overridden under Miniflare to `0.35.3`, which clears the inherited
+  libvips advisory without downgrading Wrangler to an older vulnerable chain.
+- `solith-hub-backend npm ci`, `npm audit`, `npm run typecheck`, and `npm test`
+  all pass.
 
-- root `npm audit` to pass;
-- root build/test/smoke gates to pass;
-- hub backend to remain excluded from desktop distribution artifacts;
-- hub deployment to remain blocked until `solith-hub-backend/npm audit` is
-  clean or a separately reviewed service exception is approved.
+Required follow-up:
+
+- Re-run hub `npm audit` before every hub deployment.
+- Remove or revise this historical note if Miniflare removes the need for the
+  scoped Sharp override.

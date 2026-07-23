@@ -22,9 +22,17 @@ Exit criteria:
 - `npm audit --audit-level=low` is clean, or every accepted exception is
   documented in `Docs/SECURITY_AUDIT_EXCEPTIONS.md` with a removal condition
 
-The desktop release gate applies to the root package. `solith-hub-backend` is a
-separate Cloudflare service track and is excluded from desktop release artifacts
-until its own `npm audit` is clean or separately approved.
+The desktop release gate applies to the root package. The hub backend is a
+separate Cloudflare service track, but it must also pass its own service gate
+before any hub deployment is released:
+
+```powershell
+cd solith-hub-backend
+npm ci
+npm audit
+npm run typecheck
+npm test
+```
 
 ## Pull request gate
 

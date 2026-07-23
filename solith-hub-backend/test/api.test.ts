@@ -32,6 +32,14 @@ class FakeStatement {
     return this;
   }
 
+  async first<T>(): Promise<T | null> {
+    if (this.query.trim().toUpperCase() === 'SELECT 1') {
+      return { '1': 1 } as T;
+    }
+
+    throw new Error(`Unexpected test query: ${this.query}`);
+  }
+
   async all<T>(): Promise<D1Result<T>> {
     const [since, through] = this.values as [string, string];
     const results = this.db.rows
@@ -103,6 +111,16 @@ function env(db = new FakeD1(), adminToken = 'test-admin-token') {
   };
 }
 
+class FailingD1 extends FakeD1 {
+  override prepare(): D1PreparedStatement {
+    return {
+      first: async () => {
+        throw new Error('D1 unavailable');
+      },
+    } as unknown as D1PreparedStatement;
+  }
+}
+
 const validSubmission = {
   game_id: 'atomfall',
   executable_hash: 'a'.repeat(64),
@@ -131,6 +149,28 @@ const validSubmission = {
 };
 
 describe('Solith Definition Hub API', () => {
+  it('reports healthy only after a D1 round-trip succeeds', async () => {
+    const response = await app.request('/health', undefined, env().bindings);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      service: 'solith-hub-backend',
+      status: 'healthy',
+      database: 'connected',
+    });
+  });
+
+  it('reports unhealthy when D1 is unavailable', async () => {
+    const response = await app.request('/health', undefined, env(new FailingD1()).bindings);
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      service: 'solith-hub-backend',
+      status: 'unhealthy',
+      database: 'disconnected',
+    });
+  });
+
   it('forces every submission to L0_Community and strips client certification', async () => {
     const testEnv = env();
     const response = await app.request(
