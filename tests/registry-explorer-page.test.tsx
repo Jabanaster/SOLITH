@@ -70,7 +70,25 @@ const registry = {
       verification_cycles_completed: 0,
       last_monitored_pid: null,
     },
-    entries: [],
+    entries: [{
+      ct_entry_id: 'entry-health',
+      entry_path: ['Health'],
+      label: 'Health Pointer',
+      type: 'Float',
+      address_data: {
+        base: 'Avowed-Win64-Shipping.exe',
+        root_offset: '0x1234',
+        raw_address: 'Avowed-Win64-Shipping.exe+1234',
+        pointer_chain: ['0x20'],
+        is_valid_math: true,
+      },
+      linked_script_ids: [],
+      linked_aob_ids: ['aob-playerhealth'],
+      entry_state: {
+        current_tier: 'L0',
+        proven_stable_sessions: 0,
+      },
+    }],
     aob_signatures: [{
       aob_id: 'aob-playerhealth',
       origin: 'ct-script-0-health-script',
@@ -107,6 +125,9 @@ describe('RegistryExplorerPage', () => {
     assert.match(html, /Run Read-Only Verification/);
     assert.match(html, /Restart comparison/);
     assert.match(html, /Pointer L3 verified/);
+    assert.match(html, /Offline L4 prep/);
+    assert.match(html, /Authorize &amp; Enable/);
+    assert.match(html, /Requires L3 artifact evidence first/);
     assert.match(html, /cannot promote rows into Live Watch/);
     assert.match(html, /Solith does not execute Auto Assembler text here/);
   });

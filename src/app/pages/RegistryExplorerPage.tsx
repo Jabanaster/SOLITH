@@ -4,6 +4,8 @@ import { validateLoadedRegistry } from '../../core/registry/loaded-registry.js';
 import type { CtCompilerPipelineRegistry } from '../../core/registry/compile-ct-registry.js';
 import type { RegistryResultType, RegistrySearchResult } from '../../core/registry/query-registry.js';
 import { searchRegistry } from '../../core/registry/query-registry.js';
+import type { L4CertificationTier, L4EntryEvidence } from '../../core/registry/l4-governance.js';
+import { L4GovernancePanel } from '../components/L4GovernancePanel.js';
 
 interface RegistryExplorerPageProps {
   registry?: CompiledCtRegistry | null;
@@ -251,6 +253,24 @@ function GovernanceDashboard({
   }
 
   const quarantinedScripts = pipeline.script_catalog_refs.filter((script) => script.rejection_flags.length > 0);
+  const l3StableEntryIds = new Set(pointerStability?.promotedToL3 ?? []);
+  const l4Entries: L4EntryEvidence[] = pipeline.entries.map((entry) => {
+    const l3Stable = l3StableEntryIds.has(entry.ct_entry_id);
+    const pointerChain = [
+      entry.address_data.root_offset ?? entry.address_data.raw_address,
+      ...entry.address_data.pointer_chain,
+    ].filter((segment): segment is string => Boolean(segment));
+
+    return {
+      ctEntryId: entry.ct_entry_id,
+      label: entry.label,
+      certificationTier: (l3Stable ? 'L3' : entry.entry_state.current_tier) as L4CertificationTier,
+      moduleTarget: entry.address_data.base,
+      pointerChain,
+      valueType: entry.type,
+      l3ArtifactHash: l3Stable ? pipeline.source.sha256 : undefined,
+    };
+  });
 
   return (
     <section className="panel-card" aria-label="Governance dashboard">
@@ -440,6 +460,8 @@ function GovernanceDashboard({
           )}
         </div>
       </section>
+
+      <L4GovernancePanel entries={l4Entries} />
     </section>
   );
 }
