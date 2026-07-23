@@ -40,6 +40,16 @@ test('package homepage points to the public project site, not the local app entr
   assert.equal(pkg.homepage.startsWith('file:'), false);
 });
 
+test('local index.html includes a useful static fallback for direct file opens', () => {
+  const root = findRepoRoot(import.meta.url);
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf-8');
+
+  assert.match(html, /static-landing/);
+  assert.match(html, /npm run dev/);
+  assert.match(html, /github\.com\/Jabanaster\/SOLITH/);
+  assert.match(html, /\.\/solith-icon\.png/);
+});
+
 test('release artifact listing finds Solith setup artifacts', () => {
   const root = makeRoot();
   const dist = path.join(root, 'dist');

@@ -51,12 +51,15 @@ interface TrustMeta {
 const PAGE_SIZE = 120;
 
 function isCommunityScanEntry(entry: TrainerCatalogEntry): boolean {
-  return entry.hasModPack && requiresCommunityExecutionApproval(entry.certLevel);
+  return entry.hasModPack && (
+    requiresCommunityExecutionApproval(entry.certLevel) ||
+    entry.verificationStatus === 'community'
+  );
 }
 
 function tierHint(entry: TrainerCatalogEntry): string {
-  if (requiresCommunityExecutionApproval(entry.certLevel)) {
-    return 'Community definition — active scan and explicit approval required';
+  if (isCommunityScanEntry(entry)) {
+    return 'Community definition — opens Discovery first; explicit approval is required before any live attach';
   }
   if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
   if (entry.verificationStatus === 'community') return 'First session scan may be required';
@@ -120,7 +123,7 @@ function CatalogCard({
         <span className={styles.badge} title={tierHint(entry)}>
           {entry.verificationStatus}
         </span>
-        {requiresCommunityExecutionApproval(entry.certLevel) && (
+        {isCommunityScanEntry(entry) && (
           <span
             className={styles.communityBadge}
             aria-label={COMMUNITY_WARNING_LABEL}
@@ -193,9 +196,9 @@ function CatalogCard({
             type="button"
             className={communityScan ? styles.communityScanBtn : styles.launchBtn}
             onClick={() => void onLaunch(entry)}
-            title={communityScan ? 'Open the scan-required community discovery deck' : undefined}
+            title={communityScan ? 'Open the scan-required community discovery deck; no memory writes run from this card.' : undefined}
           >
-            {communityScan ? 'Community Scan' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
+            {communityScan ? 'Run Community Scan' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
           {entry.hasModPack && (
             <>

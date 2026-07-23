@@ -909,6 +909,24 @@ button, input, select, textarea {
 
 .game-card.border-warning { border-color: rgba(245, 158, 11, 0.35); }
 
+.game-card-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 138px;
+  padding: 14px 16px 4px;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(56, 189, 248, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(14, 28, 48, 0.9), rgba(9, 14, 25, 0.2));
+}
+
+.game-card-art img {
+  width: min(78%, 190px);
+  height: 120px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.28));
+}
+
 .game-card-content { padding: 16px; }
 
 .game-card-header {

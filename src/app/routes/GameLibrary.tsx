@@ -120,6 +120,9 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
                 className={`game-card glass ${game.needsRescan ? 'border-warning' : ''}`}
                 onClick={() => onSelect(game.id)}
               >
+                <div className="game-card-art" aria-hidden="true">
+                  <BrandingArtwork artwork="gameLibraryControllerMonitors" size="section" />
+                </div>
                 <div className="game-card-content">
                   <div className="game-card-header">
                     <h3 className="game-name">{game.name}</h3>

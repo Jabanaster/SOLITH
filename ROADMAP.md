@@ -4,7 +4,7 @@
 
 Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 
-* Local **`master` @ `985609e`** — `v2.4.0-alpha.2` baseline work contains the clean Vite-boundary / test-stability safe harbor plus strict TypeScript and test AppData isolation fixes
+* Local **`master` @ `7b21120`** — `v2.4.0-alpha.2` baseline work contains the clean Vite-boundary / test-stability safe harbor, strict TypeScript and test AppData isolation fixes, the standalone read-only scanner helper, and the offline L2→L3 delta comparison engine
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -16,7 +16,7 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Blocker | Status |
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `821/821`; Electron output verifier passes `19/19` |
+| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `833/833`; Electron output verifier passes `29/29` |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 | Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
@@ -26,10 +26,10 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npx tsc --noEmit` (Alpha tip) | **PASS** — zero TypeScript errors at `985609e` |
-| Local `npm test` (Alpha tip) | **PASS** — `821/821` at `985609e` |
+| Local `npx tsc --noEmit` (Alpha tip) | **PASS** — zero TypeScript errors at `7b21120` |
+| Local `npm test` (Alpha tip) | **PASS** — `833/833` at `7b21120` |
 | Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build after renderer/native boundary cleanup |
-| Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `19/19` after safety-hardening |
+| Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `29/29` after safety-hardening |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
 | Atomfall L3 live cert branch | **Merged** `cursor/atomfall-l3-live-cert` → `master` |
 
@@ -71,6 +71,7 @@ Dual-Core Live Engine → Internal (Win32 VEH/Injection) + External (WinGDK RPM)
 | **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
 | **AH** | schema.v1 catalog unification (capability SoT) | **Done** — merged to `master` (Phases 0→5) |
 | **AI** *(Alpha)* | Verified Alpha cut — installer + `v2.3.0-alpha.1` | **Done** — NSIS `dist/Solith Setup 2.3.0-alpha.1.exe`; await push/tag lock |
+| **AJ** | Offline L2→L3 delta comparison engine | **Done** — `7b21120`; compares saved read-only verification artifacts, ignores ASLR absolute drift, and promotes only stable structural evidence |
 
 ### Shell polish / evidence (2026-07)
 
@@ -117,7 +118,7 @@ Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** unt
 | 2 | Anti-cheat / protected-target blocking | **Active / strengthened** — read-only process adapter fails closed on known protected indicators before returning a session |
 | 3 | Harmless-process smoke tests | **Available** — `npm run smoke:runtime-readonly -- --pid <pid> --name <process.exe>` uses explicit PID selection and bounded module reads |
 | 4 | Offline/single-player support | **Standing rule** — live features require explicit offline/private-play confirmation and guard evidence |
-| 5 | Restart validation + L0–L4 certification | **Active / strengthened** — restart artifact comparison can classify unique stable signatures as L3 candidates only when evidence stays stable |
+| 5 | Restart validation + L0–L4 certification | **Active / strengthened** — restart artifact comparison can classify unique stable signatures and pointer-chain telemetry as L3 candidates only when evidence stays stable |
 | 6 | Metadata-only CT import + inert script preservation | **Done / strengthened** — CT scripts remain `executable=false`; rejection reasons are preserved for review |
 | 7 | Read-only process/module scanning + AOB extraction | **Done / active** — AOB extraction and read-only signature resolution exist; live game validation still requires explicit process selection |
 | 8 | Safe save editing with backup/rollback | **Implemented for accepted save-field paths** — proposal/backup/rollback remains the preferred route where file-backed support exists |

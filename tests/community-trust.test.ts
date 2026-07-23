@@ -1,5 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   COMMUNITY_WARNING_LABEL,
   requiresCommunityExecutionApproval,
@@ -8,11 +10,21 @@ import {
   sanitizeDefinitionForCommunityPublish,
 } from '../src/core/trainer-catalog/sync/hub-client.ts';
 
+const ROOT = path.resolve(import.meta.dirname ?? '.', '..');
+
 describe('community definition trust layer', () => {
   test('L0 definitions receive the required warning and execution gate', () => {
     assert.equal(COMMUNITY_WARNING_LABEL, 'Community (Scan Required)');
     assert.equal(requiresCommunityExecutionApproval('L0_Community'), true);
     assert.equal(requiresCommunityExecutionApproval('L3_Certified'), false);
+  });
+
+  test('Trainer Library exposes community rows as explicit scan-required actions', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'src/app/pages/TrainerLibraryPage.tsx'), 'utf-8');
+
+    assert.match(source, /entry\.verificationStatus === 'community'/);
+    assert.match(source, /Run Community Scan/);
+    assert.match(source, /no memory writes run from this card/i);
   });
 
   test('publishing strips PII paths and all client certification claims', () => {
