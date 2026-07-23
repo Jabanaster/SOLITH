@@ -4,7 +4,7 @@
 
 Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 
-* Local **`master` @ `7b21120`** — `v2.4.0-alpha.2` baseline work contains the clean Vite-boundary / test-stability safe harbor, strict TypeScript and test AppData isolation fixes, the standalone read-only scanner helper, and the offline L2→L3 delta comparison engine
+* Local **`master` @ `c7a6dec`** — `v2.4.0-alpha.2` baseline work contains the clean Vite-boundary / test-stability safe harbor, strict TypeScript and test AppData isolation fixes, the standalone read-only scanner helper, the offline L2→L3 delta comparison engine, and the offline L4 UI governance prep
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -16,7 +16,7 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Blocker | Status |
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `833/833`; Electron output verifier passes `29/29` |
+| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `844/844`; Electron output verifier passes `29/29` |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 | Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
@@ -26,8 +26,8 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npx tsc --noEmit` (Alpha tip) | **PASS** — zero TypeScript errors at `7b21120` |
-| Local `npm test` (Alpha tip) | **PASS** — `833/833` at `7b21120` |
+| Local `npx tsc --noEmit` (Alpha tip) | **PASS** — zero TypeScript errors at `c7a6dec` before target-metadata work |
+| Local `npm test` (Alpha tip) | **PASS** — `844/844` after target-metadata work |
 | Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build after renderer/native boundary cleanup |
 | Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `29/29` after safety-hardening |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
@@ -123,6 +123,7 @@ Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** unt
 | 7 | Read-only process/module scanning + AOB extraction | **Done / active** — AOB extraction and read-only signature resolution exist; live game validation still requires explicit process selection |
 | 8 | Safe save editing with backup/rollback | **Implemented for accepted save-field paths** — proposal/backup/rollback remains the preferred route where file-backed support exists |
 | 9 | CT Library Explorer + rejection reports | **Active / strengthened** — CT Library detail now surfaces rejection reasons, not just counts |
+| 10 | Multi-launcher target metadata | **Active / strengthened** — one game profile can map Steam/GOG/Epic/Xbox/EA/etc. executable targets; certification remains per executable hash/build and restricted packages fail closed without elevation |
 
 ### Bundled schema.v1 definitions
 

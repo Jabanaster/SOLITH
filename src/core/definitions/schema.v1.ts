@@ -31,6 +31,31 @@ export type MemoryDataType = (typeof MEMORY_DATA_TYPES)[number];
 export const CERTIFICATION_LEVELS = ['L0', 'L1', 'L2', 'L3', 'L4'] as const;
 export type CertificationLevel = (typeof CERTIFICATION_LEVELS)[number];
 
+export const TARGET_LAUNCHERS = ['steam', 'gog', 'epic', 'xbox_pc', 'ea', 'ubisoft', 'rockstar', 'standalone', 'unknown'] as const;
+export type TargetLauncher = (typeof TARGET_LAUNCHERS)[number];
+
+export const TARGET_PACKAGING = ['win32', 'msixvc', 'uwp', 'appcontainer', 'unknown'] as const;
+export type TargetPackaging = (typeof TARGET_PACKAGING)[number];
+
+export const TARGET_ACCESS_MODELS = [
+  'standard_user_readonly',
+  'restricted_or_denied',
+  'protected_target_blocked',
+] as const;
+export type TargetAccessModel = (typeof TARGET_ACCESS_MODELS)[number];
+
+export interface SolithTargetMetadataV1 {
+  targetId: string;
+  launcher: TargetLauncher;
+  executableName: string;
+  executableSha256?: string;
+  executableHashPrefixes?: string[];
+  moduleName: string;
+  packaging: TargetPackaging;
+  accessModel: TargetAccessModel;
+  certificationLevel?: CertificationLevel;
+}
+
 export interface SolithDefinitionV1 {
   schemaVersion: typeof SOLITH_DEFINITION_SCHEMA_VERSION;
   id: string;
@@ -50,6 +75,12 @@ export interface SolithDefinitionV1 {
     executables: string[];
     arch: 'x86' | 'x64';
   };
+  /**
+   * Optional launcher/build-specific executable identities.
+   * Certification applies per target metadata entry; game-level identity stays
+   * human-readable while Steam/GOG/Epic/Xbox builds remain separate evidence.
+   */
+  targetMetadata?: SolithTargetMetadataV1[];
   /** Per-game reviewed connection baseline for the online-session guard. */
   connectionBaseline?: number;
   /** Aggregate pack certification (max achieved across features). */
@@ -99,6 +130,8 @@ export interface SaveEditorV1 {
 }
 
 const HEX_OFFSET = z.string().regex(/^0x[0-9a-fA-F]+$/, 'baseOffset must be 0x-prefixed hex');
+const SHA256 = z.string().regex(/^[a-f0-9]{64}$/i);
+const SHA256_PREFIX = z.string().regex(/^[a-f0-9]{4,64}$/i);
 
 export const MemoryFeatureResolutionV1Schema = z.object({
   signature: z.string().min(3).max(512).optional(),
@@ -137,13 +170,33 @@ export const SaveEditorV1Schema = z.object({
   saveFields: z.array(SaveFieldFeatureV1Schema).max(500),
 });
 
+export const SolithTargetMetadataV1Schema = z.object({
+  targetId: z.string().min(1).max(128),
+  launcher: z.enum(TARGET_LAUNCHERS),
+  executableName: z.string().min(1).max(260),
+  executableSha256: SHA256.optional(),
+  executableHashPrefixes: z.array(SHA256_PREFIX).max(32).optional(),
+  moduleName: z.string().min(1).max(260),
+  packaging: z.enum(TARGET_PACKAGING),
+  accessModel: z.enum(TARGET_ACCESS_MODELS),
+  certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
+}).superRefine((target, ctx) => {
+  if (target.accessModel !== 'standard_user_readonly' && target.certificationLevel && target.certificationLevel !== 'L0') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['certificationLevel'],
+      message: 'Restricted or protected target metadata cannot claim L1+ certification.',
+    });
+  }
+});
+
 export const SolithDefinitionV1Schema = z.object({
   schemaVersion: z.literal(SOLITH_DEFINITION_SCHEMA_VERSION),
   id: z.string().min(1).max(128),
   title: z.string().min(1).max(200),
   gameVersion: z.string().min(1).max(80),
-  targetSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
-  executableHashPrefixes: z.array(z.string().regex(/^[a-f0-9]{4,64}$/i)).max(32).default([]),
+  targetSHA256: SHA256.optional(),
+  executableHashPrefixes: z.array(SHA256_PREFIX).max(32).default([]),
   author: z.string().min(1).max(120),
   safety: z.object({
     requiresApproval: z.boolean(),
@@ -154,6 +207,7 @@ export const SolithDefinitionV1Schema = z.object({
     executables: z.array(z.string().min(1).max(260)).min(1).max(32),
     arch: z.enum(['x86', 'x64']),
   }),
+  targetMetadata: z.array(SolithTargetMetadataV1Schema).max(64).optional(),
   connectionBaseline: z.number().int().nonnegative().max(64).optional(),
   certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
   memoryFeatures: z.array(MemoryFeatureV1Schema).max(500).optional(),
