@@ -124,7 +124,8 @@
       "uninstallerIcon": "public/solith-icon.ico",
       "installerHeaderIcon": "public/solith-icon.ico",
       "shortcutName": "Solith",
-      "uninstallDisplayName": "Solith"
+      "uninstallDisplayName": "Solith",
+      "deleteAppDataOnUninstall": true
     }
   },
   "devDependencies": {

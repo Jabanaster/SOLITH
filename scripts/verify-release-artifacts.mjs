@@ -54,6 +54,7 @@ check(
 check('NSIS installerIcon points to Solith S icon', pkg.build?.nsis?.installerIcon === 'public/solith-icon.ico', pkg.build?.nsis?.installerIcon);
 check('NSIS uninstallerIcon points to Solith S icon', pkg.build?.nsis?.uninstallerIcon === 'public/solith-icon.ico', pkg.build?.nsis?.uninstallerIcon);
 check('NSIS installerHeaderIcon points to Solith S icon', pkg.build?.nsis?.installerHeaderIcon === 'public/solith-icon.ico', pkg.build?.nsis?.installerHeaderIcon);
+check('NSIS uninstall removes Solith app data', pkg.build?.nsis?.deleteAppDataOnUninstall === true, String(pkg.build?.nsis?.deleteAppDataOnUninstall));
 
 check('installer exists', exists(paths.installer), paths.installer);
 check('installer blockmap exists', exists(paths.installerBlockMap), paths.installerBlockMap);
