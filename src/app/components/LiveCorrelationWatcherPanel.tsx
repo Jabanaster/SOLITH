@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   CorrelationCandidate,
   CorrelationCandidateState,
@@ -6,7 +6,11 @@ import type {
   CorrelationReport,
   PlayerCorrelationEvent,
 } from '../../core/live-memory/live-correlation-watcher.js';
-import { buildOcrCorrelationEvent } from '../../core/ocr/local-ocr.js';
+import {
+  buildOcrCorrelationEvent,
+  scaleDisplayRoiToCapture,
+  type OcrRegionOfInterest,
+} from '../../core/ocr/local-ocr.js';
 
 type CorrelationEventKind = PlayerCorrelationEvent['kind'];
 
@@ -45,8 +49,20 @@ interface OcrSource {
   id: string;
   name: string;
   thumbnailDataUrl: string;
+  thumbnailSize?: { width: number; height: number };
+  captureSize?: { width: number; height: number };
   appIconDataUrl?: string;
 }
+
+interface SavedOcrRegion {
+  id: string;
+  name: string;
+  roi: OcrRegionOfInterest;
+}
+
+const OCR_REGION_STORAGE_KEY = 'solith:ocr-regions:v1';
+const DEFAULT_CAPTURE_SIZE = { width: 1920, height: 1080 };
+const OCR_REGION_PRESETS = ['Health', 'Essence', 'Stamina', 'XP', 'Gold', 'Weight', 'Item Count'];
 
 export default function LiveCorrelationWatcherPanel({
   attached,
@@ -70,6 +86,14 @@ export default function LiveCorrelationWatcherPanel({
   const [ocrMessage, setOcrMessage] = useState('');
   const [ocrRoi, setOcrRoi] = useState({ x: 0, y: 0, width: 420, height: 120 });
   const [lastOcrValue, setLastOcrValue] = useState<number | null>(null);
+  const [ocrRegionName, setOcrRegionName] = useState('Health');
+  const [savedOcrRegions, setSavedOcrRegions] = useState<SavedOcrRegion[]>([]);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    setSavedOcrRegions(loadSavedOcrRegions());
+  }, []);
 
   const candidates = useMemo<CorrelationCandidate[]>(() => {
     const seen = new Set<string>();
@@ -106,6 +130,7 @@ export default function LiveCorrelationWatcherPanel({
   const disabled = busy || !attached;
   const canStart = !disabled && candidates.length > 0 && !active;
   const selectedOcrSource = ocrSources.find((source) => source.id === ocrSourceId);
+  const captureSize = selectedOcrSource?.captureSize ?? DEFAULT_CAPTURE_SIZE;
 
   const refreshOcrSources = async () => {
     const api = window.electronAPI;
@@ -146,6 +171,81 @@ export default function LiveCorrelationWatcherPanel({
     } finally {
       setOcrBusy(false);
     }
+  };
+
+  const setRoiField = (key: keyof OcrRegionOfInterest, value: number) => {
+    setOcrRoi((current) => ({
+      ...current,
+      [key]: Math.max(key === 'width' || key === 'height' ? 1 : 0, Math.round(value) || 0),
+    }));
+  };
+
+  const pointerToDisplayPoint = (event: React.PointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(Math.max(event.clientX - bounds.left, 0), bounds.width),
+      y: Math.min(Math.max(event.clientY - bounds.top, 0), bounds.height),
+      bounds,
+    };
+  };
+
+  const startRoiDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!selectedOcrSource || ocrBusy) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = pointerToDisplayPoint(event);
+    dragStartRef.current = { x: point.x, y: point.y };
+    const roi = scaleDisplayRoiToCapture(
+      { x: point.x, y: point.y, width: 1, height: 1 },
+      { width: point.bounds.width, height: point.bounds.height },
+      captureSize,
+    );
+    setOcrRoi(roi);
+  };
+
+  const updateRoiDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStartRef.current || !selectedOcrSource || ocrBusy) return;
+    const point = pointerToDisplayPoint(event);
+    const x = Math.min(dragStartRef.current.x, point.x);
+    const y = Math.min(dragStartRef.current.y, point.y);
+    const width = Math.max(Math.abs(point.x - dragStartRef.current.x), 1);
+    const height = Math.max(Math.abs(point.y - dragStartRef.current.y), 1);
+    const roi = scaleDisplayRoiToCapture(
+      { x, y, width, height },
+      { width: point.bounds.width, height: point.bounds.height },
+      captureSize,
+    );
+    setOcrRoi(roi);
+  };
+
+  const endRoiDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartRef.current) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      dragStartRef.current = null;
+      setOcrMessage('OCR region selected. Run OCR tie-break or save this region for reuse.');
+    }
+  };
+
+  const saveCurrentOcrRegion = () => {
+    const name = ocrRegionName.trim() || 'OCR Region';
+    const nextRegion: SavedOcrRegion = {
+      id: slugifyRegionName(name),
+      name,
+      roi: ocrRoi,
+    };
+    setSavedOcrRegions((current) => {
+      const next = [nextRegion, ...current.filter((region) => region.id !== nextRegion.id)].slice(0, 24);
+      saveSavedOcrRegions(next);
+      return next;
+    });
+    setOcrMessage(`Saved OCR region "${name}" locally on this machine.`);
+  };
+
+  const loadCurrentOcrRegion = (regionId: string) => {
+    const region = savedOcrRegions.find((candidate) => candidate.id === regionId);
+    if (!region) return;
+    setOcrRegionName(region.name);
+    setOcrRoi(region.roi);
+    setOcrMessage(`Loaded OCR region "${region.name}".`);
   };
 
   return (
@@ -295,19 +395,70 @@ export default function LiveCorrelationWatcherPanel({
         </div>
         {selectedOcrSource && (
           <div className="live-correlation-ocr-layout">
-            <img src={selectedOcrSource.thumbnailDataUrl} alt={`Preview of ${selectedOcrSource.name}`} />
+            <div
+              ref={previewRef}
+              className="live-correlation-ocr-preview"
+              role="application"
+              aria-label="Drag to select OCR region"
+              onPointerDown={startRoiDrag}
+              onPointerMove={updateRoiDrag}
+              onPointerUp={endRoiDrag}
+              onPointerCancel={endRoiDrag}
+            >
+              <img src={selectedOcrSource.thumbnailDataUrl} alt={`Preview of ${selectedOcrSource.name}`} draggable={false} />
+              <div className="live-correlation-ocr-roi" style={roiToPercentStyle(ocrRoi, captureSize)} />
+              <span className="live-correlation-ocr-hint">Drag over visible numbers</span>
+            </div>
             <div className="live-correlation-ocr-controls">
+              <div className="live-correlation-region-row">
+                <label>
+                  Region name
+                  <input
+                    type="text"
+                    value={ocrRegionName}
+                    onChange={(event) => setOcrRegionName(event.target.value)}
+                    disabled={ocrBusy}
+                  />
+                </label>
+                <button type="button" className="btn-secondary" onClick={saveCurrentOcrRegion} disabled={ocrBusy}>
+                  Save region
+                </button>
+              </div>
+              <div className="live-correlation-region-presets" aria-label="OCR region presets">
+                {OCR_REGION_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setOcrRegionName(preset)}
+                    disabled={ocrBusy}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              {savedOcrRegions.length > 0 && (
+                <select
+                  aria-label="Saved OCR region"
+                  defaultValue=""
+                  onChange={(event) => loadCurrentOcrRegion(event.target.value)}
+                  disabled={ocrBusy}
+                >
+                  <option value="">Load saved region…</option>
+                  {savedOcrRegions.map((region) => (
+                    <option key={region.id} value={region.id}>{region.name}</option>
+                  ))}
+                </select>
+              )}
               <div className="live-correlation-roi-grid">
                 {(['x', 'y', 'width', 'height'] as const).map((key) => (
                   <label key={key}>
                     ROI {key}
                     <input
                       type="number"
-                      min={0}
+                      min={key === 'width' || key === 'height' ? 1 : 0}
                       value={ocrRoi[key]}
-                      onChange={(event) =>
-                        setOcrRoi((current) => ({ ...current, [key]: Math.max(0, Number(event.target.value) || 0) }))
-                      }
+                      onChange={(event) => setRoiField(key, Number(event.target.value))}
                       disabled={ocrBusy}
                     />
                   </label>
@@ -381,4 +532,48 @@ function formatTrail(values: number[]): string {
     .slice(-6)
     .map((value) => Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/\.?0+$/, ''))
     .join(' → ');
+}
+
+function roiToPercentStyle(roi: OcrRegionOfInterest, captureSize: { width: number; height: number }): React.CSSProperties {
+  const left = `${(roi.x / captureSize.width) * 100}%`;
+  const top = `${(roi.y / captureSize.height) * 100}%`;
+  const width = `${(roi.width / captureSize.width) * 100}%`;
+  const height = `${(roi.height / captureSize.height) * 100}%`;
+  return { left, top, width, height };
+}
+
+function loadSavedOcrRegions(): SavedOcrRegion[] {
+  try {
+    const raw = window.localStorage.getItem(OCR_REGION_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isSavedOcrRegion).slice(0, 24);
+  } catch {
+    return [];
+  }
+}
+
+function saveSavedOcrRegions(regions: SavedOcrRegion[]): void {
+  try {
+    window.localStorage.setItem(OCR_REGION_STORAGE_KEY, JSON.stringify(regions));
+  } catch {
+    // Local persistence is optional; OCR remains usable even if storage is unavailable.
+  }
+}
+
+function isSavedOcrRegion(value: unknown): value is SavedOcrRegion {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as SavedOcrRegion;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    Boolean(candidate.roi) &&
+    ['x', 'y', 'width', 'height'].every((key) => Number.isFinite(candidate.roi[key as keyof OcrRegionOfInterest]))
+  );
+}
+
+function slugifyRegionName(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return slug || 'ocr-region';
 }

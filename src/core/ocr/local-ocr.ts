@@ -7,6 +7,13 @@ export interface OcrRegionOfInterest {
   height: number;
 }
 
+export interface OcrDisplayRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export interface LocalOcrResult {
   text: string;
   normalizedText: string;
@@ -57,4 +64,29 @@ export function buildOcrCorrelationEvent(result: LocalOcrResult): PlayerCorrelat
     observedValue: result.value,
     observedAt: new Date().toISOString(),
   };
+}
+
+export function scaleDisplayRoiToCapture(
+  displayRoi: OcrRegionOfInterest,
+  displaySize: { width: number; height: number },
+  captureSize: { width: number; height: number },
+): OcrRegionOfInterest {
+  if (displaySize.width <= 0 || displaySize.height <= 0) {
+    throw new Error('ocr_display_size_invalid');
+  }
+  if (captureSize.width <= 0 || captureSize.height <= 0) {
+    throw new Error('ocr_capture_size_invalid');
+  }
+
+  const xScale = captureSize.width / displaySize.width;
+  const yScale = captureSize.height / displaySize.height;
+  const x = clamp(Math.round(displayRoi.x * xScale), 0, captureSize.width - 1);
+  const y = clamp(Math.round(displayRoi.y * yScale), 0, captureSize.height - 1);
+  const width = clamp(Math.round(displayRoi.width * xScale), 1, captureSize.width - x);
+  const height = clamp(Math.round(displayRoi.height * yScale), 1, captureSize.height - y);
+  return { x, y, width, height };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

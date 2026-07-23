@@ -210,6 +210,8 @@ interface Window {
         id: string;
         name: string;
         thumbnailDataUrl: string;
+        thumbnailSize?: { width: number; height: number };
+        captureSize?: { width: number; height: number };
         appIconDataUrl?: string;
       }>;
       error?: string;

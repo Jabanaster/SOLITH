@@ -26,6 +26,8 @@ export function registerLocalOcrIpc(): void {
             id: source.id,
             name: source.name,
             thumbnailDataUrl: source.thumbnail.toDataURL(),
+            thumbnailSize: source.thumbnail.getSize(),
+            captureSize: WINDOW_THUMBNAIL_SIZE,
             appIconDataUrl: source.appIcon?.isEmpty() ? undefined : source.appIcon?.toDataURL(),
           })),
       };

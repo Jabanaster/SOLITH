@@ -1,11 +1,11 @@
 ﻿# Solith / Solith Roadmap
 
-## Current Baseline (Solith 2.4.0-rc.2+)
+## Current Baseline (Solith 2.4.0-rc.3+)
 
 Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 
-* Remote **`origin/master` @ `d4aa8a4`** — current post-`v2.4.0-rc.2` tip. Includes the audit-clean hub backend, D1 health validation, automatic multi-type/multi-mode live-memory scan matrix, and inert AOB repair candidate analysis tooling.
-* Release-candidate tag **`v2.4.0-rc.2`** — hub backend audit clean + D1 `/health` validation baseline. The scan-matrix / AOB-repair work is newer than this tag and should be considered post-RC until a new tag is cut.
+* Remote **`origin/master`** — current post-`v2.4.0-rc.3` offline-polish tip. Includes the audit-clean hub backend, D1 health validation, automatic multi-type/multi-mode live-memory scan matrix, inert AOB repair candidate analysis tooling, the AL read-only correlation watcher, and the AM local OCR verification fallback.
+* Release-candidate tag **`v2.4.0-rc.3`** — local OCR verification fallback baseline. OCR is local-only, explicitly window-selected, ROI-scoped, and feeds the read-only correlation watcher as tie-break evidence only.
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`
@@ -17,7 +17,7 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Blocker | Status |
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; recent focused live-memory scanner/session/AOB tests pass `51/51`; last full-suite release gate passed before current post-RC scan-matrix work |
+| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; full root suite passes `853/853` plus isolated SQL suite `10/10`; Electron output verifier passes `29/29` |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 | Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
@@ -27,9 +27,9 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Gate | Status |
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npx tsc --noEmit` (post-RC tip) | **PASS** — zero TypeScript errors at `d4aa8a4` |
-| Focused live-memory scanner/session/AOB tests (post-RC tip) | **PASS** — `51/51` after automatic multi-type scan matrix + AOB repair analyzer |
-| Local `npm test` (RC baseline) | **PASS** — `850/850` before post-RC scan-matrix work; rerun full suite before next tag |
+| Local `npx tsc --noEmit` (post-RC tip) | **PASS** — zero TypeScript errors |
+| Focused live-memory scanner/session/AOB tests (post-RC tip) | **PASS** — `183/183` including live correlation watcher + OCR tie-break regression |
+| Local `npm test` (RC baseline) | **PASS** — `853/853` plus isolated SQL suite `10/10` |
 | Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build after renderer/native boundary cleanup |
 | Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `29/29` after safety-hardening |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
@@ -75,8 +75,8 @@ Dual-Core Live Engine → Internal (Win32 VEH/Injection) + External (WinGDK RPM)
 | **AI** *(Alpha)* | Verified Alpha cut — installer + `v2.3.0-alpha.1` | **Done** — NSIS `dist/Solith Setup 2.3.0-alpha.1.exe`; await push/tag lock |
 | **AJ** | Offline L2→L3 delta comparison engine | **Done** — `7b21120`; compares saved read-only verification artifacts, ignores ASLR absolute drift, and promotes only stable structural evidence |
 | **AK** | Auto memory scan matrix | **Done** — `d4aa8a4`; manual scan now fans out across exact / between / greater-than / less-than plus all supported value types, while capturing an unknown-value baseline |
-| **AL** | Live correlation watcher | **Planned next** — read-only watcher to track candidate deltas in real time, score event correlation, and isolate likely values separately from noisy scan findings |
-| **AM** | Screen/OCR verification fallback | **Planned** — optional screenshot/OCR confirmation when memory-only correlation cannot produce substantial evidence; user preview/confirmation required before using OCR as truth data |
+| **AL** | Live correlation watcher | **Done** — `9c70631`; read-only watcher tracks candidate deltas in real time, scores declared player events, throttles UI telemetry, and preserves recent-delta lookback evidence |
+| **AM** | Screen/OCR verification fallback | **Done** — `eac6b37`; local Tesseract OCR captures only explicitly selected window regions and feeds observed numbers back as read-only tie-break evidence |
 
 ### Shell polish / evidence (2026-07)
 
@@ -122,9 +122,9 @@ This is the current Solith-grade discovery hierarchy for live-memory research. I
 | Layer | Purpose | Status | Certification impact |
 |-------|---------|--------|----------------------|
 | **1. Auto scan matrix** | One user scan fans out across exact / between / greater-than / less-than and all supported value types (`byte`, `int32`, `uint32`, `float`, `double`, `int64`). It also captures an unknown-value baseline. | **Implemented** — `d4aa8a4` | Produces L0/L1 session-local candidates only |
-| **2. Live correlation watcher** | Polls candidates in real time, keeps them separated by value type / scan mode / source, and scores changes against player-declared events such as damage, XP gain, spending gold, consuming items, or collecting loot. | **Next build target** | Can raise confidence to L2-style session evidence, not L3 by itself |
-| **3. Event prompt layer** | Lets the user provide lightweight signals (`spent gold`, `took damage`, `used potion`, `picked up loot`) instead of typing every value manually. | **Planned with watcher** | Improves correlation quality without adding write capability |
-| **4. Screen/OCR verification fallback** | If memory-only correlation is weak or noisy, asks the user to briefly open a relevant menu so Solith can read visible values locally. | **Planned fallback, not primary path** | Verification aid only; OCR results must show confidence and user-visible preview |
+| **2. Live correlation watcher** | Polls candidates in real time, keeps them separated by value type / scan mode / source, and scores changes against player-declared events such as damage, XP gain, spending gold, consuming items, or collecting loot. | **Implemented** — `9c70631` | Can raise confidence to L2-style session evidence, not L3 by itself |
+| **3. Event prompt layer** | Lets the user provide lightweight signals (`spent gold`, `took damage`, `used potion`, `picked up loot`) instead of typing every value manually. | **Implemented with watcher** | Improves correlation quality without adding write capability |
+| **4. Screen/OCR verification fallback** | If memory-only correlation is weak or noisy, asks the user to briefly open a relevant menu so Solith can read visible values locally. | **Implemented** — `eac6b37`; drag/saved-region polish continues post-RC | Verification aid only; OCR results must show confidence and user-visible preview |
 | **5. Manual confirmation** | Final fallback when OCR fails or confidence is low; user types/approves the visible value. | **Existing pattern / to polish** | Human-confirmed session evidence only |
 | **6. Restart validation** | Compares structural evidence across process restarts while ignoring ASLR absolute address drift. | **Implemented offline; live runs required per title/build** | Required for L3 stability claims |
 
@@ -145,8 +145,8 @@ Design rule: OCR/screen watching is **not** the primary scanner. It is a failove
 | 9 | CT Library Explorer + rejection reports | **Active / strengthened** — CT Library detail now surfaces rejection reasons, not just counts |
 | 10 | Multi-launcher target metadata | **Active / strengthened** — one game profile can map Steam/GOG/Epic/Xbox/EA/etc. executable targets; certification remains per executable hash/build and restricted packages fail closed without elevation |
 | 11 | Automatic scan matrix | **Done / strengthened** — player-facing scan uses all supported value types and compatible first-pass modes in one read-only action; narrowing preserves each candidate's discovered type |
-| 12 | Live correlation watcher | **Next** — read-only polling layer compares candidate changes against player-declared events like damage, spending, XP gain, item pickup, healing, or stamina use |
-| 13 | Screen/OCR verification fallback | **Planned** — only asks the user to open menus when memory correlation is weak/noisy; OCR assists verification but never replaces restart validation |
+| 12 | Live correlation watcher | **Done** — read-only polling layer compares candidate changes against player-declared events like damage, spending, XP gain, item pickup, healing, or stamina use |
+| 13 | Screen/OCR verification fallback | **Done** — only asks the user to open menus when memory correlation is weak/noisy; OCR assists verification but never replaces restart validation |
 
 ### Bundled schema.v1 definitions
 
@@ -164,12 +164,10 @@ Avowed ships Steam + WinGDK executables at **L0** only (no `signature` / `baseOf
 
 **Still required (after the two above, or when sessions allow):**
 
-3. **Live correlation watcher** — use auto-scan candidates + player-declared events to isolate health, essence, stamina, XP, gold, weight, consumables, and materials separately from noisy scan buckets
-4. **OCR/screen verification fallback** — only when watcher confidence is weak; ask the user to open the Character or Inventory menu once, preview extracted values, and correlate against watched deltas
-5. Connection baselines — Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
-6. Restart-verify pointer paths for remaining bundled memory games (beyond Atomfall ammo)
-7. Additional L2–L4 certification runs with in-game evidence for non-Atomfall / non-elevated-Avowed titles
-8. Managed-runtime live memory spike (Milestone Z) — research only when authorized
+3. Connection baselines — Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
+4. Restart-verify pointer paths for remaining bundled memory games (beyond Atomfall ammo)
+5. Additional L2–L4 certification runs with in-game evidence for non-Atomfall / non-elevated-Avowed titles
+6. Managed-runtime live memory spike (Milestone Z) — research only when authorized
 
 ### Can continue offline (post-merge)
 

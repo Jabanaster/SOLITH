@@ -904,17 +904,81 @@ button, input, select, textarea {
   margin-top: 10px;
 }
 
-.live-correlation-ocr-layout img {
+.live-correlation-ocr-preview {
+  position: relative;
   width: 100%;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.28);
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+
+.live-correlation-ocr-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.live-correlation-ocr-roi {
+  position: absolute;
+  border: 2px solid var(--teal);
+  border-radius: 4px;
+  background: rgba(79, 184, 217, 0.16);
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.34),
+    0 0 16px rgba(79, 184, 217, 0.45);
+  pointer-events: none;
+}
+
+.live-correlation-ocr-hint {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 4px 7px;
+  border: 1px solid rgba(79, 184, 217, 0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(3, 7, 18, 0.74);
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .live-correlation-ocr-controls {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.live-correlation-region-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.live-correlation-region-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.live-correlation-region-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.live-correlation-region-presets .btn-secondary {
+  padding: 5px 8px;
+  font-size: 10px;
 }
 
 .live-correlation-roi-grid {
