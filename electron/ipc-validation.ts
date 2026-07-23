@@ -404,6 +404,46 @@ export const LiveMemoryReadManySchema = z.object({
     .max(500),
 });
 
+export const LiveMemoryCorrelationStartSchema = z.object({
+  candidates: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(160).optional(),
+        address: LIVE_ADDRESS_STRING,
+        value: z.number().finite(),
+        dataType: LIVE_VALUE_TYPE,
+        source: z.enum(['auto-scan', 'unknown-scan', 'aob-candidate', 'pointer-candidate', 'manual']).optional(),
+        scanMode: z.string().min(1).max(80).optional(),
+        label: z.string().min(1).max(160).optional(),
+      }),
+    )
+    .min(1)
+    .max(10_000),
+  pollIntervalMs: z.number().int().min(50).max(5000).optional(),
+  epsilon: z.number().finite().nonnegative().max(10_000).optional(),
+});
+
+export const LiveMemoryCorrelationEventSchema = z.object({
+  id: z.string().min(1).max(160).optional(),
+  kind: z.enum([
+    'spent_resource',
+    'gained_resource',
+    'took_damage',
+    'healed',
+    'used_stamina',
+    'recovered_stamina',
+    'used_item',
+    'collected_loot',
+    'custom',
+  ]),
+  label: z.string().min(1).max(160).optional(),
+  expectedDirection: z.enum(['increased', 'decreased', 'changed', 'unchanged']),
+  expectedDelta: z.number().finite().optional(),
+  observedAt: z.string().min(1).max(80).optional(),
+});
+
+export const LiveMemoryCorrelationEmptySchema = z.object({});
+
 export const LiveMemoryFreezeStartSchema = z.object({
   address: LIVE_ADDRESS_STRING,
   dataType: LIVE_VALUE_TYPE,

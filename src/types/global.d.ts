@@ -152,6 +152,53 @@ interface Window {
       values?: { address: string; value: number; dataType: string }[];
       error?: string;
     }>;
+    liveMemoryCorrelationStart: (payload: {
+      candidates: Array<{
+        id?: string;
+        address: string;
+        value: number;
+        dataType: string;
+        source?: 'auto-scan' | 'unknown-scan' | 'aob-candidate' | 'pointer-candidate' | 'manual';
+        scanMode?: string;
+        label?: string;
+      }>;
+      pollIntervalMs?: number;
+      epsilon?: number;
+    }) => Promise<{
+      success: boolean;
+      report?: import('../core/live-memory/live-correlation-watcher.js').CorrelationReport;
+      error?: string;
+    }>;
+    liveMemoryCorrelationPoll: () => Promise<{
+      success: boolean;
+      report?: import('../core/live-memory/live-correlation-watcher.js').CorrelationReport;
+      error?: string;
+    }>;
+    liveMemoryCorrelationEvent: (payload: {
+      id?: string;
+      kind:
+        | 'spent_resource'
+        | 'gained_resource'
+        | 'took_damage'
+        | 'healed'
+        | 'used_stamina'
+        | 'recovered_stamina'
+        | 'used_item'
+        | 'collected_loot'
+        | 'custom';
+      label?: string;
+      expectedDirection: 'increased' | 'decreased' | 'changed' | 'unchanged';
+      expectedDelta?: number;
+      observedAt?: string;
+    }) => Promise<{
+      success: boolean;
+      report?: import('../core/live-memory/live-correlation-watcher.js').CorrelationReport;
+      error?: string;
+    }>;
+    liveMemoryCorrelationStop: () => Promise<{ success: boolean; error?: string }>;
+    onLiveMemoryCorrelationReport?: (
+      callback: (payload: import('../core/live-memory/live-correlation-watcher.js').CorrelationReport) => void,
+    ) => (() => void) | undefined;
     liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryFreezeStop: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryFreezeStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;

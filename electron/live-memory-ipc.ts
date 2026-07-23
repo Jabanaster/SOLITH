@@ -15,6 +15,9 @@ import {
   LiveMemoryScanFirstUnknownSchema,
   LiveMemoryScanNextFromUnknownSchema,
   LiveMemoryReadManySchema,
+  LiveMemoryCorrelationEmptySchema,
+  LiveMemoryCorrelationEventSchema,
+  LiveMemoryCorrelationStartSchema,
   LiveMemoryFreezeStartSchema,
   LiveMemoryFreezeStopSchema,
   LiveMemoryFreezeStatusSchema,
@@ -38,6 +41,7 @@ import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
+import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
 import { setCrashReportContext } from '../src/core/crash/local-crash-reporter.js';
 import { hashInstalledExecutableForCatalog } from '../src/core/live-memory/installed-exe-hash.js';
 import {
@@ -467,6 +471,66 @@ export function registerLiveMemoryIpc(): void {
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'read_many_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-correlation-start', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = LiveMemoryCorrelationStartSchema.parse(payload);
+      const mod = await getLiveMemoryModule();
+      const access = bundle.session.getMemoryAccessOrThrow();
+      bundle.correlationWatcher?.stop();
+      bundle.correlationWatcher = new mod.LiveCorrelationWatcher({
+        driver: access.driver,
+        handle: access.handle,
+        candidates: parsed.candidates,
+        pollIntervalMs: parsed.pollIntervalMs,
+        epsilon: parsed.epsilon,
+        onReport: (report: unknown) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('live-memory-correlation-report', report);
+          }
+        },
+      });
+      bundle.correlationWatcher.start();
+      return { success: true, report: bundle.correlationWatcher.getReport() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'correlation_start_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-correlation-poll', async (event, payload: unknown) => {
+    try {
+      LiveMemoryCorrelationEmptySchema.parse(payload ?? {});
+      const bundle = requireBundle(event);
+      if (!bundle.correlationWatcher) return { success: false, error: 'correlation_watcher_not_started' };
+      return { success: true, report: bundle.correlationWatcher.pollOnce() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'correlation_poll_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-correlation-event', async (event, payload: unknown) => {
+    try {
+      const parsed = LiveMemoryCorrelationEventSchema.parse(payload);
+      const bundle = requireBundle(event);
+      if (!bundle.correlationWatcher) return { success: false, error: 'correlation_watcher_not_started' };
+      return { success: true, report: bundle.correlationWatcher.recordEvent(parsed) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'correlation_event_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-correlation-stop', async (event, payload: unknown) => {
+    try {
+      LiveMemoryCorrelationEmptySchema.parse(payload ?? {});
+      const bundle = requireBundle(event);
+      bundle.correlationWatcher?.stop();
+      bundle.correlationWatcher = null;
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'correlation_stop_failed') };
     }
   });
 
@@ -910,6 +974,7 @@ interface SessionBundle {
   session: LiveMemorySession;
   audit: MemoryAuditLog;
   manager: MemoryManager;
+  correlationWatcher: LiveCorrelationWatcher | null;
 }
 
 const sessions = new Map<number, SessionBundle>();
@@ -935,7 +1000,7 @@ function refreshCrashContext(bundle: SessionBundle | undefined): void {
 function bindSessionBundle(senderId: number, session: LiveMemorySession, mod: any): SessionBundle {
   const audit = new mod.MemoryAuditLog({ filePath: memoryAuditFilePath() });
   const manager = new mod.MemoryManager(session, audit);
-  const bundle: SessionBundle = { session, audit, manager };
+  const bundle: SessionBundle = { session, audit, manager, correlationWatcher: null };
   sessions.set(senderId, bundle);
   return bundle;
 }
@@ -959,6 +1024,7 @@ function maybeStartAvowedWingdkBackups(input: {
 function disposeSession(senderId: number): void {
   const existing = sessions.get(senderId);
   if (existing) {
+    existing.correlationWatcher?.stop();
     existing.manager.setSnapshotListener(null);
     existing.session.detach();
     sessions.delete(senderId);

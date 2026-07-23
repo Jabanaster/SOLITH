@@ -27,6 +27,17 @@ export type {
   RealtimeScannerConfig,
   RealtimeScannerStopReason,
 } from './real-time-scanner.js';
+export { LiveCorrelationWatcher } from './live-correlation-watcher.js';
+export type {
+  CorrelationCandidate,
+  CorrelationCandidateState,
+  CorrelationDirection,
+  CorrelationReport,
+  CorrelationSource,
+  CorrelationStrength,
+  LiveCorrelationWatcherConfig,
+  PlayerCorrelationEvent,
+} from './live-correlation-watcher.js';
 export { getConnectionBaseline, listReviewedConnectionBaselines } from './game-connection-baselines.js';
 export { scanForPointerPath } from './pointer-scanner.js';
 export type { PointerScanBounds, PointerPathCandidate, PointerScanResult } from './pointer-scanner.js';

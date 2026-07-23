@@ -131,6 +131,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('live-memory-scan-next-from-unknown', payload),
   liveMemoryReadMany: (payload: { addresses: { address: string; dataType: string }[] }) =>
     ipcRenderer.invoke('live-memory-read-many', payload),
+  liveMemoryCorrelationStart: (payload: {
+    candidates: Array<{
+      id?: string;
+      address: string;
+      value: number;
+      dataType: string;
+      source?: 'auto-scan' | 'unknown-scan' | 'aob-candidate' | 'pointer-candidate' | 'manual';
+      scanMode?: string;
+      label?: string;
+    }>;
+    pollIntervalMs?: number;
+    epsilon?: number;
+  }) => ipcRenderer.invoke('live-memory-correlation-start', payload),
+  liveMemoryCorrelationPoll: () => ipcRenderer.invoke('live-memory-correlation-poll', {}),
+  liveMemoryCorrelationEvent: (payload: {
+    id?: string;
+    kind:
+      | 'spent_resource'
+      | 'gained_resource'
+      | 'took_damage'
+      | 'healed'
+      | 'used_stamina'
+      | 'recovered_stamina'
+      | 'used_item'
+      | 'collected_loot'
+      | 'custom';
+    label?: string;
+    expectedDirection: 'increased' | 'decreased' | 'changed' | 'unchanged';
+    expectedDelta?: number;
+    observedAt?: string;
+  }) => ipcRenderer.invoke('live-memory-correlation-event', payload),
+  liveMemoryCorrelationStop: () => ipcRenderer.invoke('live-memory-correlation-stop', {}),
+  onLiveMemoryCorrelationReport: (callback: (payload: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload);
+    ipcRenderer.on('live-memory-correlation-report', listener);
+    return () => ipcRenderer.removeListener('live-memory-correlation-report', listener);
+  },
   liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
     ipcRenderer.invoke('live-memory-freeze-start', payload),
   liveMemoryFreezeStop: () => ipcRenderer.invoke('live-memory-freeze-stop'),
