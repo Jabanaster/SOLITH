@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
@@ -15,6 +15,11 @@ import {
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
 import { solithBranding } from '../assets/branding/index.js';
+import {
+  ctImportUiReducer,
+  friendlyCtImportError,
+  idleCtImportUiState,
+} from '../../core/ct-library/import-state.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
@@ -49,6 +54,38 @@ interface TrustMeta {
 }
 
 const PAGE_SIZE = 120;
+
+function newImportJobId(): string {
+  return `ct-import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readTextFileWithAbort(file: File, signal: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    const cleanup = () => {
+      signal.removeEventListener('abort', abort);
+    };
+    const abort = () => {
+      cleanup();
+      reader.abort();
+      reject(new DOMException('Import cancelled by user.', 'AbortError'));
+    };
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener('abort', abort, { once: true });
+    reader.onerror = () => {
+      cleanup();
+      reject(reader.error ?? new Error('Failed to read file.'));
+    };
+    reader.onload = () => {
+      cleanup();
+      resolve(String(reader.result ?? ''));
+    };
+    reader.readAsText(file);
+  });
+}
 
 function isCommunityScanEntry(entry: TrainerCatalogEntry): boolean {
   return entry.hasModPack && (
@@ -257,6 +294,7 @@ export default function TrainerLibraryPage({
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [genreFilters, setGenreFilters] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const [ctImportState, dispatchCtImport] = useReducer(ctImportUiReducer, idleCtImportUiState);
   const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
   const [quarantineCount, setQuarantineCount] = useState(0);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
@@ -270,6 +308,7 @@ export default function TrainerLibraryPage({
   const [scanningInstalls, setScanningInstalls] = useState(false);
   const importYamlRef = useRef<HTMLInputElement>(null);
   const importCtRef = useRef<HTMLInputElement>(null);
+  const ctImportAbortRef = useRef<AbortController | null>(null);
   const queryRef = useRef(query);
   const tierFilterRef = useRef(tierFilter);
   const genreFiltersRef = useRef(genreFilters);
@@ -562,24 +601,64 @@ export default function TrainerLibraryPage({
 
   const handleImportCt = async (file: File) => {
     if (!window.electronAPI?.trainerCatalogImportCt) return;
+    const controller = new AbortController();
+    const jobId = newImportJobId();
+    ctImportAbortRef.current = controller;
+    dispatchCtImport({ type: 'start', jobId, label: 'Hashing Source...' });
     setImporting(true);
     setMessage('');
     try {
-      const xmlText = await file.text();
+      const xmlText = await readTextFileWithAbort(file, controller.signal);
+      dispatchCtImport({
+        type: 'progress',
+        progress: {
+          jobId,
+          phase: 'parsing-xml',
+          label: 'Parsing XML...',
+          processedTables: 0,
+          totalTables: 1,
+        },
+      });
       const result = await window.electronAPI.trainerCatalogImportCt({ xmlText, title: file.name.replace(/\.ct$/i, '') });
       if (result.success) {
+        dispatchCtImport({
+          type: 'complete',
+          progress: {
+            jobId,
+            phase: 'complete',
+            label: 'Import Complete.',
+            processedTables: 1,
+            totalTables: 1,
+          },
+        });
         setMessage(
           `Imported "${result.title ?? file.name}" — ${result.acceptedCount ?? 0} accepted, ${result.rejectedCount ?? 0} rejected.`,
         );
         await load(query);
       } else {
         const detail = result.errors?.join('; ') ?? result.error ?? 'Import failed';
+        dispatchCtImport({ type: 'failed', errorMessage: detail });
+        setMessage(detail);
+      }
+    } catch (error) {
+      const isAbort = error instanceof DOMException && error.name === 'AbortError';
+      if (isAbort) {
+        dispatchCtImport({ type: 'cancelled', errorCode: 'ABORT_ERR' });
+        setMessage(friendlyCtImportError('ABORT_ERR'));
+      } else {
+        const detail = error instanceof Error ? error.message : String(error);
+        dispatchCtImport({ type: 'failed', errorMessage: detail });
         setMessage(detail);
       }
     } finally {
       setImporting(false);
+      ctImportAbortRef.current = null;
       if (importCtRef.current) importCtRef.current.value = '';
     }
+  };
+
+  const handleCancelCtImport = () => {
+    ctImportAbortRef.current?.abort();
   };
 
   const handleNotifyWhenVerified = async (entry: TrainerCatalogEntry) => {
@@ -847,6 +926,50 @@ export default function TrainerLibraryPage({
           </label>
         </div>
       </section>
+
+      {ctImportState.status !== 'idle' && (
+        <section
+          className={`${styles.importPanel} ${ctImportState.status === 'failed' ? styles.importPanelError : ''}`}
+          aria-live="polite"
+          aria-labelledby="ct-import-status-heading"
+        >
+          <div>
+            <h2 id="ct-import-status-heading">CT Import Status</h2>
+            <p>
+              {ctImportState.errorMessage ??
+                ctImportState.progress?.label ??
+                'Preparing metadata-only CT import...'}
+            </p>
+            {typeof ctImportState.progress?.processedTables === 'number' && (
+              <small>
+                Tables processed: {ctImportState.progress.processedTables}
+                {typeof ctImportState.progress.totalTables === 'number'
+                  ? ` / ${ctImportState.progress.totalTables}`
+                  : ''}
+              </small>
+            )}
+          </div>
+          <div className={styles.importActions}>
+            {ctImportState.status === 'running' && (
+              <button type="button" className={styles.cancelImportBtn} onClick={handleCancelCtImport}>
+                Cancel Import
+              </button>
+            )}
+            {(ctImportState.status === 'failed' || ctImportState.status === 'cancelled' || ctImportState.status === 'complete') && (
+              <button
+                type="button"
+                className={styles.syncBtn}
+                onClick={() => {
+                  dispatchCtImport({ type: 'reset' });
+                  importCtRef.current?.click();
+                }}
+              >
+                Retry / Import Another CT
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <form className={styles.searchRow} onSubmit={handleSearch}>
         <input

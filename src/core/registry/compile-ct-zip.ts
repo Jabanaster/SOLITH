@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import yauzl from 'yauzl';
@@ -90,9 +91,40 @@ export interface CompileCtZipOptions {
   maxCtBytes?: number;
   maxArchiveBytes?: number;
   limit?: number;
+  signal?: AbortSignal;
+  onProgress?: (progress: CtZipImportProgress) => void;
+  tempRoot?: string;
+  cleanupTempOnAbort?: boolean;
 }
 
 const DEFAULT_MAX_ARCHIVE_BYTES = 250 * 1024 * 1024;
+
+export type CtZipImportPhase =
+  | 'hashing-source'
+  | 'extracting-archive'
+  | 'parsing-xml'
+  | 'scraping-signatures'
+  | 'writing-output'
+  | 'complete'
+  | 'cancelled'
+  | 'failed';
+
+export interface CtZipImportProgress {
+  phase: CtZipImportPhase;
+  label: string;
+  archivePath?: string;
+  processedTables: number;
+  totalTables?: number;
+}
+
+export class CtZipImportAbortError extends Error {
+  readonly code = 'ABORT_ERR';
+
+  constructor(message = 'CT import cancelled by user.') {
+    super(message);
+    this.name = 'CtZipImportAbortError';
+  }
+}
 
 function slugId(value: string, fallback: string): string {
   const slug = value
@@ -132,12 +164,67 @@ export function validateZipEntryPath(entryName: string): string | null {
   return null;
 }
 
-function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new CtZipImportAbortError();
+  }
+}
+
+function emitProgress(options: CompileCtZipOptions, progress: CtZipImportProgress): void {
+  options.onProgress?.(progress);
+}
+
+async function createTempSandbox(options: CompileCtZipOptions): Promise<string> {
+  const tempRoot = options.tempRoot ? path.resolve(options.tempRoot) : os.tmpdir();
+  await fs.mkdir(tempRoot, { recursive: true });
+  return fs.mkdtemp(path.join(tempRoot, 'solith-ct-import-'));
+}
+
+async function cleanupTempSandbox(tempSandboxPath: string | null): Promise<void> {
+  if (!tempSandboxPath) return;
+  await fs.rm(tempSandboxPath, { recursive: true, force: true });
+}
+
+function streamToString(stream: NodeJS.ReadableStream, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    let settled = false;
+    const cleanup = () => {
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const rejectOnce = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onAbort = () => {
+      if ('destroy' in stream && typeof stream.destroy === 'function') {
+        stream.destroy(new CtZipImportAbortError());
+      }
+      rejectOnce(new CtZipImportAbortError());
+    };
+
+    if (signal?.aborted) {
+      rejectOnce(new CtZipImportAbortError());
+      return;
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    stream.on('data', (chunk) => {
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    stream.on('error', rejectOnce);
+    stream.on('end', () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    });
   });
 }
 
@@ -159,17 +246,35 @@ function openReadStream(zipFile: yauzl.ZipFile, entry: yauzl.Entry): Promise<Rea
   });
 }
 
-async function tableEntryFromXml(archivePath: string, xmlText: string): Promise<CtZipCatalogEntry> {
+async function tableEntryFromXml(
+  archivePath: string,
+  xmlText: string,
+  options: CompileCtZipOptions = {},
+  processedTables = 0,
+): Promise<CtZipCatalogEntry> {
   const game = gameFromArchivePath(archivePath);
   const tableName = titleFromArchivePath(archivePath);
   const sourceSha256 = crypto.createHash('sha256').update(xmlText, 'utf8').digest('hex');
-  const [pointers, scripts] = await Promise.all([
-    parseCheatTableXml(xmlText, { title: tableName }),
-    extractCheatTableRawScriptCatalog(xmlText, {
-      title: tableName,
-      sourceNote: 'Raw Cheat Engine script text extracted as inert Solith metadata. Scripts are never executed.',
-    }),
-  ]);
+  throwIfAborted(options.signal);
+  emitProgress(options, {
+    phase: 'parsing-xml',
+    label: 'Parsing XML...',
+    archivePath,
+    processedTables,
+  });
+  const pointers = await parseCheatTableXml(xmlText, { title: tableName });
+  throwIfAborted(options.signal);
+  const scripts = await extractCheatTableRawScriptCatalog(xmlText, {
+    title: tableName,
+    sourceNote: 'Raw Cheat Engine script text extracted as inert Solith metadata. Scripts are never executed.',
+  });
+  throwIfAborted(options.signal);
+  emitProgress(options, {
+    phase: 'scraping-signatures',
+    label: 'Scraping Signatures...',
+    archivePath,
+    processedTables,
+  });
   const aobReport = extractAOBsFromCatalog(scripts);
   const pointerCheats = pointers.accepted.map((pointer) => ({
     id: `ptr-${pointer.id}`,
@@ -244,12 +349,23 @@ export async function compileCtZipArchive(
   options: CompileCtZipOptions = {},
 ): Promise<CtZipCatalogIndex> {
   const sourceArchivePath = path.resolve(zipPath);
+  const tempSandboxPath = await createTempSandbox(options);
+  let shouldCleanupTempSandbox = true;
+  try {
+  throwIfAborted(options.signal);
   const archiveStats = await fs.stat(sourceArchivePath);
   const maxArchiveBytes = options.maxArchiveBytes ?? DEFAULT_MAX_ARCHIVE_BYTES;
   if (archiveStats.size > maxArchiveBytes) {
     throw new Error(`CT archive exceeds ${maxArchiveBytes} byte import cap.`);
   }
+  emitProgress(options, {
+    phase: 'hashing-source',
+    label: 'Hashing Source...',
+    processedTables: 0,
+  });
+  throwIfAborted(options.signal);
   const archiveBytes = await fs.readFile(sourceArchivePath);
+  throwIfAborted(options.signal);
   const sourceArchiveSha256 = crypto.createHash('sha256').update(archiveBytes).digest('hex');
   const generatedAt = options.compiledAt ?? new Date().toISOString();
   const index: CtZipCatalogIndex = {
@@ -273,12 +389,24 @@ export async function compileCtZipArchive(
     rejected: [],
   };
 
-  const zipFile = await openZip(sourceArchivePath);
-  const maxCtBytes = options.maxCtBytes ?? DEFAULT_MAX_CT_BYTES;
   try {
+    emitProgress(options, {
+      phase: 'extracting-archive',
+      label: 'Extracting Archive...',
+      processedTables: 0,
+    });
+    throwIfAborted(options.signal);
+    const zipFile = await openZip(sourceArchivePath);
+    const maxCtBytes = options.maxCtBytes ?? DEFAULT_MAX_CT_BYTES;
     await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        zipFile.close();
+        reject(new CtZipImportAbortError());
+      };
+      options.signal?.addEventListener('abort', onAbort, { once: true });
       zipFile.on('entry', (entry) => {
         void (async () => {
+          throwIfAborted(options.signal);
           if (!/\.ct$/i.test(entry.fileName)) {
             zipFile.readEntry();
             return;
@@ -304,8 +432,8 @@ export async function compileCtZipArchive(
           }
           try {
             const stream = await openReadStream(zipFile, entry);
-            const xmlText = await streamToString(stream);
-            const table = await tableEntryFromXml(entry.fileName, xmlText);
+            const xmlText = await streamToString(stream, options.signal);
+            const table = await tableEntryFromXml(entry.fileName, xmlText, options, index.totals.compiledTables);
             index.tables.push(table);
             index.totals.compiledTables += 1;
             index.totals.pointers += table.counts.pointers;
@@ -329,6 +457,9 @@ export async function compileCtZipArchive(
               });
             }
           } catch (error) {
+            if (error instanceof CtZipImportAbortError) {
+              throw error;
+            }
             index.rejected.push({
               archivePath: entry.fileName,
               reason: error instanceof Error ? error.message : String(error),
@@ -338,21 +469,61 @@ export async function compileCtZipArchive(
           zipFile.readEntry();
         })().catch(reject);
       });
-      zipFile.on('end', resolve);
-      zipFile.on('error', reject);
+      zipFile.on('end', () => {
+        options.signal?.removeEventListener('abort', onAbort);
+        resolve();
+      });
+      zipFile.on('error', (error) => {
+        options.signal?.removeEventListener('abort', onAbort);
+        reject(error);
+      });
       zipFile.readEntry();
     });
-  } finally {
     zipFile.close();
+  } catch (error) {
+    if (error instanceof CtZipImportAbortError) {
+      emitProgress(options, {
+        phase: 'cancelled',
+        label: 'Import Cancelled.',
+        processedTables: index.totals.compiledTables,
+      });
+    } else {
+      emitProgress(options, {
+        phase: 'failed',
+        label: 'Import Failed.',
+        processedTables: index.totals.compiledTables,
+      });
+    }
+    throw error;
   }
 
   index.tables.sort((a, b) => a.archivePath.localeCompare(b.archivePath));
   index.rejected.sort((a, b) => a.archivePath.localeCompare(b.archivePath));
 
   if (options.outputJsonPath) {
+    emitProgress(options, {
+      phase: 'writing-output',
+      label: 'Writing Output...',
+      processedTables: index.totals.compiledTables,
+      totalTables: index.totals.ctFiles,
+    });
+    throwIfAborted(options.signal);
     await fs.mkdir(path.dirname(options.outputJsonPath), { recursive: true });
     await fs.writeFile(options.outputJsonPath, JSON.stringify(index, null, 2), 'utf8');
   }
 
+  emitProgress(options, {
+    phase: 'complete',
+    label: 'Import Complete.',
+    processedTables: index.totals.compiledTables,
+    totalTables: index.totals.ctFiles,
+  });
+  await cleanupTempSandbox(tempSandboxPath);
+  shouldCleanupTempSandbox = false;
   return index;
+  } finally {
+    if (shouldCleanupTempSandbox) {
+      await cleanupTempSandbox(tempSandboxPath);
+    }
+  }
 }

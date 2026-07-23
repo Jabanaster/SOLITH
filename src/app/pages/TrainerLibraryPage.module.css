@@ -79,6 +79,60 @@
   align-items: center;
 }
 
+.importPanel {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(80, 220, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(8, 22, 38, 0.94);
+  box-shadow: 0 0 24px rgba(80, 220, 255, 0.08);
+}
+
+.importPanelError {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(42, 29, 9, 0.92);
+}
+
+.importPanel h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  color: #e8f0ff;
+}
+
+.importPanel p {
+  margin: 0;
+  color: #aecaef;
+  font-size: 0.84rem;
+}
+
+.importPanel small {
+  display: block;
+  margin-top: 0.3rem;
+  color: #7f98bd;
+  font-size: 0.72rem;
+}
+
+.importActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cancelImportBtn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(80, 24, 28, 0.9);
+  color: #fee2e2;
+  cursor: pointer;
+  font-weight: 800;
+}
+
 .syncBtn {
   padding: 0.55rem 0.9rem;
   border-radius: 8px;

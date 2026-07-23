@@ -377,6 +377,29 @@ interface Window {
       tables: import('../core/registry/compile-ct-zip.js').CtZipCatalogEntry[];
       error?: string;
     }>;
+    ctLibraryImportZipStart: (payload: {
+      archivePath: string;
+      jobId?: string;
+      limit?: number;
+      maxShardBytes?: number;
+    }) => Promise<{
+      success: boolean;
+      jobId: string;
+      libraryOutputPath?: string;
+      shardDirectory?: string;
+      shards?: number;
+      totals?: import('../core/registry/compile-ct-zip.js').CtZipCatalogIndex['totals'];
+      error?: string;
+      errorCode?: string;
+    }>;
+    ctLibraryImportZipCancel: (payload: { jobId: string }) => Promise<{
+      success: boolean;
+      jobId: string;
+      error?: string;
+    }>;
+    onCtLibraryImportProgress?: (
+      callback: (payload: import('../core/ct-library/import-state.js').CtImportProgress) => void,
+    ) => (() => void) | undefined;
     registryRunReadOnlyVerification: (payload: {
       registry: unknown;
       pid: number;

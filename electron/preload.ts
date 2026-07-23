@@ -206,6 +206,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     offset?: number;
   }) => ipcRenderer.invoke('ct-library-search', payload),
   ctLibraryGameDetail: (payload: { gameId: string }) => ipcRenderer.invoke('ct-library-game-detail', payload),
+  ctLibraryImportZipStart: (payload: {
+    archivePath: string;
+    jobId?: string;
+    limit?: number;
+    maxShardBytes?: number;
+  }) => ipcRenderer.invoke('ct-library-import-zip-start', payload),
+  ctLibraryImportZipCancel: (payload: { jobId: string }) => ipcRenderer.invoke('ct-library-import-zip-cancel', payload),
+  onCtLibraryImportProgress: (callback: (payload: {
+    jobId: string;
+    phase: string;
+    label: string;
+    archivePath?: string;
+    processedTables?: number;
+    totalTables?: number;
+  }) => void) => {
+    const listener = (_event: unknown, payload: {
+      jobId: string;
+      phase: string;
+      label: string;
+      archivePath?: string;
+      processedTables?: number;
+      totalTables?: number;
+    }) => callback(payload);
+    ipcRenderer.on('ct-library-import-progress', listener);
+    return () => ipcRenderer.removeListener('ct-library-import-progress', listener);
+  },
   registryRunReadOnlyVerification: (payload: {
     registry: unknown;
     pid: number;

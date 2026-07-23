@@ -1,8 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import type { CtLibraryGameSummary, CtLibrarySummaryIndex } from '../../core/ct-library/types.js';
 import type { CtLibrarySearchResult } from '../../core/ct-library/search.js';
 import type { CtZipCatalogEntry } from '../../core/registry/compile-ct-zip.js';
+import {
+  ctImportUiReducer,
+  friendlyCtImportError,
+  idleCtImportUiState,
+} from '../../core/ct-library/import-state.js';
 import styles from './CtLibraryExplorerPage.module.css';
 
 type KindFilter = 'all' | 'pointer' | 'script' | 'aob';
@@ -26,6 +31,10 @@ interface DetailResponse {
 
 function formatNumber(value: number | undefined): string {
   return (value ?? 0).toLocaleString();
+}
+
+function newImportJobId(): string {
+  return `ct-library-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function tableForResult(tables: CtZipCatalogEntry[], result: CtLibrarySearchResult | null): CtZipCatalogEntry | null {
@@ -174,6 +183,8 @@ export default function CtLibraryExplorerPage() {
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [importState, dispatchImport] = useReducer(ctImportUiReducer, idleCtImportUiState);
+  const importZipRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(
     () => results.find((result) => result.id === selectedId) ?? results[0] ?? null,
@@ -214,6 +225,12 @@ export default function CtLibraryExplorerPage() {
   }, [load]);
 
   useEffect(() => {
+    return window.electronAPI?.onCtLibraryImportProgress?.((progress) => {
+      dispatchImport({ type: 'progress', progress });
+    });
+  }, []);
+
+  useEffect(() => {
     if (!selected || !window.electronAPI?.ctLibraryGameDetail) {
       setDetail(null);
       return;
@@ -226,13 +243,124 @@ export default function CtLibraryExplorerPage() {
 
   const games = summary?.games ?? [];
 
+  const handleImportZip = async (file: File) => {
+    const filePath = (file as File & { path?: string }).path;
+    const api = window.electronAPI;
+    if (!api?.ctLibraryImportZipStart) {
+      setMessage('CT ZIP import is unavailable outside the Electron shell.');
+      return;
+    }
+    if (!filePath) {
+      setMessage('CT ZIP import requires the Electron desktop app file path bridge.');
+      return;
+    }
+    const jobId = newImportJobId();
+    dispatchImport({ type: 'start', jobId, label: 'Hashing Source...' });
+    setMessage('');
+    try {
+      const result = await api.ctLibraryImportZipStart({ archivePath: filePath, jobId });
+      if (result.success) {
+        dispatchImport({
+          type: 'complete',
+          progress: {
+            jobId,
+            phase: 'complete',
+            label: 'Import Complete.',
+            processedTables: result.totals?.compiledTables,
+            totalTables: result.totals?.ctFiles,
+          },
+        });
+        setMessage(
+          `Imported CT library archive — ${formatNumber(result.totals?.compiledTables)} tables, ${formatNumber(result.totals?.cheats)} metadata entries.`,
+        );
+        await load();
+      } else {
+        dispatchImport({
+          type: result.errorCode === 'ABORT_ERR' ? 'cancelled' : 'failed',
+          errorCode: result.errorCode,
+          errorMessage: result.error,
+        });
+        setMessage(friendlyCtImportError(result.errorCode, result.error));
+      }
+    } finally {
+      if (importZipRef.current) importZipRef.current.value = '';
+    }
+  };
+
+  const handleCancelImport = async () => {
+    if (!importState.jobId) return;
+    await window.electronAPI?.ctLibraryImportZipCancel?.({ jobId: importState.jobId });
+  };
+
   return (
     <main className={styles.page}>
       <PageModuleHeader
         artwork="hoodedProfile"
         title="CT Library Explorer"
         description="Search and inspect compiled Cheat Engine table metadata without executing scripts or touching a live process."
+        actions={
+          <div className={styles.headerActions}>
+            <input
+              ref={importZipRef}
+              type="file"
+              accept=".zip,application/zip"
+              className={styles.hiddenFileInput}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleImportZip(file);
+              }}
+            />
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => importZipRef.current?.click()}
+              disabled={importState.status === 'running'}
+            >
+              Import CT ZIP
+            </button>
+          </div>
+        }
       />
+
+      {importState.status !== 'idle' && (
+        <section
+          className={`${styles.importPanel} ${importState.status === 'failed' ? styles.importPanelError : ''}`}
+          aria-live="polite"
+          aria-labelledby="ct-library-import-heading"
+        >
+          <div>
+            <h2 id="ct-library-import-heading">CT Library Import</h2>
+            <p>{importState.errorMessage ?? importState.progress?.label ?? 'Preparing metadata-only import...'}</p>
+            {typeof importState.progress?.processedTables === 'number' && (
+              <small>
+                Tables processed: {importState.progress.processedTables}
+                {typeof importState.progress.totalTables === 'number'
+                  ? ` / ${importState.progress.totalTables}`
+                  : ''}
+              </small>
+            )}
+          </div>
+          <div className={styles.importActions}>
+            {importState.status === 'running' && (
+              <button type="button" className={styles.cancelBtn} onClick={() => void handleCancelImport()}>
+                Cancel Import
+              </button>
+            )}
+            {(importState.status === 'failed' || importState.status === 'cancelled' || importState.status === 'complete') && (
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => {
+                  dispatchImport({ type: 'reset' });
+                  importZipRef.current?.click();
+                }}
+              >
+                Retry / Import Another ZIP
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className={styles.summaryGrid} aria-label="CT Library summary">
         <div className={styles.card}><span>CT files</span><strong>{formatNumber(summary?.totals.ctFiles)}</strong></div>

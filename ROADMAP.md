@@ -16,7 +16,7 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 | Blocker | Status |
 |---------|--------|
 | Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `844/844`; Electron output verifier passes `29/29` |
+| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; `npm test` passes `850/850`; Electron output verifier passes `29/29` |
 | Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
 | L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
 | Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
@@ -27,7 +27,7 @@ Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 |------|--------|
 | Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
 | Local `npx tsc --noEmit` (Alpha tip) | **PASS** — zero TypeScript errors at `c7a6dec` before target-metadata work |
-| Local `npm test` (Alpha tip) | **PASS** — `844/844` after target-metadata work |
+| Local `npm test` (Alpha tip) | **PASS** — `850/850` after CT import cancel/retry UX work |
 | Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build after renderer/native boundary cleanup |
 | Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `29/29` after safety-hardening |
 | Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |

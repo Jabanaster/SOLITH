@@ -6,7 +6,12 @@ import path from 'node:path';
 import test from 'node:test';
 import yazl from 'yazl';
 import { buildCtLibraryIndex } from '../src/core/ct-library/index.js';
-import { compileCtZipArchive, validateZipEntryPath } from '../src/core/registry/compile-ct-zip.js';
+import {
+  CtZipImportAbortError,
+  compileCtZipArchive,
+  validateZipEntryPath,
+  type CtZipImportPhase,
+} from '../src/core/registry/compile-ct-zip.js';
 
 function writeZip(zipPath: string, entries: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -84,4 +89,49 @@ test('CT Library rejects unsafe zip CT entry paths before parsing', () => {
   assert.equal(validateZipEntryPath('/Absolute.CT'), 'absolute zip entry paths are rejected');
   assert.equal(validateZipEntryPath('C:/Absolute.CT'), 'absolute zip entry paths are rejected');
   assert.equal(validateZipEntryPath('Bad\u0000Name.CT'), 'zip entry contains NUL byte');
+});
+
+test('CT Library zip compiler emits granular progress phases', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'solith-ct-library-progress-'));
+  const zipPath = path.join(tempDir, 'personal-ct.zip');
+  await writeZip(zipPath, {
+    'My Games/Avowed/Avowed-Win64-Shipping.CT': tableXml('Avowed', 'playerHealth'),
+  });
+
+  const phases: CtZipImportPhase[] = [];
+  await compileCtZipArchive(zipPath, {
+    compiledAt: '2026-07-20T00:00:00.000Z',
+    outputJsonPath: path.join(tempDir, 'catalog.index.json'),
+    onProgress: (progress) => phases.push(progress.phase),
+  });
+
+  assert.deepEqual(
+    phases,
+    ['hashing-source', 'extracting-archive', 'parsing-xml', 'scraping-signatures', 'writing-output', 'complete'],
+  );
+});
+
+test('CT Library zip compiler cancellation rejects and wipes temp import sandbox', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'solith-ct-library-cancel-'));
+  const tempRoot = path.join(tempDir, 'sandboxes');
+  const zipPath = path.join(tempDir, 'personal-ct.zip');
+  await writeZip(zipPath, {
+    'My Games/Avowed/Avowed-Win64-Shipping.CT': tableXml('Avowed', 'playerHealth'),
+  });
+  const controller = new AbortController();
+
+  await assert.rejects(
+    () => compileCtZipArchive(zipPath, {
+      compiledAt: '2026-07-20T00:00:00.000Z',
+      tempRoot,
+      signal: controller.signal,
+      onProgress: (progress) => {
+        if (progress.phase === 'parsing-xml') controller.abort();
+      },
+    }),
+    CtZipImportAbortError,
+  );
+
+  const remaining = await fs.readdir(tempRoot);
+  assert.deepEqual(remaining, []);
 });

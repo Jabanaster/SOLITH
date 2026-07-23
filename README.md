@@ -2,7 +2,7 @@
 
 Solith is a local-first, single-player trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
 
-Current development baseline: `solith@2.4.0-alpha.2`. The latest verified local gate for this baseline is `npx tsc --noEmit` passing with zero errors and `npm test` passing `844/844` tests.
+Current development baseline: `solith@2.4.0-alpha.2`. The latest verified local gate for this baseline is `npx tsc --noEmit` passing with zero errors and `npm test` passing `850/850` tests.
 
 "**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
 

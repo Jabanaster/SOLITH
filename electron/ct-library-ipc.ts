@@ -1,7 +1,9 @@
 import { ipcMain } from 'electron';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { compileCtLibraryArchive } from '../src/core/ct-library/write-library.js';
 import {
   defaultCtLibraryPaths,
   getCtLibraryGameDetail,
@@ -13,6 +15,7 @@ const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = path.dirname(moduleFilename);
 const projectRoot = path.resolve(moduleDirectory, '..');
 const paths = defaultCtLibraryPaths(projectRoot);
+const activeImports = new Map<string, AbortController>();
 
 const SearchSchema = z.object({
   query: z.string().max(200).optional().default(''),
@@ -26,9 +29,33 @@ const GameDetailSchema = z.object({
   gameId: z.string().min(1).max(160),
 }).strict();
 
+const ImportStartSchema = z.object({
+  archivePath: z.string().min(1).max(2048),
+  jobId: z.string().min(1).max(120).optional(),
+  limit: z.number().int().min(1).max(100_000).optional(),
+  maxShardBytes: z.number().int().min(1024).max(100 * 1024 * 1024).optional(),
+}).strict();
+
+const ImportCancelSchema = z.object({
+  jobId: z.string().min(1).max(120),
+}).strict();
+
 function sanitize(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+  const message = sanitize(error);
+  if (/NUL byte/i.test(message)) return 'REJECTED_NUL_BYTE';
+  if (/path traversal/i.test(message)) return 'REJECTED_PATH_TRAVERSAL';
+  if (/absolute zip entry/i.test(message)) return 'REJECTED_ABSOLUTE_PATH';
+  if (/byte import cap|exceeds/i.test(message)) return 'REJECTED_SIZE_CAP';
+  return undefined;
 }
 
 export function registerCtLibraryIpc(): void {
@@ -61,5 +88,62 @@ export function registerCtLibraryIpc(): void {
     } catch (error) {
       return { success: false, available: false, tables: [], error: sanitize(error) };
     }
+  });
+
+  ipcMain.handle('ct-library-import-zip-start', async (event, payload: unknown) => {
+    const parsed = ImportStartSchema.safeParse(payload);
+    if (!parsed.success) {
+      return { success: false, jobId: 'invalid', error: parsed.error.message };
+    }
+    const jobId = parsed.data.jobId ?? randomUUID();
+    if (activeImports.has(jobId)) {
+      return { success: false, jobId, error: 'ct_import_job_already_running' };
+    }
+
+    const controller = new AbortController();
+    activeImports.set(jobId, controller);
+    const libraryDirectory = path.dirname(paths.summaryPath);
+    const registryDirectory = path.join(projectRoot, 'data', 'registry');
+
+    try {
+      const result = await compileCtLibraryArchive(parsed.data.archivePath, {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          event.sender.send('ct-library-import-progress', { jobId, ...progress });
+        },
+        outputJsonPath: path.join(registryDirectory, 'personal-ct-catalog.index.json'),
+        libraryOutputPath: paths.summaryPath,
+        shardDirectory: path.join(libraryDirectory, 'personal-ct-library-shards'),
+        limit: parsed.data.limit,
+        maxShardBytes: parsed.data.maxShardBytes,
+      });
+      return {
+        success: true,
+        jobId,
+        libraryOutputPath: result.libraryOutputPath,
+        shardDirectory: result.shardDirectory,
+        shards: result.shards.length,
+        totals: result.index.totals,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        jobId,
+        error: sanitize(error),
+        errorCode: errorCode(error),
+      };
+    } finally {
+      activeImports.delete(jobId);
+    }
+  });
+
+  ipcMain.handle('ct-library-import-zip-cancel', async (_event, payload: unknown) => {
+    const parsed = ImportCancelSchema.parse(payload);
+    const controller = activeImports.get(parsed.jobId);
+    if (!controller) {
+      return { success: false, jobId: parsed.jobId, error: 'ct_import_job_not_found' };
+    }
+    controller.abort();
+    return { success: true, jobId: parsed.jobId };
   });
 }
