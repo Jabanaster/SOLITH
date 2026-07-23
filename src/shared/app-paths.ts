@@ -8,7 +8,6 @@
 
 import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
 import os from 'node:os';
 
 const moduleFilename = fileURLToPath(import.meta.url);
@@ -25,20 +24,8 @@ export interface SolithAppPaths {
   demoFixtureRoot: string;
 }
 
-/** Prefer solith.db; migrate/rename legacy resourceforge.db when present. */
 function resolveDatabasePath(userDataRoot: string): string {
-  const preferred = path.join(userDataRoot, 'solith.db');
-  const legacy = path.join(userDataRoot, 'resourceforge.db');
-  try {
-    if (!fs.existsSync(preferred) && fs.existsSync(legacy)) {
-      fs.renameSync(legacy, preferred);
-    }
-  } catch {
-    // Fall through — callers can still open whichever file exists.
-  }
-  if (fs.existsSync(preferred)) return preferred;
-  if (fs.existsSync(legacy)) return legacy;
-  return preferred;
+  return path.join(userDataRoot, 'solith.db');
 }
 
 function isTestRuntime(): boolean {

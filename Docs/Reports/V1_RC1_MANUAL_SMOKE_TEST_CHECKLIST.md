@@ -4,8 +4,8 @@ RC1 commit: `e11d95e869bfaede6311d396eeab0c0a0d7b2da5`
 RC1 tag: `v1.0.0-rc.1`
 
 Artifact paths:
-- Installer: `dist\ResourceForge Setup 1.0.0.exe`
-- Unpacked executable: `dist\win-unpacked\ResourceForge.exe`
+- Installer: `dist\Solith Setup 1.0.0.exe`
+- Unpacked executable: `dist\win-unpacked\Solith.exe`
 - Electron main bundle: `dist-electron\main.js`
 
 ---
@@ -15,12 +15,12 @@ Artifact paths:
 Run: `npm run test:packaged-smoke` (playwright.e2e.config.ts)
 Result: **22/22 PASS** — 2026-06-27
 
-The test launches `dist\win-unpacked\ResourceForge.exe` via Playwright with an isolated
+The test launches `dist\win-unpacked\Solith.exe` via Playwright with an isolated
 `ELECTRON_USER_DATA_PATH` temp dir. The single-instance lock uses that temp dir, so the
 test runs cleanly even when a production instance is already open.
 
 Runtime report (last run):
-- exe_path: dist\win-unpacked\ResourceForge.exe
+- exe_path: dist\win-unpacked\Solith.exe
 - app_get_app_path: dist\win-unpacked\resources\app.asar
 - ipc_channels verified: getGames, getSettings, addGame, addUserSelectedLocation, parseSave, getAllProfiles, getRecipes, checkGameRunning, getCompatibilityProfile
 - exit_code: 0
@@ -35,7 +35,7 @@ Current diagnostic run in this turn:
 - orphan_check: pass
 
 Points verified:
-- [x] 01 packaged exe exists at dist/win-unpacked/ResourceForge.exe
+- [x] 01 packaged exe exists at dist/win-unpacked/Solith.exe
 - [x] 02 app launches and first window appears
 - [x] 03 window title contains Solith
 - [x] 04 window reaches domcontentloaded state
@@ -86,7 +86,7 @@ Notes:
 - No final `v1.0.0` release has been created yet.
 - The items below require a human to manually observe the running UI.
 
-[ ] Launch `dist\win-unpacked\ResourceForge.exe` (close any existing instance first)
+[ ] Launch `dist\win-unpacked\Solith.exe` (close any existing instance first)
 [ ] Confirm app window opens and stays open
 [ ] Confirm title/sidebar renders visually
 [ ] Confirm trainer page loads

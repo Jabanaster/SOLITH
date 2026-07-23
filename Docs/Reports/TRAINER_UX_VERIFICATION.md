@@ -22,7 +22,7 @@ d14a0f3  test(trainer): add Electron Trainer UX end-to-end verification
 | Vite renderer | `dist-electron/dist/main-*.js` |
 | Electron main | `dist-electron/main.js` |
 | Electron preload | `dist-electron/preload.cjs` |
-| Packaged exe | `dist/win-unpacked/ResourceForge.exe` |
+| Packaged exe | `dist/win-unpacked/Solith.exe` |
 
 ---
 
@@ -107,7 +107,7 @@ Script: `npm run dist:dir && npm run test:packaged-smoke`
 
 Evidence for original 15 points:
 ```
-exe_path              = dist\win-unpacked\ResourceForge.exe
+exe_path              = dist\win-unpacked\Solith.exe
 app_get_app_path      = dist\win-unpacked\resources\app.asar
 ipc_channels_tested   = getGames, getSettings, addGame, addUserSelectedLocation, parseSave
 exit_code             = 0

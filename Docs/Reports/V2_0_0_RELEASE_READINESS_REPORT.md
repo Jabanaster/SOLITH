@@ -34,13 +34,13 @@ Delivered V2 changes:
 - Product name: `Solith`
 - App ID: `com.solith.app`
 - Windows executable name: `Solith`
-- NSIS installer artifact naming: `ResourceForge Setup ${version}.${ext}`
-- Repository metadata: present (`https://github.com/Jabanaster/ResourceForge.git`)
+- NSIS installer artifact naming: `Solith Setup ${version}.${ext}`
+- Repository metadata: present (`https://github.com/Jabanaster/SOLITH.git`)
 - Publish/updater config: absent
 
 ## Source Verification (Post-Bump)
 
-Completed on source repo (`G:\GAME TRAINER`) at version `2.0.0`:
+Completed on source repo (`G:\ACTIVE_PROJECTS\SOLITH`) at version `2.0.0`:
 
 - `npx tsc --noEmit`
 - `npm test`
@@ -55,14 +55,14 @@ Completed on source repo (`G:\GAME TRAINER`) at version `2.0.0`:
 Source checksum output:
 
 ```text
-48f34b133cfe0ec7bb6a6698cae9ac128d5a55cb7dad8ba9091d4386b681484d  dist/ResourceForge Setup 2.0.0.exe
-64921e6f037f7fe38090a0035e2a2648f7db6c392ede20629f732e94b4d33fcf  dist/ResourceForge Setup 2.0.0.exe.blockmap
+48f34b133cfe0ec7bb6a6698cae9ac128d5a55cb7dad8ba9091d4386b681484d  dist/Solith Setup 2.0.0.exe
+64921e6f037f7fe38090a0035e2a2648f7db6c392ede20629f732e94b4d33fcf  dist/Solith Setup 2.0.0.exe.blockmap
 ```
 
 ## Local Fresh-Clone Verification (Post-Bump)
 
 - Verification path: `G:\SOLITH_V2_LOCAL_VERIFY_4`
-- Clone source: local repo `G:\GAME TRAINER`
+- Clone source: local repo `G:\ACTIVE_PROJECTS\SOLITH`
 - Verified HEAD: `6b5fa26e669379146c09374afdd604406e043178`
 
 Executed and passed:
@@ -87,8 +87,8 @@ Executed and passed:
 Fresh-clone checksum output:
 
 ```text
-6259f038b95b3a7e040a705d4e0f959fe611553a5957cd220436dc5b1109657b  dist/ResourceForge Setup 2.0.0.exe
-fcd3ed99c34716efa20970598998943f9bf96f6e7806b0609e6da4f52bce6196  dist/ResourceForge Setup 2.0.0.exe.blockmap
+6259f038b95b3a7e040a705d4e0f959fe611553a5957cd220436dc5b1109657b  dist/Solith Setup 2.0.0.exe
+fcd3ed99c34716efa20970598998943f9bf96f6e7806b0609e6da4f52bce6196  dist/Solith Setup 2.0.0.exe.blockmap
 ```
 
 ## Safety Guarantees Preserved

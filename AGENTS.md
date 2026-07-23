@@ -1,6 +1,6 @@
 # Solith Agent Instructions
 
-The previous ResourceForge-specific AGENTS.md instructions no longer apply.
+The previous legacy project-specific AGENTS.md instructions no longer apply.
 
 Current project root:
 ```powershell

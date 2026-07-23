@@ -36,6 +36,18 @@ Referenced from the root `package.json` as:
 "memoryjs": "file:vendor/memoryjs-3.5.1-patched"
 ```
 
+## Solith policy boundary
+
+This vendored source includes upstream `memoryjs` files for debugger and DLL
+helpers because they are part of the package's source tree. Their presence here
+does not authorize Solith features to use them.
+
+Solith release policy forbids debugger bypass, DLL/code injection expansion,
+anti-cheat bypass, kernel drivers, and host security-policy weakening. Packaged
+Solith workflows must route live-memory behavior through the explicit
+selection/offline-guard/approval/certification/audit gates documented in the
+main project.
+
 No build artifacts (`build/`, `.node` binaries) or nested `node_modules` are
 committed here — only the source files needed for `npm` to extract and then
 `node-gyp` to compile.

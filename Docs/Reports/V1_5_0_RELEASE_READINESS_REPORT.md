@@ -42,31 +42,31 @@ Files changed before this report:
 - Product name: `Solith`
 - App ID: `com.solith.app`
 - Windows executable name: `Solith`
-- NSIS installer artifact name: `ResourceForge Setup ${version}.${ext}`
+- NSIS installer artifact name: `Solith Setup ${version}.${ext}`
 - Publish/updater configuration: absent
 
 ## Installer And Artifact Paths
 
 Source artifact verification used:
 
-- Installer: `G:\GAME TRAINER\dist\ResourceForge Setup 1.5.0.exe`
-- Installer blockmap: `G:\GAME TRAINER\dist\ResourceForge Setup 1.5.0.exe.blockmap`
-- Unpacked executable: `G:\GAME TRAINER\dist\win-unpacked\ResourceForge.exe`
-- App archive: `G:\GAME TRAINER\dist\win-unpacked\resources\app.asar`
-- Packaged TrainerHost: `G:\GAME TRAINER\dist\win-unpacked\resources\app.asar.unpacked\dist-electron\host-entry.js`
+- Installer: `G:\ACTIVE_PROJECTS\SOLITH\dist\Solith Setup 1.5.0.exe`
+- Installer blockmap: `G:\ACTIVE_PROJECTS\SOLITH\dist\Solith Setup 1.5.0.exe.blockmap`
+- Unpacked executable: `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\Solith.exe`
+- App archive: `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar`
+- Packaged TrainerHost: `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar.unpacked\dist-electron\host-entry.js`
 
 Checksum output from source artifact verification:
 
 ```text
-df1ad4a2e47c7241461cec99fe2c29ee63ca6068d940713c9036c7414c3a8b60  dist/ResourceForge Setup 1.5.0.exe
-a58f96b726e6a4782e9d455ade9fb806146cfd5c40c602d6b4d39de911aee73e  dist/ResourceForge Setup 1.5.0.exe.blockmap
+df1ad4a2e47c7241461cec99fe2c29ee63ca6068d940713c9036c7414c3a8b60  dist/Solith Setup 1.5.0.exe
+a58f96b726e6a4782e9d455ade9fb806146cfd5c40c602d6b4d39de911aee73e  dist/Solith Setup 1.5.0.exe.blockmap
 ```
 
 Checksum output from local fresh-clone verification at `G:\SOLITH_V15_LOCAL_VERIFY`:
 
 ```text
-97eae807a9c272afe4a8cc8740602f693bdfb0a621aae2712a438b6bfa7d52dd  dist/ResourceForge Setup 1.5.0.exe
-f692ff83eb56946afe5cf9d7ea2980ba875105c53616c2a34e4df2535ca069de  dist/ResourceForge Setup 1.5.0.exe.blockmap
+97eae807a9c272afe4a8cc8740602f693bdfb0a621aae2712a438b6bfa7d52dd  dist/Solith Setup 1.5.0.exe
+f692ff83eb56946afe5cf9d7ea2980ba875105c53616c2a34e4df2535ca069de  dist/Solith Setup 1.5.0.exe.blockmap
 ```
 
 Installer checksums are recorded per built artifact. The installer build process signs and packages the artifact during each build, so checksum values are expected to describe the specific artifact produced in that verification workspace.

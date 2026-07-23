@@ -270,7 +270,7 @@ npm run test:browser-fallback # 7/7 in 10.0s
 npm run test:accessibility    # 7/7 in 6.6s
 npm run test:performance      # 5/5 in 1.0s (startup 512ms, IPC 3-12ms)
 npm run test:pilot-intake     # 10/10 in 0.3s
-npm run dist                  # Exit 0, ResourceForge.exe produced
+npm run dist                  # Exit 0, Solith.exe produced
 npm run test:packaged-smoke   # 22/22 in 2.6s (Gate 18)
 git diff --check              # Exit 0 (LF→CRLF warnings only — not errors)
 git status --short            # Modified + untracked only

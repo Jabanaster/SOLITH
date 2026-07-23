@@ -25,13 +25,9 @@ export function packagedExecutableFileName(pkg) {
   return base.toLowerCase().endsWith('.exe') ? base : `${base}.exe`;
 }
 
-/** Prefer current product exe, fall back to legacy ResourceForge.exe. */
 export function resolvePackagedExecutable(root, pkg = readPackageMetadata(root)) {
   const unpackedDir = path.join(root, 'dist', 'win-unpacked');
   const preferred = path.join(unpackedDir, packagedExecutableFileName(pkg));
-  const legacy = path.join(unpackedDir, 'ResourceForge.exe');
-  if (fs.existsSync(preferred)) return preferred;
-  if (fs.existsSync(legacy)) return legacy;
   return preferred;
 }
 
@@ -79,14 +75,4 @@ export function findProductSetupArtifacts(root, pkg = readPackageMetadata(root))
     .filter((name) => pattern.test(name));
 }
 
-/** @deprecated Use findProductSetupArtifacts */
-export function findSolithSetupArtifacts(root) {
-  const distDir = path.join(root, 'dist');
-  if (!fs.existsSync(distDir)) return [];
-
-  const entries = fs.readdirSync(distDir, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((name) => /^(Solith|Solith) Setup .*\.exe(?:\.blockmap)?$/.test(name));
-}
+export const findSolithSetupArtifacts = findProductSetupArtifacts;

@@ -5,7 +5,7 @@ Full gate was run after Milestone K lock verification at HEAD 3738ecba925d6a4332
 ## Commands
 
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 npx tsc --noEmit
 npm run test:game-profile
 npm run test:trainer-schema

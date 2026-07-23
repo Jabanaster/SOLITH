@@ -77,7 +77,7 @@ Included so the pilot has operable library UX:
 ## Verification Gates
 
 ```powershell
-cd "G:\ACTIVE_PROJECTS\ResourceForge"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 npx tsx --test tests/in-process-script.test.ts
 npx tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts
 npx tsx --test tests/trainer-deck-rows.test.ts tests/trainer-health.test.ts tests/catalog-demand.test.ts

@@ -100,7 +100,7 @@ Solith is for local, offline, single-player games only.
 ### 3.1 The Dual-Core Live Memory Architecture
 Solith utilizes a context-aware hybrid engine for live memory modification:
 *   **Internal Engine (Win32/Steam/Epic):** Authorized to use in-process C++ DLL injection, Vectored Exception Handling (VEH) hooks, and Hardware Breakpoints (HWBP) for ultimate execution flow interception without corrupting original bytes.
-*   **External Engine (WinGDK/Game Pass):** Authorized to use `RPM_ONLY` (Read/WriteProcessMemory) with Fuzzy AOB state-delta tracking to safely bypass WindowsApps container restrictions.
+*   **External Engine (WinGDK/Game Pass):** Authorized to attempt normal user-mode read/query access only. If WindowsApps/AppContainer policy denies access, Solith must fail closed and report read-only validation as unavailable for that target.
 
 ### 3.2 STRICTLY PROHIBITED (The Safety Firewall)
 Solith must NEVER implement or allow:
@@ -1894,7 +1894,7 @@ Solith V1 includes:
 
 V2 implements the Dual-Core Live Memory Engine:
 
-- **External Baseline (Avowed / WinGDK):** Utilizes `RPM_ONLY` and fuzzy AOB state-delta tracking for protected WindowsApps containers.
+- **External Baseline (Avowed / WinGDK):** Utilizes normal read/query-only validation when the OS allows access and fails closed when WindowsApps/AppContainer policy denies access.
 - **Internal Pinnacle (Crimson Desert / Win32):** Authorized in-process pilot establishing the framework for C++ DLL injection, VEH hooks, and Hardware Breakpoints on standard executable targets.
 
 V2 must retain:

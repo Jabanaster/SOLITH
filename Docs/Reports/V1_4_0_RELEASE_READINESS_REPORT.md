@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Repo: `G:\GAME TRAINER`
+- Repo: `G:\ACTIVE_PROJECTS\SOLITH`
 - Branch: `master`
 - Final verified implementation commit: `5d6f8c6694e156fd367da44607843e421eaf4b30`
 - Working tree before report creation: clean
@@ -31,7 +31,7 @@
 - Bite 3 reconciliation fresh clone: PASS at `G:\SOLITH_V14_BITE3_VERIFY_RECONCILE`
 - Bite 4 source verification: PASS
 - Bite 4 fresh clone: PASS at `G:\SOLITH_V14_BITE4_VERIFY_2`
-- Final source verification: PASS at `G:\GAME TRAINER`
+- Final source verification: PASS at `G:\ACTIVE_PROJECTS\SOLITH`
 - Final fresh-clone verification: PASS at `G:\SOLITH_V14_FINAL_VERIFY`
 
 ## Final Source Gate
@@ -54,7 +54,7 @@
 ## Final Fresh-Clone Gate
 
 - Verification path: `G:\SOLITH_V14_FINAL_VERIFY`
-- Clone source: `G:\GAME TRAINER`
+- Clone source: `G:\ACTIVE_PROJECTS\SOLITH`
 - Clone HEAD: `5d6f8c6694e156fd367da44607843e421eaf4b30`
 - `npx tsc --noEmit`: PASS
 - `npm run test:game-profile`: PASS, 40/40 tests

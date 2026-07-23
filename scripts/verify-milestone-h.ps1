@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference = "Stop"
 
-cd "G:\GAME TRAINER"
+$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+Set-Location $RepoRoot
 
 $StartedAt = Get-Date -Format "yyyy-MM-ddTHH-mm-ss"
 $ReportDir = "Docs\Reports"

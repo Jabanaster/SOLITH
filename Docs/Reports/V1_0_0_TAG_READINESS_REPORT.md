@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Repo: `G:\GAME TRAINER`
+- Repo: `G:\ACTIVE_PROJECTS\SOLITH`
 - Branch: `master`
 - HEAD commit: `6d4b806724baa3ddb2d1c10eb03fca7dc93fdce2`
 - Working tree at end of Phase 9: clean

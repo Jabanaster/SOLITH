@@ -63,7 +63,7 @@ export const ENGINE_INDICATORS = {
 
 export const IGNORED_FOLDERS = [
   '.git', 'node_modules', 'cache', 'temp', 'logs', 'crashdumps',
-  '.solith', '.resourceforge', 'build', 'dist', 'obj', 'bin', 'out'
+  '.solith', 'build', 'dist', 'obj', 'bin', 'out'
 ] as const;
 
 export const SYSTEM_PATHS = [

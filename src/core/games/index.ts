@@ -215,7 +215,6 @@ export function scanGame(gameId: string): { success: boolean; result?: any; erro
     const appDataRoot = process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming');
     const backupsDirs = new Set([
       path.join(appDataRoot, 'Solith', 'backups').toLowerCase(),
-      path.join(appDataRoot, 'ResourceForge', 'backups').toLowerCase(),
     ]);
     const installDir = path.resolve(process.cwd()).toLowerCase();
 
@@ -247,8 +246,7 @@ export function scanGame(gameId: string): { success: boolean; result?: any; erro
           if (
             backupsDirs.has(canonicalDir) ||
             canonicalDir === installDir ||
-            canonicalDir.includes('.solith') ||
-            canonicalDir.includes('.resourceforge')
+            canonicalDir.includes('.solith')
           ) {
             return;
           }

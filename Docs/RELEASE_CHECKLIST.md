@@ -22,6 +22,10 @@ Exit criteria:
 - `npm audit --audit-level=low` is clean, or every accepted exception is
   documented in `Docs/SECURITY_AUDIT_EXCEPTIONS.md` with a removal condition
 
+The desktop release gate applies to the root package. `solith-hub-backend` is a
+separate Cloudflare service track and is excluded from desktop release artifacts
+until its own `npm audit` is clean or separately approved.
+
 ## Pull request gate
 
 Every PR must run:
@@ -72,3 +76,10 @@ Before release:
 - verify uninstall
 - document signed vs unsigned installer status
 - publish known limitations
+
+## Host security-policy gate
+
+Solith release scripts must not add antivirus exclusions, request administrator
+rights to change host security configuration, or ask users to disable real-time
+protection. False-positive handling is documentation-only and belongs in
+`Docs/ANTIVIRUS_SETUP.md`.

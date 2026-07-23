@@ -14,7 +14,7 @@ This batch adds shell polish follow-ups (onboarding E2E skip, branding masters, 
 |------|--------|
 | OS | Windows 10.0.26200 |
 | Node | (project engines via package-lock) |
-| Repo | `G:\ACTIVE_PROJECTS\ResourceForge` |
+| Repo | `G:\ACTIVE_PROJECTS\SOLITH` |
 | Committed HEAD | `56b8487364e0b8c8d66542971d4f253cd84f712f` |
 | Batch state | Dirty working tree — commit required before tag |
 

@@ -27,8 +27,12 @@ const VENDORED_MEMORYJS_PATH = fileURLToPath(
 );
 
 /**
- * Native memory driver — thin wrapper over the `memoryjs` addon
- * (ReadProcessMemory/WriteProcessMemory only; no injection, no drivers).
+ * Native memory driver — thin wrapper over the `memoryjs` addon.
+ *
+ * RELEASE BOUNDARY: read and write primitives are intentionally exposed only to
+ * the gated live-memory session/policy layer. This module must not be imported
+ * by renderer code, automatic background jobs, CT import code, or community
+ * metadata views.
  *
  * `memoryjs` is loaded lazily (only when a live-memory feature is actually
  * used) so the rest of the app — build, tests, packaging — never depends on
@@ -113,8 +117,9 @@ const DATA_TYPE_MAP: Record<LiveValueType, string> = {
 };
 
 /**
- * Validates handle structure to ensure it's legitimate before memory operations.
- * Reduces antivirus heuristic detection by pre-validating handle integrity.
+ * Validates handle structure to ensure it is legitimate before memory operations.
+ * This is a correctness guard; it is not stealth, evasion, or security-product
+ * bypass logic.
  */
 function validateHandle(handle: LiveProcessHandle, operation: string): void {
   if (!handle || typeof handle !== 'object') {
@@ -130,7 +135,7 @@ function validateHandle(handle: LiveProcessHandle, operation: string): void {
 
 /**
  * Validates memory address is within legitimate user-mode range.
- * Rejects clearly invalid addresses to prevent wild pointer writes (detected by antivirus).
+ * Rejects clearly invalid addresses to prevent wild pointer writes.
  */
 function validateAddress(address: bigint, operation: string): void {
   // User-mode address space: 0x10000 (skip NULL/guard pages) to ~0x7FFFFFFF0000 (end of user mode)

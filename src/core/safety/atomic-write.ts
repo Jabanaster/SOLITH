@@ -168,7 +168,7 @@ export function cleanupAbandonedTempFiles(dirPath: string): void {
       } else if (
         entry.isFile() &&
         entry.name.endsWith('.tmp') &&
-        (entry.name.includes('.solith-') || entry.name.includes('.resourceforge-'))
+          entry.name.includes('.solith-')
       ) {
         try {
           fs.unlinkSync(fullPath);

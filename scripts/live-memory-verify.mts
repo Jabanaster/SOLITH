@@ -1,6 +1,11 @@
 /**
  * One-off manual verification script — NOT part of `npm test`.
  *
+ * RELEASE BOUNDARY: this is a developer-only diagnostic. It is not shipped as a
+ * user workflow, not invoked automatically, and intentionally exercises a
+ * synthetic child process only. Do not use it against games or protected
+ * processes during release validation.
+ *
  * Spawns a real, separate Node child process holding a known value in a
  * dedicated (non-pooled) Buffer, then uses the actual product code
  * (nativeMemoryDriver, backed by the compiled `memoryjs` native addon) to

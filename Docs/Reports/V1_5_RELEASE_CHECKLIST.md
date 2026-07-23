@@ -34,7 +34,7 @@ Record:
 
 ## Fresh Clone Gates
 
-- Local fresh clone from `G:\GAME TRAINER`
+- Local fresh clone from `G:\ACTIVE_PROJECTS\SOLITH`
 - Remote fresh clone from origin URL after push
 - Same source, build, artifact, checksum, packaged host, and orphan gates in each clone
 

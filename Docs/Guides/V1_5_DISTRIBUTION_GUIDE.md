@@ -9,15 +9,15 @@ Solith V1.5 is a local-only, offline-first, single-player save/data-file tool. I
 Run the release build from the repository root:
 
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 npm run build
 ```
 
 Expected Windows artifacts:
 
-- Installer: `dist\ResourceForge Setup 1.5.0.exe`
-- Installer blockmap: `dist\ResourceForge Setup 1.5.0.exe.blockmap`
-- Unpacked app: `dist\win-unpacked\ResourceForge.exe`
+- Installer: `dist\Solith Setup 1.5.0.exe`
+- Installer blockmap: `dist\Solith Setup 1.5.0.exe.blockmap`
+- Unpacked app: `dist\win-unpacked\Solith.exe`
 - Packaged TrainerHost entry: `dist\win-unpacked\resources\app.asar.unpacked\dist-electron\host-entry.js`
 
 ## Artifact Verification
@@ -37,7 +37,7 @@ node scripts/generate-release-checksums.mjs
 
 ## Installation
 
-1. Run `dist\ResourceForge Setup 1.5.0.exe`.
+1. Run `dist\Solith Setup 1.5.0.exe`.
 2. Launch Solith from the Start Menu shortcut or installed executable.
 3. Use Solith only with local single-player games or local data files you own or have permission to modify.
 

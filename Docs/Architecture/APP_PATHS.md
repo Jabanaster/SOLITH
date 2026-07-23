@@ -11,7 +11,7 @@ When Electron is not available (i.e., running under `tsx` or `node --test`), the
 
 | Path | Location |
 |------|----------|
-| `appRoot` | Project root (`G:/GAME TRAINER`) |
+| `appRoot` | Project root (`G:/ACTIVE_PROJECTS/SOLITH`) |
 | `userDataRoot` | `<project>/data/` |
 | `databasePath` | `<project>/data/solith.db` |
 | `demoFixtureRoot` | `<project>/demo-game/` |

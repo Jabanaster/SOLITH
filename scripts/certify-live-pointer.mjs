@@ -2,6 +2,10 @@
 /**
  * L3 live pointer certification harness — real memoryjs / ReadProcessMemory path.
  *
+ * RELEASE BOUNDARY: manual developer evidence capture only. This script is not
+ * part of the packaged app UI, not part of automated release gates, and must not
+ * be used against online/protected processes.
+ *
  * Bypasses FakeMemoryDriver. Attaches to a live Windows process, resolves a
  * schema.v1 memoryFeature pointer chain, reads, writes a safe test value, and
  * verifies the write.

@@ -2,8 +2,8 @@
 
 **Status**: VERIFIED & PASSING
 **Date**: 2026-06-28
-**Installer Path**: `G:\GAME TRAINER\dist\ResourceForge Setup 1.0.0.exe`
-**Unpacked Folder**: `G:\GAME TRAINER\dist\win-unpacked`
+**Installer Path**: `G:\ACTIVE_PROJECTS\SOLITH\dist\Solith Setup 1.0.0.exe`
+**Unpacked Folder**: `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked`
 
 ---
 
@@ -26,7 +26,7 @@ npm run test:packaged-smoke
 ```
 
 ### Packaged Smoke Run Output
-- `win-unpacked/ResourceForge.exe exists` — **PASS**
+- `win-unpacked/Solith.exe exists` — **PASS**
 - `app launches and window appears` — **PASS**
 - `window title contains Solith` — **PASS**
 - `React root mounts (#root)` — **PASS**

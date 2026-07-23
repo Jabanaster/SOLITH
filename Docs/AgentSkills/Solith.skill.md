@@ -8,7 +8,7 @@ Solith is a local-only, offline-only, single-player trainer/save-editor applicat
 
 Project root:
 ```
-G:\GAME TRAINER
+G:\ACTIVE_PROJECTS\SOLITH
 ```
 
 Repository:
@@ -42,7 +42,7 @@ If you cannot reread this file, stop and report:
 ```
 STATUS=BLOCKED
 REASON=Could not reread AGENTS.md
-NEXT_SAFE_COMMAND=Get-Content "G:\GAME TRAINER\AGENTS.md" -First 120
+NEXT_SAFE_COMMAND=Get-Content "G:\ACTIVE_PROJECTS\SOLITH\AGENTS.md" -First 120
 ```
 
 ---
@@ -60,7 +60,7 @@ Has it been about 5 minutes or more since LAST_SKILL_REREAD_TIME?
 
 If yes, reread:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 Get-Content "AGENTS.md" -First 200
 ```
 Then continue. If no, continue.
@@ -129,7 +129,7 @@ STOP=<YES/NO>
 For command tasks, use:
 ```
 RUN:
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 <command>
 
 PASTE:
@@ -173,7 +173,7 @@ Bad:
 {
   "name": "read_file",
   "arguments": {
-    "path": "G:\\GAME TRAINER\\AGENTS.md"
+    "path": "G:\\ACTIVE_PROJECTS\\SOLITH\\AGENTS.md"
   }
 }
 ```
@@ -233,18 +233,18 @@ The target shell for this project is Windows PowerShell 5.1 or newer.
 
 Preferred shell command format:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 <command>
 ```
 
 If a command fails because the active shell is not PowerShell, explicitly invoke PowerShell:
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\GAME TRAINER'; <command>"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\ACTIVE_PROJECTS\SOLITH'; <command>"
 ```
 
 For reading this file specifically, use:
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content 'G:\GAME TRAINER\AGENTS.md' -First 200"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content 'G:\ACTIVE_PROJECTS\SOLITH\AGENTS.md' -First 200"
 ```
 
 Do not translate PowerShell commands into Git Bash, WSL, Linux shell, or cmd.exe syntax unless the user explicitly asks.
@@ -253,7 +253,7 @@ If shell ambiguity prevents safe execution, stop and report:
 ```
 STATUS=BLOCKED
 REASON=Shell ambiguity prevents safe command execution
-NEXT_SAFE_COMMAND=powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\GAME TRAINER'; git status --short"
+NEXT_SAFE_COMMAND=powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:\ACTIVE_PROJECTS\SOLITH'; git status --short"
 ```
 
 ---
@@ -262,14 +262,14 @@ NEXT_SAFE_COMMAND=powershell -NoProfile -ExecutionPolicy Bypass -Command "cd 'G:
 
 Before any Git, npm, node, test, build, or file command, run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 ```
 
 Never run project commands from `C:\WINDOWS\system32`.
 
 If you notice the shell is there, immediately correct with:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 ```
 
 ---
@@ -277,7 +277,7 @@ cd "G:\GAME TRAINER"
 ## Source of Truth Hierarchy
 
 1. Real command output from the repository.
-2. Files currently in `G:\GAME TRAINER`.
+2. Files currently in `G:\ACTIVE_PROJECTS\SOLITH`.
 3. Current `AGENTS.md`.
 4. User's latest explicit instruction.
 5. Prior summaries only if they do not conflict with current repo state.
@@ -384,7 +384,7 @@ symlinks or junctions used to escape approved folders
 
 For project files, all write operations must stay inside:
 ```
-G:\GAME TRAINER
+G:\ACTIVE_PROJECTS\SOLITH
 ```
 
 For real game save files, default mode is **read-only** unless the user explicitly authorizes a specific write operation.
@@ -575,7 +575,7 @@ Do not create commits, tags, branches, or merges from detached HEAD unless the u
 
 Before any new work, run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 
 git branch --show-current
 git status --short
@@ -604,7 +604,7 @@ SAFE_TO_CONTINUE=<YES or NO>
 
 For a release evidence pass, run in order:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 
 npx tsc --noEmit
 npm run test:game-profile
@@ -673,7 +673,7 @@ Do not create a release unless the user explicitly says: `RELEASE IT`
 
 Before any commit, tag, push, merge, or release, reread this file and run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 git status --short
 git diff --stat
 git log --oneline --decorate -5
@@ -691,7 +691,7 @@ A zero-byte junk file can be proposed for deletion, but still requires approval.
 
 After deletion, run:
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 git status --short
 ```
 
@@ -768,7 +768,7 @@ If context conflicts, stop and report:
 STATUS=BLOCKED
 REASON=Conflicting or stale context detected
 CURRENT_KNOWN_LOCK=c4d7c79a84c5d5e36ff850920bac7e057b2dbec9
-NEXT_SAFE_COMMAND=cd "G:\GAME TRAINER"; git status --short; git rev-parse HEAD
+NEXT_SAFE_COMMAND=cd "G:\ACTIVE_PROJECTS\SOLITH"; git status --short; git rev-parse HEAD
 ```
 
 ---

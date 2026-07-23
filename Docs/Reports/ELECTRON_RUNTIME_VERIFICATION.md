@@ -110,7 +110,7 @@ The manual and automated verification gates have been successfully executed:
 - **npm run build:electron**: Passed successfully, bundling main, preload, and host-entry via `tsup`, and verifying with `verify-electron-output.mjs` (19/19 checks passed).
 - **npm run dev**: Verified dev orchestration starts Vite + tsup watch + Electron Main cleanly.
 - **npm run test:electron-smoke**: Passed successfully (6/6 tests passed).
-- **npm run build**: Generated Setup NSIS installer target successfully after terminating locked processes (`ResourceForge Setup 1.0.0.exe`).
+- **npm run build**: Generated Setup NSIS installer target successfully after terminating locked processes (`Solith Setup 1.0.0.exe`).
 - **npm run test:electron-e2e**: Passed successfully (4/4 tests passed) after implementing the rollback journal fix in `electron/main.ts`.
 - **npm run test:packaged-smoke**: Passed successfully (22/22 tests passed).
 

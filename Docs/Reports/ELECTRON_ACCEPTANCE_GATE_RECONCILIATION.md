@@ -37,7 +37,7 @@
 | 14 | Electron screenshots | **DEFERRED** | — | Computer-use tools not invoked; no screenshots captured. Not blocking for ACCEPTED. |
 | 15 | Path resolution tests | **PASS** | T1 | `safety-integration.test.ts` test 1 passes. `path-safety.ts` fully tested. |
 | 16 | Production build (`npm run build`) | **PASS** | T1 | `npm run build:vite` + `npm run build:electron` both pass in this session. |
-| 17 | Installer build | **PASS** | T1 | `npm run dist:dir` completes. `dist/win-unpacked/ResourceForge.exe` exists and is launchable. |
+| 17 | Installer build | **PASS** | T1 | `npm run dist:dir` completes. `dist/win-unpacked/Solith.exe` exists and is launchable. |
 | 18 | Packaged smoke test | **PASS** | T1 | See Gate 18 Evidence section below. 15/15 runtime points verified. |
 | 19 | Preload exposed correctly | **PASS** | T1 | Smoke test 4 (`window.electronAPI is exposed`) passes. Preload is CJS (`preload.cjs`). |
 | 20 | Documentation complete | **PASS** | T2 | This document created. Build pipeline, paths, IPC inventory docs confirmed present. |
@@ -152,11 +152,11 @@
 
 | Field | Value |
 |-------|-------|
-| `exe_path` | `G:\GAME TRAINER\dist\win-unpacked\ResourceForge.exe` |
+| `exe_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\Solith.exe` |
 | `isolated_user_data` | `%TEMP%\rf-pkg-smoke-1782248335178-falujl4blbd\userData` |
-| `app_get_app_path` | `G:\GAME TRAINER\dist\win-unpacked\resources\app.asar` |
-| `resources_path` | `G:\GAME TRAINER\dist\win-unpacked\resources` |
-| `preload_path` | `G:\GAME TRAINER\dist\win-unpacked\resources\app.asar\dist-electron\preload.cjs` |
+| `app_get_app_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar` |
+| `resources_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources` |
+| `preload_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar\dist-electron\preload.cjs` |
 | `db_path` | `C:\Users\chase\AppData\Local\Temp\rf-pkg-smoke-1782248335178-falujl4blbd\solith.db` |
 
 The preload resolves inside `app.asar` (ASAR-packaged). The database resides in the isolated temp `userData` — not in the ASAR or the installation directory.
@@ -178,7 +178,7 @@ The preload resolves inside `app.asar` (ASAR-packaged). The database resides in 
 
 | Point | Description | Result |
 |-------|-------------|--------|
-| 01 | Packaged exe exists at `dist/win-unpacked/ResourceForge.exe` | ✅ PASS |
+| 01 | Packaged exe exists at `dist/win-unpacked/Solith.exe` | ✅ PASS |
 | 02 | App launches and first window appears | ✅ PASS |
 | 03 | Window title contains Solith | ✅ PASS |
 | 04 | Window reaches `domcontentloaded` state | ✅ PASS |
@@ -214,7 +214,7 @@ The preload resolves inside `app.asar` (ASAR-packaged). The database resides in 
 **Evidence:** Both Gate 13 runs used separate temp dirs and produced independent results with identical hashes.
 
 ### Fix 4 — parseSave Fixture Path for Packaged Test
-**Root cause:** Gate 18 Point 13 failed because `validatePathSafety()` blocks files inside `process.cwd()`. When Playwright launches the packaged exe, `process.cwd()` is `G:\GAME TRAINER` (the project root), which contains the test fixture.  
+**Root cause:** Gate 18 Point 13 failed because `validatePathSafety()` blocks files inside `process.cwd()`. When Playwright launches the packaged exe, `process.cwd()` is `G:\ACTIVE_PROJECTS\SOLITH` (the project root), which contains the test fixture.
 **Fix:** Point 13 copies the fixture to the isolated temp `APP_DATA` directory and registers it via `addUserSelectedLocation` before calling `parseSave`.  
 **Evidence:** Point 13 passes; `player.gold = 150` confirmed from the temp-dir copy.
 
@@ -252,4 +252,4 @@ All 20 gates are either PASS or DEFERRED (Gate 14 — screenshots — is non-blo
 
 - **Gate 13:** 4/4 Playwright E2E tests pass. Full workflow `UI → preload → IPC → DB → backup → atomic apply → restore → journal` proven across two independent runs with separate isolated `userData` directories. All six SHA-256 equalities hold. Both runs produce identical hashes, proving determinism. Zero renderer errors. Zero main process errors. Temp dirs cleaned up.
 
-- **Gate 18:** 15/15 packaged exe smoke points pass against `dist/win-unpacked/ResourceForge.exe` (electron-builder output). `app.getAppPath()` resolves to `...resources/app.asar`. Preload loads from inside the ASAR. Database stored in isolated temp `userData`, not in ASAR or installation directory. `contextIsolation` confirmed active. Full `window.electronAPI` present. All tested IPC channels (`getGames`, `getSettings`, `addGame`, `addUserSelectedLocation`, `parseSave`) succeed. Exit code 0. Zero errors.
+- **Gate 18:** 15/15 packaged exe smoke points pass against `dist/win-unpacked/Solith.exe` (electron-builder output). `app.getAppPath()` resolves to `...resources/app.asar`. Preload loads from inside the ASAR. Database stored in isolated temp `userData`, not in ASAR or installation directory. `contextIsolation` confirmed active. Full `window.electronAPI` present. All tested IPC channels (`getGames`, `getSettings`, `addGame`, `addUserSelectedLocation`, `parseSave`) succeed. Exit code 0. Zero errors.

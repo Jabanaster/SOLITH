@@ -63,7 +63,7 @@ Results are exact — no paraphrasing.
 | 12 | `npm run test:accessibility` | **7/7 pass** in 6.9s |
 | 13 | `npm run test:performance` | **12/12 pass** in 5.3s (warm startup 501ms, IPC 1-8ms, nav 314-315ms, apply 17ms, restore 7-8ms) |
 | 14 | `npm run test:pilot-intake` | **10/10 pass** in 0.3s |
-| 15 | `npm run dist` | Exit 0, `ResourceForge.exe` produced |
+| 15 | `npm run dist` | Exit 0, `Solith.exe` produced |
 | 16 | `npm run test:packaged-smoke` | **22/22 pass** in 2.7s (Gate 18) |
 | 17 | `git diff --check` | Exit 0 — no whitespace errors |
 | 18 | `git status --short` | Modified + untracked only — no unexpected files |

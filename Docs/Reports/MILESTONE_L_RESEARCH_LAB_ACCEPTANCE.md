@@ -112,7 +112,7 @@ scripts/inspect-ct.mjs
 ## Verification Gates (run before tag)
 
 ```powershell
-cd "G:\ACTIVE_PROJECTS\ResourceForge"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 npx tsc --noEmit
 npx tsx --test tests/trainer-research.test.ts
 npx tsx --test tests/script-research.test.ts

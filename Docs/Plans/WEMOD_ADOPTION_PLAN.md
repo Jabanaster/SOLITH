@@ -403,7 +403,7 @@ Phase AG (polish + release)
 Run in order after each phase merge:
 
 ```powershell
-cd "G:\ACTIVE_PROJECTS\ResourceForge"   # or workspace root
+cd "G:\ACTIVE_PROJECTS\SOLITH"   # or workspace root
 
 npx tsc --noEmit
 npm test

@@ -232,8 +232,7 @@ function createWindow() {
 
   const isDev =
     process.argv.includes('--dev') ||
-    process.env.SOLITH_DEV === '1' ||
-    process.env.RESOURCEFORGE_DEV === '1';
+    process.env.SOLITH_DEV === '1';
   const isCompatTest = process.argv.includes('--compat-test');
 
   if (isCompatTest) {

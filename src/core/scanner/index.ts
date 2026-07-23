@@ -247,11 +247,10 @@ export function findLatestSave(saveFiles: string[]): string | null {
         return;
       }
       
-      // Exclude directories containing backup or Solith / legacy ResourceForge data
+      // Exclude directories containing backups or Solith's own app data
       if (
         lowerPath.includes('backup') ||
-        lowerPath.includes('solith') ||
-        lowerPath.includes('resourceforge')
+        lowerPath.includes('solith')
       ) {
         return;
       }

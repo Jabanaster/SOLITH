@@ -7,14 +7,14 @@
 ## Context
 
 Reproducibility gate for Windows checkout: run clean-tree commands on repo root
-`G:\ACTIVE_PROJECTS\ResourceForge` (not any legacy alternate path).
+`G:\ACTIVE_PROJECTS\SOLITH` (not any legacy alternate path).
 
 ## Environment
 
 | Item | Value |
 |------|--------|
 | OS | Windows 10.0.26200 |
-| Repo | `G:\ACTIVE_PROJECTS\ResourceForge` |
+| Repo | `G:\ACTIVE_PROJECTS\SOLITH` |
 | CI verifier | `.github/workflows/ci-fast.yml` → this file |
 
 ## Gate results

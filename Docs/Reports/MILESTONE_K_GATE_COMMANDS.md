@@ -3,7 +3,7 @@
 These are the full release evidence gates to run only after user approval.
 
 ```powershell
-cd "G:\GAME TRAINER"
+cd "G:\ACTIVE_PROJECTS\SOLITH"
 
 npx tsc --noEmit
 npm run test:game-profile

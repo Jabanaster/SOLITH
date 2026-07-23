@@ -39,12 +39,11 @@ A **production-ready, extensible multi-game cheat system** with support for 7 ga
 - Type-safe native operations
 - **Commit:** `3863857`
 
-### **Phase 3: Antivirus Setup Automation** ✅
-- PowerShell setup script (auto-configures Windows Defender)
-- Comprehensive documentation (ANTIVIRUS_SETUP.md)
-- Manual Bitdefender instructions
-- False positive reporting guidance
-- **Commits:** `3863857`, README update
+### **Phase 3: False-Positive Handling Policy** ✅
+- Documentation-only antivirus guidance
+- No automated Windows Defender or third-party AV policy changes
+- False-positive reporting guidance
+- **Status:** retired unsafe whitelist automation in favor of fail-safe documentation
 
 ### **Phase 4: Complete Multi-Game System** ✅
 - 7-game registry (Palworld, Atomfall, Stardew Valley, Avowed, Undisputed, Dredge, Crimson Desert)
@@ -176,11 +175,11 @@ interface CheatDefinition {
 - ✅ Clear error messages
 - ✅ Result: Reduced antivirus false positives
 
-### **Antivirus Integration (Phase 3)**
-- ✅ Auto-whitelist script (Windows Defender)
-- ✅ Manual Bitdefender instructions
-- ✅ Comprehensive troubleshooting docs
-- ✅ False positive reporting procedures
+### **False-Positive Handling (Phase 3)**
+- ✅ Documentation-only false-positive guidance
+- ✅ No automated host security-policy modification
+- ✅ No setup path that requires disabling protection
+- ✅ False-positive reporting procedures
 - ✅ Code-signing guidance
 
 ### **Multi-Game System (Phase 4)**
@@ -277,7 +276,7 @@ const game = findGameByExecutable('Palworld-Win64-Shipping.exe')
 | Document | Purpose |
 |----------|---------|
 | `SOLITH_LIVE_TRAINER_PARITY.md` | Live trainer architecture |
-| `ANTIVIRUS_SETUP.md` | Complete antivirus guide (Windows Defender, Bitdefender, etc.) |
+| `ANTIVIRUS_SETUP.md` | Documentation-only false-positive handling guide |
 | `LIVE_TRAINER_IMPLEMENTATION.md` | Implementation details (auto-scan workflow, session caching) |
 | `MULTI_GAME_TRAINER_SUMMARY.md` | **This file** - full system overview |
 | README.md | Updated with multi-game trainer section + quick start |
@@ -366,7 +365,7 @@ Others: connectionBaseline = 0 (strict mode)
 - ✅ Real-time scanning infrastructure
 - ✅ Freeze value feature
 - ✅ Online-session guard
-- ✅ Defensive wrapping (antivirus)
+- ✅ Defensive wrapping and policy-safe false-positive handling
 - ✅ Multi-game registry
 - ✅ Game auto-detection
 
@@ -390,10 +389,9 @@ Others: connectionBaseline = 0 (strict mode)
 
 ## 🎬 Quick Start
 
-### **1. Setup Antivirus (First Time)**
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
-```
+### **1. Review Security Posture (First Time)**
+Read `Docs/ANTIVIRUS_SETUP.md`. Solith does not modify host security policy or
+ask users to disable real-time protection.
 
 ### **2. Launch Solith**
 - Build: `npm run build`
@@ -423,8 +421,8 @@ powershell -ExecutionPolicy Bypass -File scripts/setup-antivirus-whitelist.ps1
 - [x] Core infrastructure complete (registry, detector, types)
 - [x] 7 game configs registered with 245+ cheats
 - [x] GameCheatSelector UI component
-- [x] Defensive wrapping (antivirus false positive mitigation)
-- [x] Whitelist setup script + documentation
+- [x] Defensive wrapping and false-positive handling documentation
+- [x] Retired automated whitelist setup path
 - [x] Build verified (no errors)
 - [x] All commits pushed
 - [x] Documentation complete

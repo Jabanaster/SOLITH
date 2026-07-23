@@ -13,8 +13,6 @@ import {
 
 const root = process.env.SOLITH_RELEASE_ROOT
   ? path.resolve(process.env.SOLITH_RELEASE_ROOT)
-  : process.env.RESOURCEFORGE_RELEASE_ROOT
-    ? path.resolve(process.env.RESOURCEFORGE_RELEASE_ROOT)
   : findRepoRoot(import.meta.url);
 
 const pkg = readPackageMetadata(root);
