@@ -142,7 +142,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       label?: string;
     }>;
     pollIntervalMs?: number;
+    reportIntervalMs?: number;
     epsilon?: number;
+    eventLookbackMs?: number;
   }) => ipcRenderer.invoke('live-memory-correlation-start', payload),
   liveMemoryCorrelationPoll: () => ipcRenderer.invoke('live-memory-correlation-poll', {}),
   liveMemoryCorrelationEvent: (payload: {
@@ -160,6 +162,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     label?: string;
     expectedDirection: 'increased' | 'decreased' | 'changed' | 'unchanged';
     expectedDelta?: number;
+    observedValue?: number;
+    lookbackMs?: number;
     observedAt?: string;
   }) => ipcRenderer.invoke('live-memory-correlation-event', payload),
   liveMemoryCorrelationStop: () => ipcRenderer.invoke('live-memory-correlation-stop', {}),
@@ -168,6 +172,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('live-memory-correlation-report', listener);
     return () => ipcRenderer.removeListener('live-memory-correlation-report', listener);
   },
+  localOcrListWindowSources: (payload?: { targetName?: string }) =>
+    ipcRenderer.invoke('local-ocr-list-window-sources', payload ?? {}),
+  localOcrReadWindowRegion: (payload: {
+    sourceId: string;
+    roi: { x: number; y: number; width: number; height: number };
+  }) => ipcRenderer.invoke('local-ocr-read-window-region', payload),
   liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
     ipcRenderer.invoke('live-memory-freeze-start', payload),
   liveMemoryFreezeStop: () => ipcRenderer.invoke('live-memory-freeze-stop'),

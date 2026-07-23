@@ -115,6 +115,36 @@ test('LiveCorrelationWatcher exposes recent delta trails for UI research without
   assert.deepEqual(report.candidates[0]?.recentValues, [725, 725, 710]);
 });
 
+test('LiveCorrelationWatcher uses OCR observed values as a read-only tie-break boost', () => {
+  const driver = new FakeMemoryDriver({
+    [0x100n.toString()]: 725,
+    [0x200n.toString()]: 725,
+  });
+  const watcher = new LiveCorrelationWatcher({
+    driver,
+    handle: HANDLE,
+    candidates: [
+      { id: 'gold-real', address: '0x100', value: 725, dataType: 'int32', source: 'auto-scan', scanMode: 'exact' },
+      { id: 'nearby-decoy', address: '0x200', value: 725, dataType: 'float', source: 'auto-scan', scanMode: 'exact' },
+    ],
+  });
+
+  watcher.pollOnce();
+  driver.setValue(0x100n, 710);
+  driver.setValue(0x200n, 711);
+  watcher.pollOnce();
+  const report = watcher.recordEvent({
+    kind: 'ocr_value',
+    label: 'OCR gold value',
+    expectedDirection: 'changed',
+    observedValue: 710,
+  });
+
+  assert.equal(report.strong[0]?.id, 'gold-real');
+  assert.equal(report.strong[0]?.observedValueMatches, 1);
+  assert.ok(report.strong[0]?.reasons.some((reason) => /OCR-observed/i.test(reason)));
+});
+
 test('LiveCorrelationWatcher supports mixed value types without collapsing to one data type', () => {
   const driver = new FakeMemoryDriver({
     [0x100n.toString()]: 155,

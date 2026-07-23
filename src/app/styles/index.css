@@ -886,6 +886,51 @@ button, input, select, textarea {
   background: rgba(255, 111, 111, 0.08);
 }
 
+.live-correlation-ocr {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.live-correlation-ocr h4 {
+  margin: 0 0 6px;
+}
+
+.live-correlation-ocr-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 420px) 1fr;
+  gap: 14px;
+  align-items: start;
+  margin-top: 10px;
+}
+
+.live-correlation-ocr-layout img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.live-correlation-ocr-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.live-correlation-roi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.live-correlation-roi-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 /* ─── Content Area ──────────────────────────────────────── */
 .content-area {
   flex: 1;

@@ -51,6 +51,7 @@ import { registerRegistryVerificationIpc } from './registry-verification-ipc.js'
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
+import { registerLocalOcrIpc } from './local-ocr-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
 import {
   reconcileCommunitySyncPolling,
@@ -85,6 +86,7 @@ registerRegistryVerificationIpc();
 registerInstallDiscoveryIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();
+registerLocalOcrIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);

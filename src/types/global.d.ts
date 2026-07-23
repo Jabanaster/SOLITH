@@ -187,10 +187,12 @@ interface Window {
         | 'recovered_stamina'
         | 'used_item'
         | 'collected_loot'
+        | 'ocr_value'
         | 'custom';
       label?: string;
       expectedDirection: 'increased' | 'decreased' | 'changed' | 'unchanged';
       expectedDelta?: number;
+      observedValue?: number;
       lookbackMs?: number;
       observedAt?: string;
     }) => Promise<{
@@ -202,6 +204,26 @@ interface Window {
     onLiveMemoryCorrelationReport?: (
       callback: (payload: import('../core/live-memory/live-correlation-watcher.js').CorrelationReport) => void,
     ) => (() => void) | undefined;
+    localOcrListWindowSources: (payload?: { targetName?: string }) => Promise<{
+      success: boolean;
+      sources?: Array<{
+        id: string;
+        name: string;
+        thumbnailDataUrl: string;
+        appIconDataUrl?: string;
+      }>;
+      error?: string;
+    }>;
+    localOcrReadWindowRegion: (payload: {
+      sourceId: string;
+      roi: { x: number; y: number; width: number; height: number };
+    }) => Promise<{
+      success: boolean;
+      result?: import('../core/ocr/local-ocr.js').LocalOcrResult;
+      roi?: { x: number; y: number; width: number; height: number };
+      sourceName?: string;
+      error?: string;
+    }>;
     liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryFreezeStop: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryFreezeStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;

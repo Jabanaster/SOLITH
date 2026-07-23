@@ -436,16 +436,32 @@ export const LiveMemoryCorrelationEventSchema = z.object({
     'recovered_stamina',
     'used_item',
     'collected_loot',
+    'ocr_value',
     'custom',
   ]),
   label: z.string().min(1).max(160).optional(),
   expectedDirection: z.enum(['increased', 'decreased', 'changed', 'unchanged']),
   expectedDelta: z.number().finite().optional(),
+  observedValue: z.number().finite().optional(),
   lookbackMs: z.number().int().min(50).max(10_000).optional(),
   observedAt: z.string().min(1).max(80).optional(),
 });
 
 export const LiveMemoryCorrelationEmptySchema = z.object({});
+
+export const LocalOcrListSourcesSchema = z.object({
+  targetName: z.string().min(1).max(260).optional(),
+});
+
+export const LocalOcrCaptureSchema = z.object({
+  sourceId: z.string().min(1).max(300),
+  roi: z.object({
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+    width: z.number().int().positive().max(4096),
+    height: z.number().int().positive().max(4096),
+  }),
+});
 
 export const LiveMemoryFreezeStartSchema = z.object({
   address: LIVE_ADDRESS_STRING,

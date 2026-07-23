@@ -26,10 +26,12 @@ export interface PlayerCorrelationEvent {
     | 'recovered_stamina'
     | 'used_item'
     | 'collected_loot'
+    | 'ocr_value'
     | 'custom';
   label?: string;
   expectedDirection: CorrelationDirection;
   expectedDelta?: number;
+  observedValue?: number;
   lookbackMs?: number;
   observedAt?: string;
 }
@@ -46,6 +48,7 @@ export interface CorrelationCandidateState extends CorrelationCandidate {
   matchedEvents: number;
   contradictedEvents: number;
   exactDeltaMatches: number;
+  observedValueMatches: number;
   recentDeltas: number[];
   recentValues: number[];
   unreadable: boolean;
@@ -147,6 +150,7 @@ export class LiveCorrelationWatcher {
         matchedEvents: 0,
         contradictedEvents: 0,
         exactDeltaMatches: 0,
+        observedValueMatches: 0,
         recentDeltas: [],
         recentValues: [candidate.value],
         deltaHistory: [],
@@ -226,6 +230,16 @@ export class LiveCorrelationWatcher {
     for (const state of this.states.values()) {
       if (state.unreadable || state.deltaHistory.length === 0) continue;
 
+      if (event.observedValue != null && state.currentValue != null) {
+        if (Math.abs(state.currentValue - event.observedValue) <= this.ocrValueTolerance(state, event.observedValue)) {
+          state.matchedEvents += 1;
+          state.observedValueMatches += 1;
+          continue;
+        }
+        state.contradictedEvents += 1;
+        continue;
+      }
+
       const recent = state.deltaHistory.filter((entry) => eventAtMs - entry.atMs <= lookbackMs);
       const window = recent.length > 0 ? recent : state.deltaHistory.slice(-1);
       const matching = window.find((entry) => eventMatchesDelta(event.expectedDirection, entry.delta, this.epsilon));
@@ -282,6 +296,13 @@ export class LiveCorrelationWatcher {
   private candidateId(candidate: CorrelationCandidate): string {
     return candidate.id ?? `${candidate.address}:${candidate.dataType}:${candidate.source ?? 'manual'}:${candidate.scanMode ?? 'any'}`;
   }
+
+  private ocrValueTolerance(state: CorrelationCandidateState, observedValue: number): number {
+    if (state.dataType === 'float' || state.dataType === 'double') {
+      return Math.max(this.epsilon, Math.abs(observedValue) * 0.001, 0.01);
+    }
+    return Math.max(this.epsilon, 0.0001);
+  }
 }
 
 function pushCapped<T>(items: T[], item: T, maxItems: number): void {
@@ -335,6 +356,11 @@ function scoreCandidate(state: CorrelationCandidateState, eventCount: number): {
   if (state.exactDeltaMatches > 0) {
     score += Math.min(15, state.exactDeltaMatches * 5);
     reasons.push('Matched declared delta amount');
+  }
+
+  if (state.observedValueMatches > 0) {
+    score += Math.min(30, state.observedValueMatches * 20);
+    reasons.push('Matched OCR-observed screen value');
   }
 
   if (changeRatio === 0) {

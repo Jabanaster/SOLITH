@@ -6,6 +6,7 @@ import type {
   CorrelationReport,
   PlayerCorrelationEvent,
 } from '../../core/live-memory/live-correlation-watcher.js';
+import { buildOcrCorrelationEvent } from '../../core/ocr/local-ocr.js';
 
 type CorrelationEventKind = PlayerCorrelationEvent['kind'];
 
@@ -40,6 +41,13 @@ const EVENT_BUTTONS: Array<{
 
 const MAX_WATCH_CANDIDATES = 500;
 
+interface OcrSource {
+  id: string;
+  name: string;
+  thumbnailDataUrl: string;
+  appIconDataUrl?: string;
+}
+
 export default function LiveCorrelationWatcherPanel({
   attached,
   busy,
@@ -56,6 +64,12 @@ export default function LiveCorrelationWatcherPanel({
   const [customLabel, setCustomLabel] = useState('');
   const [customDirection, setCustomDirection] = useState<CorrelationDirection>('changed');
   const [showNoise, setShowNoise] = useState(false);
+  const [ocrSources, setOcrSources] = useState<OcrSource[]>([]);
+  const [ocrSourceId, setOcrSourceId] = useState('');
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrMessage, setOcrMessage] = useState('');
+  const [ocrRoi, setOcrRoi] = useState({ x: 0, y: 0, width: 420, height: 120 });
+  const [lastOcrValue, setLastOcrValue] = useState<number | null>(null);
 
   const candidates = useMemo<CorrelationCandidate[]>(() => {
     const seen = new Set<string>();
@@ -91,6 +105,48 @@ export default function LiveCorrelationWatcherPanel({
 
   const disabled = busy || !attached;
   const canStart = !disabled && candidates.length > 0 && !active;
+  const selectedOcrSource = ocrSources.find((source) => source.id === ocrSourceId);
+
+  const refreshOcrSources = async () => {
+    const api = window.electronAPI;
+    setOcrBusy(true);
+    setOcrMessage('');
+    try {
+      const result = await api.localOcrListWindowSources();
+      if (result?.success) {
+        setOcrSources(result.sources ?? []);
+        setOcrSourceId((current) => current || result.sources?.[0]?.id || '');
+      } else {
+        setOcrMessage(`OCR source list failed: ${result?.error ?? 'unknown error'}`);
+      }
+    } finally {
+      setOcrBusy(false);
+    }
+  };
+
+  const runOcrTieBreak = async () => {
+    if (!ocrSourceId) return;
+    const api = window.electronAPI;
+    setOcrBusy(true);
+    setOcrMessage('Running local OCR on selected window ROI...');
+    try {
+      const result = await api.localOcrReadWindowRegion({ sourceId: ocrSourceId, roi: ocrRoi });
+      if (!result?.success || !result.result) {
+        setOcrMessage(`OCR failed: ${result?.error ?? 'unknown error'}`);
+        return;
+      }
+      setLastOcrValue(result.result.value);
+      if (result.result.value == null) {
+        setOcrMessage(`OCR read "${result.result.normalizedText || result.result.text.trim()}" but found no numeric value.`);
+        return;
+      }
+      const event = buildOcrCorrelationEvent(result.result);
+      if (event) onEvent(event);
+      setOcrMessage(`OCR observed ${result.result.value} from ${result.sourceName ?? 'selected window'} and sent a read-only tie-break event.`);
+    } finally {
+      setOcrBusy(false);
+    }
+  };
 
   return (
     <section className="v2-monitor-section live-correlation-panel" aria-label="Read-only live correlation watcher">
@@ -214,6 +270,58 @@ export default function LiveCorrelationWatcherPanel({
       ) : (
         <p className="v2-meta">Run an auto scan first, then start the watcher to collect read-only correlation evidence.</p>
       )}
+
+      <div className="live-correlation-ocr" aria-label="Local OCR fallback">
+        <h4>AM Screen/OCR fallback <span className="v2-badge">Local only</span></h4>
+        <p className="v2-meta">
+          Use only when multiple candidates tie. Solith captures a selected app window ROI, reads numbers locally,
+          and sends the value back as a read-only confidence tie-breaker.
+        </p>
+        <div className="v2-controls-row">
+          <button type="button" className="btn-secondary" onClick={() => void refreshOcrSources()} disabled={ocrBusy}>
+            Refresh window list
+          </button>
+          <select
+            aria-label="OCR window source"
+            value={ocrSourceId}
+            onChange={(event) => setOcrSourceId(event.target.value)}
+            disabled={ocrBusy || ocrSources.length === 0}
+          >
+            <option value="">Select a window…</option>
+            {ocrSources.map((source) => (
+              <option key={source.id} value={source.id}>{source.name}</option>
+            ))}
+          </select>
+        </div>
+        {selectedOcrSource && (
+          <div className="live-correlation-ocr-layout">
+            <img src={selectedOcrSource.thumbnailDataUrl} alt={`Preview of ${selectedOcrSource.name}`} />
+            <div className="live-correlation-ocr-controls">
+              <div className="live-correlation-roi-grid">
+                {(['x', 'y', 'width', 'height'] as const).map((key) => (
+                  <label key={key}>
+                    ROI {key}
+                    <input
+                      type="number"
+                      min={0}
+                      value={ocrRoi[key]}
+                      onChange={(event) =>
+                        setOcrRoi((current) => ({ ...current, [key]: Math.max(0, Number(event.target.value) || 0) }))
+                      }
+                      disabled={ocrBusy}
+                    />
+                  </label>
+                ))}
+              </div>
+              <button type="button" className="btn-secondary" onClick={() => void runOcrTieBreak()} disabled={ocrBusy || !active}>
+                Run OCR tie-break
+              </button>
+              {lastOcrValue != null && <p className="v2-meta">Last OCR value: {lastOcrValue}</p>}
+            </div>
+          </div>
+        )}
+        {ocrMessage && <p className="v2-meta" role="status">{ocrMessage}</p>}
+      </div>
     </section>
   );
 }
