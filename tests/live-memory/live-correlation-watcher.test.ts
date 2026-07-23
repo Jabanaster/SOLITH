@@ -63,6 +63,58 @@ test('LiveCorrelationWatcher keeps noisy every-poll values separate from event-c
   assert.ok(noisy!.reasons.some((reason) => /almost every poll/i.test(reason)));
 });
 
+test('LiveCorrelationWatcher matches recent decreases even after regen starts before the event click', () => {
+  const driver = new FakeMemoryDriver({
+    [0x100n.toString()]: 140,
+    [0x200n.toString()]: 140,
+  });
+  const watcher = new LiveCorrelationWatcher({
+    driver,
+    handle: HANDLE,
+    candidates: [
+      { id: 'stamina-real', address: '0x100', value: 140, dataType: 'float', source: 'auto-scan', scanMode: 'exact' },
+      { id: 'stamina-static', address: '0x200', value: 140, dataType: 'float', source: 'auto-scan', scanMode: 'exact' },
+    ],
+    eventLookbackMs: 1500,
+  });
+
+  watcher.pollOnce();
+  driver.setValue(0x100n, 116);
+  watcher.pollOnce();
+  driver.setValue(0x100n, 119.5);
+  watcher.pollOnce();
+
+  const report = watcher.recordEvent({ kind: 'used_stamina', expectedDirection: 'decreased', expectedDelta: 24 });
+
+  assert.equal(report.strong[0]?.id, 'stamina-real');
+  assert.equal(report.strong[0]?.exactDeltaMatches, 1);
+  assert.deepEqual(report.strong[0]?.recentValues, [140, 140, 116, 119.5]);
+  assert.ok(report.strong[0]?.reasons.some((reason) => /lookback/i.test(reason)));
+});
+
+test('LiveCorrelationWatcher exposes recent delta trails for UI research without write affordances', () => {
+  const driver = new FakeMemoryDriver({
+    [0x100n.toString()]: 725,
+  });
+  const watcher = new LiveCorrelationWatcher({
+    driver,
+    handle: HANDLE,
+    candidates: [
+      { id: 'gold-real', address: '0x100', value: 725, dataType: 'int32', source: 'auto-scan', scanMode: 'exact' },
+    ],
+  });
+
+  watcher.pollOnce();
+  driver.setValue(0x100n, 710);
+  watcher.pollOnce();
+  const report = watcher.getReport();
+
+  assert.equal(report.readOnly, true);
+  assert.equal(report.executable, false);
+  assert.deepEqual(report.candidates[0]?.recentDeltas, [0, -15]);
+  assert.deepEqual(report.candidates[0]?.recentValues, [725, 725, 710]);
+});
+
 test('LiveCorrelationWatcher supports mixed value types without collapsing to one data type', () => {
   const driver = new FakeMemoryDriver({
     [0x100n.toString()]: 155,

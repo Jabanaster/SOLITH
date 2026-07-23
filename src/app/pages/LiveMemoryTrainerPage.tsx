@@ -9,6 +9,7 @@ import {
   type WatchListBookmark,
 } from '../live-memory/watch-list-bookmarks.js';
 import AddressDataResearchPanel from '../components/AddressDataResearchPanel.js';
+import LiveCorrelationWatcherPanel from '../components/LiveCorrelationWatcherPanel.js';
 import LiveToggleCardsPanel from '../components/LiveToggleCardsPanel.js';
 import SinglePlayerWaiverModal from '../components/SinglePlayerWaiverModal.js';
 import {
@@ -18,6 +19,11 @@ import {
   type ResearchPromoteSeed,
 } from '../../core/live-memory/ct-promote.js';
 import { SessionSinglePlayerWaiverStore } from '../../core/live-memory/single-player-waiver-shared.js';
+import type {
+  CorrelationCandidate,
+  CorrelationReport,
+  PlayerCorrelationEvent,
+} from '../../core/live-memory/live-correlation-watcher.js';
 
 interface ProcessEntry {
   pid: number;
@@ -95,6 +101,9 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
   const [scanMatches, setScanMatches] = useState<ScanMatchEntry[]>([]);
   const [scanInfo, setScanInfo] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
+  const [correlationReport, setCorrelationReport] = useState<CorrelationReport | null>(null);
+  const [correlationActive, setCorrelationActive] = useState(false);
+  const [correlationFlashEvent, setCorrelationFlashEvent] = useState<string | null>(null);
 
   const [freezeValue, setFreezeValue] = useState('');
   const [freezeIntervalMs, setFreezeIntervalMs] = useState('200');
@@ -246,6 +255,8 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
       setReadValue(null);
       setSavedControls([]);
       setControlsChecked(false);
+      setCorrelationReport(null);
+      setCorrelationActive(false);
       setMessage('Detached.');
     } finally {
       setBusy(false);
@@ -390,6 +401,74 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
       setDataType(match.dataType as (typeof DATA_TYPES)[number]);
     }
     setMessage(`Loaded ${match.address} into the manual read/write section below — review and propose from there.`);
+  };
+
+  useEffect(() => {
+    if (!apiAvailable || !api.onLiveMemoryCorrelationReport) return undefined;
+    return api.onLiveMemoryCorrelationReport((report: CorrelationReport) => {
+      setCorrelationReport(report);
+    });
+  }, [apiAvailable, api]);
+
+  useEffect(() => {
+    if (!attached && correlationActive) {
+      setCorrelationActive(false);
+      setCorrelationReport(null);
+    }
+  }, [attached, correlationActive]);
+
+  const handleStartCorrelationWatcher = async (candidates: CorrelationCandidate[]) => {
+    if (!attached || candidates.length === 0) return;
+    setBusy(true);
+    try {
+      const result = await api.liveMemoryCorrelationStart({
+        candidates,
+        pollIntervalMs: 100,
+        reportIntervalMs: 333,
+        eventLookbackMs: 1500,
+        epsilon: 0.001,
+      });
+      if (result?.success) {
+        setCorrelationActive(true);
+        setCorrelationReport(result.report ?? null);
+        setMessage(`Correlation watcher started on ${candidates.length} read-only candidate(s).`);
+      } else {
+        setMessage(`Correlation watcher failed: ${result?.error ?? 'unknown error'}`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleStopCorrelationWatcher = async () => {
+    setBusy(true);
+    try {
+      const result = await api.liveMemoryCorrelationStop();
+      if (result?.success) {
+        setCorrelationActive(false);
+        setMessage('Correlation watcher stopped.');
+      } else {
+        setMessage(`Correlation watcher stop failed: ${result?.error ?? 'unknown error'}`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCorrelationEvent = async (event: PlayerCorrelationEvent) => {
+    if (!correlationActive) return;
+    setCorrelationFlashEvent(event.kind);
+    window.setTimeout(() => setCorrelationFlashEvent(null), 450);
+    try {
+      const result = await api.liveMemoryCorrelationEvent(event);
+      if (result?.success) {
+        setCorrelationReport(result.report ?? null);
+      } else {
+        setMessage(`Correlation event failed: ${result?.error ?? 'unknown error'}`);
+      }
+    } catch {
+      setMessage('Correlation event failed.');
+    }
   };
 
   const handlePointerScan = async () => {
@@ -837,6 +916,21 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
             </ul>
           )}
         </section>
+      )}
+
+      {attached && (
+        <LiveCorrelationWatcherPanel
+          attached={attached}
+          busy={busy}
+          scanMatches={scanMatches}
+          fallbackDataType={dataType}
+          report={correlationReport}
+          active={correlationActive}
+          flashEvent={correlationFlashEvent}
+          onStart={handleStartCorrelationWatcher}
+          onStop={handleStopCorrelationWatcher}
+          onEvent={handleCorrelationEvent}
+        />
       )}
 
       {attached && (

@@ -420,7 +420,9 @@ export const LiveMemoryCorrelationStartSchema = z.object({
     .min(1)
     .max(10_000),
   pollIntervalMs: z.number().int().min(50).max(5000).optional(),
+  reportIntervalMs: z.number().int().min(100).max(5000).optional(),
   epsilon: z.number().finite().nonnegative().max(10_000).optional(),
+  eventLookbackMs: z.number().int().min(50).max(10_000).optional(),
 });
 
 export const LiveMemoryCorrelationEventSchema = z.object({
@@ -439,6 +441,7 @@ export const LiveMemoryCorrelationEventSchema = z.object({
   label: z.string().min(1).max(160).optional(),
   expectedDirection: z.enum(['increased', 'decreased', 'changed', 'unchanged']),
   expectedDelta: z.number().finite().optional(),
+  lookbackMs: z.number().int().min(50).max(10_000).optional(),
   observedAt: z.string().min(1).max(80).optional(),
 });
 

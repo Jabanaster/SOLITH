@@ -30,6 +30,7 @@ export interface PlayerCorrelationEvent {
   label?: string;
   expectedDirection: CorrelationDirection;
   expectedDelta?: number;
+  lookbackMs?: number;
   observedAt?: string;
 }
 
@@ -45,6 +46,8 @@ export interface CorrelationCandidateState extends CorrelationCandidate {
   matchedEvents: number;
   contradictedEvents: number;
   exactDeltaMatches: number;
+  recentDeltas: number[];
+  recentValues: number[];
   unreadable: boolean;
   score: number;
   strength: CorrelationStrength;
@@ -77,6 +80,8 @@ export interface LiveCorrelationWatcherConfig {
   candidates: CorrelationCandidate[];
   pollIntervalMs?: number;
   epsilon?: number;
+  eventLookbackMs?: number;
+  deltaHistoryLimit?: number;
   driver?: MemoryDriver;
   now?: () => string;
   onReport?: (report: CorrelationReport) => void;
@@ -85,6 +90,8 @@ export interface LiveCorrelationWatcherConfig {
 
 interface MutableCandidateState extends CorrelationCandidateState {
   baselineValue: number;
+  deltaHistory: Array<{ delta: number; atMs: number; poll: number }>;
+  valueHistory: Array<{ value: number; atMs: number; poll: number }>;
 }
 
 /**
@@ -101,6 +108,8 @@ export class LiveCorrelationWatcher {
   private readonly handle: LiveProcessHandle;
   private readonly epsilon: number;
   private readonly pollIntervalMs: number;
+  private readonly eventLookbackMs: number;
+  private readonly deltaHistoryLimit: number;
   private readonly now: () => string;
   private readonly onReport?: (report: CorrelationReport) => void;
   private readonly onError?: (error: string) => void;
@@ -115,6 +124,8 @@ export class LiveCorrelationWatcher {
     this.handle = config.handle;
     this.epsilon = config.epsilon ?? 0.0001;
     this.pollIntervalMs = Math.max(50, config.pollIntervalMs ?? 250);
+    this.eventLookbackMs = Math.max(50, config.eventLookbackMs ?? 1500);
+    this.deltaHistoryLimit = Math.max(2, Math.min(64, config.deltaHistoryLimit ?? 12));
     this.now = config.now ?? (() => new Date().toISOString());
     this.onReport = config.onReport;
     this.onError = config.onError;
@@ -136,6 +147,10 @@ export class LiveCorrelationWatcher {
         matchedEvents: 0,
         contradictedEvents: 0,
         exactDeltaMatches: 0,
+        recentDeltas: [],
+        recentValues: [candidate.value],
+        deltaHistory: [],
+        valueHistory: [{ value: candidate.value, atMs: Date.now(), poll: 0 }],
         unreadable: false,
         score: 0,
         strength: 'weak',
@@ -166,6 +181,7 @@ export class LiveCorrelationWatcher {
 
   pollOnce(): CorrelationReport {
     this.pollCount += 1;
+    const polledAtMs = Date.now();
 
     for (const state of this.states.values()) {
       state.polls += 1;
@@ -175,12 +191,16 @@ export class LiveCorrelationWatcher {
         state.lastValue = previous;
         state.currentValue = nextValue;
         state.value = nextValue;
+        pushCapped(state.valueHistory, { value: nextValue, atMs: polledAtMs, poll: this.pollCount }, this.deltaHistoryLimit);
+        state.recentValues = state.valueHistory.map((entry) => entry.value);
         state.readablePolls += 1;
         state.unreadable = false;
 
         if (previous != null) {
           const delta = nextValue - previous;
           state.lastDelta = delta;
+          pushCapped(state.deltaHistory, { delta, atMs: polledAtMs, poll: this.pollCount }, this.deltaHistoryLimit);
+          state.recentDeltas = state.deltaHistory.map((entry) => entry.delta);
           if (!this.valuesEqual(delta, 0)) {
             state.changedPolls += 1;
             if (delta > 0) state.increasedPolls += 1;
@@ -200,27 +220,34 @@ export class LiveCorrelationWatcher {
 
   recordEvent(event: PlayerCorrelationEvent): CorrelationReport {
     this.eventCount += 1;
+    const eventAtMs = parseObservedAtMs(event.observedAt) ?? Date.now();
+    const lookbackMs = Math.max(50, event.lookbackMs ?? this.eventLookbackMs);
 
     for (const state of this.states.values()) {
-      const delta = state.lastDelta;
-      if (state.unreadable || delta == null) continue;
+      if (state.unreadable || state.deltaHistory.length === 0) continue;
 
-      const direction = directionFromDelta(delta, this.epsilon);
-      const matchesDirection =
-        event.expectedDirection === 'changed'
-          ? direction !== 'unchanged'
-          : direction === event.expectedDirection;
+      const recent = state.deltaHistory.filter((entry) => eventAtMs - entry.atMs <= lookbackMs);
+      const window = recent.length > 0 ? recent : state.deltaHistory.slice(-1);
+      const matching = window.find((entry) => eventMatchesDelta(event.expectedDirection, entry.delta, this.epsilon));
+      const scoredDelta = matching?.delta ?? largestMeaningfulDelta(window.map((entry) => entry.delta), this.epsilon);
+      if (scoredDelta == null) continue;
 
-      if (matchesDirection) {
+      if (matching) {
         state.matchedEvents += 1;
         if (
           event.expectedDelta != null &&
-          Math.abs(Math.abs(delta) - Math.abs(event.expectedDelta)) <= this.epsilon
+          Math.abs(Math.abs(matching.delta) - Math.abs(event.expectedDelta)) <= this.epsilon
         ) {
           state.exactDeltaMatches += 1;
         }
       } else {
-        state.contradictedEvents += 1;
+        const direction = directionFromDelta(scoredDelta, this.epsilon);
+        if (
+          event.expectedDirection !== 'unchanged' ||
+          (event.expectedDirection === 'unchanged' && direction !== 'unchanged')
+        ) {
+          state.contradictedEvents += 1;
+        }
       }
     }
 
@@ -257,9 +284,31 @@ export class LiveCorrelationWatcher {
   }
 }
 
+function pushCapped<T>(items: T[], item: T, maxItems: number): void {
+  items.push(item);
+  while (items.length > maxItems) items.shift();
+}
+
+function parseObservedAtMs(observedAt?: string): number | null {
+  if (!observedAt) return null;
+  const parsed = Date.parse(observedAt);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function directionFromDelta(delta: number, epsilon: number): CorrelationDirection {
   if (Math.abs(delta) <= epsilon) return 'unchanged';
   return delta > 0 ? 'increased' : 'decreased';
+}
+
+function eventMatchesDelta(expected: CorrelationDirection, delta: number, epsilon: number): boolean {
+  const direction = directionFromDelta(delta, epsilon);
+  return expected === 'changed' ? direction !== 'unchanged' : direction === expected;
+}
+
+function largestMeaningfulDelta(deltas: number[], epsilon: number): number | null {
+  const meaningful = deltas.filter((delta) => Math.abs(delta) > epsilon);
+  if (meaningful.length === 0) return deltas.length > 0 ? deltas[deltas.length - 1] : null;
+  return meaningful.reduce((best, delta) => (Math.abs(delta) > Math.abs(best) ? delta : best), meaningful[0]);
 }
 
 function scoreCandidate(state: CorrelationCandidateState, eventCount: number): { score: number; reasons: string[] } {
@@ -278,6 +327,7 @@ function scoreCandidate(state: CorrelationCandidateState, eventCount: number): {
     score -= Math.round(contradictionRatio * 45);
     if (state.matchedEvents > 0) reasons.push(`Matched ${state.matchedEvents}/${eventCount} declared event(s)`);
     if (state.contradictedEvents > 0) reasons.push(`Contradicted ${state.contradictedEvents}/${eventCount} declared event(s)`);
+    if (state.matchedEvents > 0 && state.recentDeltas.length > 1) reasons.push('Matched via recent-delta lookback window');
   } else {
     reasons.push('No player event markers recorded yet');
   }
@@ -320,7 +370,12 @@ function classifyScore(score: number, unreadable: boolean): CorrelationStrength 
 function buildReport(states: CorrelationCandidateState[], polls: number, events: number): CorrelationReport {
   const sorted = states
     .map((state) => {
-      const { baselineValue: _baselineValue, ...publicState } = state as MutableCandidateState;
+      const {
+        baselineValue: _baselineValue,
+        deltaHistory: _deltaHistory,
+        valueHistory: _valueHistory,
+        ...publicState
+      } = state as MutableCandidateState;
       return { ...publicState };
     })
     .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)));

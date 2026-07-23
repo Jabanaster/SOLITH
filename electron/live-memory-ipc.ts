@@ -481,14 +481,19 @@ export function registerLiveMemoryIpc(): void {
       const mod = await getLiveMemoryModule();
       const access = bundle.session.getMemoryAccessOrThrow();
       bundle.correlationWatcher?.stop();
+      let lastReportSentAt = 0;
+      const reportIntervalMs = parsed.reportIntervalMs ?? 333;
       bundle.correlationWatcher = new mod.LiveCorrelationWatcher({
         driver: access.driver,
         handle: access.handle,
         candidates: parsed.candidates,
         pollIntervalMs: parsed.pollIntervalMs,
         epsilon: parsed.epsilon,
+        eventLookbackMs: parsed.eventLookbackMs,
         onReport: (report: unknown) => {
-          if (!event.sender.isDestroyed()) {
+          const now = Date.now();
+          if (!event.sender.isDestroyed() && now - lastReportSentAt >= reportIntervalMs) {
+            lastReportSentAt = now;
             event.sender.send('live-memory-correlation-report', report);
           }
         },

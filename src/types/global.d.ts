@@ -163,7 +163,9 @@ interface Window {
         label?: string;
       }>;
       pollIntervalMs?: number;
+      reportIntervalMs?: number;
       epsilon?: number;
+      eventLookbackMs?: number;
     }) => Promise<{
       success: boolean;
       report?: import('../core/live-memory/live-correlation-watcher.js').CorrelationReport;
@@ -189,6 +191,7 @@ interface Window {
       label?: string;
       expectedDirection: 'increased' | 'decreased' | 'changed' | 'unchanged';
       expectedDelta?: number;
+      lookbackMs?: number;
       observedAt?: string;
     }) => Promise<{
       success: boolean;
