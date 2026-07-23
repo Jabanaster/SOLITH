@@ -5,11 +5,12 @@ import { observeRemoteConnections } from './remote-connection-observer.js';
 import { getConnectionBaseline } from './game-connection-baselines.js';
 import {
   scanFirst as scanFirstRegions,
+  scanFirstAutoMatrix as scanFirstAutoMatrixRegions,
   scanNext as scanNextMatches,
   scanFirstUnknown as scanFirstUnknownSnapshot,
   scanNextFromSnapshotMultiType,
 } from './memory-scanner.js';
-import type { ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
+import type { AutoFirstScanMatrixResult, AutoFirstScanQuery, ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
 import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
 import { scanAobInProcess } from './aob-resolver.js';
@@ -315,6 +316,38 @@ export class LiveMemorySession {
   scanFirst(dataType: LiveValueType, targetValue: number, bounds?: ScanBounds): ScanResult {
     if (!this.handle) throw new Error('No process attached.');
     return scanFirstRegions(this.driver, this.handle, dataType, targetValue, bounds);
+  }
+
+  /**
+   * UX-first manual scan: runs compatible first-scan modes across every value
+   * type in one read-only pass matrix, and optionally captures an unknown-value
+   * baseline under `unknownKey`. This removes the Cheat Engine-style burden of
+   * manually picking Float vs Int vs Double and Exact vs Between vs Greater/Less
+   * before the user has enough evidence to know which is right.
+   */
+  scanFirstAutoMatrix(
+    query: AutoFirstScanQuery & { unknownKey?: string } = {},
+  ): Omit<AutoFirstScanMatrixResult, 'unknown'> & {
+    unknown?: Omit<NonNullable<AutoFirstScanMatrixResult['unknown']>, 'snapshot'>;
+  } {
+    if (!this.handle) throw new Error('No process attached.');
+    const result = scanFirstAutoMatrixRegions(this.driver, this.handle, query);
+    if (query.unknownKey && result.unknown) {
+      this.unknownSnapshots.set(query.unknownKey, result.unknown.snapshot);
+    }
+    const { unknown, ...safeResult } = result;
+    return {
+      ...safeResult,
+      ...(unknown
+        ? {
+            unknown: {
+              regionsScanned: unknown.regionsScanned,
+              bytesScanned: unknown.bytesScanned,
+              truncated: unknown.truncated,
+            },
+          }
+        : {}),
+    };
   }
 
   /** Next scan: read-only narrowing of a prior candidate set. */

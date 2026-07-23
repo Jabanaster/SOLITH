@@ -10,6 +10,7 @@ import {
   LiveMemoryConfirmWriteSchema,
   LiveMemoryRollbackSchema,
   LiveMemoryScanFirstSchema,
+  LiveMemoryScanFirstAutoMatrixSchema,
   LiveMemoryScanNextSchema,
   LiveMemoryScanFirstUnknownSchema,
   LiveMemoryScanNextFromUnknownSchema,
@@ -365,6 +366,36 @@ export function registerLiveMemoryIpc(): void {
       return { success: true, result: serializeScanResult(result) };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_first_failed') };
+    }
+  });
+
+  // Read-only UX-first scan: one manual action fans out across compatible
+  // scan modes and value types, plus an optional unknown-value baseline.
+  ipcMain.handle('live-memory-scan-first-auto-matrix', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanFirstAutoMatrixSchema.parse(payload);
+      const result = session.scanFirstAutoMatrix({
+        value: parsed.value,
+        min: parsed.min,
+        max: parsed.max,
+        modes: parsed.modes,
+        dataTypes: parsed.dataTypes,
+        includeUnknown: parsed.includeUnknown,
+        unknownKey: parsed.unknownKey,
+        bounds: {
+          maxRegionBytes: parsed.maxRegionBytes,
+          maxTotalBytes: parsed.maxTotalBytes,
+          maxMatches: parsed.maxMatches,
+        },
+        unknownBounds: {
+          maxRegionBytes: parsed.unknownMaxRegionBytes,
+          maxTotalBytes: parsed.unknownMaxTotalBytes,
+        },
+      });
+      return { success: true, result: serializeAutoMatrixResult(result) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_first_auto_matrix_failed') };
     }
   });
 
@@ -972,12 +1003,53 @@ function serializeMatches(matches: ScanMatch[]) {
   return matches.map((m) => ({ address: m.address.toString(), value: m.value }));
 }
 
+function serializeTypedMatches(matches: Array<ScanMatch & { dataType?: string }>) {
+  return matches.map((m) => ({
+    address: m.address.toString(),
+    value: m.value,
+    ...(m.dataType ? { dataType: m.dataType } : {}),
+  }));
+}
+
 function serializeScanResult(result: { matches: ScanMatch[]; regionsScanned: number; bytesScanned: number; truncated: boolean }) {
   return {
     matches: serializeMatches(result.matches),
     regionsScanned: result.regionsScanned,
     bytesScanned: result.bytesScanned,
     truncated: result.truncated,
+  };
+}
+
+function serializeAutoMatrixResult(result: {
+  buckets: Array<{
+    mode: string;
+    dataType: string;
+    matches: Array<ScanMatch & { dataType?: string }>;
+    regionsScanned: number;
+    bytesScanned: number;
+    truncated: boolean;
+    skipped?: boolean;
+    reason?: string;
+  }>;
+  unknown?: { regionsScanned: number; bytesScanned: number; truncated: boolean };
+  totals: {
+    buckets: number;
+    matches: number;
+    regionsScanned: number;
+    bytesScanned: number;
+    truncatedBuckets: number;
+    skippedBuckets: number;
+    unknownCaptured: boolean;
+  };
+  readOnly: boolean;
+  executable: boolean;
+}) {
+  return {
+    ...result,
+    buckets: result.buckets.map((bucket) => ({
+      ...bucket,
+      matches: serializeTypedMatches(bucket.matches),
+    })),
   };
 }
 

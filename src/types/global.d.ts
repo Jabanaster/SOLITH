@@ -81,6 +81,47 @@ interface Window {
       result?: { matches: { address: string; value: number }[]; regionsScanned: number; bytesScanned: number; truncated: boolean };
       error?: string;
     }>;
+    liveMemoryScanFirstAutoMatrix: (payload: {
+      value?: number;
+      min?: number;
+      max?: number;
+      modes?: Array<'exact' | 'between' | 'greaterThan' | 'lessThan'>;
+      dataTypes?: string[];
+      includeUnknown?: boolean;
+      unknownKey?: string;
+      maxRegionBytes?: number;
+      maxTotalBytes?: number;
+      maxMatches?: number;
+      unknownMaxRegionBytes?: number;
+      unknownMaxTotalBytes?: number;
+    }) => Promise<{
+      success: boolean;
+      result?: {
+        buckets: Array<{
+          mode: 'exact' | 'between' | 'greaterThan' | 'lessThan';
+          dataType: string;
+          matches: { address: string; value: number; dataType?: string }[];
+          regionsScanned: number;
+          bytesScanned: number;
+          truncated: boolean;
+          skipped?: boolean;
+          reason?: string;
+        }>;
+        unknown?: { regionsScanned: number; bytesScanned: number; truncated: boolean };
+        totals: {
+          buckets: number;
+          matches: number;
+          regionsScanned: number;
+          bytesScanned: number;
+          truncatedBuckets: number;
+          skippedBuckets: number;
+          unknownCaptured: boolean;
+        };
+        readOnly: true;
+        executable: false;
+      };
+      error?: string;
+    }>;
     liveMemoryScanNext: (payload: {
       dataType: string;
       comparison: { kind: string; value?: number; min?: number; max?: number };

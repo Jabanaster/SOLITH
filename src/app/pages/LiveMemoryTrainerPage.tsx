@@ -45,6 +45,8 @@ interface WriteProposal {
 interface ScanMatchEntry {
   address: string;
   value: number;
+  dataType?: string;
+  scanMode?: string;
 }
 
 interface FreezeStatusView {
@@ -308,19 +310,44 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     if (scanTargetValue.trim() === '') return;
     setBusy(true);
     try {
-      const result = await api.liveMemoryScanFirst({ dataType, targetValue: Number(scanTargetValue) });
+      const numericValue = Number(scanTargetValue);
+      const result = await api.liveMemoryScanFirstAutoMatrix({
+        value: numericValue,
+        min: numericValue,
+        max: numericValue,
+        includeUnknown: true,
+        unknownKey: 'manual-live-memory-scan',
+      });
       if (result?.success && result.result) {
-        const matches: ScanMatchEntry[] = result.result.matches;
+        const seen = new Set<string>();
+        const matches: ScanMatchEntry[] = [];
+        for (const bucket of result.result.buckets) {
+          if (bucket.skipped) continue;
+          for (const match of bucket.matches) {
+            const matchType = match.dataType ?? bucket.dataType;
+            const key = `${match.address}:${matchType}:${bucket.mode}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            matches.push({
+              address: match.address,
+              value: match.value,
+              dataType: matchType,
+              scanMode: bucket.mode,
+            });
+          }
+        }
         setScanMatches(matches);
         setHasScanned(true);
         setScanInfo(
-          `${matches.length} match(es) · ${result.result.regionsScanned} region(s) scanned · ` +
-            `${(result.result.bytesScanned / (1024 * 1024)).toFixed(1)} MiB` +
-            (result.result.truncated ? ' · scan truncated by safety limits, results are partial' : ''),
+          `${matches.length} match(es) across ${result.result.totals.buckets} auto bucket(s) · ` +
+            `${result.result.totals.regionsScanned} region-pass(es) · ` +
+            `${(result.result.totals.bytesScanned / (1024 * 1024)).toFixed(1)} MiB` +
+            (result.result.totals.unknownCaptured ? ' · unknown baseline captured' : '') +
+            (result.result.totals.truncatedBuckets > 0 ? ' · scan truncated by safety limits, results are partial' : ''),
         );
         setMessage('');
       } else {
-        setMessage(`First scan failed: ${result?.error ?? 'unknown error'}`);
+        setMessage(`Auto scan failed: ${result?.error ?? 'unknown error'}`);
       }
     } finally {
       setBusy(false);
@@ -333,15 +360,24 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     try {
       const comparison =
         scanComparison === 'exact' ? { kind: 'exact', value: Number(scanNextValue) } : { kind: scanComparison };
-      const result = await api.liveMemoryScanNext({ dataType, comparison, previous: scanMatches });
-      if (result?.success) {
-        const matches: ScanMatchEntry[] = result.matches ?? [];
-        setScanMatches(matches);
-        setScanInfo(`${matches.length} match(es) remaining after narrowing`);
-        setMessage('');
-      } else {
-        setMessage(`Next scan failed: ${result?.error ?? 'unknown error'}`);
+      const fallbackType = dataType;
+      const groups = new Map<string, ScanMatchEntry[]>();
+      for (const match of scanMatches) {
+        const matchType = match.dataType ?? fallbackType;
+        groups.set(matchType, [...(groups.get(matchType) ?? []), match]);
       }
+      const narrowed: ScanMatchEntry[] = [];
+      for (const [matchType, matches] of groups.entries()) {
+        const result = await api.liveMemoryScanNext({ dataType: matchType, comparison, previous: matches });
+        if (!result?.success) {
+          setMessage(`Next scan failed: ${result?.error ?? 'unknown error'}`);
+          return;
+        }
+        narrowed.push(...(result.matches ?? []).map((match: ScanMatchEntry) => ({ ...match, dataType: matchType })));
+      }
+      setScanMatches(narrowed);
+      setScanInfo(`${narrowed.length} match(es) remaining after narrowing across ${groups.size} value type(s)`);
+      setMessage('');
     } finally {
       setBusy(false);
     }
@@ -350,6 +386,9 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
   const handleUseMatch = (match: ScanMatchEntry) => {
     setAddress(match.address);
     setReadValue(match.value);
+    if (match.dataType && DATA_TYPES.includes(match.dataType as (typeof DATA_TYPES)[number])) {
+      setDataType(match.dataType as (typeof DATA_TYPES)[number]);
+    }
     setMessage(`Loaded ${match.address} into the manual read/write section below — review and propose from there.`);
   };
 
@@ -734,7 +773,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
             value changes in-game, the same way advanced memory scan workflows operate.
           </p>
 
-          <label htmlFor="lm-scan-first-value">First scan: exact value</label>
+          <label htmlFor="lm-scan-first-value">First scan: current value</label>
           <div className="v2-controls-row">
             <input
               id="lm-scan-first-value"
@@ -744,9 +783,13 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
               placeholder="e.g. 100"
             />
             <button className="btn-secondary" onClick={handleScanFirst} disabled={busy || scanTargetValue.trim() === ''}>
-              First Scan
+              Auto Scan All Types
             </button>
           </div>
+          <p className="v2-meta">
+            This scans exact, between, greater-than, and less-than buckets across byte, int32, uint32, float,
+            double, and int64, and captures an unknown-value baseline. No manual value-type dropdown is used here.
+          </p>
 
           {hasScanned && (
             <>
@@ -780,8 +823,9 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
           {scanMatches.length > 0 && (
             <ul className="v2-scan-results" aria-label="Scan results">
               {scanMatches.slice(0, SCAN_RESULTS_DISPLAY_LIMIT).map(m => (
-                <li key={m.address}>
+                <li key={`${m.address}-${m.dataType ?? dataType}-${m.scanMode ?? 'narrowed'}`}>
                   <code>{m.address}</code> = {m.value}{' '}
+                  <span className="v2-meta">({m.dataType ?? dataType}{m.scanMode ? ` · ${m.scanMode}` : ''})</span>{' '}
                   <button className="btn-secondary" onClick={() => handleUseMatch(m)} disabled={busy}>
                     Use this address
                   </button>

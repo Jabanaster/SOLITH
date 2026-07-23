@@ -165,6 +165,45 @@ describe('LiveMemorySession', () => {
     assert.equal(result.success, false);
     assert.equal(driver.getValue(0x1000n), 100);
   });
+
+  test('scanFirstAutoMatrix fans out modes and value types while storing unknown baseline internally', async () => {
+    const driver = new FakeMemoryDriver();
+    const region = Buffer.alloc(32, 0);
+    region.writeInt32LE(125, 0);
+    region.writeFloatLE(125, 4);
+    driver.addRegion(0x5000n, region, true);
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const first = session.scanFirstAutoMatrix({
+      value: 125,
+      min: 120,
+      max: 130,
+      dataTypes: ['int32', 'float'],
+      modes: ['exact', 'between'],
+      includeUnknown: true,
+      unknownKey: 'health',
+    });
+
+    assert.equal(first.readOnly, true);
+    assert.equal(first.executable, false);
+    assert.equal(first.totals.buckets, 4);
+    assert.equal(first.totals.unknownCaptured, true);
+    assert.ok(first.unknown);
+    assert.equal('snapshot' in first.unknown, false);
+    assert.ok(first.buckets.some((bucket) =>
+      bucket.mode === 'exact' &&
+      bucket.dataType === 'int32' &&
+      bucket.matches.some((match) => match.address === 0x5000n),
+    ));
+
+    region.writeInt32LE(100, 0);
+    region.writeFloatLE(100, 4);
+    const narrowed = session.scanNextFromUnknown('health', ['int32', 'float'], { kind: 'decreased' });
+
+    assert.ok(narrowed.matches.some((match) => match.address === 0x5000n && match.dataType === 'int32'));
+    assert.ok(narrowed.matches.some((match) => match.address === 0x5004n && match.dataType === 'float'));
+  });
 });
 
 // ── Freeze (continuous re-write) ─────────────────────────────────────────────

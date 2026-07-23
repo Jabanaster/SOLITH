@@ -102,6 +102,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     maxTotalBytes?: number;
     maxMatches?: number;
   }) => ipcRenderer.invoke('live-memory-scan-first', payload),
+  liveMemoryScanFirstAutoMatrix: (payload: {
+    value?: number;
+    min?: number;
+    max?: number;
+    modes?: Array<'exact' | 'between' | 'greaterThan' | 'lessThan'>;
+    dataTypes?: string[];
+    includeUnknown?: boolean;
+    unknownKey?: string;
+    maxRegionBytes?: number;
+    maxTotalBytes?: number;
+    maxMatches?: number;
+    unknownMaxRegionBytes?: number;
+    unknownMaxTotalBytes?: number;
+  }) => ipcRenderer.invoke('live-memory-scan-first-auto-matrix', payload),
   liveMemoryScanNext: (payload: {
     dataType: string;
     comparison: { kind: string; value?: number; min?: number; max?: number };

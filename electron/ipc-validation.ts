@@ -253,6 +253,7 @@ export const TrainerHostRollbackSchema = z.object({
 const LIVE_VALUE_TYPE = z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']);
 // Decimal or 0x-prefixed hex string — parsed with BigInt() in the main process.
 const LIVE_ADDRESS_STRING = z.string().min(1).max(20).regex(/^(0x[0-9a-fA-F]+|\d+)$/, 'Address must be decimal or 0x-hex');
+const UNKNOWN_SCAN_KEY = z.string().min(1).max(128);
 
 export const LiveMemoryListProcessesSchema = z.object({});
 
@@ -329,6 +330,25 @@ export const LiveMemoryScanFirstSchema = z.object({
   maxMatches: z.number().int().positive().max(5000).optional(),
 });
 
+export const LiveMemoryScanFirstAutoMatrixSchema = z.object({
+  value: z.number().finite().optional(),
+  min: z.number().finite().optional(),
+  max: z.number().finite().optional(),
+  modes: z
+    .array(z.enum(['exact', 'between', 'greaterThan', 'lessThan']))
+    .min(1)
+    .max(4)
+    .optional(),
+  dataTypes: z.array(LIVE_VALUE_TYPE).min(1).max(6).optional(),
+  includeUnknown: z.boolean().optional(),
+  unknownKey: UNKNOWN_SCAN_KEY.optional(),
+  maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
+  maxTotalBytes: z.number().int().positive().max(4 * 1024 * 1024 * 1024).optional(),
+  maxMatches: z.number().int().positive().max(5000).optional(),
+  unknownMaxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
+  unknownMaxTotalBytes: z.number().int().positive().max(1024 * 1024 * 1024).optional(),
+});
+
 const SCAN_COMPARISON_SCHEMA = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('exact'), value: z.number().finite() }),
   z.object({ kind: z.literal('changed') }),
@@ -356,8 +376,6 @@ export const LiveMemoryScanNextSchema = z.object({
 // applied against that snapshot instead of a prior match list.
 // key scopes the baseline snapshot to one caller-chosen slot (the renderer passes the cheat
 // id) so scanning two stats' unknown values concurrently doesn't clobber each other's baseline.
-const UNKNOWN_SCAN_KEY = z.string().min(1).max(128);
-
 export const LiveMemoryScanFirstUnknownSchema = z.object({
   key: UNKNOWN_SCAN_KEY,
   maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),

@@ -154,7 +154,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
       );
     }
 
-    if (state.unknownScanActive) {
+    if (state.unknownScanActive && state.candidates.length === 0) {
       return (
         <div className={styles['discovery-panel']}>
           <span className={styles['discovery-hint']}>
@@ -176,7 +176,9 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
     if (state.candidates.length === 0) {
       return (
         <div className={styles['discovery-panel']}>
-          <span className={styles['discovery-hint']}>Enter current in-game value:</span>
+          <span className={styles['discovery-hint']}>
+            Enter current in-game value. Solith scans all supported value types and first-pass modes automatically.
+          </span>
           <input
             type="number"
             className={styles['discovery-input']}
@@ -189,7 +191,7 @@ export const GameSpecificCheatMenu: React.FC<GameSpecificCheatMenuProps> = ({ ga
             disabled={inputValue === ''}
             onClick={() => session.discover(cheat, Number(inputValue))}
           >
-            Scan
+            Auto Scan
           </button>
           <button
             className={styles['discovery-btn-secondary']}

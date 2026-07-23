@@ -357,7 +357,10 @@ export function scanFirstUnknown(driver: MemoryDriver, handle: LiveProcessHandle
       continue;
     }
 
-    snapshot.push({ baseAddress: region.baseAddress, data: buf });
+    // Copy the bytes into an immutable baseline. Some drivers/test fakes may
+    // return a view into an underlying region buffer; an unknown-value scan is
+    // only meaningful if later game changes cannot mutate the saved baseline.
+    snapshot.push({ baseAddress: region.baseAddress, data: Buffer.from(buf) });
     bytesScanned += region.size;
     regionsScanned += 1;
   }
@@ -426,6 +429,71 @@ export interface TypedScanResult {
   truncated: boolean;
 }
 
+export const ALL_SCAN_VALUE_TYPES: LiveValueType[] = ['byte', 'int32', 'uint32', 'float', 'double', 'int64'];
+
+export type AutoFirstScanMode = 'exact' | 'between' | 'greaterThan' | 'lessThan';
+
+export interface AutoFirstScanQuery {
+  /** Visible/HUD value used by exact, greaterThan, and lessThan modes. */
+  value?: number;
+  /** Inclusive lower bound used by between mode. */
+  min?: number;
+  /** Inclusive upper bound used by between mode. */
+  max?: number;
+  /** Defaults to every numeric memory type Solith supports. */
+  dataTypes?: LiveValueType[];
+  /** Defaults to exact, between, greaterThan, and lessThan when inputs permit them. */
+  modes?: AutoFirstScanMode[];
+  /** Capture one raw unknown-value baseline in the same manual scan action. */
+  includeUnknown?: boolean;
+  bounds?: ScanBounds;
+  unknownBounds?: ScanBounds;
+}
+
+export interface AutoFirstScanBucket {
+  mode: AutoFirstScanMode;
+  dataType: LiveValueType;
+  matches: TypedScanMatch[];
+  regionsScanned: number;
+  bytesScanned: number;
+  truncated: boolean;
+  skipped?: false;
+}
+
+export interface AutoFirstScanSkippedBucket {
+  mode: AutoFirstScanMode;
+  dataType: LiveValueType;
+  matches: [];
+  regionsScanned: 0;
+  bytesScanned: 0;
+  truncated: false;
+  skipped: true;
+  reason: string;
+}
+
+export interface AutoFirstUnknownScanSummary {
+  regionsScanned: number;
+  bytesScanned: number;
+  truncated: boolean;
+  snapshot: UnknownScanSnapshot;
+}
+
+export interface AutoFirstScanMatrixResult {
+  buckets: Array<AutoFirstScanBucket | AutoFirstScanSkippedBucket>;
+  unknown?: AutoFirstUnknownScanSummary;
+  totals: {
+    buckets: number;
+    matches: number;
+    regionsScanned: number;
+    bytesScanned: number;
+    truncatedBuckets: number;
+    skippedBuckets: number;
+    unknownCaptured: boolean;
+  };
+  readOnly: true;
+  executable: false;
+}
+
 /**
  * Same idea as scanNextFromSnapshot, but tries every dataType in `dataTypes`
  * at each offset instead of committing to one interpretation upfront — the
@@ -482,4 +550,156 @@ export function scanNextFromSnapshotMultiType(
   }
 
   return { matches, regionsScanned: snapshot.regionsScanned, bytesScanned: snapshot.bytesScanned, truncated };
+}
+
+function firstScanComparisonForMode(mode: AutoFirstScanMode, query: AutoFirstScanQuery): ScanComparison | string {
+  switch (mode) {
+    case 'exact':
+      return typeof query.value === 'number' ? { kind: 'exact', value: query.value } : 'exact mode requires value.';
+    case 'greaterThan':
+      return typeof query.value === 'number'
+        ? { kind: 'greaterThan', value: query.value }
+        : 'greaterThan mode requires value.';
+    case 'lessThan':
+      return typeof query.value === 'number'
+        ? { kind: 'lessThan', value: query.value }
+        : 'lessThan mode requires value.';
+    case 'between':
+      return typeof query.min === 'number' && typeof query.max === 'number'
+        ? { kind: 'between', min: query.min, max: query.max }
+        : 'between mode requires min and max.';
+  }
+}
+
+function scanFirstByComparison(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  dataType: LiveValueType,
+  comparison: ScanComparison,
+  bounds?: ScanBounds,
+): ScanResult {
+  const maxRegionBytes = bounds?.maxRegionBytes ?? DEFAULT_MAX_REGION_BYTES;
+  const maxTotalBytes = bounds?.maxTotalBytes ?? DEFAULT_MAX_TOTAL_BYTES;
+  const maxMatches = bounds?.maxMatches ?? DEFAULT_MAX_MATCHES;
+  const step = valueSize(dataType);
+
+  const regions = driver
+    .getRegions(handle)
+    .filter((r) => r.writable && r.size > 0 && r.size <= maxRegionBytes);
+
+  const matches: ScanMatch[] = [];
+  let bytesScanned = 0;
+  let regionsScanned = 0;
+  let truncated = false;
+
+  for (const region of regions) {
+    if (bytesScanned + region.size > maxTotalBytes) {
+      truncated = true;
+      break;
+    }
+
+    let buf: Buffer;
+    try {
+      buf = driver.readBuffer(handle, region.baseAddress, region.size);
+    } catch {
+      continue;
+    }
+
+    bytesScanned += region.size;
+    regionsScanned += 1;
+
+    for (let offset = 0; offset + step <= buf.length; offset += step) {
+      const value = decodeValue(dataType, buf, offset);
+      if (!Number.isFinite(value)) continue;
+      if (matchesComparison(comparison, value, value)) {
+        matches.push({ address: region.baseAddress + BigInt(offset), value });
+        if (matches.length >= maxMatches) {
+          truncated = true;
+          break;
+        }
+      }
+    }
+
+    if (truncated) break;
+  }
+
+  return { matches, regionsScanned, bytesScanned, truncated };
+}
+
+/**
+ * Automatic first-pass manual scan matrix. This is the Solith UX-friendly
+ * alternative to a Cheat Engine-style "pick one scan type + one value type"
+ * dropdown. A single user scan can fan out across all supported value types
+ * and all compatible first-scan modes, while also capturing one unknown-value
+ * snapshot for later changed/increased/decreased narrowing.
+ *
+ * Read-only. It only reads writable committed regions and returns inert
+ * candidates tagged with the interpretation that produced them.
+ */
+export function scanFirstAutoMatrix(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  query: AutoFirstScanQuery = {},
+): AutoFirstScanMatrixResult {
+  const dataTypes = query.dataTypes ?? ALL_SCAN_VALUE_TYPES;
+  const modes = query.modes ?? ['exact', 'between', 'greaterThan', 'lessThan'];
+  const buckets: AutoFirstScanMatrixResult['buckets'] = [];
+
+  for (const mode of modes) {
+    const comparison = firstScanComparisonForMode(mode, query);
+    for (const dataType of dataTypes) {
+      if (typeof comparison === 'string') {
+        buckets.push({
+          mode,
+          dataType,
+          matches: [],
+          regionsScanned: 0,
+          bytesScanned: 0,
+          truncated: false,
+          skipped: true,
+          reason: comparison,
+        });
+        continue;
+      }
+
+      const result = scanFirstByComparison(driver, handle, dataType, comparison, query.bounds);
+      buckets.push({
+        mode,
+        dataType,
+        matches: result.matches.map((match) => ({ ...match, dataType })),
+        regionsScanned: result.regionsScanned,
+        bytesScanned: result.bytesScanned,
+        truncated: result.truncated,
+      });
+    }
+  }
+
+  const unknownSnapshot = query.includeUnknown
+    ? scanFirstUnknown(driver, handle, query.unknownBounds ?? query.bounds)
+    : undefined;
+
+  return {
+    buckets,
+    ...(unknownSnapshot
+      ? {
+          unknown: {
+            regionsScanned: unknownSnapshot.regionsScanned,
+            bytesScanned: unknownSnapshot.bytesScanned,
+            truncated: unknownSnapshot.truncated,
+            snapshot: unknownSnapshot,
+          },
+        }
+      : {}),
+    totals: {
+      buckets: buckets.length,
+      matches: buckets.reduce((count, bucket) => count + bucket.matches.length, 0),
+      regionsScanned: buckets.reduce((count, bucket) => count + bucket.regionsScanned, 0),
+      bytesScanned: buckets.reduce((count, bucket) => count + bucket.bytesScanned, 0),
+      truncatedBuckets: buckets.filter((bucket) => bucket.truncated).length,
+      skippedBuckets: buckets.filter((bucket) => bucket.skipped).length,
+      unknownCaptured: Boolean(unknownSnapshot),
+    },
+    readOnly: true,
+    executable: false,
+  };
 }

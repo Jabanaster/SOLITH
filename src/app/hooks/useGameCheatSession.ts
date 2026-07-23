@@ -12,8 +12,10 @@ export interface DriftPromptState {
 export interface ScanCandidate {
   address: string;
   value: number;
-  /** Present on candidates from a multi-type unknown-value scan; absent from exact-value scans (single fixed type). */
+  /** Present on candidates from multi-type scans; used to keep narrowing under the same interpretation. */
   dataType?: string;
+  /** First-pass scan mode that found this candidate; research metadata only. */
+  scanMode?: string;
 }
 
 export interface CheatSessionState {
@@ -370,7 +372,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   );
 
   const discover = useCallback(
-    async (cheat: CheatDefinition, currentValue: number) => {
+    async (cheat: CheatDefinition, currentValue: number, range?: { min: number; max: number }) => {
       const dataType = resolveMemoryDataType(cheat);
       if (!dataType) {
         patchState(cheat.id, { status: 'error', error: 'This cheat requires console commands, not memory scanning' });
@@ -378,16 +380,43 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       }
       try {
         await ensureAttached();
-        const result = await window.electronAPI.liveMemoryScanFirst({ dataType, targetValue: currentValue });
+        const result = await window.electronAPI.liveMemoryScanFirstAutoMatrix({
+          value: currentValue,
+          min: range?.min ?? currentValue,
+          max: range?.max ?? currentValue,
+          includeUnknown: true,
+          unknownKey: cheat.id,
+        });
         if (!result.success || !result.result) {
           patchState(cheat.id, { status: 'error', error: result.error ?? 'Scan failed' });
           return;
         }
+        const seen = new Set<string>();
+        const candidates: ScanCandidate[] = [];
+        for (const bucket of result.result.buckets) {
+          if (bucket.skipped) continue;
+          for (const match of bucket.matches) {
+            const matchType = match.dataType ?? bucket.dataType;
+            const key = `${match.address}:${matchType}:${bucket.mode}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            candidates.push({
+              address: match.address,
+              value: match.value,
+              dataType: matchType,
+              scanMode: bucket.mode,
+            });
+          }
+        }
         patchState(cheat.id, {
           status: 'discovering',
-          candidates: result.result.matches,
-          confirmedDataType: dataType,
-          error: result.result.truncated ? 'Scan truncated by memory budget — narrow to reduce it' : null,
+          candidates,
+          confirmedDataType: null,
+          unknownScanActive: Boolean(result.result.unknown),
+          error:
+            result.result.totals.truncatedBuckets > 0 || result.result.unknown?.truncated
+              ? 'Auto scan truncated by memory budget — narrow to reduce it'
+              : null,
         });
       } catch (err) {
         patchState(cheat.id, { status: 'error', error: err instanceof Error ? err.message : String(err) });
@@ -403,40 +432,57 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
    * (increased/decreased/changed) — the same underlying scanNext, just a
    * different comparison kind, so either can be used repeatedly in any
    * order against a shrinking candidate list without ever needing a fresh
-   * baseline snapshot. Requires a single-type candidate list (from discover(),
-   * not discoverUnknown()) since scanNext takes one dataType for the whole batch.
+   * baseline snapshot. Auto-matrix candidates are grouped by their discovered
+   * data type so a mixed first scan never falls back to one guessed type.
    */
   const narrowWithComparison = useCallback(
     async (cheat: CheatDefinition, comparison: { kind: string; value?: number; min?: number; max?: number }) => {
       const current = getState(cheat.id);
-      const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
-      if (!dataType || current.candidates.length === 0) return;
+      const fallbackDataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
+      if (!fallbackDataType || current.candidates.length === 0) return;
 
       try {
-        const result = await window.electronAPI.liveMemoryScanNext({
-          dataType,
-          comparison,
-          previous: current.candidates.map((c) => ({ address: c.address, value: c.value })),
-        });
-        if (!result.success || !result.matches) {
-          patchState(cheat.id, { status: 'error', error: result.error ?? 'Narrow failed' });
-          return;
+        const groups = new Map<string, ScanCandidate[]>();
+        for (const candidate of current.candidates) {
+          const candidateType = candidate.dataType ?? fallbackDataType;
+          groups.set(candidateType, [...(groups.get(candidateType) ?? []), candidate]);
         }
 
-        const narrowed = result.matches;
+        const narrowed: ScanCandidate[] = [];
+        for (const [dataType, candidates] of groups.entries()) {
+          const result = await window.electronAPI.liveMemoryScanNext({
+            dataType,
+            comparison,
+            previous: candidates.map((c) => ({ address: c.address, value: c.value })),
+          });
+          if (!result.success || !result.matches) {
+            patchState(cheat.id, { status: 'error', error: result.error ?? 'Narrow failed' });
+            return;
+          }
+          narrowed.push(...result.matches.map((match) => ({ ...match, dataType })));
+        }
+
         if (narrowed.length === 1) {
           const [confirmed] = narrowed;
+          const confirmedDataType = confirmed.dataType ?? fallbackDataType;
           patchState(cheat.id, {
             status: 'confirmed',
             candidates: narrowed,
             confirmedAddress: confirmed.address,
+            confirmedDataType,
             liveValue: confirmed.value,
+            unknownScanActive: false,
           });
-          persist(cheat, getState(cheat.id).enabled, confirmed.address, dataType);
+          persist(cheat, getState(cheat.id).enabled, confirmed.address, confirmedDataType);
         } else if (narrowed.length > 1) {
-          patchState(cheat.id, { status: 'discovering', candidates: narrowed });
+          patchState(cheat.id, { status: 'discovering', candidates: narrowed, unknownScanActive: false });
         } else {
-          patchState(cheat.id, { status: 'error', error: 'No candidates matched — try scanning again', candidates: [] });
+          patchState(cheat.id, {
+            status: 'error',
+            error: 'No candidates matched — try scanning again',
+            candidates: [],
+            unknownScanActive: false,
+          });
         }
       } catch (err) {
         patchState(cheat.id, { status: 'error', error: err instanceof Error ? err.message : String(err) });

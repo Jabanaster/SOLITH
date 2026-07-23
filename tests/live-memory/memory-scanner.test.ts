@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FakeMemoryDriver } from '../fixtures/fake-memory-driver.js';
-import { scanFirst, scanFirstRange, scanNext } from '../../src/core/live-memory/memory-scanner.js';
+import { scanFirst, scanFirstAutoMatrix, scanFirstRange, scanNext } from '../../src/core/live-memory/memory-scanner.js';
 
 const HANDLE = { pid: 1234, opaque: { fake: true } };
 
@@ -325,4 +325,63 @@ test('scanFirstRange skips unreadable regions without aborting later matches', (
   assert.equal(result.matches[0].address, 0xb000n);
   assert.equal(result.regionsScanned, 1);
   assert.equal(result.truncated, false);
+});
+
+test('scanFirstAutoMatrix scans all requested modes and value types in one read-only matrix', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(64, 0);
+  region.writeInt32LE(125, 0);
+  region.writeFloatLE(125, 4);
+  region.writeInt32LE(200, 8);
+  region.writeFloatLE(50.5, 12);
+  driver.addRegion(0xc000n, region, true);
+
+  const result = scanFirstAutoMatrix(driver, HANDLE, {
+    value: 125,
+    min: 120,
+    max: 130,
+    dataTypes: ['int32', 'float'],
+    modes: ['exact', 'between', 'greaterThan', 'lessThan'],
+    bounds: { maxMatches: 20 },
+    includeUnknown: true,
+  });
+
+  assert.equal(result.readOnly, true);
+  assert.equal(result.executable, false);
+  assert.equal(result.totals.buckets, 8);
+  assert.equal(result.totals.skippedBuckets, 0);
+  assert.equal(result.totals.unknownCaptured, true);
+  assert.ok(result.unknown);
+
+  const exactInt = result.buckets.find((bucket) => bucket.mode === 'exact' && bucket.dataType === 'int32');
+  assert.ok(exactInt);
+  assert.ok(exactInt.matches.some((match) => match.address === 0xc000n && match.dataType === 'int32'));
+
+  const exactFloat = result.buckets.find((bucket) => bucket.mode === 'exact' && bucket.dataType === 'float');
+  assert.ok(exactFloat);
+  assert.ok(exactFloat.matches.some((match) => match.address === 0xc004n && match.dataType === 'float'));
+
+  const greaterInt = result.buckets.find((bucket) => bucket.mode === 'greaterThan' && bucket.dataType === 'int32');
+  assert.ok(greaterInt);
+  assert.ok(greaterInt.matches.some((match) => match.address === 0xc008n && match.value === 200));
+
+  const lessFloat = result.buckets.find((bucket) => bucket.mode === 'lessThan' && bucket.dataType === 'float');
+  assert.ok(lessFloat);
+  assert.ok(lessFloat.matches.some((match) => match.address === 0xc00cn && match.dataType === 'float'));
+});
+
+test('scanFirstAutoMatrix marks incompatible buckets skipped instead of guessing missing values', () => {
+  const driver = new FakeMemoryDriver();
+  driver.addRegion(0xd000n, filledBuffer(16, 0), true);
+
+  const result = scanFirstAutoMatrix(driver, HANDLE, {
+    dataTypes: ['int32', 'float'],
+    modes: ['exact', 'between'],
+    includeUnknown: false,
+  });
+
+  assert.equal(result.totals.buckets, 4);
+  assert.equal(result.totals.skippedBuckets, 4);
+  assert.ok(result.buckets.every((bucket) => bucket.skipped));
+  assert.equal(result.totals.unknownCaptured, false);
 });

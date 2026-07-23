@@ -42,6 +42,7 @@
     "registry:inspect": "tsx scripts/inspect-registry.mjs",
     "registry:search": "tsx scripts/search-registry.mjs",
     "runtime:validate-signatures": "tsx scripts/validate-runtime-signatures.mjs",
+    "runtime:analyze-aob-repair": "tsx scripts/analyze-aob-repair-candidates.mjs",
     "smoke:runtime-readonly": "tsx scripts/smoke-windows-readonly-runtime.mjs",
     "test:install-discovery": "tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts tests/install-discovery-epic-gog.test.ts",
     "test:trainer-health": "tsx --test tests/trainer-health.test.ts tests/trainer-deck-rows.test.ts tests/catalog-demand.test.ts",
