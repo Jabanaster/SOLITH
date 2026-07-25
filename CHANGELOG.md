@@ -8,6 +8,7 @@
 - Removed dead `better-sqlite3` dependency; shipped database remains sql.js.
 - Purged remaining ResourceForge installer/branding identity from active tree and test temp prefixes.
 - Enforced Node.js 22 and automated version-consistency checks.
+- Triaged npm audit High findings: two leaf advisories fixed via targeted `postcss` / `brace-expansion` overrides (no `audit fix --force`; Electron/React/Vite/memoryjs majors unchanged).
 
 ## v2.4.0-rc.3
 
