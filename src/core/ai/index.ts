@@ -45,18 +45,60 @@ export function setAIConfig(provider: 'Ollama' | 'LM Studio', config: Partial<AI
 
 export function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {
   return new Promise((resolve) => {
-    // Rule-based fallback - always succeeds for now
     if (config.provider === 'None') {
       resolve({ success: true, message: 'Using rule-based explanations (no AI configured)' });
       return;
     }
-    
-    // For Ollama and LM Studio, we would make actual API calls here
-    // For now, just return a simulated response
-    resolve({ 
-      success: true, 
-      message: `Connection to ${config.provider} successful` 
-    });
+
+    const endpoint = (config.endpoint || '').trim();
+    if (!endpoint) {
+      resolve({
+        success: false,
+        message: `${config.provider} endpoint is empty. Configure a local endpoint before testing.`,
+      });
+      return;
+    }
+
+    let url: URL;
+    try {
+      url = new URL(endpoint);
+    } catch {
+      resolve({ success: false, message: `Invalid ${config.provider} endpoint URL.` });
+      return;
+    }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      resolve({ success: false, message: `${config.provider} endpoint must be http(s).` });
+      return;
+    }
+
+    const timeoutMs = Math.max(1_000, Math.min(config.timeout || 60_000, 60_000));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Ollama exposes /api/tags; LM Studio OpenAI-compatible servers expose /v1/models.
+    const probePath = config.provider === 'LM Studio' ? '/v1/models' : '/api/tags';
+    const probeUrl = new URL(probePath, url).toString();
+
+    fetch(probeUrl, { method: 'GET', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          resolve({
+            success: false,
+            message: `${config.provider} responded HTTP ${response.status} at ${probePath}.`,
+          });
+          return;
+        }
+        resolve({ success: true, message: `Connection to ${config.provider} verified at ${probePath}.` });
+      })
+      .catch((error: unknown) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        resolve({
+          success: false,
+          message: `Connection to ${config.provider} failed: ${detail}`,
+        });
+      })
+      .finally(() => clearTimeout(timer));
   });
 }
 

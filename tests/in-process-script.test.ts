@@ -1,11 +1,18 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { analyzeAaScript } from '../src/core/script-research/aa-script-analyzer.ts';
 import { IN_PROCESS_SCRIPT_MILESTONE } from '../src/core/in-process-script/charter.ts';
 import { evaluateInProcessGate } from '../src/core/in-process-script/guards.ts';
 import { planHookFromScriptAnalysis, FRIENDSHIP_AOB } from '../src/core/in-process-script/aa-hook-planner.ts';
 import { proposeHookInstall } from '../src/core/in-process-script/hook-engine.ts';
-import { proposeInjectorLaunch } from '../src/core/in-process-script/injector-launcher.ts';
+import {
+  clearInjectorProposals,
+  confirmInjectorLaunch,
+  proposeInjectorLaunch,
+} from '../src/core/in-process-script/injector-launcher.ts';
 import { buildFriendshipCapShellcode } from '../src/core/in-process-script/presets/crimson-fast-friendship.ts';
 import { buildAbsoluteJumpPatch } from '../src/core/in-process-script/code-cave.ts';
 
@@ -17,6 +24,13 @@ code:
   mov qword ptr [rax+20], 64
 registersymbol(INJECT_FAST_FRIENDSHIP)
 `;
+
+const pilotGate = {
+  featureEnabled: true,
+  userConfirmedOffline: true,
+  userApprovedAction: true,
+  executableName: 'CrimsonDesert.exe',
+} as const;
 
 describe('in-process script execution milestone', () => {
   test('charter limits pilot to CrimsonDesert.exe and defaults OFF', () => {
@@ -59,13 +73,86 @@ describe('in-process script execution milestone', () => {
     assert.equal(plan.status, 'ready');
   });
 
-  test('stages hook and injector proposals', () => {
+  test('stages hook and rejects unbound injector proposals', () => {
     const analysis = analyzeAaScript('Fast friendship', FRIENDSHIP_SCRIPT, 'CrimsonDesert.exe')!;
     const plan = planHookFromScriptAnalysis(analysis, 'CrimsonDesert.exe');
     const hookProposal = proposeHookInstall(plan);
     assert.ok(hookProposal.proposalId);
 
-    assert.throws(() => proposeInjectorLaunch('not-a-file.bin'));
+    assert.throws(
+      () =>
+        proposeInjectorLaunch({
+          exePath: 'not-a-file.bin',
+          attachedExecutableName: 'CrimsonDesert.exe',
+          attachedPid: 1001,
+          gate: pilotGate,
+        }),
+      /Trainer executable not found|Only \.exe/,
+    );
+
+    assert.throws(
+      () =>
+        proposeInjectorLaunch({
+          exePath: path.join(os.tmpdir(), 'x.exe'),
+          attachedExecutableName: 'Palworld-Win64-Shipping.exe',
+          attachedPid: 1001,
+          gate: { ...pilotGate, executableName: 'Palworld-Win64-Shipping.exe' },
+        }),
+      /limited to|CrimsonDesert/i,
+    );
+  });
+
+  test('injector confirm re-checks gate, attachment, and file hash', async () => {
+    clearInjectorProposals();
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-injector-'));
+    const exePath = path.join(tmpDir, 'research-helper.exe');
+    try {
+      fs.writeFileSync(exePath, Buffer.from('MZ-fake-helper-v1'));
+      const proposal = proposeInjectorLaunch({
+        exePath,
+        attachedExecutableName: 'CrimsonDesert.exe',
+        attachedPid: 1001,
+        gate: pilotGate,
+      });
+      assert.equal(proposal.attachedExecutableName, 'CrimsonDesert.exe');
+      assert.ok(proposal.sha256);
+
+      await assert.rejects(
+        () =>
+          confirmInjectorLaunch({
+            proposalId: proposal.proposalId,
+            attachedExecutableName: 'OtherGame.exe',
+            attachedPid: 1001,
+            gate: { ...pilotGate, executableName: 'OtherGame.exe' },
+            remoteConnections: {
+              availability: 'available',
+              remoteConnectionCount: 0,
+              observedAt: new Date().toISOString(),
+            },
+          }),
+        /no longer matches|limited to/i,
+      );
+
+      fs.writeFileSync(exePath, Buffer.from('MZ-fake-helper-TAMPERED'));
+      await assert.rejects(
+        () =>
+          confirmInjectorLaunch({
+            proposalId: proposal.proposalId,
+            attachedExecutableName: 'CrimsonDesert.exe',
+            attachedPid: 1001,
+            gate: pilotGate,
+            remoteConnections: {
+              availability: 'available',
+              remoteConnectionCount: 0,
+              observedAt: new Date().toISOString(),
+            },
+          }),
+        /hash changed/i,
+      );
+    } finally {
+      clearInjectorProposals();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   test('builds friendship shellcode and 14-byte jump patch', () => {

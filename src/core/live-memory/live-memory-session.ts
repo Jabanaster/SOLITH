@@ -164,6 +164,23 @@ export class LiveMemorySession {
     return this.userConfirmedOffline;
   }
 
+  getAcceptedConnectionBaseline(): number {
+    return this.acceptedConnectionBaseline;
+  }
+
+  /** Fresh remote-connection observation for the attached PID (fail-closed callers). */
+  async observeAttachedRemoteConnections(): Promise<RemoteConnectionEvidence> {
+    if (!this.target) {
+      return {
+        availability: 'unavailable',
+        remoteConnectionCount: 0,
+        observedAt: new Date().toISOString(),
+        error: 'not_attached',
+      };
+    }
+    return this.remoteConnectionObserver(this.target.pid);
+  }
+
   /**
    * Advisory connection observe (KI-017 history). Does not gate writes —
    * use evaluateWriteConsent / isOfflineConfirmed for allow/deny.

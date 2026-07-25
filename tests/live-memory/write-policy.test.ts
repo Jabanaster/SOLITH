@@ -9,17 +9,19 @@ import {
 describe('WritePolicyGate', () => {
   const gate = new WritePolicyGate();
 
-  test('trainer default context allows writes without researchWriteMode', () => {
+  test('trainer default context denies until waiver and approval are set', () => {
     const decision = gate.evaluate(defaultTrainerWritePolicyContext());
-    assert.equal(decision.allow, true);
-    if (decision.allow) {
-      assert.ok(decision.reasons.some((r) => /passed/i.test(r)));
+    assert.equal(decision.allow, false);
+    if (!decision.allow) {
+      assert.equal(decision.code, 'NO_CONSENT');
     }
   });
 
-  test('trainer path ignores researchWriteMode and backup flags', () => {
+  test('trainer path allows when waiver + approval are explicit', () => {
     const decision = gate.evaluate(
       defaultTrainerWritePolicyContext({
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
         researchWriteModeEnabled: false,
         hasBackupSnapshot: false,
       }),
@@ -29,7 +31,11 @@ describe('WritePolicyGate', () => {
 
   test('denies when read-only mode is enabled', () => {
     const decision = gate.evaluate(
-      defaultTrainerWritePolicyContext({ readOnlyMode: true }),
+      defaultTrainerWritePolicyContext({
+        readOnlyMode: true,
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
+      }),
     );
     assert.equal(decision.allow, false);
     if (!decision.allow) {
@@ -39,7 +45,10 @@ describe('WritePolicyGate', () => {
 
   test('denies when single-player waiver not accepted', () => {
     const decision = gate.evaluate(
-      defaultTrainerWritePolicyContext({ singlePlayerWaiverAccepted: false }),
+      defaultTrainerWritePolicyContext({
+        singlePlayerWaiverAccepted: false,
+        userApproved: true,
+      }),
     );
     assert.equal(decision.allow, false);
     if (!decision.allow) {
@@ -49,7 +58,7 @@ describe('WritePolicyGate', () => {
 
   test('legacy isOffline:false maps to NO_CONSENT', () => {
     const decision = gate.evaluate(
-      defaultTrainerWritePolicyContext({ isOffline: false }),
+      defaultTrainerWritePolicyContext({ isOffline: false, userApproved: true }),
     );
     assert.equal(decision.allow, false);
     if (!decision.allow) {
@@ -59,7 +68,10 @@ describe('WritePolicyGate', () => {
 
   test('denies when user approval is missing', () => {
     const decision = gate.evaluate(
-      defaultTrainerWritePolicyContext({ userApproved: false }),
+      defaultTrainerWritePolicyContext({
+        singlePlayerWaiverAccepted: true,
+        userApproved: false,
+      }),
     );
     assert.equal(decision.allow, false);
     if (!decision.allow) {
@@ -68,7 +80,12 @@ describe('WritePolicyGate', () => {
   });
 
   test('research_probe denies when Research Write Mode is off (default)', () => {
-    const decision = gate.evaluate(researchProbeWritePolicyContext());
+    const decision = gate.evaluate(
+      researchProbeWritePolicyContext({
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
+      }),
+    );
     assert.equal(decision.allow, false);
     if (!decision.allow) {
       assert.equal(decision.code, 'RESEARCH_MODE_OFF');
@@ -80,6 +97,8 @@ describe('WritePolicyGate', () => {
       researchProbeWritePolicyContext({
         researchWriteModeEnabled: true,
         hasBackupSnapshot: false,
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
       }),
     );
     assert.equal(decision.allow, false);

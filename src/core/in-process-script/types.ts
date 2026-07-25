@@ -37,8 +37,16 @@ export interface InjectorLaunchProposal {
   exePath: string;
   fileName: string;
   sha256?: string;
+  /** Attached pilot game executable required at propose/confirm time. */
+  attachedExecutableName: string;
+  /** Attached pilot process id required at propose/confirm time. */
+  attachedPid: number;
+  /** Offline waiver captured when the proposal was created. */
+  userConfirmedOffline: boolean;
   warnings: string[];
   createdAt: string;
+  /** Absolute expiry; confirm after this time fails and consumes the proposal. */
+  expiresAt: string;
 }
 
 export interface InProcessGateInput {

@@ -1,6 +1,7 @@
 /**
  * MemoryManager — safe-write facade over LiveMemorySession + local audit log.
- * Phase 10: optional WritePolicyGate checked before propose/confirm/safeWrite.
+ * Phase 10: WritePolicyGate checked before propose/confirm/safeWrite.
+ * Defaults are fail-closed; IPC/callers must supply approval + session waiver.
  */
 
 import type { MemoryAuditLog } from './audit-log.js';
@@ -24,7 +25,11 @@ export interface SafeWriteResult {
   readbackValue?: number;
   error?: string;
   policyCode?: string;
+  /** Set when a post-write snapshot/backup listener throws. Write may still have succeeded. */
+  snapshotError?: string;
 }
+
+export type ConfirmWriteManagerResult = ConfirmWriteResult & { snapshotError?: string };
 
 /** Optional hook after a confirmed process write (e.g. Avowed WinGDK save snapshot). */
 export type MemoryManagerSnapshotListener = (info: {
@@ -32,10 +37,18 @@ export type MemoryManagerSnapshotListener = (info: {
   reason?: string;
 }) => void;
 
+export interface WriteCallOptions {
+  featureId?: string;
+  reason?: string;
+  /** Required when no explicit writePolicyContext was set. Defaults false (fail-closed). */
+  userApproved?: boolean;
+  verifyReadback?: boolean;
+}
+
 export class MemoryManager {
   private snapshotListener: MemoryManagerSnapshotListener | null = null;
   private readonly writeGate = new WritePolicyGate();
-  /** When null, trainer default context is used (existing product path). */
+  /** When null, trainer context is derived from session waiver + per-call approval. */
   private writePolicyContext: WritePolicyContext | null = null;
 
   constructor(
@@ -43,27 +56,44 @@ export class MemoryManager {
     private readonly audit: MemoryAuditLog,
   ) {}
 
-  /** Override write policy (e.g. research_probe). Null restores trainer defaults. */
+  /** Override write policy (e.g. research_probe). Null restores session-derived trainer defaults. */
   setWritePolicyContext(context: WritePolicyContext | null): void {
     this.writePolicyContext = context;
   }
 
-  getWritePolicyContext(): WritePolicyContext {
-    return this.writePolicyContext ?? defaultTrainerWritePolicyContext();
+  getWritePolicyContext(userApprovedForCall = false): WritePolicyContext {
+    if (this.writePolicyContext) {
+      if (this.writePolicyContext.writeClass === 'trainer') {
+        return {
+          ...this.writePolicyContext,
+          singlePlayerWaiverAccepted: this.session.isOfflineConfirmed(),
+          userApproved:
+            this.writePolicyContext.userApproved === true || userApprovedForCall === true,
+        };
+      }
+      return this.writePolicyContext;
+    }
+    return defaultTrainerWritePolicyContext({
+      singlePlayerWaiverAccepted: this.session.isOfflineConfirmed(),
+      userApproved: userApprovedForCall === true,
+    });
   }
 
-  private waiverAssumedForAudit(): boolean {
-    const ctx = this.getWritePolicyContext();
+  private waiverAssumedForAudit(userApprovedForCall = false): boolean {
+    const ctx = this.getWritePolicyContext(userApprovedForCall);
     return ctx.singlePlayerWaiverAccepted === true || ctx.isOffline === true;
   }
 
-  private enforceWritePolicy(reason: string): { ok: true } | { ok: false; error: string; code: string } {
-    const decision = this.writeGate.evaluate(this.getWritePolicyContext());
+  private enforceWritePolicy(
+    reason: string,
+    userApprovedForCall: boolean,
+  ): { ok: true } | { ok: false; error: string; code: string } {
+    const decision = this.writeGate.evaluate(this.getWritePolicyContext(userApprovedForCall));
     if (decision.allow) return { ok: true };
     this.audit.append({
       op: 'abort',
       reason: `write_policy:${decision.code}:${reason}:${decision.reasons.join(';')}`,
-      waiverAssumed: this.waiverAssumedForAudit(),
+      waiverAssumed: this.waiverAssumedForAudit(userApprovedForCall),
     });
     return { ok: false, error: `write_policy_denied:${decision.code}`, code: decision.code };
   }
@@ -80,11 +110,20 @@ export class MemoryManager {
     this.snapshotListener = listener;
   }
 
-  private emitSnapshot(info: { featureId?: string; reason?: string }): void {
+  private emitSnapshot(info: { featureId?: string; reason?: string }): { ok: true } | { ok: false; error: string } {
+    if (!this.snapshotListener) return { ok: true };
     try {
-      this.snapshotListener?.(info);
-    } catch {
-      // Backup hooks must never fail a live write path.
+      this.snapshotListener(info);
+      return { ok: true };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      this.audit.append({
+        op: 'abort',
+        featureId: info.featureId,
+        reason: `snapshot_listener_failed:${info.reason ?? 'snapshot'}:${error}`,
+        waiverAssumed: this.waiverAssumedForAudit(true),
+      });
+      return { ok: false, error };
     }
   }
 
@@ -103,9 +142,10 @@ export class MemoryManager {
   proposeWrite(
     address: LiveMemoryAddress,
     requestedValue: number,
-    options: { featureId?: string; reason?: string } = {},
+    options: WriteCallOptions = {},
   ): LiveWriteProposal {
-    const gate = this.enforceWritePolicy(options.reason ?? 'propose');
+    const userApproved = options.userApproved === true;
+    const gate = this.enforceWritePolicy(options.reason ?? 'propose', userApproved);
     if (!gate.ok) {
       throw new Error(gate.error);
     }
@@ -118,16 +158,17 @@ export class MemoryManager {
       valueBefore: proposal.currentValue,
       valueAfter: proposal.requestedValue,
       reason: `${options.reason ?? 'propose'}:proposed`,
-      waiverAssumed: true,
+      waiverAssumed: this.waiverAssumedForAudit(userApproved),
     });
     return proposal;
   }
 
   async confirmWrite(
     proposalId: string,
-    options: { featureId?: string; reason?: string } = {},
-  ): Promise<ConfirmWriteResult> {
-    const gate = this.enforceWritePolicy(options.reason ?? 'confirm');
+    options: WriteCallOptions = {},
+  ): Promise<ConfirmWriteManagerResult> {
+    const userApproved = options.userApproved === true;
+    const gate = this.enforceWritePolicy(options.reason ?? 'confirm', userApproved);
     if (!gate.ok) {
       return { success: false, error: gate.error };
     }
@@ -137,6 +178,7 @@ export class MemoryManager {
         op: 'abort',
         featureId: options.featureId,
         reason: confirm.error ?? 'confirm_failed',
+        waiverAssumed: this.waiverAssumedForAudit(userApproved),
       });
       return confirm;
     }
@@ -150,9 +192,12 @@ export class MemoryManager {
       valueBefore: confirm.manifest?.valueBefore,
       valueAfter: confirm.manifest?.valueAfter,
       reason: `${options.reason ?? 'confirm'}:confirmed`,
-      waiverAssumed: true,
+      waiverAssumed: this.waiverAssumedForAudit(userApproved),
     });
-    this.emitSnapshot({ featureId: options.featureId, reason: options.reason ?? 'confirm' });
+    const snap = this.emitSnapshot({ featureId: options.featureId, reason: options.reason ?? 'confirm' });
+    if (!snap.ok) {
+      return { ...confirm, snapshotError: snap.error };
+    }
     return confirm;
   }
 
@@ -162,10 +207,11 @@ export class MemoryManager {
   async safeWrite(
     address: LiveMemoryAddress,
     requestedValue: number,
-    options: { featureId?: string; reason?: string; verifyReadback?: boolean } = {},
+    options: WriteCallOptions = {},
   ): Promise<SafeWriteResult> {
     const reason = options.reason ?? 'safe_write';
-    const gate = this.enforceWritePolicy(reason);
+    const userApproved = options.userApproved === true;
+    const gate = this.enforceWritePolicy(reason, userApproved);
     if (!gate.ok) {
       return { success: false, error: gate.error, policyCode: gate.code };
     }
@@ -180,6 +226,7 @@ export class MemoryManager {
         address: `0x${address.address.toString(16)}`,
         valueType: address.dataType,
         reason: `propose_failed:${error}`,
+        waiverAssumed: this.waiverAssumedForAudit(userApproved),
       });
       return { success: false, error };
     }
@@ -192,7 +239,7 @@ export class MemoryManager {
       valueBefore: proposal.currentValue,
       valueAfter: proposal.requestedValue,
       reason: `${reason}:proposed`,
-      waiverAssumed: true,
+      waiverAssumed: this.waiverAssumedForAudit(userApproved),
     });
 
     const confirm = await this.session.confirmWrite(proposal.proposalId);
@@ -205,7 +252,7 @@ export class MemoryManager {
         valueBefore: proposal.currentValue,
         valueAfter: proposal.requestedValue,
         reason: confirm.error ?? 'confirm_failed',
-        waiverAssumed: this.waiverAssumedForAudit(),
+        waiverAssumed: this.waiverAssumedForAudit(userApproved),
       });
       return { success: false, proposal, confirm, error: confirm.error };
     }
@@ -218,12 +265,13 @@ export class MemoryManager {
       valueBefore: confirm.manifest?.valueBefore,
       valueAfter: confirm.manifest?.valueAfter,
       reason: `${reason}:confirmed`,
-      waiverAssumed: true,
+      waiverAssumed: this.waiverAssumedForAudit(userApproved),
     });
-    this.emitSnapshot({ featureId: options.featureId, reason });
+    const snap = this.emitSnapshot({ featureId: options.featureId, reason });
+    const snapshotError = snap.ok ? undefined : snap.error;
 
     if (options.verifyReadback === false) {
-      return { success: true, proposal, confirm, verified: undefined };
+      return { success: true, proposal, confirm, verified: undefined, snapshotError };
     }
 
     let readbackValue: number;
@@ -236,6 +284,7 @@ export class MemoryManager {
         confirm,
         verified: false,
         error: `Write succeeded but readback failed: ${String(err)}`,
+        snapshotError,
       };
     }
 
@@ -249,7 +298,7 @@ export class MemoryManager {
       reason: verified ? `${reason}:readback_ok` : `${reason}:readback_mismatch`,
     });
 
-    return { success: true, proposal, confirm, verified, readbackValue };
+    return { success: true, proposal, confirm, verified, readbackValue, snapshotError };
   }
 
   async rollback(manifest: LiveWriteManifest, featureId?: string): Promise<RollbackResult> {
@@ -262,7 +311,7 @@ export class MemoryManager {
       valueBefore: manifest.valueAfter,
       valueAfter: manifest.valueBefore,
       reason: result.success ? 'rollback_ok' : (result.error ?? 'rollback_failed'),
-      waiverAssumed: result.success ? true : this.waiverAssumedForAudit(),
+      waiverAssumed: this.waiverAssumedForAudit(result.success),
     });
     return result;
   }

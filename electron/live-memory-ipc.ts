@@ -320,6 +320,7 @@ export function registerLiveMemoryIpc(): void {
       const proposal = bundle.manager.proposeWrite(
         { address: BigInt(parsed.address), dataType: parsed.dataType },
         parsed.requestedValue,
+        { userApproved: true, reason: 'ipc_propose' },
       );
       refreshCrashContext(bundle);
       // Serialize bigint address to a string for the structured-clone IPC boundary.
@@ -333,7 +334,10 @@ export function registerLiveMemoryIpc(): void {
     try {
       const bundle = requireBundle(event);
       const parsed = LiveMemoryConfirmWriteSchema.parse(payload);
-      const result = await bundle.manager.confirmWrite(parsed.proposalId);
+      const result = await bundle.manager.confirmWrite(parsed.proposalId, {
+        userApproved: true,
+        reason: 'ipc_confirm',
+      });
       refreshCrashContext(bundle);
       return serializeWriteResult(result);
     } catch (error) {
@@ -935,23 +939,36 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-propose-injector-launch', async (event, payload: unknown) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const session = requireSession(event);
       const parsed = InProcessProposeInjectorSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
 
-      const { getSettings } = await import('../src/core/settings/index.js');
-      const settings = getSettings();
+      const attachedExecutableName = session.getAttachedExecutableName() ?? '';
+      const attachedPid = session.getAttachedPid();
+      if (attachedPid == null) {
+        return { success: false, error: 'Injector launch requires an attached CrimsonDesert.exe session.' };
+      }
       const { evaluateInProcessGate } = await import('../src/core/in-process-script/guards.js');
       const gate = evaluateInProcessGate({
-        featureEnabled: settings.inProcessScriptExecutionEnabled === true,
-        userConfirmedOffline: parsed.userConfirmedOffline,
+        featureEnabled: true,
+        userConfirmedOffline: session.isOfflineConfirmed() && parsed.userConfirmedOffline === true,
         userApprovedAction: parsed.userApprovedAction,
-        executableName: 'CrimsonDesert.exe',
+        executableName: attachedExecutableName,
       });
       if (!gate.allowed) return { success: false, error: gate.reason };
 
       const { proposeInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
-      const proposal = proposeInjectorLaunch(parsed.exePath);
+      const proposal = proposeInjectorLaunch({
+        exePath: parsed.exePath,
+        attachedExecutableName,
+        attachedPid,
+        gate: {
+          featureEnabled: true,
+          userConfirmedOffline: session.isOfflineConfirmed() && parsed.userConfirmedOffline === true,
+          userApprovedAction: parsed.userApprovedAction,
+          executableName: attachedExecutableName,
+        },
+      });
       return { success: true, proposal };
     } catch (error) {
       return { success: false, error: sanitize(error, 'in_process_propose_injector_failed') };
@@ -960,12 +977,27 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-confirm-injector-launch', async (event, payload: unknown) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const session = requireSession(event);
       const parsed = InProcessConfirmInjectorSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
 
+      const attachedExecutableName = session.getAttachedExecutableName() ?? '';
+      const attachedPid = session.getAttachedPid();
+      const remoteConnections = await session.observeAttachedRemoteConnections();
       const { confirmInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
-      const result = await confirmInjectorLaunch(parsed.proposalId);
+      const result = await confirmInjectorLaunch({
+        proposalId: parsed.proposalId,
+        attachedExecutableName,
+        attachedPid,
+        gate: {
+          featureEnabled: true,
+          userConfirmedOffline: session.isOfflineConfirmed(),
+          userApprovedAction: parsed.userApprovedAction,
+          executableName: attachedExecutableName,
+        },
+        remoteConnections,
+        acceptedConnectionBaseline: session.getAcceptedConnectionBaseline(),
+      });
       return { success: true, pid: result.pid };
     } catch (error) {
       return { success: false, error: sanitize(error, 'in_process_confirm_injector_failed') };

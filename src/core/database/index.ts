@@ -24,6 +24,42 @@ function checkTransaction(sql: string) {
   }
 }
 
+/**
+ * Atomically replace a file (temp sibling + rename). Prevents truncated DB files
+ * when the process dies mid-write.
+ */
+export function atomicWriteFileSync(targetPath: string, data: Buffer | string): void {
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const tempPath = path.join(
+    dir,
+    `${path.basename(targetPath)}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`,
+  );
+  try {
+    fs.writeFileSync(tempPath, data);
+    fs.renameSync(tempPath, targetPath);
+  } finally {
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Preserve the original write/rename failure for callers.
+      }
+    }
+  }
+}
+
+function exportAndPersistToDisk(sqlDb: any): void {
+  if (!sqlDb || !dbPath || dbPath === ':memory:') {
+    return;
+  }
+  const data = sqlDb.export();
+  const buffer = Buffer.from(data);
+  atomicWriteFileSync(dbPath, buffer);
+}
+
 // Persists the in-memory sql.js database to disk
 export function persistDatabase(sqlDb: any, forceSync = false): Promise<void> {
   if (inTransaction && !forceSync) {
@@ -42,13 +78,7 @@ export function persistDatabase(sqlDb: any, forceSync = false): Promise<void> {
         if (resolvePendingPersist) resolvePendingPersist();
         return;
       }
-      const data = sqlDb.export();
-      const buffer = Buffer.from(data);
-      const dir = path.dirname(dbPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(dbPath, buffer);
+      exportAndPersistToDisk(sqlDb);
       if (resolvePendingPersist) resolvePendingPersist();
     } catch (error: any) {
       console.error('Failed to persist database:', error);
@@ -96,13 +126,7 @@ export function flushPersistence(): Promise<void> {
   }
   if (rawDb && dbPath && dbPath !== ':memory:') {
     try {
-      const data = rawDb.export();
-      const buffer = Buffer.from(data);
-      const dir = path.dirname(dbPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(dbPath, buffer);
+      exportAndPersistToDisk(rawDb);
       if (resolvePendingPersist) resolvePendingPersist();
     } catch (error: any) {
       if (rejectPendingPersist) rejectPendingPersist(error);
@@ -138,11 +162,7 @@ if (typeof process !== 'undefined') {
   process.on('exit', () => {
     if (rawDb && dbPath && dbPath !== ':memory:') {
       try {
-        const data = rawDb.export();
-        const buffer = Buffer.from(data);
-        const dir = path.dirname(dbPath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(dbPath, buffer);
+        exportAndPersistToDisk(rawDb);
       } catch (e) {
         console.error('Failed to flush database on process exit:', e);
       }
@@ -171,7 +191,7 @@ function convertRowDates(row: any): any {
   return newRow;
 }
 
-// Wrapper for sql.js Statement to mimic better-sqlite3 Statement
+// Wrapper for sql.js Statement to present a prepared-statement style API
 class StatementWrapper {
   private stmt: any;
   private sql: string;

@@ -37,24 +37,54 @@ describe('Phase 10 WritePolicyGate', () => {
     if (!decision.allow) assert.equal(decision.code, 'NO_BACKUP');
   });
 
-  test('allows trainer path with default context', () => {
+  test('denies trainer path with unset default context', () => {
     const gate = new WritePolicyGate();
     const decision = gate.evaluate(defaultTrainerWritePolicyContext());
-    assert.equal(decision.allow, true);
+    assert.equal(decision.allow, false);
+    if (!decision.allow) assert.equal(decision.code, 'NO_CONSENT');
+  });
+
+  test('allows trainer path only with explicit waiver and approval', () => {
+    const gate = new WritePolicyGate();
+    assert.equal(
+      gate.evaluate(
+        defaultTrainerWritePolicyContext({
+          singlePlayerWaiverAccepted: true,
+          userApproved: true,
+        }),
+      ).allow,
+      true,
+    );
   });
 
   test('denies research / no approval / read-only / no waiver', () => {
     const gate = new WritePolicyGate();
     assert.equal(
-      gate.evaluate(defaultTrainerWritePolicyContext({ singlePlayerWaiverAccepted: false })).allow,
+      gate.evaluate(
+        defaultTrainerWritePolicyContext({
+          singlePlayerWaiverAccepted: false,
+          userApproved: true,
+        }),
+      ).allow,
       false,
     );
     assert.equal(
-      gate.evaluate(defaultTrainerWritePolicyContext({ userApproved: false })).allow,
+      gate.evaluate(
+        defaultTrainerWritePolicyContext({
+          singlePlayerWaiverAccepted: true,
+          userApproved: false,
+        }),
+      ).allow,
       false,
     );
     assert.equal(
-      gate.evaluate(defaultTrainerWritePolicyContext({ readOnlyMode: true })).allow,
+      gate.evaluate(
+        defaultTrainerWritePolicyContext({
+          readOnlyMode: true,
+          singlePlayerWaiverAccepted: true,
+          userApproved: true,
+        }),
+      ).allow,
       false,
     );
   });
@@ -81,7 +111,7 @@ describe('Phase 10 WritePolicyGate', () => {
     });
 
     const address: LiveMemoryAddress = { address: 0x1000n, dataType: 'int32' };
-    const result = await manager.safeWrite(address, 99, { reason: 'probe' });
+    const result = await manager.safeWrite(address, 99, { reason: 'probe', userApproved: true });
     assert.equal(result.success, false);
     assert.equal(result.policyCode, 'NO_BACKUP');
     assert.ok(audit.recent().some((e) => e.op === 'abort' && e.reason?.includes('NO_BACKUP')));

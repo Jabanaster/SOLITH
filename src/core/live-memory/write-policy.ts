@@ -5,6 +5,8 @@
  * Research probes additionally require researchWriteMode + session snapshot backup.
  * Automated connection-count OnlineGuard is NOT used here (see evaluateWriteConsent).
  * Injection / code-exec requests are structurally absent; INJECT_FORBIDDEN is reserved.
+ *
+ * Defaults are deny-by-default. Callers must set waiver + approval explicitly.
  */
 
 export type WriteGateCode =
@@ -112,15 +114,18 @@ function applyLegacyOfflineOverride(
   return base;
 }
 
-/** Default context for existing trainer MemoryManager paths (research mode N/A). */
+/**
+ * Fail-closed trainer defaults. Waiver and approval must be supplied explicitly
+ * (typically from LiveMemorySession.isOfflineConfirmed() + IPC user action).
+ */
 export function defaultTrainerWritePolicyContext(
   overrides: Partial<WritePolicyContext> = {},
 ): WritePolicyContext {
   const base: WritePolicyContext = {
     writeClass: 'trainer',
-    singlePlayerWaiverAccepted: true,
+    singlePlayerWaiverAccepted: false,
     hasBackupSnapshot: true,
-    userApproved: true,
+    userApproved: false,
     researchWriteModeEnabled: false,
     readOnlyMode: false,
     ...overrides,
@@ -132,15 +137,16 @@ export function defaultTrainerWritePolicyContext(
  * Research probe context — fail-closed defaults.
  * researchWriteModeEnabled stays false unless the operator explicitly enables it;
  * hasBackupSnapshot stays false until a session snapshot checkpoint exists.
+ * Waiver and approval also default false.
  */
 export function researchProbeWritePolicyContext(
   overrides: Partial<WritePolicyContext> = {},
 ): WritePolicyContext {
   const base: WritePolicyContext = {
     writeClass: 'research_probe',
-    singlePlayerWaiverAccepted: true,
+    singlePlayerWaiverAccepted: false,
     hasBackupSnapshot: false,
-    userApproved: true,
+    userApproved: false,
     researchWriteModeEnabled: false,
     readOnlyMode: false,
     ...overrides,

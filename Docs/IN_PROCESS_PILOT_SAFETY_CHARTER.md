@@ -20,10 +20,10 @@ This is **not** a general trainer injection framework.
 ## Hard gates (all required)
 
 1. Feature flag **OFF** until you turn it on in Settings  
-2. Solo / offline confirmation for the session  
+2. Solo / offline confirmation for the session (session-owned; not client-asserted alone)  
 3. Explicit per-action approval (hook install / injector launch)  
-4. Online-session guard rechecked before write/patch  
-5. Executable name must be exactly **`CrimsonDesert.exe`**
+4. Hook install rechecks the session online-guard; injector propose/confirm require an attached **`CrimsonDesert.exe`** session with matching PID, offline waiver, approval, online fail-closed observation, and matching file hash  
+5. Attached executable name must be exactly **`CrimsonDesert.exe`**
 
 Source of truth: `src/core/in-process-script/charter.ts` + `guards.ts`.
 

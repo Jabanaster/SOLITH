@@ -49,6 +49,13 @@ describe('memory-manager + audit-log', () => {
     );
   });
 
+  test('safeWrite without userApproved is denied by fail-closed defaults', async () => {
+    const { manager, address } = await attachedManager();
+    const result = await manager.safeWrite(address, 55, { reason: 'no_approval' });
+    assert.equal(result.success, false);
+    assert.equal(result.policyCode, 'NO_APPROVAL');
+  });
+
   test('safeWrite proposes, confirms, verifies, and audits', async () => {
     const driver = new FakeMemoryDriver({ '4096': 10 });
     driver.setProcessExecutableName(1234, 'Demo.exe');
@@ -74,6 +81,7 @@ describe('memory-manager + audit-log', () => {
       featureId: 'demo-health',
       reason: 'test_write',
       verifyReadback: true,
+      userApproved: true,
     });
 
     assert.equal(result.success, true);
@@ -81,6 +89,10 @@ describe('memory-manager + audit-log', () => {
     assert.equal(result.readbackValue, 99);
     assert.ok(audit.recent().some((e) => e.op === 'write' && e.featureId === 'demo-health'));
     assert.ok(audit.recent().some((e) => e.reason?.includes('readback_ok')));
+    assert.equal(
+      audit.recent().find((e) => e.reason?.includes('confirmed'))?.waiverAssumed,
+      true,
+    );
   });
 
   test('proposeWrite + confirmWrite append audit lines to jsonl file', async () => {
@@ -101,8 +113,14 @@ describe('memory-manager + audit-log', () => {
       const manager = new MemoryManager(session, audit);
       const address: LiveMemoryAddress = { address: 0x1000n, dataType: 'int32' };
 
-      const proposal = manager.proposeWrite(address, 42, { reason: 'ipc_propose' });
-      const confirm = await manager.confirmWrite(proposal.proposalId, { reason: 'ipc_confirm' });
+      const proposal = manager.proposeWrite(address, 42, {
+        reason: 'ipc_propose',
+        userApproved: true,
+      });
+      const confirm = await manager.confirmWrite(proposal.proposalId, {
+        reason: 'ipc_confirm',
+        userApproved: true,
+      });
       assert.equal(confirm.success, true);
 
       const body = fs.readFileSync(filePath, 'utf8');
@@ -133,29 +151,58 @@ describe('memory-manager + audit-log', () => {
     });
 
     const address: LiveMemoryAddress = { address: 0x1000n, dataType: 'int32' };
-    const proposal = manager.proposeWrite(address, 7, { featureId: 'demo' });
-    const confirm = await manager.confirmWrite(proposal.proposalId, { featureId: 'demo' });
+    const proposal = manager.proposeWrite(address, 7, { featureId: 'demo', userApproved: true });
+    const confirm = await manager.confirmWrite(proposal.proposalId, {
+      featureId: 'demo',
+      userApproved: true,
+    });
     assert.equal(confirm.success, true);
     assert.equal(hits, 1);
 
     manager.setSnapshotListener(null);
-    const proposal2 = manager.proposeWrite(address, 8);
-    await manager.confirmWrite(proposal2.proposalId);
+    const proposal2 = manager.proposeWrite(address, 8, { userApproved: true });
+    await manager.confirmWrite(proposal2.proposalId, { userApproved: true });
     assert.equal(hits, 1);
+  });
+
+  test('snapshot listener failure is audited and returned without lying', async () => {
+    const { manager, audit, address } = await attachedManager();
+    manager.setSnapshotListener(() => {
+      throw new Error('backup_copy_failed');
+    });
+    const result = await manager.safeWrite(address, 33, {
+      reason: 'snap_fail',
+      userApproved: true,
+    });
+    assert.equal(result.success, true);
+    assert.equal(result.snapshotError, 'backup_copy_failed');
+    assert.ok(
+      audit.recent().some((e) => e.op === 'abort' && e.reason?.includes('snapshot_listener_failed')),
+    );
   });
 
   test('default trainer policy does not require researchWriteMode', async () => {
     const { manager, address } = await attachedManager();
-    // researchWriteMode stays false in trainer defaults — writes must still succeed.
-    const result = await manager.safeWrite(address, 55, { reason: 'trainer_default' });
+    const result = await manager.safeWrite(address, 55, {
+      reason: 'trainer_default',
+      userApproved: true,
+    });
     assert.equal(result.success, true);
     assert.equal(result.verified, true);
   });
 
   test('safeWrite denies research_probe when Research Write Mode is off', async () => {
     const { manager, audit, address } = await attachedManager();
-    manager.setWritePolicyContext(researchProbeWritePolicyContext());
-    const result = await manager.safeWrite(address, 99, { reason: 'research_probe' });
+    manager.setWritePolicyContext(
+      researchProbeWritePolicyContext({
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
+      }),
+    );
+    const result = await manager.safeWrite(address, 99, {
+      reason: 'research_probe',
+      userApproved: true,
+    });
     assert.equal(result.success, false);
     assert.equal(result.policyCode, 'RESEARCH_MODE_OFF');
     assert.match(result.error ?? '', /write_policy_denied:RESEARCH_MODE_OFF/);
@@ -170,23 +217,32 @@ describe('memory-manager + audit-log', () => {
       researchProbeWritePolicyContext({
         researchWriteModeEnabled: true,
         hasBackupSnapshot: false,
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
       }),
     );
 
     assert.throws(
-      () => manager.proposeWrite(address, 11, { reason: 'no_backup' }),
+      () => manager.proposeWrite(address, 11, { reason: 'no_backup', userApproved: true }),
       /write_policy_denied:NO_BACKUP/,
     );
 
-    // Restore trainer defaults so a proposal can be created, then deny on confirm.
     manager.setWritePolicyContext(null);
-    const proposal = manager.proposeWrite(address, 12, { reason: 'pre_confirm' });
+    const proposal = manager.proposeWrite(address, 12, {
+      reason: 'pre_confirm',
+      userApproved: true,
+    });
     manager.setWritePolicyContext(
       researchProbeWritePolicyContext({
         researchWriteModeEnabled: false,
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
       }),
     );
-    const confirm = await manager.confirmWrite(proposal.proposalId, { reason: 'blocked' });
+    const confirm = await manager.confirmWrite(proposal.proposalId, {
+      reason: 'blocked',
+      userApproved: true,
+    });
     assert.equal(confirm.success, false);
     assert.match(confirm.error ?? '', /write_policy_denied:RESEARCH_MODE_OFF/);
     assert.ok(
@@ -200,9 +256,14 @@ describe('memory-manager + audit-log', () => {
       researchProbeWritePolicyContext({
         researchWriteModeEnabled: true,
         hasBackupSnapshot: true,
+        singlePlayerWaiverAccepted: true,
+        userApproved: true,
       }),
     );
-    const result = await manager.safeWrite(address, 77, { reason: 'probe_ok' });
+    const result = await manager.safeWrite(address, 77, {
+      reason: 'probe_ok',
+      userApproved: true,
+    });
     assert.equal(result.success, true);
     assert.equal(result.verified, true);
   });
