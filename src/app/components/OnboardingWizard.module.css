@@ -22,9 +22,16 @@
 }
 
 .art {
-  max-width: 200px;
+  display: flex;
+  justify-content: center;
   margin: 0 auto 0.75rem;
-  opacity: 0.95;
+}
+
+.icon {
+  width: 76px;
+  height: 76px;
+  display: block;
+  object-fit: contain;
 }
 
 .panel h1 {

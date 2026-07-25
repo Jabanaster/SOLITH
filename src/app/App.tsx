@@ -25,6 +25,7 @@ import { BrandingArtwork } from './components/BrandingArtwork.js';
 import { SolithTopBanner } from './components/SolithTopBanner.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
 import { OpeningCinematic } from './components/OpeningCinematic.js';
+import { SolithWispCompanion } from './components/SolithWispCompanion.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
 
@@ -519,6 +520,10 @@ const App: React.FC = () => {
           source={openingCinematicUrl}
           onComplete={finishOpeningCinematic}
         />
+      )}
+
+      {!navigator.webdriver && !showOpeningCinematic && (
+        <SolithWispCompanion />
       )}
     </div>
   );

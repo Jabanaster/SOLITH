@@ -2,16 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app/App';
 import TrainerOverlayPage from './app/pages/TrainerOverlayPage';
+import WispOverlayPage from './app/pages/WispOverlayPage';
 import './app/styles/index.css';
 import './app/styles/trainer-control-panel.css';
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
 
-const isOverlay = window.location.hash === '#trainer-overlay';
+const route = window.location.hash;
 
 root.render(
   <React.StrictMode>
-    {isOverlay ? <TrainerOverlayPage /> : <App />}
+    {route === '#trainer-overlay'
+      ? <TrainerOverlayPage />
+      : route === '#wisp-overlay'
+        ? <WispOverlayPage />
+        : <App />}
   </React.StrictMode>
 );

@@ -1801,6 +1801,433 @@ button, input, select, textarea {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* ─── Solith Wisp Companion ─────────────────────────────── */
+.solith-wisp {
+  position: fixed;
+  z-index: 85;
+  width: 430px;
+  min-height: 164px;
+  pointer-events: none;
+  color: #e8f5ff;
+}
+
+.solith-wisp--bottom-right { right: 22px; bottom: 22px; }
+.solith-wisp--bottom-left { left: 22px; bottom: 22px; }
+.solith-wisp--top-right { right: 22px; top: 22px; }
+.solith-wisp--top-left { left: 22px; top: 22px; }
+
+.wisp-overlay-page {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+  -webkit-app-region: drag;
+}
+
+.solith-wisp--overlay {
+  position: absolute;
+  inset: auto 10px 8px auto;
+  z-index: 1;
+  width: 430px;
+  min-height: 164px;
+}
+
+.solith-wisp--top-right .solith-wisp__bubble-stack,
+.solith-wisp--top-left .solith-wisp__bubble-stack {
+  bottom: auto;
+  top: 10px;
+}
+
+.solith-wisp--overlay .solith-wisp__creature,
+.solith-wisp--overlay .solith-wisp__bubble,
+.solith-wisp-restore--overlay {
+  -webkit-app-region: no-drag;
+}
+
+.solith-wisp__creature,
+.solith-wisp__bubble,
+.solith-wisp-restore {
+  pointer-events: auto;
+}
+
+.solith-wisp__creature {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 116px;
+  height: 116px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transform-origin: 50% 68%;
+  animation:
+    solithWispHover 4.2s ease-in-out infinite,
+    solithWispDrift 9s ease-in-out infinite;
+  filter:
+    drop-shadow(0 0 16px rgba(0, 196, 255, 0.42))
+    drop-shadow(0 18px 28px rgba(0, 0, 0, 0.48));
+}
+
+.solith-wisp--bottom-left .solith-wisp__creature,
+.solith-wisp--top-left .solith-wisp__creature {
+  right: auto;
+  left: 0;
+}
+
+.solith-wisp--top-right .solith-wisp__creature,
+.solith-wisp--top-left .solith-wisp__creature {
+  bottom: auto;
+  top: 0;
+}
+
+.solith-wisp__creature:hover {
+  filter:
+    drop-shadow(0 0 22px rgba(68, 221, 255, 0.58))
+    drop-shadow(0 20px 30px rgba(0, 0, 0, 0.48));
+}
+
+.solith-wisp__creature img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.34);
+  filter: saturate(1.12) contrast(1.08);
+  animation: solithWispEnergyPulse 3.1s ease-in-out infinite;
+}
+
+.solith-wisp__aura {
+  position: absolute;
+  inset: 12%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(0, 205, 255, 0.28), transparent 62%);
+  opacity: 0.78;
+  transform: translateY(10px) scale(1.05);
+  animation: solithWispAura 3.6s ease-in-out infinite;
+}
+
+.solith-wisp__eyes {
+  position: absolute;
+  inset: 20% 18% auto 18%;
+  height: 44%;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 44% 47%, rgba(82, 232, 255, 0.64), transparent 4%),
+    radial-gradient(circle at 56% 47%, rgba(82, 232, 255, 0.64), transparent 4%);
+  opacity: 0.58;
+  animation: solithWispBlink 6.4s ease-in-out infinite;
+}
+
+.solith-wisp__shadow {
+  position: absolute;
+  left: 23%;
+  right: 23%;
+  bottom: -12px;
+  height: 16px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgba(0, 208, 255, 0.38), transparent 70%);
+  filter: blur(6px);
+  opacity: 0.8;
+  animation: solithWispShadow 4.2s ease-in-out infinite;
+}
+
+.solith-wisp__bubble-stack {
+  position: absolute;
+  right: 112px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 312px;
+  pointer-events: none;
+}
+
+.solith-wisp--bottom-left .solith-wisp__bubble-stack,
+.solith-wisp--top-left .solith-wisp__bubble-stack {
+  right: auto;
+  left: 112px;
+  align-items: flex-start;
+}
+
+.solith-wisp__bubble {
+  border: 1px solid rgba(84, 211, 255, 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(14, 25, 45, 0.94), rgba(5, 10, 21, 0.94)),
+    radial-gradient(circle at top left, rgba(0, 198, 255, 0.16), transparent 38%);
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.45),
+    0 0 32px rgba(0, 190, 255, 0.14);
+  backdrop-filter: blur(14px);
+  padding: 12px;
+  max-width: 312px;
+  pointer-events: auto;
+  transform-origin: bottom right;
+  animation: solithWispBubbleIn 0.22s ease-out;
+}
+
+.solith-wisp--bottom-left .solith-wisp__bubble,
+.solith-wisp--top-left .solith-wisp__bubble {
+  transform-origin: bottom left;
+}
+
+.solith-wisp__command-bubble {
+  border-color: rgba(120, 106, 255, 0.35);
+  background:
+    linear-gradient(180deg, rgba(18, 28, 50, 0.94), rgba(5, 10, 21, 0.94)),
+    radial-gradient(circle at top right, rgba(132, 99, 255, 0.18), transparent 42%);
+}
+
+.solith-wisp__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.solith-wisp__header > div:first-child {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 7px;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+.solith-wisp__header strong {
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.solith-wisp__header small {
+  grid-column: 2;
+  color: rgba(191, 218, 255, 0.62);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.solith-wisp__severity {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #5ee7ff;
+  box-shadow: 0 0 12px currentColor;
+}
+
+.solith-wisp__severity--success { background: #5dffb1; color: #5dffb1; }
+.solith-wisp__severity--warning,
+.solith-wisp__severity--guard { background: #ffb444; color: #ffb444; }
+.solith-wisp__severity--error { background: #b778ff; color: #b778ff; }
+
+.solith-wisp__header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.solith-wisp__header button,
+.solith-wisp__bubble footer button,
+.solith-wisp__actions button,
+.solith-wisp__quick-input button {
+  border: 1px solid rgba(103, 204, 255, 0.24);
+  border-radius: 9px;
+  background: rgba(23, 44, 76, 0.72);
+  color: #dff6ff;
+  cursor: pointer;
+}
+
+.solith-wisp__header button,
+.solith-wisp__bubble footer button {
+  padding: 4px 7px;
+  font-size: 0.68rem;
+}
+
+.solith-wisp__bubble p {
+  margin: 0 0 10px;
+  color: rgba(222, 239, 255, 0.86);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.solith-wisp__progress {
+  height: 6px;
+  margin: 8px 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(61, 93, 140, 0.38);
+}
+
+.solith-wisp__progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #25dbff, #8b6cff);
+}
+
+.solith-wisp__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.solith-wisp__actions button {
+  padding: 6px 8px;
+  font-size: 0.7rem;
+}
+
+.solith-wisp__quick-input {
+  display: flex;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.solith-wisp__quick-input input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid rgba(103, 204, 255, 0.18);
+  border-radius: 9px;
+  background: rgba(3, 9, 20, 0.66);
+  color: #ecf9ff;
+  padding: 7px 8px;
+  font-size: 0.72rem;
+}
+
+.solith-wisp__quick-input button {
+  padding: 0 10px;
+  font-size: 0.72rem;
+}
+
+.solith-wisp__bubble footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  color: rgba(161, 192, 223, 0.6);
+  font-size: 0.64rem;
+}
+
+.solith-wisp--protective .solith-wisp__creature,
+.solith-wisp--concerned .solith-wisp__creature {
+  filter:
+    drop-shadow(0 0 22px rgba(255, 153, 31, 0.46))
+    drop-shadow(0 20px 30px rgba(0, 0, 0, 0.48));
+}
+
+.solith-wisp--proud .solith-wisp__creature {
+  filter:
+    drop-shadow(0 0 24px rgba(92, 255, 177, 0.48))
+    drop-shadow(0 20px 30px rgba(0, 0, 0, 0.48));
+}
+
+.solith-wisp--reaction-ack .solith-wisp__creature {
+  animation:
+    solithWispAck 0.8s ease-out,
+    solithWispHover 4.2s ease-in-out infinite 0.8s,
+    solithWispDrift 9s ease-in-out infinite;
+}
+
+.solith-wisp--reaction-thinking .solith-wisp__creature img {
+  animation:
+    solithWispThinking 0.8s ease-in-out infinite,
+    solithWispEnergyPulse 3.1s ease-in-out infinite;
+}
+
+.solith-wisp--reaction-dismissed .solith-wisp__creature {
+  animation:
+    solithWispDismissed 0.65s ease-out,
+    solithWispHover 4.2s ease-in-out infinite 0.65s,
+    solithWispDrift 9s ease-in-out infinite;
+}
+
+.solith-wisp-restore {
+  position: fixed;
+  z-index: 85;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(81, 214, 255, 0.36);
+  border-radius: 16px;
+  background: rgba(8, 16, 31, 0.86);
+  color: #67e8ff;
+  box-shadow: 0 0 22px rgba(0, 190, 255, 0.2);
+  cursor: pointer;
+}
+
+.solith-wisp-restore--bottom-right { right: 22px; bottom: 22px; }
+.solith-wisp-restore--bottom-left { left: 22px; bottom: 22px; }
+.solith-wisp-restore--top-right { right: 22px; top: 22px; }
+.solith-wisp-restore--top-left { left: 22px; top: 22px; }
+.solith-wisp-restore--overlay { right: 12px; bottom: 12px; }
+
+@keyframes solithWispHover {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50% { transform: translateY(-9px) rotate(1.8deg); }
+}
+
+@keyframes solithWispDrift {
+  0%, 100% { margin-right: 0; }
+  35% { margin-right: 4px; }
+  70% { margin-right: -3px; }
+}
+
+@keyframes solithWispEnergyPulse {
+  0%, 100% { filter: saturate(1.12) contrast(1.08) brightness(1); }
+  50% { filter: saturate(1.28) contrast(1.12) brightness(1.08); }
+}
+
+@keyframes solithWispAura {
+  0%, 100% { opacity: 0.54; transform: translateY(10px) scale(1.0); }
+  50% { opacity: 0.82; transform: translateY(6px) scale(1.12); }
+}
+
+@keyframes solithWispShadow {
+  0%, 100% { opacity: 0.62; transform: scaleX(0.88); }
+  50% { opacity: 0.86; transform: scaleX(1.08); }
+}
+
+@keyframes solithWispAck {
+  0% { transform: translateY(0) scale(1); }
+  32% { transform: translateY(4px) scale(0.96); }
+  62% { transform: translateY(-13px) scale(1.04) rotate(2deg); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes solithWispThinking {
+  0%, 100% { transform: scale(1.34) rotate(-1deg); }
+  50% { transform: scale(1.39) rotate(1deg); }
+}
+
+@keyframes solithWispDismissed {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  48% { transform: translateY(3px) scale(0.94); opacity: 0.82; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes solithWispBlink {
+  0%, 92%, 100% { opacity: 0.78; }
+  94%, 96% { opacity: 0.18; }
+}
+
+@keyframes solithWispBubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .solith-wisp__creature,
+  .solith-wisp__creature img,
+  .solith-wisp__aura,
+  .solith-wisp__eyes,
+  .solith-wisp__shadow,
+  .solith-wisp__bubble {
+    animation: none;
+  }
+}
+
 /* ─── Code / Mono Text ──────────────────────────────────── */
 code, .mono {
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;

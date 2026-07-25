@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import styles from './OnboardingWizard.module.css';
-import { BrandingArtwork } from './BrandingArtwork.js';
 
 type OnboardingStep = 'welcome' | 'library' | 'saves' | 'advanced' | 'done';
 
@@ -37,7 +36,12 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
       <div className={styles.panel}>
         <div className={styles.art}>
-          <BrandingArtwork artwork="trainerController" size="section" />
+          <img
+            src="./solith-icon.png"
+            alt=""
+            aria-hidden="true"
+            className={styles.icon}
+          />
         </div>
 
         {step === 'welcome' && (

@@ -45,6 +45,7 @@ import { registerLiveMemoryIpc } from './live-memory-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
+import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
@@ -87,6 +88,7 @@ registerInstallDiscoveryIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();
 registerLocalOcrIpc();
+registerWispOverlayIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -311,6 +313,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   unregisterTrainerHotkeys();
   destroyTrainerOverlay();
+  destroyWispOverlay();
   stopCommunitySyncPolling();
 });
 
@@ -945,7 +948,7 @@ ipcMain.handle('v2-monitor-start', async (event, payload: unknown) => {
     const parsed = V2MonitorStartSchema.parse(payload);
 
     const settingsModule = await import('../src/core/settings/index.js');
-    // better-sqlite3 stores boolean true as integer 1, so accept both representations.
+    // sql.js stores boolean true as integer 1 in some paths; accept both.
     const rawFeatureFlag = settingsModule.getSetting('v2SessionMonitorEnabled');
     const featureEnabled = rawFeatureFlag === true || rawFeatureFlag === 1;
 

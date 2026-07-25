@@ -123,7 +123,7 @@ export async function startCommunitySyncPolling(): Promise<CommunitySyncResult |
 export async function reconcileCommunitySyncPolling(): Promise<CommunitySyncResult | null> {
   if (!deps.isEnabled()) {
     stopCommunitySyncPolling();
-    deps.log('disabled — timer cleared, zero Hub network');
+    deps.log('disabled - timer cleared, zero Hub network');
     return null;
   }
   return startCommunitySyncPolling();

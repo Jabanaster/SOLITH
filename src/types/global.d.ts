@@ -262,6 +262,8 @@ interface Window {
 
     trainerOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
+    wispOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
+    wispOverlayHide: () => Promise<{ success: boolean; error?: string }>;
     trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
     trainerHotkeysGetBindings: () => Promise<{
       success: boolean;

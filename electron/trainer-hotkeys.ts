@@ -7,6 +7,11 @@ import {
   setTrainerHotkeyBindings,
   type TrainerHotkeyAction,
 } from '../src/core/cheat-system/trainer-hotkey-bindings.js';
+import {
+  getTrainerHotkeyEntries,
+  registerTrainerHotkeyEntries,
+  unregisterTrainerHotkeyEntries,
+} from '../src/core/cheat-system/trainer-hotkey-registration.js';
 import { hideTrainerOverlay, toggleTrainerOverlay } from './trainer-overlay.js';
 
 let registered = false;
@@ -24,43 +29,15 @@ export function registerTrainerHotkeys(): void {
   if (!isTrainerCapabilityEnabled('v2HotkeysEnabled')) return;
 
   const bindings = getTrainerHotkeyBindings();
-  let allOk = true;
+  const entries = getTrainerHotkeyEntries(bindings);
+  const result = registerTrainerHotkeyEntries(entries, globalShortcut, getTrainerHotkeyCallback, console);
 
-  const toggleOk = globalShortcut.register(bindings.toggle_overlay, () => {
-    if (!isTrainerCapabilityEnabled('v2OverlayEnabled')) {
-      broadcastHotkey('toggle_overlay');
-      return;
-    }
-    const visible = toggleTrainerOverlay();
-    broadcastHotkey(visible ? 'toggle_overlay' : 'hide_overlay');
-  });
-  if (!toggleOk) allOk = false;
-
-  const hideOk = globalShortcut.register(bindings.hide_overlay, () => {
-    hideTrainerOverlay();
-    broadcastHotkey('hide_overlay');
-  });
-  if (!hideOk) allOk = false;
-
-  for (let i = 1; i <= 12; i += 1) {
-    const action = `cheat_slot_${i}` as TrainerHotkeyAction;
-    const key = bindings[action];
-    if (!key) continue;
-    const ok = globalShortcut.register(key, () => broadcastHotkey(action));
-    if (!ok) allOk = false;
-  }
-
-  if (!allOk) {
-    // eslint-disable-next-line no-console
-    console.warn('[trainer-hotkeys] Failed to register one or more global shortcuts');
-  }
-
-  registered = true;
+  registered = result.registered.length > 0 || result.failed.length > 0;
 }
 
 export function unregisterTrainerHotkeys(): void {
   if (!registered) return;
-  globalShortcut.unregisterAll();
+  unregisterTrainerHotkeyEntries(globalShortcut, console);
   registered = false;
 }
 
@@ -109,4 +86,26 @@ export function registerTrainerHotkeyIpc(): void {
 export function refreshTrainerHotkeys(): void {
   unregisterTrainerHotkeys();
   registerTrainerHotkeys();
+}
+
+function getTrainerHotkeyCallback(action: TrainerHotkeyAction): () => void {
+  if (action === 'toggle_overlay') {
+    return () => {
+      if (!isTrainerCapabilityEnabled('v2OverlayEnabled')) {
+        broadcastHotkey('toggle_overlay');
+        return;
+      }
+      const visible = toggleTrainerOverlay();
+      broadcastHotkey(visible ? 'toggle_overlay' : 'hide_overlay');
+    };
+  }
+
+  if (action === 'hide_overlay') {
+    return () => {
+      hideTrainerOverlay();
+      broadcastHotkey('hide_overlay');
+    };
+  }
+
+  return () => broadcastHotkey(action);
 }

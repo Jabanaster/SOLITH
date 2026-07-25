@@ -31,12 +31,14 @@ describe('community sync orchestrator', () => {
   test('disabled means zero sync calls and no interval', async () => {
     let syncCalls = 0;
     let intervals = 0;
+    const logs: string[] = [];
     configureCommunitySyncOrchestrator({
       isEnabled: () => false,
       sync: async () => {
         syncCalls += 1;
         return syncedResult();
       },
+      log: (message) => logs.push(message),
       setIntervalFn: ((fn: TimerHandler, ms?: number) => {
         intervals += 1;
         return setInterval(fn, ms) as unknown as NodeJS.Timeout;
@@ -48,6 +50,7 @@ describe('community sync orchestrator', () => {
     assert.equal(syncCalls, 0);
     assert.equal(intervals, 0);
     assert.equal(isCommunitySyncPollingActive(), false);
+    assert.deepEqual(logs, ['disabled - timer cleared, zero Hub network']);
   });
 
   test('enable mounts interval and runs an immediate sync', async () => {
