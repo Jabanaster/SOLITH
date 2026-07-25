@@ -14,7 +14,7 @@ export type LifecycleState =
   | 'game_not_running'            // Monitoring active, game not detected
   | 'game_running'                // Game detected, no session evidence
   | 'observing'                   // Partial session evidence accumulating
-  | 'external_session_observed'   // External trainer session detected (not RF-owned)
+  | 'external_session_observed'   // External trainer session detected (not Solith-owned)
   | 'solith_session_connected' // Solith-owned authenticated session (future)
   | 'session_ended_game_running'  // Session markers gone, game still running
   | 'game_exited'                 // Game process gone

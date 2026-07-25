@@ -8,7 +8,7 @@
 ### tsup Configuration
 - Entry: `electron/main.ts` → `dist-electron/main.js` (ESM, Node 22 target)
 - Entry: `electron/preload.ts` → `dist-electron/preload.cjs` (CommonJS for Electron sandbox preload)
-- Externals: `electron`, `better-sqlite3`
+- Externals: `electron`
 - All relative imports bundled inline — no bare relative imports at runtime
 - `__dirname`/`__filename`/`require` shims injected via banner
 

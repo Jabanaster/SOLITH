@@ -71,7 +71,7 @@ function expectedOutputHash(originalContent: string, fieldPath: string, newValue
 interface WorkflowResult {
   runLabel: string;
   runId: string;
-  userDataDirRedacted: string; // %TEMP%\rf-e2e-<runId>
+  userDataDirRedacted: string; // %TEMP%\solith-e2e-<runId>
   durationMs: number;
   exitCode: number;
   cleanupSuccess: boolean;
@@ -105,7 +105,7 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
 
   const startMs  = Date.now();
   const runId    = `${runLabel}-${startMs}`;
-  const baseTemp = path.join(os.tmpdir(), `rf-e2e-${runId}`);
+  const baseTemp = path.join(os.tmpdir(), `solith-e2e-${runId}`);
   const sourceDir   = path.join(baseTemp, 'source');
   const gameDir     = path.join(baseTemp, 'game');
   const userDataDir = path.join(baseTemp, 'userData');
@@ -266,7 +266,7 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
     result = {
       runLabel,
       runId,
-      userDataDirRedacted: `%TEMP%\\rf-e2e-${runId}\\userData`,
+      userDataDirRedacted: `%TEMP%\\solith-e2e-${runId}\\userData`,
       durationMs: Date.now() - startMs,
       exitCode: 0,
       cleanupSuccess: true,
@@ -280,7 +280,7 @@ async function runWorkflow(runLabel: string): Promise<WorkflowResult> {
       workspaceAfterRestore,
       gameId,
       backupId,
-      backupPath: `%TEMP%\\rf-e2e-${runId}\\appdata\\...\\${path.basename(backupPath)}`,
+      backupPath: `%TEMP%\\solith-e2e-${runId}\\appdata\\...\\${path.basename(backupPath)}`,
       journalEventTypes,
       rendererErrorCount: rendererErrors.length,
       mainErrorCount: mainErrors.length,

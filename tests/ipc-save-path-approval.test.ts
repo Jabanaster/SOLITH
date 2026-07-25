@@ -16,7 +16,7 @@ describe('save/data IPC path approval', () => {
 
   beforeEach(async () => {
     await initDatabase();
-    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rf-ipc-save-path-'));
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ipc-save-path-'));
     gameDir = path.join(tempRoot, 'game');
     externalDir = path.join(tempRoot, 'external');
     fs.mkdirSync(gameDir, { recursive: true });

@@ -1,5 +1,14 @@
 # Solith Changelog
 
+## v2.4.0-alpha.2
+
+- Authoritative package version for the current development line (`package.json` SoT).
+- Phase 1–3 safety hardening: atomic sql.js persistence, fail-closed write policy, honest local AI probe, injector destructive-boundary controls (PID bind, expiry, replay protection, audit).
+- Wisp companion foundation integrated coherently (no expanded Wisp scope in this line).
+- Removed dead `better-sqlite3` dependency; shipped database remains sql.js.
+- Purged remaining ResourceForge installer/branding identity from active tree and test temp prefixes.
+- Enforced Node.js 22 and automated version-consistency checks.
+
 ## v2.4.0-rc.3
 
 - Added the **AM local OCR verification fallback** for read-only live-memory research.

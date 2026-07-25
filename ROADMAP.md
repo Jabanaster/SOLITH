@@ -1,11 +1,12 @@
 ﻿# Solith / Solith Roadmap
 
-## Current Baseline (Solith 2.4.0-rc.3+)
+## Current Baseline (Solith 2.4.0-alpha.2)
 
 Product UI: **Solith** · package `solith@2.4.0-alpha.2`
 
-* Remote **`origin/master`** — current post-`v2.4.0-rc.3` offline-polish tip. Includes the audit-clean hub backend, D1 health validation, automatic multi-type/multi-mode live-memory scan matrix, inert AOB repair candidate analysis tooling, the AL read-only correlation watcher, and the AM local OCR verification fallback.
-* Release-candidate tag **`v2.4.0-rc.3`** — local OCR verification fallback baseline. OCR is local-only, explicitly window-selected, ROI-scoped, and feeds the read-only correlation watcher as tie-break evidence only.
+* Authoritative version is **`2.4.0-alpha.2`** from `package.json` — not a release candidate. Historical tags such as `v2.4.0-rc.3` remain in git history only and must not be treated as the live product line.
+* Remote **`origin/master`** — current offline-polish tip on the alpha.2 line. Includes the audit-clean hub backend, D1 health validation, automatic multi-type/multi-mode live-memory scan matrix, inert AOB repair candidate analysis tooling, the AL read-only correlation watcher, and the AM local OCR verification fallback.
+* Historical tag **`v2.4.0-rc.3`** — OCR verification fallback baseline (superseded as a version claim by alpha.2 SoT). OCR is local-only, explicitly window-selected, ROI-scoped, and feeds the read-only correlation watcher as tie-break evidence only.
 * Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
 * In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
 * Shell polish tag: `v2.1-shell-polish` → `0928d29`

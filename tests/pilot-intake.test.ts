@@ -34,7 +34,7 @@ const FIXTURE_TXT   = 'hp=100 gold=150 level=5';
 const FIXTURE_BIN   = '\x00\x01\x02\x03\xFF\xFE\xFD';
 
 function makeWorkspace(label: string) {
-  const dir = path.join(os.tmpdir(), `rf-intake-test-${label}-${Date.now()}`);
+  const dir = path.join(os.tmpdir(), `solith-intake-test-${label}-${Date.now()}`);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

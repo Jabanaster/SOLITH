@@ -67,7 +67,7 @@
 | Field | Value |
 |-------|-------|
 | `run_id` | `run1-1782248282796` |
-| `user_data_dir` | `%TEMP%\rf-e2e-run1-1782248282796\userData` |
+| `user_data_dir` | `%TEMP%\solith-e2e-run1-1782248282796\userData` |
 | `duration_ms` | `6252` |
 | `exit_code` | `0` |
 | `cleanup_success` | `true` |
@@ -98,7 +98,7 @@
 | Field | Value |
 |-------|-------|
 | `run_id` | `run2-1782248289150` |
-| `user_data_dir` | `%TEMP%\rf-e2e-run2-1782248289150\userData` |
+| `user_data_dir` | `%TEMP%\solith-e2e-run2-1782248289150\userData` |
 | `duration_ms` | `529` |
 | `exit_code` | `0` |
 | `cleanup_success` | `true` |
@@ -153,11 +153,11 @@
 | Field | Value |
 |-------|-------|
 | `exe_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\Solith.exe` |
-| `isolated_user_data` | `%TEMP%\rf-pkg-smoke-1782248335178-falujl4blbd\userData` |
+| `isolated_user_data` | `%TEMP%\solith-pkg-smoke-1782248335178-falujl4blbd\userData` |
 | `app_get_app_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar` |
 | `resources_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources` |
 | `preload_path` | `G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar\dist-electron\preload.cjs` |
-| `db_path` | `C:\Users\chase\AppData\Local\Temp\rf-pkg-smoke-1782248335178-falujl4blbd\solith.db` |
+| `db_path` | `C:\Users\chase\AppData\Local\Temp\solith-pkg-smoke-1782248335178-falujl4blbd\solith.db` |
 
 The preload resolves inside `app.asar` (ASAR-packaged). The database resides in the isolated temp `userData` — not in the ASAR or the installation directory.
 

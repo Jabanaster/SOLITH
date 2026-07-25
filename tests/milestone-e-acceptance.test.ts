@@ -38,7 +38,7 @@ const ROOT     = findRepoRoot(import.meta.url);
 const EXE_PATH = resolvePackagedExecutable(ROOT);
 
 // Per-run isolation
-const RUN_ID    = `rf-me-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const RUN_ID    = `solith-me-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const USER_DATA = path.join(os.tmpdir(), RUN_ID, 'userData');
 const APP_DATA  = path.join(os.tmpdir(), RUN_ID, 'appdata');
 const GAME_DIR  = path.join(os.tmpdir(), RUN_ID, 'game');

@@ -220,7 +220,7 @@ describe('drill-core-settings — byte/value preservation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('drill-core-settings — production apply/restore engine', () => {
-  const gameDir = path.join(os.tmpdir(), `rf-drillcore-engine-${Date.now()}`);
+  const gameDir = path.join(os.tmpdir(), `solith-drillcore-engine-${Date.now()}`);
   const target = path.join(gameDir, 'settings.json');
   let gameId = '';
 

@@ -2173,7 +2173,7 @@ This milestone must be complete before production file editing.
 ## Milestone 11 â€” Packaging infrastructure
 
 - userData paths
-- better-sqlite3 or SQLite packaging verification
+- sql.js (WASM) packaging verification
 - Electron Builder
 - Windows installer
 - Portable build where practical

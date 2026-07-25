@@ -2,7 +2,7 @@
 
 Solith is a local-first, single-player trainer-style desktop application. It helps you manage local game installations, scan for saves and configurations, compare save states, and safely apply file-backed resource modifications.
 
-Current development baseline: `solith@2.4.0-alpha.2`. The latest verified local gate for this baseline is `npx tsc --noEmit` passing with zero errors and `npm test` passing `850/850` tests.
+Current development baseline: `solith@2.4.0-alpha.2`. Authoritative version is `package.json` (enforced by `tests/version-consistency.test.ts`). Do not treat historical `v2.4.0-rc.*` tags as the live product version.
 
 "**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
 
@@ -61,11 +61,13 @@ Solith does not support online/multiplayer targeting, anti-cheat bypass, stealth
 ## Prerequisites
 
 - Windows 10/11
-- Node.js compatible with the project toolchain; CI uses Node 22
-- npm
+- **Node.js 22.x** (pinned in `.nvmrc`; `package.json` engines `>=22 <23`; `engine-strict=true`)
+- npm 10+ (bundled with Node 22)
 - Visual Studio Build Tools with "Desktop development with C++" for native modules
 - Python available to node-gyp
 - Playwright browsers for E2E/smoke tests when running Playwright suites
+
+Unsupported Node majors (including Node 24) fail at `npm install` / `npm ci` and at `pretest` / `prebuild` via `scripts/check-node.mjs`.
 
 ## Clean setup
 

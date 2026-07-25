@@ -119,3 +119,7 @@ electron/test-compat.db
 # Kept in repo for documentation purposes but excluded from meaningful diffs
 # fix-esm-imports.mjs
 # fix-esm-imports.ps1
+
+# Local research session dumps (machine-specific)
+artifacts/
+

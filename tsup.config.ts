@@ -17,7 +17,6 @@ export default defineConfig([
     // Only keep electron + node built-ins + heavy native deps as external
     external: [
       'electron',
-      'better-sqlite3',
     ],
     noExternal: [
       /^\.\.?\//,  // Bundle all relative imports
@@ -59,7 +58,6 @@ const __dirname = _pathDirname(__filename);
     bundle: true,
     external: [
       'electron',
-      'better-sqlite3',
     ],
     banner: {
       js: `
@@ -87,7 +85,6 @@ const __dirname = _pathDirname(__filename);
     bundle: true,
     external: [
       'electron',
-      'better-sqlite3',
     ],
     banner: {
       js: `

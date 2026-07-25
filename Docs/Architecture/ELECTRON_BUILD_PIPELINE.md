@@ -24,7 +24,8 @@ Electron `BrowserWindow` preload path must resolve to **`preload.cjs`**, not `pr
 
 ### Externals
 - `electron` — provided by the Electron runtime
-- `better-sqlite3` — native addon, cannot be bundled
+
+Shipped persistence uses **sql.js** (WASM), which is bundled/unpacked as configured in `package.json` `asarUnpack`. There is no `better-sqlite3` dependency.
 
 ### Banner
 A shim is prepended to `main.js` to provide `__dirname`, `__filename`, and `require` for any legacy code in dependencies that expects CommonJS globals:

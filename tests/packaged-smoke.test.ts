@@ -24,8 +24,8 @@ const EXE_PATH   = resolvePackagedExecutable(ROOT);
 
 // Isolated userData per run — never touches production data
 const RUN_ID     = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const USER_DATA  = path.join(os.tmpdir(), `rf-pkg-smoke-${RUN_ID}`);
-const APP_DATA   = path.join(os.tmpdir(), `rf-pkg-appdata-${RUN_ID}`);
+const USER_DATA  = path.join(os.tmpdir(), `solith-pkg-smoke-${RUN_ID}`);
+const APP_DATA   = path.join(os.tmpdir(), `solith-pkg-appdata-${RUN_ID}`);
 
 // Fixture for parseSave verification
 const FIXTURE    = path.join(ROOT, 'tests', 'fixtures', 'discovery-test', 'game', 'player_save.json');
@@ -101,7 +101,7 @@ test.afterAll(async () => {
   // Report for the reconciliation document
   console.log('\n══════════ GATE 18 PACKAGED RUNTIME REPORT ══════════');
   console.log(`exe_path            = ${EXE_PATH}`);
-  console.log(`isolated_user_data  = %TEMP%\\rf-pkg-smoke-${RUN_ID}\\userData`);
+  console.log(`isolated_user_data  = %TEMP%\\solith-pkg-smoke-${RUN_ID}\\userData`);
   console.log(`app_get_app_path    = ${appGetAppPath}`);
   console.log(`resources_path      = ${resourcesPath}`);
   console.log(`preload_path        = ${preloadPath}`);

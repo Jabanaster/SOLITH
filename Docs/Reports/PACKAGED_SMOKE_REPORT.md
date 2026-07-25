@@ -12,8 +12,8 @@
 To confirm that the production compiler, file structure, ASAR configuration, and child processes work correctly inside a packaged environment, automated smoke tests were executed.
 
 ### Packaging Configuration
-- **Native Rebuilds**: `@electron/rebuild` completed native module compilation (`better-sqlite3`) for Windows x64.
-- **ASAR Exclusions**: `better-sqlite3` and `sql.js` native binaries are unpacked into resources to allow normal execution.
+- **Native Rebuilds**: `@electron/rebuild` / `electron-builder install-app-deps` rebuild native modules required by the Electron runtime (currently `memoryjs`; database is sql.js WASM).
+- **ASAR Exclusions**: `sql.js` WASM assets and TrainerHost / scanner entrypoints are unpacked into resources to allow normal execution.
 - **Child Process Entrypoint**: `dist-electron/host-entry.js` is included in the package scope.
 
 ---
@@ -52,7 +52,7 @@ npm run test:electron-e2e
 ```
 
 ### Workflow Steps Verified
-1. **Isolated Boot**: Launches app inside isolated `%TEMP%\rf-e2e` space.
+1. **Isolated Boot**: Launches app inside isolated `%TEMP%\solith-e2e` space.
 2. **Add Game**: Exposes path to demo game folder (`demo-game/`).
 3. **Scan**: Scan process runs, parses resources, writes entries to SQLite.
 4. **Compare**: Runs compare on `save1.json` and `save2.json`, identifying a gold candidate value.

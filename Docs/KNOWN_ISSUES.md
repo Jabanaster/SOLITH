@@ -218,4 +218,4 @@ repacking, apply, and restore are prohibited.
 
 ## Transitional Technical Debt
 - **tsup configuration for CJS preload**: While the main process compiles as native ES module (`main.js`), the Electron preload script compiles to CommonJS (`preload.cjs`) to align with Electron context isolation guidelines. All preload references inside `main.ts` map to `preload.cjs` accordingly.
-- **Better-SQLite3 packaging**: Because of binary linkage, `better-sqlite3` and `sql.js` are configured under `asarUnpack` in the `build` parameters in `package.json`.
+- **sql.js packaging**: The shipped database is `sql.js` (WASM). It is listed under `asarUnpack` in `package.json` so the WASM/binary assets remain loadable outside the ASAR.
