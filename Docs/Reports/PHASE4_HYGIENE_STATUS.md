@@ -1,26 +1,32 @@
-# Phase 4 hygiene status — post a435db0 recert
+# Phase 4 hygiene status
 
 **Date:** 2026-07-25  
-**Decision:** **RELEASE DENIED**  
-**Independent re-audit:** still open (not claimed closed by this document)
+**Phase 4 packaging/hygiene:** **CLOSED** at certified commit `6a8967f`  
+**Release:** **DENIED**  
+**Independent hostile re-audit:** **OPEN** (next gate)
 
 ## Status table
 
-| Item | Status | Evidence |
-|------|--------|----------|
-| Node 22 alignment | Closed (provisional → reinforced) | Portable 22.23.1; engines; `.nvmrc`; CI `node-version-file`; Node 24 rejected |
-| Dead `better-sqlite3` | Closed | Removed; sql.js SoT |
-| Dependency vulnerability triage | Closed | 0 `npm audit`; report `DEPENDENCY_AUDIT_PHASE4.md` |
-| Override regression coverage | Closed | `tests/dependency-security-overrides.test.ts` pins overrides + asserts audit 0 |
-| Full tests under Node 22 | Closed | 905/905 at source and clean-clone rerun |
-| Wisp finish/revert | **Closed (finish)** | Coherent foundation only; tests green; no feature expansion |
-| ResourceForge purge | **Closed** | Active-tree search clean at `a435db0` |
-| Single version SoT | **Closed** | `2.4.0-alpha.2` + consistency test |
-| Clean committed checkpoint | Closed when follow-up commit lands clean | — |
-| Full clean-clone certification | **Closed for `a435db0`** | `PHASE4_CLEAN_CLONE_CERTIFICATION_a435db0.md` |
-| Package/install/restart/uninstall proof | **Closed for `a435db0`** | Same report |
-| Independent re-audit | **Open** | Required before release |
+| Gate | Status |
+|------|--------|
+| Phase 1 — Data integrity | Provisionally closed |
+| Phase 2 — Security repairs | Provisionally closed |
+| Phase 3 — Destructive boundary | Provisionally closed |
+| Phase 4 — Hygiene | **Closed** |
+| Phase 4 — Node/dependencies | **Closed** |
+| Phase 4 — Clean-clone at `a435db0` | Closed (superseded for HEAD gate) |
+| Phase 4 — Current HEAD certification (`6a8967f`) | **Closed** — see `PHASE4_CLEAN_CLONE_CERTIFICATION_6a8967f.md` |
+| Independent hostile re-audit | **Open** |
+| Release | **DENIED** |
 
-## Caveat retained
+## `6a8967f` certification highlights
 
-npm `overrides` for `postcss` / `brace-expansion` remain a containment mechanism. Install + build + the new override/audit tests must stay green; a future parent bump can break compatibility even while advisories stay resolved.
+- Empty-tree clone, Node 22.23.1, `npm ci` 0, `tsc` 0
+- Authoritative `npm test` after electron build: **907/907**
+- Build verifier **29/29**, packaged smoke **22/22**
+- Install → launch → restart → uninstall clean; audit **0**
+- Installer SHA-256 `987546E450BD3D9FD07C1A58FFB7AC4A9399FB3D36E119E51EB5F69DA93F9F10`
+
+## Follow-up hygiene (post-cert)
+
+`scripts/ensure-electron-host-entry.mjs` wired into `pretest` so virgin clones build `host-entry.js` before TrainerHost E2E. That change is documentation/tooling for reproducibility; it does not alter packaged application behavior. Any commit after `6a8967f` must either be recertified or proven docs/tooling-only under the option-2 minimum bar.
