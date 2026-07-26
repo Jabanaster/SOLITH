@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Smallest-viable Xbox Game Bar Widget project (proof of concept).
+
+    Game Bar widgets are UWP XAML applications that reference the Xbox Game Bar
+    SDK NuGet package (Microsoft.Xbox.GameBarWidget or the successor package
+    referenced in the Game Bar SDK docs) and declare a
+    "microsoft.gameBarUIExtension" AppExtension in Package.appxmanifest.
+
+    This project targets net8.0-windows10.0.19041.0 using the modern
+    Windows App SDK / UWP-hybrid csproj style. UNTESTED: this file has never
+    been opened or built by Visual Studio in this sandbox (no VS/MSBuild/
+    Windows SDK is installed here - see ARCHITECTURE.md "What was NOT verified").
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>WispGameBarWidget</RootNamespace>
+    <AssemblyName>WispGameBarWidget</AssemblyName>
+    <UseWinUI>false</UseWinUI>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
+    <Platforms>x64;ARM64</Platforms>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Real package id/version must come from NuGet.org at build time on a
+      machine with network access + Visual Studio. Name matches the current
+      Xbox Game Bar SDK package documented by Microsoft as of the Sept 2024
+      changelog entry (7.2.240903001). Verify exact id/version in the NuGet
+      gallery before building - this could not be resolved in this sandbox
+      (no network-backed NuGet restore was attempted or claimed).
+    -->
+    <PackageReference Include="Microsoft.Xbox.GameBarWidget" Version="7.2.240903001" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Page Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MainPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Compile Update="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+    </Compile>
+    <Compile Update="MainPage.xaml.cs">
+      <DependentUpon>MainPage.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\solith-wisp-base-float.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+</Project>
