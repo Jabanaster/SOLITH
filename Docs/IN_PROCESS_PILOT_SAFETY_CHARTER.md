@@ -1,7 +1,7 @@
 # In-Process Script Pilot — Safety Charter (User-Facing)
 
-**Status:** Quarantined experimental mode · **OFF by default**  
-**Pilot executable only:** `CrimsonDesert.exe`  
+**Status:** Quarantined experimental mode · **OFF by default**
+**Pilot executable only:** `CrimsonDesert.exe`
 **Setting key:** `inProcessScriptExecutionEnabled` (must be explicitly set `true`)
 
 ## What this mode is
@@ -19,13 +19,14 @@ This is **not** a general trainer injection framework.
 
 ## Hard gates (all required)
 
-1. Feature flag **OFF** until you turn it on in Settings  
-2. Solo / offline confirmation for the session (session-owned; not client-asserted alone)  
-3. Explicit per-action approval (hook install / injector launch)  
-4. Hook install rechecks the session online-guard; injector propose/confirm require an attached **`CrimsonDesert.exe`** session with matching PID, offline waiver, approval, online fail-closed observation, and matching file hash  
+1. Feature flag **OFF** until you turn it on in Settings
+2. Solo / offline confirmation for the session (session-owned; not client-asserted alone)
+3. Explicit per-action approval (hook install / injector launch) via short-lived, single-use consent tokens bound to the operation
+4. Hook install rechecks the session online-guard; injector propose/confirm require an attached **`CrimsonDesert.exe`** session with matching PID **and** live OS identity (basename, path, creation time), offline waiver, consent token, online fail-closed observation, matching file hash, and helper path under **`userData/injector-helpers`**
 5. Attached executable name must be exactly **`CrimsonDesert.exe`**
+6. Injector launch outcomes are appended to **`userData/logs/injector-audit.jsonl`** (durable audit), not only in-memory diagnostics
 
-Source of truth: `src/core/in-process-script/charter.ts` + `guards.ts`.
+Source of truth: `src/core/in-process-script/charter.ts` + `guards.ts` + `injector-launcher.ts` + `src/core/consent/write-consent.ts`.
 
 ## Ban / account / AV risk
 

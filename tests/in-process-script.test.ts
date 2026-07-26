@@ -13,6 +13,7 @@ import {
   confirmInjectorLaunch,
   proposeInjectorLaunch,
 } from '../src/core/in-process-script/injector-launcher.ts';
+import { clearWriteConsentStore, issueWriteConsent } from '../src/core/consent/write-consent.ts';
 import { buildFriendshipCapShellcode } from '../src/core/in-process-script/presets/crimson-fast-friendship.ts';
 import { buildAbsoluteJumpPatch } from '../src/core/in-process-script/code-cave.ts';
 
@@ -78,38 +79,46 @@ describe('in-process script execution milestone', () => {
     const plan = planHookFromScriptAnalysis(analysis, 'CrimsonDesert.exe');
     const hookProposal = proposeHookInstall(plan);
     assert.ok(hookProposal.proposalId);
+    const helpersRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-helpers-'));
 
     assert.throws(
       () =>
         proposeInjectorLaunch({
           exePath: 'not-a-file.bin',
+          helpersRoot,
           attachedExecutableName: 'CrimsonDesert.exe',
           attachedPid: 1001,
           gate: pilotGate,
         }),
-      /Trainer executable not found|Only \.exe/,
+      /Trainer executable not found|Only \.exe|injector-helpers/,
     );
 
     assert.throws(
       () =>
         proposeInjectorLaunch({
-          exePath: path.join(os.tmpdir(), 'x.exe'),
+          exePath: path.join(helpersRoot, 'x.exe'),
+          helpersRoot,
           attachedExecutableName: 'Palworld-Win64-Shipping.exe',
           attachedPid: 1001,
           gate: { ...pilotGate, executableName: 'Palworld-Win64-Shipping.exe' },
         }),
       /limited to|CrimsonDesert/i,
     );
+    fs.rmSync(helpersRoot, { recursive: true, force: true });
   });
 
   test('injector confirm re-checks gate, attachment, and file hash', async () => {
     clearInjectorProposals();
+    clearWriteConsentStore();
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-injector-'));
-    const exePath = path.join(tmpDir, 'research-helper.exe');
+    const helpersRoot = path.join(tmpDir, 'injector-helpers');
+    fs.mkdirSync(helpersRoot, { recursive: true });
+    const exePath = path.join(helpersRoot, 'research-helper.exe');
     try {
       fs.writeFileSync(exePath, Buffer.from('MZ-fake-helper-v1'));
       const proposal = proposeInjectorLaunch({
         exePath,
+        helpersRoot,
         attachedExecutableName: 'CrimsonDesert.exe',
         attachedPid: 1001,
         gate: pilotGate,
@@ -117,12 +126,33 @@ describe('in-process script execution milestone', () => {
       assert.equal(proposal.attachedExecutableName, 'CrimsonDesert.exe');
       assert.ok(proposal.sha256);
 
+      const consentWrong = issueWriteConsent({
+        operation: 'injector_confirm_launch',
+        sessionKey: 't',
+        proposalId: proposal.proposalId,
+        attachedPid: 1001,
+        attachedExecutableName: 'CrimsonDesert.exe',
+        exePath: proposal.exePath,
+        exeSha256: proposal.sha256,
+      });
       await assert.rejects(
         () =>
           confirmInjectorLaunch({
             proposalId: proposal.proposalId,
             attachedExecutableName: 'OtherGame.exe',
             attachedPid: 1001,
+            helpersRoot,
+            verifyLiveIdentity: () => null,
+            consentToken: consentWrong.tokenId,
+            consentBinding: {
+              operation: 'injector_confirm_launch',
+              sessionKey: 't',
+              proposalId: proposal.proposalId,
+              attachedPid: 1001,
+              attachedExecutableName: 'CrimsonDesert.exe',
+              exePath: proposal.exePath,
+              exeSha256: proposal.sha256,
+            },
             gate: { ...pilotGate, executableName: 'OtherGame.exe' },
             remoteConnections: {
               availability: 'available',
@@ -134,12 +164,33 @@ describe('in-process script execution milestone', () => {
       );
 
       fs.writeFileSync(exePath, Buffer.from('MZ-fake-helper-TAMPERED'));
+      const consentHash = issueWriteConsent({
+        operation: 'injector_confirm_launch',
+        sessionKey: 't',
+        proposalId: proposal.proposalId,
+        attachedPid: 1001,
+        attachedExecutableName: 'CrimsonDesert.exe',
+        exePath: proposal.exePath,
+        exeSha256: proposal.sha256,
+      });
       await assert.rejects(
         () =>
           confirmInjectorLaunch({
             proposalId: proposal.proposalId,
             attachedExecutableName: 'CrimsonDesert.exe',
             attachedPid: 1001,
+            helpersRoot,
+            verifyLiveIdentity: () => null,
+            consentToken: consentHash.tokenId,
+            consentBinding: {
+              operation: 'injector_confirm_launch',
+              sessionKey: 't',
+              proposalId: proposal.proposalId,
+              attachedPid: 1001,
+              attachedExecutableName: 'CrimsonDesert.exe',
+              exePath: proposal.exePath,
+              exeSha256: proposal.sha256,
+            },
             gate: pilotGate,
             remoteConnections: {
               availability: 'available',
@@ -151,6 +202,7 @@ describe('in-process script execution milestone', () => {
       );
     } finally {
       clearInjectorProposals();
+      clearWriteConsentStore();
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });

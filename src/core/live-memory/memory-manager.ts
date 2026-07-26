@@ -16,6 +16,10 @@ import {
   defaultTrainerWritePolicyContext,
   type WritePolicyContext,
 } from './write-policy.js';
+import {
+  consumeWriteConsent,
+  type WriteConsentBinding,
+} from '../consent/write-consent.js';
 
 export interface SafeWriteResult {
   success: boolean;
@@ -40,8 +44,21 @@ export type MemoryManagerSnapshotListener = (info: {
 export interface WriteCallOptions {
   featureId?: string;
   reason?: string;
-  /** Required when no explicit writePolicyContext was set. Defaults false (fail-closed). */
+  /**
+   * Legacy direct approval for library/tests. IPC must use `consentToken` instead.
+   * Ignored when `consentToken` is present (token is the approval evidence).
+   */
   userApproved?: boolean;
+  /**
+   * Single-use operation-bound consent artifact token (required for IPC confirms).
+   */
+  consentToken?: string;
+  /** Binding used to consume `consentToken` (must match issuance). */
+  consentBinding?: WriteConsentBinding;
+  /**
+   * Propose/staging path — waiver only. Confirm/commit still needs approval or consent.
+   */
+  writeIntent?: 'stage' | 'commit';
   verifyReadback?: boolean;
 }
 
@@ -61,7 +78,10 @@ export class MemoryManager {
     this.writePolicyContext = context;
   }
 
-  getWritePolicyContext(userApprovedForCall = false): WritePolicyContext {
+  getWritePolicyContext(
+    userApprovedForCall = false,
+    writeIntent: 'stage' | 'commit' = 'commit',
+  ): WritePolicyContext {
     if (this.writePolicyContext) {
       if (this.writePolicyContext.writeClass === 'trainer') {
         return {
@@ -69,13 +89,15 @@ export class MemoryManager {
           singlePlayerWaiverAccepted: this.session.isOfflineConfirmed(),
           userApproved:
             this.writePolicyContext.userApproved === true || userApprovedForCall === true,
+          writeIntent,
         };
       }
-      return this.writePolicyContext;
+      return { ...this.writePolicyContext, writeIntent };
     }
     return defaultTrainerWritePolicyContext({
       singlePlayerWaiverAccepted: this.session.isOfflineConfirmed(),
       userApproved: userApprovedForCall === true,
+      writeIntent,
     });
   }
 
@@ -87,8 +109,11 @@ export class MemoryManager {
   private enforceWritePolicy(
     reason: string,
     userApprovedForCall: boolean,
+    writeIntent: 'stage' | 'commit' = 'commit',
   ): { ok: true } | { ok: false; error: string; code: string } {
-    const decision = this.writeGate.evaluate(this.getWritePolicyContext(userApprovedForCall));
+    const decision = this.writeGate.evaluate(
+      this.getWritePolicyContext(userApprovedForCall, writeIntent),
+    );
     if (decision.allow) return { ok: true };
     this.audit.append({
       op: 'abort',
@@ -110,7 +135,11 @@ export class MemoryManager {
     this.snapshotListener = listener;
   }
 
-  private emitSnapshot(info: { featureId?: string; reason?: string }): { ok: true } | { ok: false; error: string } {
+  private emitSnapshot(info: {
+    featureId?: string;
+    reason?: string;
+    userApproved?: boolean;
+  }): { ok: true } | { ok: false; error: string } {
     if (!this.snapshotListener) return { ok: true };
     try {
       this.snapshotListener(info);
@@ -121,7 +150,7 @@ export class MemoryManager {
         op: 'abort',
         featureId: info.featureId,
         reason: `snapshot_listener_failed:${info.reason ?? 'snapshot'}:${error}`,
-        waiverAssumed: this.waiverAssumedForAudit(true),
+        waiverAssumed: this.waiverAssumedForAudit(info.userApproved === true),
       });
       return { ok: false, error };
     }
@@ -144,8 +173,9 @@ export class MemoryManager {
     requestedValue: number,
     options: WriteCallOptions = {},
   ): LiveWriteProposal {
+    const intent = options.writeIntent ?? 'stage';
     const userApproved = options.userApproved === true;
-    const gate = this.enforceWritePolicy(options.reason ?? 'propose', userApproved);
+    const gate = this.enforceWritePolicy(options.reason ?? 'propose', userApproved, intent);
     if (!gate.ok) {
       throw new Error(gate.error);
     }
@@ -167,8 +197,24 @@ export class MemoryManager {
     proposalId: string,
     options: WriteCallOptions = {},
   ): Promise<ConfirmWriteManagerResult> {
-    const userApproved = options.userApproved === true;
-    const gate = this.enforceWritePolicy(options.reason ?? 'confirm', userApproved);
+    let userApproved = options.userApproved === true;
+    if (options.consentToken) {
+      if (!options.consentBinding) {
+        return { success: false, error: 'consent_binding_required' };
+      }
+      const consumed = consumeWriteConsent(options.consentToken, options.consentBinding);
+      if (!consumed.ok) {
+        this.audit.append({
+          op: 'abort',
+          featureId: options.featureId,
+          reason: `consent_denied:${consumed.reason}`,
+          waiverAssumed: this.waiverAssumedForAudit(false),
+        });
+        return { success: false, error: `consent_denied:${consumed.reason}` };
+      }
+      userApproved = true;
+    }
+    const gate = this.enforceWritePolicy(options.reason ?? 'confirm', userApproved, 'commit');
     if (!gate.ok) {
       return { success: false, error: gate.error };
     }
@@ -194,7 +240,11 @@ export class MemoryManager {
       reason: `${options.reason ?? 'confirm'}:confirmed`,
       waiverAssumed: this.waiverAssumedForAudit(userApproved),
     });
-    const snap = this.emitSnapshot({ featureId: options.featureId, reason: options.reason ?? 'confirm' });
+    const snap = this.emitSnapshot({
+      featureId: options.featureId,
+      reason: options.reason ?? 'confirm',
+      userApproved,
+    });
     if (!snap.ok) {
       return { ...confirm, snapshotError: snap.error };
     }
@@ -210,66 +260,48 @@ export class MemoryManager {
     options: WriteCallOptions = {},
   ): Promise<SafeWriteResult> {
     const reason = options.reason ?? 'safe_write';
-    const userApproved = options.userApproved === true;
-    const gate = this.enforceWritePolicy(reason, userApproved);
-    if (!gate.ok) {
-      return { success: false, error: gate.error, policyCode: gate.code };
-    }
+    const policyCodeFromError = (error: string | undefined): string | undefined => {
+      if (!error) return undefined;
+      const marker = 'write_policy_denied:';
+      const idx = error.indexOf(marker);
+      if (idx < 0) return undefined;
+      return error.slice(idx + marker.length).split(/[:\s]/)[0] || undefined;
+    };
+
     let proposal: LiveWriteProposal;
     try {
-      proposal = this.session.proposeWrite(address, requestedValue);
+      proposal = this.proposeWrite(address, requestedValue, {
+        ...options,
+        writeIntent: 'stage',
+        userApproved: false,
+        reason,
+      });
     } catch (err) {
-      const error = String(err);
-      this.audit.append({
-        op: 'abort',
-        featureId: options.featureId,
-        address: `0x${address.address.toString(16)}`,
-        valueType: address.dataType,
-        reason: `propose_failed:${error}`,
-        waiverAssumed: this.waiverAssumedForAudit(userApproved),
-      });
-      return { success: false, error };
+      const error = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        error,
+        policyCode: policyCodeFromError(error),
+      };
     }
 
-    this.audit.append({
-      op: 'write',
-      featureId: options.featureId,
-      address: `0x${address.address.toString(16)}`,
-      valueType: address.dataType,
-      valueBefore: proposal.currentValue,
-      valueAfter: proposal.requestedValue,
-      reason: `${reason}:proposed`,
-      waiverAssumed: this.waiverAssumedForAudit(userApproved),
+    const confirm = await this.confirmWrite(proposal.proposalId, {
+      ...options,
+      writeIntent: 'commit',
+      reason,
     });
-
-    const confirm = await this.session.confirmWrite(proposal.proposalId);
     if (!confirm.success) {
-      this.audit.append({
-        op: 'abort',
-        featureId: options.featureId,
-        address: `0x${address.address.toString(16)}`,
-        valueType: address.dataType,
-        valueBefore: proposal.currentValue,
-        valueAfter: proposal.requestedValue,
-        reason: confirm.error ?? 'confirm_failed',
-        waiverAssumed: this.waiverAssumedForAudit(userApproved),
-      });
-      return { success: false, proposal, confirm, error: confirm.error };
+      return {
+        success: false,
+        proposal,
+        confirm,
+        error: confirm.error,
+        policyCode: policyCodeFromError(confirm.error),
+        snapshotError: confirm.snapshotError,
+      };
     }
 
-    this.audit.append({
-      op: 'write',
-      featureId: options.featureId,
-      address: `0x${address.address.toString(16)}`,
-      valueType: address.dataType,
-      valueBefore: confirm.manifest?.valueBefore,
-      valueAfter: confirm.manifest?.valueAfter,
-      reason: `${reason}:confirmed`,
-      waiverAssumed: this.waiverAssumedForAudit(userApproved),
-    });
-    const snap = this.emitSnapshot({ featureId: options.featureId, reason });
-    const snapshotError = snap.ok ? undefined : snap.error;
-
+    const snapshotError = confirm.snapshotError;
     if (options.verifyReadback === false) {
       return { success: true, proposal, confirm, verified: undefined, snapshotError };
     }
@@ -289,6 +321,8 @@ export class MemoryManager {
     }
 
     const verified = readbackValue === requestedValue;
+    const userApproved =
+      options.userApproved === true || Boolean(options.consentToken);
     this.audit.append({
       op: 'read',
       featureId: options.featureId,
@@ -296,9 +330,18 @@ export class MemoryManager {
       valueType: address.dataType,
       valueAfter: readbackValue,
       reason: verified ? `${reason}:readback_ok` : `${reason}:readback_mismatch`,
+      waiverAssumed: this.waiverAssumedForAudit(userApproved),
     });
 
-    return { success: true, proposal, confirm, verified, readbackValue, snapshotError };
+    return {
+      success: true,
+      proposal,
+      confirm,
+      verified,
+      readbackValue,
+      snapshotError,
+      error: verified ? undefined : 'readback_mismatch',
+    };
   }
 
   async rollback(manifest: LiveWriteManifest, featureId?: string): Promise<RollbackResult> {

@@ -68,7 +68,12 @@ interface Window {
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
     liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) => Promise<any>;
-    liveMemoryConfirmWrite: (payload: { proposalId: string }) => Promise<any>;
+    liveMemoryIssueWriteConsent: (payload: { proposalId: string; userConfirmed: true }) => Promise<{
+      success: boolean;
+      consent?: { tokenId: string; expiresAt: string; bindingHash: string };
+      error?: string;
+    }>;
+    liveMemoryConfirmWrite: (payload: { proposalId: string; consentToken: string }) => Promise<any>;
     liveMemoryRollback: (payload: { manifest: unknown }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryScanFirst: (payload: {
       dataType: string;
@@ -624,7 +629,16 @@ interface Window {
       proposal?: import('../core/in-process-script/types.js').InjectorLaunchProposal;
       error?: string;
     }>;
-    inProcessConfirmInjectorLaunch: (payload: { proposalId: string; userApprovedAction: true }) => Promise<{
+    inProcessIssueInjectorConsent: (payload: { proposalId: string; userConfirmed: true }) => Promise<{
+      success: boolean;
+      consent?: { tokenId: string; expiresAt: string; bindingHash: string };
+      error?: string;
+    }>;
+    inProcessConfirmInjectorLaunch: (payload: {
+      proposalId: string;
+      userApprovedAction: true;
+      consentToken: string;
+    }) => Promise<{
       success: boolean;
       pid?: number;
       error?: string;

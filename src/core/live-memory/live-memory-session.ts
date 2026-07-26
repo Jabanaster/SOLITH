@@ -215,18 +215,48 @@ export class LiveMemorySession {
     return { driver: this.driver, handle: this.handle };
   }
 
-  private verifyAttachedProcessIdentity(): string | null {
+  /**
+   * Re-read the live attached process and confirm identity still matches.
+   * Used on destructive confirm paths to mitigate PID reuse.
+   */
+  verifyAttachedProcessIdentity(): string | null {
     if (!this.handle || !this.target) {
       return 'No process attached.';
     }
 
+    if (this.handle.pid !== this.target.pid) {
+      return `Attached handle PID ${this.handle.pid} does not match session target PID ${this.target.pid}.`;
+    }
+
     const actualExecutableName = this.driver.getProcessExecutableName(this.handle);
     if (!actualExecutableName) {
-      return `Unable to verify executable name for PID ${this.handle.pid}.`;
+      return `Unable to verify executable name for PID ${this.handle.pid} (process may have exited).`;
     }
 
     if (actualExecutableName.toLowerCase() !== this.target.executableName.toLowerCase()) {
       return `Attached process identity mismatch: expected ${this.target.executableName}, found ${actualExecutableName}.`;
+    }
+
+    const expectedPath = this.target.executablePath?.trim();
+    if (expectedPath) {
+      const actualPath = this.driver.getProcessExecutablePath(this.handle);
+      if (!actualPath) {
+        return `Unable to verify executable path for PID ${this.handle.pid} (process may have exited).`;
+      }
+      if (actualPath.toLowerCase() !== expectedPath.toLowerCase()) {
+        return `Attached process path mismatch: expected ${expectedPath}, found ${actualPath}.`;
+      }
+    }
+
+    const expectedStart = this.target.startTime?.trim();
+    if (expectedStart) {
+      const actualStart = this.driver.getProcessStartTime(this.handle);
+      if (!actualStart) {
+        return `Unable to verify process creation time for PID ${this.handle.pid} (process may have exited).`;
+      }
+      if (Date.parse(actualStart) !== Date.parse(expectedStart)) {
+        return `Attached process creation time mismatch (possible PID reuse).`;
+      }
     }
 
     return null;
@@ -303,7 +333,20 @@ export class LiveMemorySession {
       return { success: false, guard, error: `Protected target check failed closed: ${String(err)}` };
     }
 
-    this.target = target;
+    const livePath =
+      target.executablePath?.trim() ||
+      this.driver.getProcessExecutablePath(openedHandle) ||
+      undefined;
+    const liveStart =
+      target.startTime?.trim() ||
+      this.driver.getProcessStartTime(openedHandle) ||
+      undefined;
+
+    this.target = {
+      ...target,
+      executablePath: livePath,
+      startTime: liveStart,
+    };
     this.userConfirmedOffline = userConfirmedOffline;
     this.acceptedConnectionBaseline = acceptedConnectionBaseline;
     this.lastFingerprint = fingerprintResult ?? null;
@@ -513,6 +556,11 @@ export class LiveMemorySession {
     };
     this.pendingProposals.set(proposal.proposalId, proposal);
     return proposal;
+  }
+
+  /** Look up a staged write proposal (for consent binding). */
+  getPendingWriteProposal(proposalId: string): LiveWriteProposal | undefined {
+    return this.pendingProposals.get(proposalId);
   }
 
   /** Re-checks write consent (waiver), then executes a previously staged proposal. */

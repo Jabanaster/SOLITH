@@ -81,6 +81,8 @@ export class FakeMemoryDriver implements MemoryDriver {
   private unreadableRegions: { baseAddress: bigint; size: number; writable: boolean }[] = [];
   private modules: MemoryModule[] = [];
   private processNames = new Map<number, string>();
+  private processPaths = new Map<number, string>();
+  private processStartTimes = new Map<number, string>();
   private opened = false;
   public closeCallCount = 0;
 
@@ -122,12 +124,28 @@ export class FakeMemoryDriver implements MemoryDriver {
     this.processNames.set(pid, name);
   }
 
+  setProcessExecutablePath(pid: number, exePath: string): void {
+    this.processPaths.set(pid, exePath);
+  }
+
+  setProcessStartTime(pid: number, startTimeIso: string): void {
+    this.processStartTimes.set(pid, startTimeIso);
+  }
+
   getModules(_handle: LiveProcessHandle): MemoryModule[] {
     return [...this.modules];
   }
 
   getProcessExecutableName(handle: LiveProcessHandle): string | null {
     return this.processNames.get(handle.pid) ?? null;
+  }
+
+  getProcessExecutablePath(handle: LiveProcessHandle): string | null {
+    return this.processPaths.get(handle.pid) ?? null;
+  }
+
+  getProcessStartTime(handle: LiveProcessHandle): string | null {
+    return this.processStartTimes.get(handle.pid) ?? null;
   }
 
   readPointer(_handle: LiveProcessHandle, address: bigint): bigint {

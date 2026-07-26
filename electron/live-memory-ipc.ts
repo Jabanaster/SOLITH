@@ -1,4 +1,5 @@
 import { app, ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import {
   LiveMemoryListProcessesSchema,
@@ -7,6 +8,7 @@ import {
   LiveMemoryDetachSchema,
   LiveMemoryReadSchema,
   LiveMemoryProposeWriteSchema,
+  LiveMemoryIssueWriteConsentSchema,
   LiveMemoryConfirmWriteSchema,
   LiveMemoryRollbackSchema,
   LiveMemoryScanFirstSchema,
@@ -35,6 +37,7 @@ import {
   InProcessProposeHookSchema,
   InProcessConfirmHookSchema,
   InProcessProposeInjectorSchema,
+  InProcessIssueInjectorConsentSchema,
   InProcessConfirmInjectorSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
@@ -317,16 +320,50 @@ export function registerLiveMemoryIpc(): void {
     try {
       const bundle = requireBundle(event);
       const parsed = LiveMemoryProposeWriteSchema.parse(payload);
+      // Staging only — destructive confirm requires a consumed consent artifact.
       const proposal = bundle.manager.proposeWrite(
         { address: BigInt(parsed.address), dataType: parsed.dataType },
         parsed.requestedValue,
-        { userApproved: true, reason: 'ipc_propose' },
+        { writeIntent: 'stage', userApproved: false, reason: 'ipc_propose' },
       );
       refreshCrashContext(bundle);
-      // Serialize bigint address to a string for the structured-clone IPC boundary.
       return { success: true, proposal: { ...proposal, target: { ...proposal.target, address: proposal.target.address.toString() } } };
     } catch (error) {
       return { success: false, error: sanitize(error, 'propose_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-issue-write-consent', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = LiveMemoryIssueWriteConsentSchema.parse(payload);
+      const identityError = bundle.session.verifyAttachedProcessIdentity();
+      if (identityError) {
+        return { success: false, error: identityError };
+      }
+      const liveProposal = bundle.session.getPendingWriteProposal(parsed.proposalId);
+      if (!liveProposal) {
+        return { success: false, error: 'Unknown write proposal.' };
+      }
+      const attachedPid = bundle.session.getAttachedPid();
+      const attachedExecutableName = bundle.session.getAttachedExecutableName() ?? '';
+      if (attachedPid == null || !attachedExecutableName) {
+        return { success: false, error: 'not_attached' };
+      }
+      const { issueWriteConsent } = await import('../src/core/consent/write-consent.js');
+      const consent = issueWriteConsent({
+        operation: 'live_memory_confirm_write',
+        sessionKey: String(event.sender.id),
+        proposalId: liveProposal.proposalId,
+        attachedPid,
+        attachedExecutableName,
+        address: liveProposal.target.address.toString(),
+        dataType: liveProposal.target.dataType,
+        requestedValue: liveProposal.requestedValue,
+      });
+      return { success: true, consent };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'issue_write_consent_failed') };
     }
   });
 
@@ -334,8 +371,32 @@ export function registerLiveMemoryIpc(): void {
     try {
       const bundle = requireBundle(event);
       const parsed = LiveMemoryConfirmWriteSchema.parse(payload);
+      const identityError = bundle.session.verifyAttachedProcessIdentity();
+      if (identityError) {
+        return { success: false, error: identityError };
+      }
+      const liveProposal = bundle.session.getPendingWriteProposal(parsed.proposalId);
+      if (!liveProposal) {
+        return { success: false, error: 'Unknown write proposal.' };
+      }
+      const attachedPid = bundle.session.getAttachedPid();
+      const attachedExecutableName = bundle.session.getAttachedExecutableName() ?? '';
+      if (attachedPid == null || !attachedExecutableName) {
+        return { success: false, error: 'not_attached' };
+      }
+      const consentBinding = {
+        operation: 'live_memory_confirm_write' as const,
+        sessionKey: String(event.sender.id),
+        proposalId: liveProposal.proposalId,
+        attachedPid,
+        attachedExecutableName,
+        address: liveProposal.target.address.toString(),
+        dataType: liveProposal.target.dataType,
+        requestedValue: liveProposal.requestedValue,
+      };
       const result = await bundle.manager.confirmWrite(parsed.proposalId, {
-        userApproved: true,
+        consentToken: parsed.consentToken,
+        consentBinding,
         reason: 'ipc_confirm',
       });
       refreshCrashContext(bundle);
@@ -948,6 +1009,10 @@ export function registerLiveMemoryIpc(): void {
       if (attachedPid == null) {
         return { success: false, error: 'Injector launch requires an attached CrimsonDesert.exe session.' };
       }
+      const identityError = session.verifyAttachedProcessIdentity();
+      if (identityError) {
+        return { success: false, error: identityError };
+      }
       const { evaluateInProcessGate } = await import('../src/core/in-process-script/guards.js');
       const gate = evaluateInProcessGate({
         featureEnabled: true,
@@ -957,11 +1022,21 @@ export function registerLiveMemoryIpc(): void {
       });
       if (!gate.allowed) return { success: false, error: gate.reason };
 
-      const { proposeInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
+      const { getAppPaths } = await import('../src/shared/app-paths.js');
+      const paths = await getAppPaths();
+      const {
+        proposeInjectorLaunch,
+        getDefaultInjectorHelpersRoot,
+        setInjectorAuditSink,
+      } = await import('../src/core/in-process-script/injector-launcher.js');
+      ensureInjectorAuditSink(paths.userDataRoot, setInjectorAuditSink);
+      const helpersRoot = getDefaultInjectorHelpersRoot(paths.userDataRoot);
+      fs.mkdirSync(helpersRoot, { recursive: true });
       const proposal = proposeInjectorLaunch({
         exePath: parsed.exePath,
         attachedExecutableName,
         attachedPid,
+        helpersRoot,
         gate: {
           featureEnabled: true,
           userConfirmedOffline: session.isOfflineConfirmed() && parsed.userConfirmedOffline === true,
@@ -975,6 +1050,37 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  ipcMain.handle('in-process-issue-injector-consent', async (event, payload: unknown) => {
+    try {
+      const session = requireSession(event);
+      const parsed = InProcessIssueInjectorConsentSchema.parse(payload);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+      const identityError = session.verifyAttachedProcessIdentity();
+      if (identityError) return { success: false, error: identityError };
+      const { getInjectorProposal } = await import('../src/core/in-process-script/injector-launcher.js');
+      const proposal = getInjectorProposal(parsed.proposalId);
+      if (!proposal) return { success: false, error: 'Unknown injector launch proposal.' };
+      const attachedPid = session.getAttachedPid();
+      const attachedExecutableName = session.getAttachedExecutableName() ?? '';
+      if (attachedPid == null || !attachedExecutableName) {
+        return { success: false, error: 'not_attached' };
+      }
+      const { issueWriteConsent } = await import('../src/core/consent/write-consent.js');
+      const consent = issueWriteConsent({
+        operation: 'injector_confirm_launch',
+        sessionKey: String(event.sender.id),
+        proposalId: proposal.proposalId,
+        attachedPid,
+        attachedExecutableName,
+        exePath: proposal.exePath,
+        exeSha256: proposal.sha256,
+      });
+      return { success: true, consent };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_issue_injector_consent_failed') };
+    }
+  });
+
   ipcMain.handle('in-process-confirm-injector-launch', async (event, payload: unknown) => {
     try {
       const session = requireSession(event);
@@ -984,11 +1090,39 @@ export function registerLiveMemoryIpc(): void {
       const attachedExecutableName = session.getAttachedExecutableName() ?? '';
       const attachedPid = session.getAttachedPid();
       const remoteConnections = await session.observeAttachedRemoteConnections();
-      const { confirmInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
+      const { getAppPaths } = await import('../src/shared/app-paths.js');
+      const paths = await getAppPaths();
+      const {
+        confirmInjectorLaunch,
+        getInjectorProposal,
+        getDefaultInjectorHelpersRoot,
+        setInjectorAuditSink,
+      } = await import('../src/core/in-process-script/injector-launcher.js');
+      ensureInjectorAuditSink(paths.userDataRoot, setInjectorAuditSink);
+      const proposal = getInjectorProposal(parsed.proposalId);
+      if (!proposal) {
+        return { success: false, error: 'Unknown injector launch proposal.' };
+      }
+      if (attachedPid == null) {
+        return { success: false, error: 'Injector launch requires an attached CrimsonDesert.exe session.' };
+      }
+      const consentBinding = {
+        operation: 'injector_confirm_launch' as const,
+        sessionKey: String(event.sender.id),
+        proposalId: proposal.proposalId,
+        attachedPid,
+        attachedExecutableName,
+        exePath: proposal.exePath,
+        exeSha256: proposal.sha256,
+      };
       const result = await confirmInjectorLaunch({
         proposalId: parsed.proposalId,
         attachedExecutableName,
         attachedPid,
+        helpersRoot: getDefaultInjectorHelpersRoot(paths.userDataRoot),
+        verifyLiveIdentity: () => session.verifyAttachedProcessIdentity(),
+        consentToken: parsed.consentToken,
+        consentBinding,
         gate: {
           featureEnabled: true,
           userConfirmedOffline: session.isOfflineConfirmed(),
@@ -1216,4 +1350,18 @@ function sanitize(error: unknown, fallback: string): string {
   // eslint-disable-next-line no-console
   console.error(`[live-memory-ipc] ${fallback}:`, error);
   return fallback;
+}
+
+let injectorAuditSinkWired = false;
+function ensureInjectorAuditSink(
+  userDataRoot: string,
+  setSink: (sink: ((entry: { at: string } & Record<string, unknown>) => void) | null) => void,
+): void {
+  if (injectorAuditSinkWired) return;
+  const logPath = path.join(userDataRoot, 'logs', 'injector-audit.jsonl');
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  setSink((entry) => {
+    fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');
+  });
+  injectorAuditSinkWired = true;
 }

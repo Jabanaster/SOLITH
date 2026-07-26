@@ -91,7 +91,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-read', payload),
   liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) =>
     ipcRenderer.invoke('live-memory-propose-write', payload),
-  liveMemoryConfirmWrite: (payload: { proposalId: string }) =>
+  liveMemoryIssueWriteConsent: (payload: { proposalId: string; userConfirmed: true }) =>
+    ipcRenderer.invoke('live-memory-issue-write-consent', payload),
+  liveMemoryConfirmWrite: (payload: { proposalId: string; consentToken: string }) =>
     ipcRenderer.invoke('live-memory-confirm-write', payload),
   liveMemoryRollback: (payload: { manifest: unknown }) =>
     ipcRenderer.invoke('live-memory-rollback', payload),
@@ -351,8 +353,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     userConfirmedOffline: true;
     userApprovedAction: true;
   }) => ipcRenderer.invoke('in-process-propose-injector-launch', payload),
-  inProcessConfirmInjectorLaunch: (payload: { proposalId: string; userApprovedAction: true }) =>
-    ipcRenderer.invoke('in-process-confirm-injector-launch', payload),
+  inProcessIssueInjectorConsent: (payload: { proposalId: string; userConfirmed: true }) =>
+    ipcRenderer.invoke('in-process-issue-injector-consent', payload),
+  inProcessConfirmInjectorLaunch: (payload: {
+    proposalId: string;
+    userApprovedAction: true;
+    consentToken: string;
+  }) => ipcRenderer.invoke('in-process-confirm-injector-launch', payload),
   onCatalogProcessDetected: (callback: (payload: {
     catalogGameId: string;
     displayName: string;

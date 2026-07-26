@@ -39,6 +39,11 @@ export interface WritePolicyContext {
   /** Hard kill switch — blocks all writes when true. */
   readOnlyMode?: boolean;
   /**
+   * `stage` = propose/staging only (waiver required; approval deferred to consent artifact).
+   * `commit` = destructive apply (waiver + explicit approval / consumed consent).
+   */
+  writeIntent?: 'stage' | 'commit';
+  /**
    * @deprecated Trust Shift — ignored for allow/deny. Prefer singlePlayerWaiverAccepted.
    * Kept so older callers compiling against isOffline still type-check during migration.
    */
@@ -71,7 +76,8 @@ export class WritePolicyGate {
         reasons: ['Single-player / private-play waiver not accepted.'],
       };
     }
-    if (!context.userApproved) {
+    const intent = context.writeIntent ?? 'commit';
+    if (intent !== 'stage' && !context.userApproved) {
       return {
         allow: false,
         code: 'NO_APPROVAL',
@@ -128,6 +134,7 @@ export function defaultTrainerWritePolicyContext(
     userApproved: false,
     researchWriteModeEnabled: false,
     readOnlyMode: false,
+    writeIntent: 'commit',
     ...overrides,
   };
   return applyLegacyOfflineOverride(base, overrides);

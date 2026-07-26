@@ -350,8 +350,19 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
           return { allowed: false, reason };
         }
 
+        const consentResult = await window.electronAPI.liveMemoryIssueWriteConsent({
+          proposalId: proposeResult.proposal.proposalId,
+          userConfirmed: true,
+        });
+        if (!consentResult.success || !consentResult.consent?.tokenId) {
+          const reason = consentResult.error ?? 'Consent failed';
+          patchState(cheat.id, { status: 'error', error: reason });
+          return { allowed: false, reason };
+        }
+
         const confirmResult = await window.electronAPI.liveMemoryConfirmWrite({
           proposalId: proposeResult.proposal.proposalId,
+          consentToken: consentResult.consent.tokenId,
         });
         if (!confirmResult.success) {
           const reason = confirmResult.guard?.reason ?? confirmResult.error ?? 'Write blocked';

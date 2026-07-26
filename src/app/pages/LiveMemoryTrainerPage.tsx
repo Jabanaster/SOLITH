@@ -303,7 +303,18 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     if (!pendingProposal) return;
     setBusy(true);
     try {
-      const result = await api.liveMemoryConfirmWrite({ proposalId: pendingProposal.proposalId });
+      const consentResult = await api.liveMemoryIssueWriteConsent({
+        proposalId: pendingProposal.proposalId,
+        userConfirmed: true,
+      });
+      if (!consentResult?.success || !consentResult.consent?.tokenId) {
+        setMessage(`Consent failed: ${consentResult?.error ?? 'unknown error'}`);
+        return;
+      }
+      const result = await api.liveMemoryConfirmWrite({
+        proposalId: pendingProposal.proposalId,
+        consentToken: consentResult.consent.tokenId,
+      });
       setLastGuard(result.guard ?? null);
       if (result.success) {
         setMessage(`Write applied: ${result.manifest.valueBefore} → ${result.manifest.valueAfter}.`);

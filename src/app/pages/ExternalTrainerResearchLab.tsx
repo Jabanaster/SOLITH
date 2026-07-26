@@ -343,12 +343,28 @@ const ExternalTrainerResearchLab: React.FC = () => {
   };
 
   const confirmInjectorLaunch = async () => {
-    if (!api?.inProcessConfirmInjectorLaunch || !injectorProposal || !inProcessApproved) return;
+    if (
+      !api?.inProcessConfirmInjectorLaunch ||
+      !api?.inProcessIssueInjectorConsent ||
+      !injectorProposal ||
+      !inProcessApproved
+    ) {
+      return;
+    }
     setBusy(true);
     try {
+      const consentResult = await api.inProcessIssueInjectorConsent({
+        proposalId: injectorProposal.proposalId,
+        userConfirmed: true,
+      });
+      if (!consentResult.success || !consentResult.consent?.tokenId) {
+        setMessage(consentResult.error ?? 'Injector consent failed');
+        return;
+      }
       const result = await api.inProcessConfirmInjectorLaunch({
         proposalId: injectorProposal.proposalId,
         userApprovedAction: true,
+        consentToken: consentResult.consent.tokenId,
       });
       if (result.success) {
         setInjectorProposal(null);

@@ -129,6 +129,31 @@ describe('LiveMemorySession', () => {
     assert.equal(driver.getValue(0x1000n), 100);
   });
 
+  test('verifyAttachedProcessIdentity fails closed on path or creation-time mismatch', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    driver.setProcessExecutableName(1234, 'demo.exe');
+    driver.setProcessExecutablePath(1234, 'C:\\Games\\demo.exe');
+    driver.setProcessStartTime(1234, '2026-07-01T00:00:00.000Z');
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach(
+      {
+        pid: 1234,
+        executableName: 'demo.exe',
+        executablePath: 'C:\\Games\\demo.exe',
+        startTime: '2026-07-01T00:00:00.000Z',
+      },
+      true,
+    );
+    assert.equal(session.verifyAttachedProcessIdentity(), null);
+
+    driver.setProcessExecutablePath(1234, 'C:\\Games\\spoofed.exe');
+    assert.match(session.verifyAttachedProcessIdentity() ?? '', /path mismatch/i);
+
+    driver.setProcessExecutablePath(1234, 'C:\\Games\\demo.exe');
+    driver.setProcessStartTime(1234, '2026-07-02T00:00:00.000Z');
+    assert.match(session.verifyAttachedProcessIdentity() ?? '', /creation time|PID reuse/i);
+  });
+
   test('rollback restores the value captured before the write', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
     const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);

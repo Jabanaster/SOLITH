@@ -89,6 +89,35 @@ export function testAIConnection(config: AIConfig): Promise<{ success: boolean; 
           });
           return;
         }
+        let body: unknown;
+        try {
+          body = await response.json();
+        } catch {
+          resolve({
+            success: false,
+            message: `${config.provider} returned non-JSON at ${probePath}.`,
+          });
+          return;
+        }
+        if (config.provider === 'LM Studio') {
+          const data = (body as { data?: unknown })?.data;
+          if (!Array.isArray(data)) {
+            resolve({
+              success: false,
+              message: `${config.provider} /v1/models response missing a data array.`,
+            });
+            return;
+          }
+        } else {
+          const models = (body as { models?: unknown })?.models;
+          if (!Array.isArray(models)) {
+            resolve({
+              success: false,
+              message: `${config.provider} /api/tags response missing a models array.`,
+            });
+            return;
+          }
+        }
         resolve({ success: true, message: `Connection to ${config.provider} verified at ${probePath}.` });
       })
       .catch((error: unknown) => {

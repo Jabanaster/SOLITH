@@ -25,8 +25,10 @@ export const IN_PROCESS_SCRIPT_MILESTONE = {
   safety: [
     'Feature flag inProcessScriptExecutionEnabled (default OFF — defaultFeatureEnabled: false)',
     'Offline / solo-play confirmation required',
-    'Explicit user approval per hook install and per injector launch',
-    'Injector propose/confirm require attached CrimsonDesert.exe + matching PID, offline waiver, approval, online fail-closed observation, and matching file hash',
+    'Explicit user approval per hook install and per injector launch via short-lived single-use consent tokens',
+    'Injector propose/confirm require attached CrimsonDesert.exe + matching PID/path/creation-time identity, offline waiver, consent token, online fail-closed observation, and matching file hash',
+    'Injector helpers must reside under userData/injector-helpers (not arbitrary non-system executables)',
+    'Injector launch records are appended to userData/logs/injector-audit.jsonl (durable session audit)',
     'Pilot limited to CrimsonDesert.exe only',
     'Rollback restores original bytes and frees code cave',
     'User accepts ban / AV / ToS risk when opting in (see Docs/IN_PROCESS_PILOT_SAFETY_CHARTER.md)',
@@ -36,6 +38,6 @@ export const IN_PROCESS_SCRIPT_MILESTONE = {
     'Multiplayer / online session use',
     'Arbitrary AA compiler for all CE scripts (pilot presets + plans only)',
     'Any executable other than CrimsonDesert.exe',
-    'Spawning Windows system binaries or unverified injectors without an attached pilot session',
+    'Spawning Windows system binaries or helpers outside userData/injector-helpers',
   ],
 } as const;

@@ -1,6 +1,7 @@
 import { createRequire as nodeCreateRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import type { LiveProcessHandle, LiveValueType, MemoryDriver, MemoryModule, MemoryRegion } from './types.js';
+import { queryWindowsProcessIdentity } from './windows-process-identity.js';
 
 // Win32 VirtualQuery constants (stable OS ABI values, not re-exported from
 // memoryjs's JS surface in a form worth depending on here).
@@ -260,10 +261,33 @@ export const nativeMemoryDriver: MemoryDriver = {
 
       const mem = loadMemoryjs();
       const process = mem.getProcesses().find((entry) => entry.th32ProcessID === handle.pid);
-      return process ? String(process.szExeFile) : null;
+      if (process?.szExeFile) return String(process.szExeFile);
+      return queryWindowsProcessIdentity(handle.pid)?.executableName ?? null;
     } catch (err) {
       throw new Error(
         `getProcessExecutableName(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  },
+
+  getProcessExecutablePath(handle: LiveProcessHandle): string | null {
+    try {
+      validateHandle(handle, 'getProcessExecutablePath');
+      return queryWindowsProcessIdentity(handle.pid)?.executablePath ?? null;
+    } catch (err) {
+      throw new Error(
+        `getProcessExecutablePath(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  },
+
+  getProcessStartTime(handle: LiveProcessHandle): string | null {
+    try {
+      validateHandle(handle, 'getProcessStartTime');
+      return queryWindowsProcessIdentity(handle.pid)?.startTimeIso ?? null;
+    } catch (err) {
+      throw new Error(
+        `getProcessStartTime(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   },
