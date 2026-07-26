@@ -1,4 +1,4 @@
-import React, { useMemo, useReducer, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   createWispMessage,
   DEFAULT_WISP_STATE,
@@ -12,9 +12,18 @@ import { WISP_FORM_ARTWORK } from '../assets/wisp/index.js';
 
 const POSITION_KEY = 'solith:wisp-position:v1';
 const QUIET_KEY = 'solith:wisp-quiet:v1';
+const DRAG_THRESHOLD_PX = 4;
 
 type WispPosition = {
   corner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+};
+
+type DragState = {
+  pointerId: number;
+  lastX: number;
+  lastY: number;
+  totalX: number;
+  totalY: number;
 };
 
 const DEFAULT_POSITION: WispPosition = { corner: 'bottom-right' };
@@ -176,14 +185,21 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
   const [position, setPosition] = useState(loadPosition);
   const [quickInput, setQuickInput] = useState('');
   const [reaction, setReaction] = useState<'idle' | 'ack' | 'thinking' | 'dismissed'>('idle');
+  const dragRef = useRef<DragState | null>(null);
 
   const artwork = WISP_FORM_ARTWORK[state.form];
   const positionClass = overlayMode ? 'solith-wisp--overlay' : `solith-wisp--${position.corner}`;
+  const overlayExpanded = overlayMode && state.visible && (state.interactionOpen || state.bubbles.length > 0);
 
   const visibleActions = useMemo(() => {
     if (state.message?.actions.length) return state.message.actions;
     return QUICK_ACTIONS.slice(0, 6);
   }, [state.message]);
+
+  useEffect(() => {
+    if (!overlayMode) return;
+    void window.electronAPI?.wispOverlaySetExpanded?.({ expanded: overlayExpanded });
+  }, [overlayExpanded, overlayMode]);
 
   if (!state.visible) {
     return (
@@ -298,6 +314,58 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
     pulse('dismissed');
   };
 
+  const handleCreaturePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!overlayMode || event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      lastX: event.screenX,
+      lastY: event.screenY,
+      totalX: 0,
+      totalY: 0,
+    };
+  };
+
+  const handleCreaturePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!overlayMode || !drag || drag.pointerId !== event.pointerId) return;
+
+    const deltaX = Math.round(event.screenX - drag.lastX);
+    const deltaY = Math.round(event.screenY - drag.lastY);
+    if (deltaX === 0 && deltaY === 0) return;
+
+    drag.lastX = event.screenX;
+    drag.lastY = event.screenY;
+    drag.totalX += Math.abs(deltaX);
+    drag.totalY += Math.abs(deltaY);
+
+    void window.electronAPI?.wispOverlayMoveBy?.({ deltaX, deltaY });
+  };
+
+  const handleCreaturePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (!overlayMode) return;
+    const movedEnough = drag ? drag.totalX + drag.totalY >= DRAG_THRESHOLD_PX : false;
+    if (!movedEnough) openInteraction();
+  };
+
+  const handleCreaturePointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const handleCreatureClick = () => {
+    if (!overlayMode) openInteraction();
+  };
+
   return (
     <aside
       className={`solith-wisp ${positionClass} solith-wisp--${state.mood} solith-wisp--reaction-${reaction}${state.interactionOpen ? ' solith-wisp--interacting' : ''}${state.message ? ' solith-wisp--has-bubble' : ''}`}
@@ -306,12 +374,16 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
       <button
         type="button"
         className="solith-wisp__creature"
-        onClick={openInteraction}
+        onClick={handleCreatureClick}
         onDoubleClick={cyclePosition}
-        title={overlayMode ? 'Click to talk to Solith Wisp.' : 'Click to talk to Solith Wisp. Double-click to move corners.'}
+        onPointerDown={handleCreaturePointerDown}
+        onPointerMove={handleCreaturePointerMove}
+        onPointerUp={handleCreaturePointerUp}
+        onPointerCancel={handleCreaturePointerCancel}
+        title={overlayMode ? 'Drag me, or click to talk to Solith Wisp.' : 'Click to talk to Solith Wisp. Double-click to move corners.'}
       >
         <span className="solith-wisp__aura" aria-hidden="true" />
-        <img src={artwork} alt="" decoding="async" />
+        <img src={artwork} alt="" decoding="async" draggable={false} />
         <span className="solith-wisp__eyes" aria-hidden="true" />
         <span className="solith-wisp__shadow" aria-hidden="true" />
       </button>
@@ -339,7 +411,7 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
             )}
 
             {bubble.actions.length > 0 && (
-              <div className="solith-wisp__actions" aria-label="Solith Wisp message actions">
+              <div className="solith-wisp__message-actions" aria-label="Solith Wisp message actions">
                 {bubble.actions.map((action) => (
                   <button
                     key={action.kind}
@@ -354,62 +426,67 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
             )}
           </section>
         ))}
-
-        {state.interactionOpen && (
-          <section className="solith-wisp__bubble solith-wisp__command-bubble">
-            <header className="solith-wisp__header">
-              <div>
-                <span className="solith-wisp__severity solith-wisp__severity--info" />
-                <strong>Solith Wisp</strong>
-                <small>safe companion controls</small>
-              </div>
-              <button type="button" onClick={() => dispatch({ type: 'closeInteraction' })} aria-label="Close Wisp controls">
-                ×
-              </button>
-            </header>
-
-            <p>I can mark read-only events, request safe scans, and open the overlay. I cannot write memory or run scripts.</p>
-
-            <div className="solith-wisp__actions" aria-label="Solith Wisp quick actions">
-              {visibleActions.map((action) => (
-                <button
-                  key={action.kind}
-                  type="button"
-                  onClick={() => executeAction(action.kind)}
-                  title={action.description}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="solith-wisp__quick-input">
-              <input
-                value={quickInput}
-                onChange={(event) => setQuickInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') submitQuickInput();
-                }}
-                placeholder="try: spent gold, took damage, scan"
-                aria-label="Send a safe Solith Wisp command"
-              />
-              <button type="button" onClick={submitQuickInput}>Send</button>
-            </div>
-
-            <footer>
-              <button type="button" onClick={toggleOverlayWindow}>
-                {overlayMode ? 'Close overlay' : 'Open overlay'}
-              </button>
-              <button type="button" onClick={toggleQuietMode} aria-pressed={state.quietMode}>
-                {state.quietMode ? 'Quiet mode on' : 'Quiet mode off'}
-              </button>
-              <button type="button" onClick={() => executeAction('hide')}>
-                Hide Wisp
-              </button>
-            </footer>
-          </section>
-        )}
       </div>
+
+      {state.interactionOpen && (
+        <div className="solith-wisp__response-orbit" aria-label="Solith Wisp safe quick actions">
+          <button
+            type="button"
+            className="solith-wisp__response-chip solith-wisp__response-chip--primary"
+            onClick={toggleOverlayWindow}
+          >
+            {overlayMode ? 'Close overlay' : 'Open overlay'}
+          </button>
+          <button
+            type="button"
+            className="solith-wisp__response-chip"
+            onClick={toggleQuietMode}
+            aria-pressed={state.quietMode}
+          >
+            {state.quietMode ? 'Quiet mode on' : 'Quiet mode off'}
+          </button>
+          <button
+            type="button"
+            className="solith-wisp__response-chip"
+            onClick={() => executeAction('hide')}
+          >
+            Hide Wisp
+          </button>
+          {visibleActions.slice(0, 6).map((action) => (
+            <button
+              key={action.kind}
+              type="button"
+              className="solith-wisp__response-chip"
+              onClick={() => executeAction(action.kind)}
+              title={action.description}
+            >
+              {action.label}
+            </button>
+          ))}
+          <form
+            className="solith-wisp__response-input-chip"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitQuickInput();
+            }}
+          >
+            <input
+              value={quickInput}
+              onChange={(event) => setQuickInput(event.target.value)}
+              placeholder="try: spent gold"
+              aria-label="Send a safe Solith Wisp command"
+            />
+            <button type="submit">Send</button>
+          </form>
+          <button
+            type="button"
+            className="solith-wisp__response-chip solith-wisp__response-chip--ghost"
+            onClick={() => dispatch({ type: 'closeInteraction' })}
+          >
+            Close
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

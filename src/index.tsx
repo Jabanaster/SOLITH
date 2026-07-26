@@ -10,6 +10,10 @@ const container = document.getElementById('root');
 const root = createRoot(container!);
 
 const route = window.location.hash;
+if (route === '#wisp-overlay') {
+  document.documentElement.classList.add('wisp-overlay-document');
+  document.body.classList.add('wisp-overlay-document');
+}
 
 root.render(
   <React.StrictMode>
