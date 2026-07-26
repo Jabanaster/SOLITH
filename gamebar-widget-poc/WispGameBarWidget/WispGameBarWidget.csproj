@@ -1,63 +1,82 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
-    Smallest-viable Xbox Game Bar Widget project (proof of concept).
+    Classic (pre-.NET5, non-SDK-style) UWP project, per the VS 2022
+    "Windows UAP\BlankApplication" template installed with the "Universal
+    Windows Platform development" workload.
 
-    Game Bar widgets are UWP XAML applications that reference the Xbox Game Bar
-    SDK NuGet package (Microsoft.Xbox.GameBarWidget or the successor package
-    referenced in the Game Bar SDK docs) and declare a
-    "microsoft.gameBarUIExtension" AppExtension in Package.appxmanifest.
-
-    This project targets net8.0-windows10.0.19041.0 using the modern
-    Windows App SDK / UWP-hybrid csproj style. UNTESTED: this file has never
-    been opened or built by Visual Studio in this sandbox (no VS/MSBuild/
-    Windows SDK is installed here - see ARCHITECTURE.md "What was NOT verified").
+    Rebuilt against this shape (not the modern net9.0-windows/UseUwp shape
+    tried first) because direct inspection of project.assets.json proved the
+    modern shape gets ZERO compile-time assets from Microsoft.Gaming.XboxGameBar
+    - NuGet only resolves lib/uap10.0/*.winmd as a compile reference when the
+    consuming project's own TargetFramework is literally uap10.0
+    (TargetPlatformIdentifier=UAP), which is exactly what this project shape
+    provides. This was verified, not assumed - the package's own props/targets
+    files were inspected and do not perform any manual reference injection
+    that would make the modern shape work instead.
   -->
-
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{9c9f3f2e-9d2c-4b41-9a6e-3a2b5f9d6a11}</ProjectGuid>
+    <OutputType>AppContainerExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>WispGameBarWidget</RootNamespace>
     <AssemblyName>WispGameBarWidget</AssemblyName>
-    <UseWinUI>false</UseWinUI>
-    <EnableDefaultPageItems>false</EnableDefaultPageItems>
-    <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
-    <Platforms>x64;ARM64</Platforms>
-    <WindowsPackageType>MSIX</WindowsPackageType>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
+    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.22621.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WindowsXamlEnableOverview>true</WindowsXamlEnableOverview>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+    <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+  </PropertyGroup>
 
   <ItemGroup>
-    <!--
-      Real package id/version must come from NuGet.org at build time on a
-      machine with network access + Visual Studio. Name matches the current
-      Xbox Game Bar SDK package documented by Microsoft as of the Sept 2024
-      changelog entry (7.2.240903001). Verify exact id/version in the NuGet
-      gallery before building - this could not be resolved in this sandbox
-      (no network-backed NuGet restore was attempted or claimed).
-    -->
-    <PackageReference Include="Microsoft.Xbox.GameBarWidget" Version="7.2.240903001" />
+    <!-- Real, NuGet.org-verified package - see MainPage.xaml.cs / App.xaml.cs comments. -->
+    <PackageReference Include="Microsoft.Gaming.XboxGameBar" Version="7.3.2607010" />
+    <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform" Version="6.2.14" />
   </ItemGroup>
 
   <ItemGroup>
-    <Page Include="App.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="MainPage.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Compile Update="App.xaml.cs">
+    <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Compile Update="MainPage.xaml.cs">
+    <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Assets\solith-wisp-base-float.png" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -66,4 +85,29 @@
     </AppxManifest>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Properties\Default.rd.xml" />
+    <Content Include="Assets\solith-wisp-base-float.png" />
+    <Content Include="Assets\Square150x150Logo.png" />
+    <Content Include="Assets\Square44x44Logo.png" />
+    <Content Include="Assets\Wide310x150Logo.png" />
+    <Content Include="Assets\StoreLogo50.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Page Include="MainPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
+    <VisualStudioVersion>14.0</VisualStudioVersion>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
 </Project>

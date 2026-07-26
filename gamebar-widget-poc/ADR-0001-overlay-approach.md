@@ -1,7 +1,57 @@
 # ADR-0001: Overlay technology for the Wisp companion
 
-Date: 2026-07-25
+Date: 2026-07-25 (superseded 2026-07-26)
 Status: Proposed (proof-of-concept level; not a production decision record for the main Solith app)
+
+## Supersession notice (2026-07-26)
+
+**The original version of this ADR's rejection of option A was invalid and has
+been retracted.** It was based on a project that had never been compiled,
+referenced a NuGet package (`Microsoft.Xbox.GameBarWidget`) that does not
+exist (zero hits on NuGet.org), used an activation/API pattern
+(`XboxGameBarWidget.Create(...)`, per-region `InputNonClientPointerSource`
+click-through) that does not exist in the real SDK, and asserted the SDK was
+"stagnant 2020–2024" — which is contradicted by NuGet.org's own version
+history for the real package (`Microsoft.Gaming.XboxGameBar`): releases at
+2024-09, 2024-10, 2025-06, 2025-11, and 2026-07-01 (three weeks before this
+rebuild). None of that supports rejecting the approach; it only supports
+rejecting the *first draft*.
+
+Since then, in this same worktree:
+
+- Installed the Visual Studio 2022 "Universal Windows Platform development"
+  workload (previously missing) and confirmed via `vswhere -requires
+  Microsoft.VisualStudio.Workload.Universal`.
+- Verified `Microsoft.Gaming.XboxGameBar` is real via direct NuGet.org API
+  queries, downloaded the real package, and dumped its actual `.winmd` type
+  metadata (namespaces, classes, members) rather than guessing.
+- Fetched Microsoft's current Game Bar SDK docs (activation flow, manifest
+  schema, click-through model, API reference) and rebuilt the project against
+  them verbatim: classic (non-SDK-style) UWP project targeting
+  `TargetPlatformVersion 10.0.22621.0`, real `App.OnActivated` protocol-activation
+  flow, real `XboxGameBarWidget(args, coreWindow, frame)` constructor, and a
+  corrected click-through model (Game Bar has no per-region hit-test API -
+  click-through is a coarse whole-widget toggle; the widget hides its own
+  controls when `ClickThroughEnabled` is true, per Microsoft's documented
+  pattern - the previous draft's `InputNonClientPointerSource.SetRegionRects`
+  call does not exist for Game Bar widgets and would never have compiled).
+- **Achieved a clean MSBuild compile**, producing a real signed-for-sideload
+  MSIX at `WispGameBarWidget\AppPackages\WispGameBarWidget_0.1.0.0_x64_Debug_Test\WispGameBarWidget_0.1.0.0_x64_Debug.msix`.
+
+**Corrected verdict as of this compile gate:**
+
+| Question | Answer |
+|---|---|
+| Is the SDK real and current? | Yes - verified, actively released (last: 2026-07-01) |
+| Does the corrected project compile cleanly? | Yes - verified, zero errors, MSIX produced |
+| Does it sideload, appear in Game Bar, pin, and stay visible over a real running game? | **Untested** - not yet authorized (next gate) |
+| Was Game Bar "rejected" on the merits? | **No** - the previous rejection is retracted; feasibility is genuinely open pending the sideload/pin/live-game gate below |
+
+The Decision section below (dated 2026-07-25) is **superseded** by the above
+and should not be treated as the current recommendation. It will be
+re-evaluated once Developer Mode, certificate trust, sideloading, and live
+game/focus/click-through testing are each explicitly authorized and run, one
+step at a time, per the project's stated gating process.
 
 ## Context
 
@@ -31,9 +81,13 @@ show the Wisp companion "over a game," and gives a concrete recommendation.
 - **Distribution:** Sideload via Developer Mode, or Store submission for
   wide distribution. Users must have Game Bar enabled and the widget
   installed/pinned separately from installing Solith itself.
-- **Maintenance signal:** SDK changelog shows a nearly 4-year gap
-  (2020–2024) between meaningful updates, then two small releases in
-  2024. Low investment, but not abandoned.
+- **Maintenance signal (corrected 2026-07-26):** Actively maintained.
+  NuGet.org version history for the real package (`Microsoft.Gaming.XboxGameBar`)
+  shows released versions at 2024-09, 2024-10, 2025-06, 2025-11, and
+  2026-07-01 - the latest release predates this rebuild by three weeks. The
+  original "nearly 4-year gap, low investment" characterization in this row
+  was based on an unverified assumption and is retracted; see the
+  supersession notice at the top of this document.
 - **Positioning/sizing:** Constrained to what Game Bar's widget host allows
   (`PreferredWidth`/`Height`, min/max) — no free-form always-on-top placement
   independent of Game Bar's own UI.
