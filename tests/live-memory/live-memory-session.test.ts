@@ -416,7 +416,7 @@ describe('LiveMemorySession catalog controls', () => {
     heapRegion.writeInt32LE(77, 16);
     driver.addRegion(heapBase, heapRegion, true);
 
-    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    const session = makeSession(driver, [CLEAN_EVIDENCE], 'game.exe');
     await session.attach({ pid: 1234, executableName: 'game.exe' }, true);
 
     const control = {

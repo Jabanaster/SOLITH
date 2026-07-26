@@ -39,6 +39,7 @@ import {
   InProcessProposeInjectorSchema,
   InProcessIssueInjectorConsentSchema,
   InProcessConfirmInjectorSchema,
+  InProcessRegisterInjectorHelperSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
@@ -345,23 +346,49 @@ export function registerLiveMemoryIpc(): void {
       if (!liveProposal) {
         return { success: false, error: 'Unknown write proposal.' };
       }
-      const attachedPid = bundle.session.getAttachedPid();
-      const attachedExecutableName = bundle.session.getAttachedExecutableName() ?? '';
-      if (attachedPid == null || !attachedExecutableName) {
-        return { success: false, error: 'not_attached' };
+      const identity = bundle.session.getAttachedIdentity();
+      if (!identity) {
+        return { success: false, error: 'incomplete_process_identity' };
       }
-      const { issueWriteConsent } = await import('../src/core/consent/write-consent.js');
-      const consent = issueWriteConsent({
-        operation: 'live_memory_confirm_write',
+      const {
+        requestPrivilegedWriteConsent,
+        formatMemoryWriteConsentLines,
+        parentWindowFromEvent,
+      } = await import('./privileged-consent-dialog.js');
+      const binding = {
+        operation: 'live_memory_confirm_write' as const,
         sessionKey: String(event.sender.id),
         proposalId: liveProposal.proposalId,
-        attachedPid,
-        attachedExecutableName,
+        attachedPid: identity.pid,
+        attachedExecutableName: identity.executableName,
+        executablePath: identity.executablePath,
+        processStartTime: identity.startTime,
+        volumeSerialNumber: identity.volumeSerialNumber,
+        fileIndex: identity.fileIndex,
+        attachedExeSha256: identity.exeSha256,
         address: liveProposal.target.address.toString(),
         dataType: liveProposal.target.dataType,
+        currentValue: liveProposal.currentValue,
         requestedValue: liveProposal.requestedValue,
+      };
+      const result = await requestPrivilegedWriteConsent(parentWindowFromEvent(event), {
+        title: 'Approve live memory write',
+        lines: formatMemoryWriteConsentLines({
+          attachedExecutableName: identity.executableName,
+          attachedPid: identity.pid,
+          executablePath: identity.executablePath,
+          address: liveProposal.target.address.toString(),
+          dataType: liveProposal.target.dataType,
+          currentValue: liveProposal.currentValue,
+          requestedValue: liveProposal.requestedValue,
+          proposalId: liveProposal.proposalId,
+        }),
+        binding,
       });
-      return { success: true, consent };
+      if (!result.approved) {
+        return { success: false, error: result.reason };
+      }
+      return { success: true, consent: result.consent };
     } catch (error) {
       return { success: false, error: sanitize(error, 'issue_write_consent_failed') };
     }
@@ -379,19 +406,24 @@ export function registerLiveMemoryIpc(): void {
       if (!liveProposal) {
         return { success: false, error: 'Unknown write proposal.' };
       }
-      const attachedPid = bundle.session.getAttachedPid();
-      const attachedExecutableName = bundle.session.getAttachedExecutableName() ?? '';
-      if (attachedPid == null || !attachedExecutableName) {
-        return { success: false, error: 'not_attached' };
+      const identity = bundle.session.getAttachedIdentity();
+      if (!identity) {
+        return { success: false, error: 'incomplete_process_identity' };
       }
       const consentBinding = {
         operation: 'live_memory_confirm_write' as const,
         sessionKey: String(event.sender.id),
         proposalId: liveProposal.proposalId,
-        attachedPid,
-        attachedExecutableName,
+        attachedPid: identity.pid,
+        attachedExecutableName: identity.executableName,
+        executablePath: identity.executablePath,
+        processStartTime: identity.startTime,
+        volumeSerialNumber: identity.volumeSerialNumber,
+        fileIndex: identity.fileIndex,
+        attachedExeSha256: identity.exeSha256,
         address: liveProposal.target.address.toString(),
         dataType: liveProposal.target.dataType,
+        currentValue: liveProposal.currentValue,
         requestedValue: liveProposal.requestedValue,
       };
       const result = await bundle.manager.confirmWrite(parsed.proposalId, {
@@ -1060,24 +1092,103 @@ export function registerLiveMemoryIpc(): void {
       const { getInjectorProposal } = await import('../src/core/in-process-script/injector-launcher.js');
       const proposal = getInjectorProposal(parsed.proposalId);
       if (!proposal) return { success: false, error: 'Unknown injector launch proposal.' };
-      const attachedPid = session.getAttachedPid();
-      const attachedExecutableName = session.getAttachedExecutableName() ?? '';
-      if (attachedPid == null || !attachedExecutableName) {
-        return { success: false, error: 'not_attached' };
-      }
-      const { issueWriteConsent } = await import('../src/core/consent/write-consent.js');
-      const consent = issueWriteConsent({
-        operation: 'injector_confirm_launch',
+      const identity = session.getAttachedIdentity();
+      if (!identity) return { success: false, error: 'incomplete_process_identity' };
+      const {
+        requestPrivilegedWriteConsent,
+        formatInjectorConsentLines,
+        parentWindowFromEvent,
+      } = await import('./privileged-consent-dialog.js');
+      const binding = {
+        operation: 'injector_confirm_launch' as const,
         sessionKey: String(event.sender.id),
         proposalId: proposal.proposalId,
-        attachedPid,
-        attachedExecutableName,
+        attachedPid: identity.pid,
+        attachedExecutableName: identity.executableName,
+        executablePath: identity.executablePath,
+        processStartTime: identity.startTime,
+        volumeSerialNumber: identity.volumeSerialNumber,
+        fileIndex: identity.fileIndex,
+        attachedExeSha256: identity.exeSha256,
         exePath: proposal.exePath,
         exeSha256: proposal.sha256,
+      };
+      const result = await requestPrivilegedWriteConsent(parentWindowFromEvent(event), {
+        title: 'Approve injector helper launch',
+        lines: formatInjectorConsentLines({
+          attachedExecutableName: identity.executableName,
+          attachedPid: identity.pid,
+          executablePath: identity.executablePath,
+          helperPath: proposal.exePath,
+          helperSha256: proposal.sha256,
+          proposalId: proposal.proposalId,
+        }),
+        binding,
       });
-      return { success: true, consent };
+      if (!result.approved) return { success: false, error: result.reason };
+      return { success: true, consent: result.consent };
     } catch (error) {
       return { success: false, error: sanitize(error, 'in_process_issue_injector_consent_failed') };
+    }
+  });
+
+  ipcMain.handle('in-process-register-injector-helper', async (event, payload: unknown) => {
+    try {
+      const parsed = InProcessRegisterInjectorHelperSchema.parse(payload);
+      if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
+      const { getAppPaths } = await import('../src/shared/app-paths.js');
+      const paths = await getAppPaths();
+      const {
+        getDefaultInjectorHelpersRoot,
+        sha256File,
+        isUnderInjectorHelpersRoot,
+        isWindowsSystemExecutablePath,
+      } = await import('../src/core/in-process-script/injector-launcher.js');
+      const {
+        upsertHelperManifestEntry,
+        relativeHelperPath,
+        queryAuthenticodePublisher,
+      } = await import('../src/core/in-process-script/helper-manifest.js');
+      const helpersRoot = getDefaultInjectorHelpersRoot(paths.userDataRoot);
+      fs.mkdirSync(helpersRoot, { recursive: true });
+      const resolved = path.resolve(parsed.exePath);
+      if (!fs.existsSync(resolved) || !resolved.toLowerCase().endsWith('.exe')) {
+        return { success: false, error: 'Helper executable not found.' };
+      }
+      if (isWindowsSystemExecutablePath(resolved)) {
+        return { success: false, error: 'Refusing to register Windows system executables.' };
+      }
+      if (!isUnderInjectorHelpersRoot(resolved, helpersRoot)) {
+        return { success: false, error: 'Helper must reside under injector-helpers.' };
+      }
+      const sha256 = sha256File(resolved);
+      const publisher = queryAuthenticodePublisher(resolved);
+      const {
+        requestPrivilegedApproval,
+        parentWindowFromEvent,
+      } = await import('./privileged-consent-dialog.js');
+      const decision = await requestPrivilegedApproval(parentWindowFromEvent(event), {
+        title: 'Register injector helper',
+        lines: [
+          'Operation: register sealed injector helper',
+          `Path: ${resolved}`,
+          `SHA-256: ${sha256}`,
+          `Publisher: ${publisher ?? '(unsigned / unavailable)'}`,
+          'Consequence: this hash will be allowed for future injector launches while the seal remains valid.',
+        ],
+      });
+      if (!decision.approved) {
+        return { success: false, error: decision.reason };
+      }
+      const entry = upsertHelperManifestEntry(helpersRoot, {
+        relativePath: relativeHelperPath(helpersRoot, resolved),
+        sha256,
+        publisher,
+        registeredAt: new Date().toISOString(),
+      });
+      return { success: true, entry: entry.entries.find((e) => e.sha256 === sha256) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'in_process_register_helper_failed') };
     }
   });
 
@@ -1087,8 +1198,6 @@ export function registerLiveMemoryIpc(): void {
       const parsed = InProcessConfirmInjectorSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
 
-      const attachedExecutableName = session.getAttachedExecutableName() ?? '';
-      const attachedPid = session.getAttachedPid();
       const remoteConnections = await session.observeAttachedRemoteConnections();
       const { getAppPaths } = await import('../src/shared/app-paths.js');
       const paths = await getAppPaths();
@@ -1103,22 +1212,28 @@ export function registerLiveMemoryIpc(): void {
       if (!proposal) {
         return { success: false, error: 'Unknown injector launch proposal.' };
       }
-      if (attachedPid == null) {
-        return { success: false, error: 'Injector launch requires an attached CrimsonDesert.exe session.' };
+      const identity = session.getAttachedIdentity();
+      if (!identity) {
+        return { success: false, error: 'incomplete_process_identity' };
       }
       const consentBinding = {
         operation: 'injector_confirm_launch' as const,
         sessionKey: String(event.sender.id),
         proposalId: proposal.proposalId,
-        attachedPid,
-        attachedExecutableName,
+        attachedPid: identity.pid,
+        attachedExecutableName: identity.executableName,
+        executablePath: identity.executablePath,
+        processStartTime: identity.startTime,
+        volumeSerialNumber: identity.volumeSerialNumber,
+        fileIndex: identity.fileIndex,
+        attachedExeSha256: identity.exeSha256,
         exePath: proposal.exePath,
         exeSha256: proposal.sha256,
       };
       const result = await confirmInjectorLaunch({
         proposalId: parsed.proposalId,
-        attachedExecutableName,
-        attachedPid,
+        attachedExecutableName: identity.executableName,
+        attachedPid: identity.pid,
         helpersRoot: getDefaultInjectorHelpersRoot(paths.userDataRoot),
         verifyLiveIdentity: () => session.verifyAttachedProcessIdentity(),
         consentToken: parsed.consentToken,
@@ -1127,7 +1242,7 @@ export function registerLiveMemoryIpc(): void {
           featureEnabled: true,
           userConfirmedOffline: session.isOfflineConfirmed(),
           userApprovedAction: parsed.userApprovedAction,
-          executableName: attachedExecutableName,
+          executableName: identity.executableName,
         },
         remoteConnections,
         acceptedConnectionBaseline: session.getAcceptedConnectionBaseline(),

@@ -10,6 +10,10 @@ import {
 } from '../consent/write-consent.js';
 import { IN_PROCESS_SCRIPT_MILESTONE } from './charter.js';
 import { evaluateInProcessGate } from './guards.js';
+import {
+  evaluateHelperTrust,
+  queryAuthenticodePublisher,
+} from './helper-manifest.js';
 import type { InjectorLaunchProposal, InProcessGateInput } from './types.js';
 
 const PROPOSAL_TTL_MS = 10 * 60 * 1000;
@@ -113,6 +117,17 @@ function assertPilotInjectorPath(resolved: string, helpersRoot: string): void {
       'Injector helpers must reside under the Solith injector-helpers directory (userData/injector-helpers).',
     );
   }
+  const sha256 = sha256File(resolved);
+  const publisher = queryAuthenticodePublisher(resolved);
+  const trust = evaluateHelperTrust({
+    helpersRoot,
+    exePath: resolved,
+    sha256,
+    publisher,
+  });
+  if (!trust.allowed) {
+    throw new Error(trust.reason);
+  }
 }
 
 function assertGate(gate: InProcessGateInput): void {
@@ -205,7 +220,7 @@ export function proposeInjectorLaunch(input: ProposeInjectorLaunchInput): Inject
       'Solith will spawn this process detached. You are responsible for what the trainer does.',
       'Attach to CrimsonDesert.exe in Solith — not the trainer process.',
       'Offline / solo-play only. Close trainer when finished.',
-      'Helper must be under userData/injector-helpers with matching SHA-256.',
+      'Helper must be under userData/injector-helpers, registered in the sealed hash manifest, and match SHA-256.',
       `Bound to attached ${attachedExecutableName} PID ${input.attachedPid}; confirm re-checks live OS identity, gates, online state, and file hash.`,
     ],
     createdAt,

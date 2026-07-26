@@ -23,6 +23,11 @@ import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
 import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
 import { assessProtectedTarget } from '../runtime/protected-target-guard.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
+import {
+  compareProcessIdentity,
+  isCompleteProcessIdentity,
+  queryWindowsProcessIdentity,
+} from './windows-process-identity.js';
 import type {
   FreezeStatus,
   FreezeStopReason,
@@ -160,6 +165,30 @@ export class LiveMemorySession {
     return this.target?.pid ?? null;
   }
 
+  /** Fail-closed identity snapshot for consent bindings / confirm. */
+  getAttachedIdentity(): {
+    pid: number;
+    executableName: string;
+    executablePath: string;
+    startTime: string;
+    volumeSerialNumber?: string;
+    fileIndex?: string;
+    exeSha256?: string;
+  } | null {
+    if (!this.target?.executablePath?.trim() || !this.target.startTime?.trim()) {
+      return null;
+    }
+    return {
+      pid: this.target.pid,
+      executableName: this.target.executableName,
+      executablePath: this.target.executablePath,
+      startTime: this.target.startTime,
+      volumeSerialNumber: this.target.volumeSerialNumber,
+      fileIndex: this.target.fileIndex,
+      exeSha256: this.target.exeSha256,
+    };
+  }
+
   isOfflineConfirmed(): boolean {
     return this.userConfirmedOffline;
   }
@@ -177,6 +206,18 @@ export class LiveMemorySession {
         observedAt: new Date().toISOString(),
         error: 'not_attached',
       };
+    }
+    // Test-only force: prove confirm fail-closed when online evidence exceeds baseline.
+    const forced = process.env.SOLITH_FORCE_REMOTE_CONNECTION_COUNT;
+    if (forced != null && forced !== '') {
+      const count = Number(forced);
+      if (Number.isFinite(count) && count >= 0) {
+        return {
+          availability: 'available',
+          remoteConnectionCount: Math.floor(count),
+          observedAt: new Date().toISOString(),
+        };
+      }
     }
     return this.remoteConnectionObserver(this.target.pid);
   }
@@ -218,6 +259,7 @@ export class LiveMemorySession {
   /**
    * Re-read the live attached process and confirm identity still matches.
    * Used on destructive confirm paths to mitigate PID reuse.
+   * Fail-closed: missing required metadata is an error (no silent downgrade).
    */
   verifyAttachedProcessIdentity(): string | null {
     if (!this.handle || !this.target) {
@@ -228,38 +270,47 @@ export class LiveMemorySession {
       return `Attached handle PID ${this.handle.pid} does not match session target PID ${this.target.pid}.`;
     }
 
-    const actualExecutableName = this.driver.getProcessExecutableName(this.handle);
-    if (!actualExecutableName) {
-      return `Unable to verify executable name for PID ${this.handle.pid} (process may have exited).`;
+    if (!this.target.executablePath?.trim() || !this.target.startTime?.trim()) {
+      return 'Attached session is missing required process path or creation time; failing closed.';
     }
 
-    if (actualExecutableName.toLowerCase() !== this.target.executableName.toLowerCase()) {
-      return `Attached process identity mismatch: expected ${this.target.executableName}, found ${actualExecutableName}.`;
-    }
-
-    const expectedPath = this.target.executablePath?.trim();
-    if (expectedPath) {
-      const actualPath = this.driver.getProcessExecutablePath(this.handle);
-      if (!actualPath) {
-        return `Unable to verify executable path for PID ${this.handle.pid} (process may have exited).`;
+    let live =
+      (this.handle.opaque as { fake?: boolean } | null)?.fake === true
+        ? null
+        : queryWindowsProcessIdentity(this.handle.pid);
+    if (!live) {
+      const name = this.driver.getProcessExecutableName(this.handle);
+      const exePath = this.driver.getProcessExecutablePath(this.handle);
+      const start = this.driver.getProcessStartTime(this.handle);
+      if (!name || !exePath || !start) {
+        return 'Unable to re-read live process identity (process may have exited).';
       }
-      if (actualPath.toLowerCase() !== expectedPath.toLowerCase()) {
-        return `Attached process path mismatch: expected ${expectedPath}, found ${actualPath}.`;
-      }
-    }
-
-    const expectedStart = this.target.startTime?.trim();
-    if (expectedStart) {
-      const actualStart = this.driver.getProcessStartTime(this.handle);
-      if (!actualStart) {
-        return `Unable to verify process creation time for PID ${this.handle.pid} (process may have exited).`;
-      }
-      if (Date.parse(actualStart) !== Date.parse(expectedStart)) {
-        return `Attached process creation time mismatch (possible PID reuse).`;
+      live = {
+        pid: this.handle.pid,
+        executableName: name,
+        executablePath: exePath,
+        startTimeIso: start,
+        volumeSerialNumber: this.driver.getProcessVolumeSerial?.(this.handle) ?? null,
+        fileIndex: this.driver.getProcessFileIndex?.(this.handle) ?? null,
+        exeSha256: this.target.exeSha256 ?? null,
+      };
+      if (!isCompleteProcessIdentity(live)) {
+        return 'Live process identity is incomplete (path or creation time unavailable); failing closed.';
       }
     }
 
-    return null;
+    return compareProcessIdentity(
+      {
+        pid: this.target.pid,
+        executableName: this.target.executableName,
+        executablePath: this.target.executablePath,
+        startTime: this.target.startTime,
+        volumeSerialNumber: this.target.volumeSerialNumber,
+        fileIndex: this.target.fileIndex,
+        exeSha256: this.target.exeSha256,
+      },
+      live,
+    );
   }
 
   /** Catalog game id from the most recent attach, if supplied. */
@@ -333,19 +384,68 @@ export class LiveMemorySession {
       return { success: false, guard, error: `Protected target check failed closed: ${String(err)}` };
     }
 
+    const preferDriver = (openedHandle.opaque as { fake?: boolean } | null)?.fake === true;
+    const osIdentityRaw = preferDriver ? null : queryWindowsProcessIdentity(openedHandle.pid);
+    const resolvedOs =
+      osIdentityRaw &&
+      osIdentityRaw.executableName.toLowerCase() === target.executableName.toLowerCase()
+        ? osIdentityRaw
+        : null;
     const livePath =
       target.executablePath?.trim() ||
+      resolvedOs?.executablePath ||
       this.driver.getProcessExecutablePath(openedHandle) ||
       undefined;
     const liveStart =
       target.startTime?.trim() ||
+      resolvedOs?.startTimeIso ||
       this.driver.getProcessStartTime(openedHandle) ||
       undefined;
+    const liveName =
+      resolvedOs?.executableName ||
+      this.driver.getProcessExecutableName(openedHandle) ||
+      target.executableName;
+
+    if (!livePath || !liveStart || !isCompleteProcessIdentity({
+      executableName: liveName,
+      executablePath: livePath,
+      startTimeIso: liveStart,
+    })) {
+      this.driver.closeProcess(openedHandle);
+      this.handle = null;
+      return {
+        success: false,
+        guard,
+        error: 'incomplete_process_identity',
+      };
+    }
+
+    if (liveName.toLowerCase() !== target.executableName.toLowerCase()) {
+      this.driver.closeProcess(openedHandle);
+      this.handle = null;
+      return {
+        success: false,
+        guard,
+        error: `Attached process identity mismatch: expected ${target.executableName}, found ${liveName}.`,
+      };
+    }
 
     this.target = {
       ...target,
+      executableName: liveName,
       executablePath: livePath,
       startTime: liveStart,
+      volumeSerialNumber:
+        target.volumeSerialNumber ??
+        resolvedOs?.volumeSerialNumber ??
+        this.driver.getProcessVolumeSerial?.(openedHandle) ??
+        undefined,
+      fileIndex:
+        target.fileIndex ??
+        resolvedOs?.fileIndex ??
+        this.driver.getProcessFileIndex?.(openedHandle) ??
+        undefined,
+      exeSha256: target.exeSha256 ?? resolvedOs?.exeSha256 ?? undefined,
     };
     this.userConfirmedOffline = userConfirmedOffline;
     this.acceptedConnectionBaseline = acceptedConnectionBaseline;

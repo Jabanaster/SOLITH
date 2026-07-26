@@ -83,6 +83,8 @@ export class FakeMemoryDriver implements MemoryDriver {
   private processNames = new Map<number, string>();
   private processPaths = new Map<number, string>();
   private processStartTimes = new Map<number, string>();
+  private processVolumeSerials = new Map<number, string>();
+  private processFileIndexes = new Map<number, string>();
   private opened = false;
   public closeCallCount = 0;
 
@@ -132,6 +134,14 @@ export class FakeMemoryDriver implements MemoryDriver {
     this.processStartTimes.set(pid, startTimeIso);
   }
 
+  setProcessVolumeSerial(pid: number, serial: string): void {
+    this.processVolumeSerials.set(pid, serial);
+  }
+
+  setProcessFileIndex(pid: number, fileIndex: string): void {
+    this.processFileIndexes.set(pid, fileIndex);
+  }
+
   getModules(_handle: LiveProcessHandle): MemoryModule[] {
     return [...this.modules];
   }
@@ -146,6 +156,14 @@ export class FakeMemoryDriver implements MemoryDriver {
 
   getProcessStartTime(handle: LiveProcessHandle): string | null {
     return this.processStartTimes.get(handle.pid) ?? null;
+  }
+
+  getProcessVolumeSerial(handle: LiveProcessHandle): string | null {
+    return this.processVolumeSerials.get(handle.pid) ?? null;
+  }
+
+  getProcessFileIndex(handle: LiveProcessHandle): string | null {
+    return this.processFileIndexes.get(handle.pid) ?? null;
   }
 
   readPointer(_handle: LiveProcessHandle, address: bigint): bigint {
@@ -163,6 +181,15 @@ export class FakeMemoryDriver implements MemoryDriver {
 
   openProcess(pid: number): LiveProcessHandle {
     this.opened = true;
+    if (!this.processNames.has(pid)) {
+      this.processNames.set(pid, 'demo.exe');
+    }
+    if (!this.processPaths.has(pid)) {
+      this.processPaths.set(pid, `C:\\FakeGames\\${this.processNames.get(pid)}`);
+    }
+    if (!this.processStartTimes.has(pid)) {
+      this.processStartTimes.set(pid, '2020-01-01T00:00:00.000Z');
+    }
     return { pid, opaque: { fake: true } };
   }
 

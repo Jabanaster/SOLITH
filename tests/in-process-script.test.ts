@@ -14,6 +14,8 @@ import {
   proposeInjectorLaunch,
 } from '../src/core/in-process-script/injector-launcher.ts';
 import { clearWriteConsentStore, issueWriteConsent } from '../src/core/consent/write-consent.ts';
+import { upsertHelperManifestEntry, relativeHelperPath } from '../src/core/in-process-script/helper-manifest.ts';
+import { createHash } from 'node:crypto';
 import { buildFriendshipCapShellcode } from '../src/core/in-process-script/presets/crimson-fast-friendship.ts';
 import { buildAbsoluteJumpPatch } from '../src/core/in-process-script/code-cave.ts';
 
@@ -116,6 +118,12 @@ describe('in-process script execution milestone', () => {
     const exePath = path.join(helpersRoot, 'research-helper.exe');
     try {
       fs.writeFileSync(exePath, Buffer.from('MZ-fake-helper-v1'));
+      const sha256 = createHash('sha256').update('MZ-fake-helper-v1').digest('hex');
+      upsertHelperManifestEntry(helpersRoot, {
+        relativePath: relativeHelperPath(helpersRoot, exePath),
+        sha256,
+        registeredAt: new Date().toISOString(),
+      });
       const proposal = proposeInjectorLaunch({
         exePath,
         helpersRoot,
@@ -132,6 +140,8 @@ describe('in-process script execution milestone', () => {
         proposalId: proposal.proposalId,
         attachedPid: 1001,
         attachedExecutableName: 'CrimsonDesert.exe',
+        executablePath: 'C:\\Games\\CrimsonDesert.exe',
+        processStartTime: '2020-01-01T00:00:00.000Z',
         exePath: proposal.exePath,
         exeSha256: proposal.sha256,
       });
@@ -150,6 +160,8 @@ describe('in-process script execution milestone', () => {
               proposalId: proposal.proposalId,
               attachedPid: 1001,
               attachedExecutableName: 'CrimsonDesert.exe',
+              executablePath: 'C:\\Games\\CrimsonDesert.exe',
+              processStartTime: '2020-01-01T00:00:00.000Z',
               exePath: proposal.exePath,
               exeSha256: proposal.sha256,
             },
@@ -170,6 +182,8 @@ describe('in-process script execution milestone', () => {
         proposalId: proposal.proposalId,
         attachedPid: 1001,
         attachedExecutableName: 'CrimsonDesert.exe',
+        executablePath: 'C:\\Games\\CrimsonDesert.exe',
+        processStartTime: '2020-01-01T00:00:00.000Z',
         exePath: proposal.exePath,
         exeSha256: proposal.sha256,
       });
@@ -188,6 +202,8 @@ describe('in-process script execution milestone', () => {
               proposalId: proposal.proposalId,
               attachedPid: 1001,
               attachedExecutableName: 'CrimsonDesert.exe',
+              executablePath: 'C:\\Games\\CrimsonDesert.exe',
+              processStartTime: '2020-01-01T00:00:00.000Z',
               exePath: proposal.exePath,
               exeSha256: proposal.sha256,
             },
@@ -198,7 +214,7 @@ describe('in-process script execution milestone', () => {
               observedAt: new Date().toISOString(),
             },
           }),
-        /hash changed/i,
+        /hash changed|manifest|SHA-256/i,
       );
     } finally {
       clearInjectorProposals();

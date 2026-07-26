@@ -68,7 +68,7 @@ interface Window {
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
     liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) => Promise<any>;
-    liveMemoryIssueWriteConsent: (payload: { proposalId: string; userConfirmed: true }) => Promise<{
+    liveMemoryIssueWriteConsent: (payload: { proposalId: string; userConfirmed?: true }) => Promise<{
       success: boolean;
       consent?: { tokenId: string; expiresAt: string; bindingHash: string };
       error?: string;
@@ -269,55 +269,6 @@ interface Window {
     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
     wispOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
     wispOverlayHide: () => Promise<{ success: boolean; error?: string }>;
-    trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
-    trainerHotkeysGetBindings: () => Promise<{
-      success: boolean;
-      hotkeys?: Record<string, string>;
-      conflicts?: Array<{ accelerator: string; actions: string[] }>;
-      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
-      error?: string;
-    }>;
-    trainerHotkeysSetBindings: (payload: {
-      hotkeys: Record<string, string>;
-    }) => Promise<{
-      success: boolean;
-      hotkeys?: Record<string, string>;
-      conflicts?: Array<{ accelerator: string; actions: string[] }>;
-      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
-      error?: string;
-    }>;
-    onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
-
-    trainerCatalogSearch: (payload: {
-      query?: string;
-      limit?: number;
-      offset?: number;
-      categories?: string[];
-      verificationStatus?: 'all' | 'verified' | 'community' | 'metadata-only' | 'unverified';
-    }) => Promise<{
-      success: boolean;
-      entries?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry[];
-      total?: number;
-      error?: string;
-    }>;
-    trainerCatalogStats: () => Promise<{ success: boolean; total?: number; error?: string }>;
-    trainerCatalogGet: (payload: { catalogGameId: string }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
-    trainerCatalogSeed: () => Promise<{ success: boolean; total?: number; error?: string }>;
-    trainerCatalogSyncRemote: () => Promise<{
-      success: boolean;
-      report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
-      error?: string;
-    }>;
-    trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) => Promise<{
-      success: boolean;
-      report?: {
-        status: 'disabled' | 'synced';
-        imported: number;
-        skippedUserDefinitions: number;
-        rejected: number;
-        pages: number;
-        maxLocalTimestamp: number;
-      };
       error?: string;
     }>;
     trainerCatalogGetDefinition: (payload: { catalogGameId: string }) => Promise<{
@@ -629,7 +580,7 @@ interface Window {
       proposal?: import('../core/in-process-script/types.js').InjectorLaunchProposal;
       error?: string;
     }>;
-    inProcessIssueInjectorConsent: (payload: { proposalId: string; userConfirmed: true }) => Promise<{
+    inProcessIssueInjectorConsent: (payload: { proposalId: string; userConfirmed?: true }) => Promise<{
       success: boolean;
       consent?: { tokenId: string; expiresAt: string; bindingHash: string };
       error?: string;
@@ -641,6 +592,11 @@ interface Window {
     }) => Promise<{
       success: boolean;
       pid?: number;
+      error?: string;
+    }>;
+    inProcessRegisterInjectorHelper: (payload: { exePath: string }) => Promise<{
+      success: boolean;
+      entry?: { relativePath: string; sha256: string; publisher?: string | null; registeredAt: string };
       error?: string;
     }>;
     onCatalogProcessDetected?: (

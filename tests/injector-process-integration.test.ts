@@ -26,6 +26,8 @@ import {
   clearWriteConsentStore,
   issueWriteConsent,
 } from '../src/core/consent/write-consent.ts';
+import { upsertHelperManifestEntry, relativeHelperPath } from '../src/core/in-process-script/helper-manifest.ts';
+import { createHash } from 'node:crypto';
 
 const pilotGate = {
   featureEnabled: true,
@@ -140,6 +142,12 @@ describe('injector process + consent integration', () => {
     }
     const exePath = path.join(helpersRoot, 'solith-injector-fixture.exe');
     buildFixtureExe(exePath);
+    const sha256 = createHash('sha256').update(fs.readFileSync(exePath)).digest('hex');
+    upsertHelperManifestEntry(helpersRoot, {
+      relativePath: relativeHelperPath(helpersRoot, exePath),
+      sha256,
+      registeredAt: new Date().toISOString(),
+    });
 
     const proposal = proposeInjectorLaunch({
       exePath,
@@ -154,6 +162,8 @@ describe('injector process + consent integration', () => {
       proposalId: proposal.proposalId,
       attachedPid: 1001,
       attachedExecutableName: 'CrimsonDesert.exe',
+      executablePath: 'C:\\Games\\CrimsonDesert.exe',
+      processStartTime: '2020-01-01T00:00:00.000Z',
       exePath: proposal.exePath,
       exeSha256: proposal.sha256,
     });
@@ -171,6 +181,8 @@ describe('injector process + consent integration', () => {
         proposalId: proposal.proposalId,
         attachedPid: 1001,
         attachedExecutableName: 'CrimsonDesert.exe',
+        executablePath: 'C:\\Games\\CrimsonDesert.exe',
+        processStartTime: '2020-01-01T00:00:00.000Z',
         exePath: proposal.exePath,
         exeSha256: proposal.sha256,
       },
@@ -206,6 +218,12 @@ describe('injector process + consent integration', () => {
     }
     const exePath = path.join(helpersRoot, 'solith-injector-fixture.exe');
     buildFixtureExe(exePath);
+    const sha256 = createHash('sha256').update(fs.readFileSync(exePath)).digest('hex');
+    upsertHelperManifestEntry(helpersRoot, {
+      relativePath: relativeHelperPath(helpersRoot, exePath),
+      sha256,
+      registeredAt: new Date().toISOString(),
+    });
     const proposal = proposeInjectorLaunch({
       exePath,
       helpersRoot,
@@ -221,6 +239,8 @@ describe('injector process + consent integration', () => {
       proposalId: proposal.proposalId,
       attachedPid: 1001,
       attachedExecutableName: 'CrimsonDesert.exe',
+      executablePath: 'C:\\Games\\CrimsonDesert.exe',
+      processStartTime: '2020-01-01T00:00:00.000Z',
       exePath: proposal.exePath,
       exeSha256: proposal.sha256,
     });
@@ -239,6 +259,8 @@ describe('injector process + consent integration', () => {
             proposalId: proposal.proposalId,
             attachedPid: 1001,
             attachedExecutableName: 'CrimsonDesert.exe',
+            executablePath: 'C:\\Games\\CrimsonDesert.exe',
+            processStartTime: '2020-01-01T00:00:00.000Z',
             exePath: proposal.exePath,
             exeSha256: proposal.sha256,
           },

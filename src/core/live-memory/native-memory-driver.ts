@@ -284,10 +284,32 @@ export const nativeMemoryDriver: MemoryDriver = {
   getProcessStartTime(handle: LiveProcessHandle): string | null {
     try {
       validateHandle(handle, 'getProcessStartTime');
-      return queryWindowsProcessIdentity(handle.pid)?.startTimeIso ?? null;
+      return queryWindowsProcessIdentity(handle.pid)?.startTimeIso || null;
     } catch (err) {
       throw new Error(
         `getProcessStartTime(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  },
+
+  getProcessVolumeSerial(handle: LiveProcessHandle): string | null {
+    try {
+      validateHandle(handle, 'getProcessVolumeSerial');
+      return queryWindowsProcessIdentity(handle.pid)?.volumeSerialNumber ?? null;
+    } catch (err) {
+      throw new Error(
+        `getProcessVolumeSerial(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  },
+
+  getProcessFileIndex(handle: LiveProcessHandle): string | null {
+    try {
+      validateHandle(handle, 'getProcessFileIndex');
+      return queryWindowsProcessIdentity(handle.pid)?.fileIndex ?? null;
+    } catch (err) {
+      throw new Error(
+        `getProcessFileIndex(${handle.pid}) failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   },

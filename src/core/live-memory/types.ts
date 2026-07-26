@@ -17,10 +17,14 @@ export type LiveValueType = 'int32' | 'uint32' | 'float' | 'double' | 'int64' | 
 export interface LiveProcessTarget {
   pid: number;
   executableName: string;
-  /** Absolute executable path when known (PID-reuse mitigation). */
+  /** Absolute executable path — required for destructive confirm (fail-closed). */
   executablePath?: string;
-  /** ISO 8601. Combined with pid to detect PID reuse across polls. */
+  /** ISO 8601 creation time — required for destructive confirm (fail-closed). */
   startTime?: string;
+  volumeSerialNumber?: string;
+  fileIndex?: string;
+  /** SHA-256 of the executable image at attach time. */
+  exeSha256?: string;
 }
 
 /** A single resolved memory location inside the attached process. */
@@ -93,6 +97,10 @@ export interface MemoryDriver {
   getProcessExecutablePath(handle: LiveProcessHandle): string | null;
   /** UTC ISO-8601 process creation time, when the OS exposes it. */
   getProcessStartTime(handle: LiveProcessHandle): string | null;
+  /** Volume serial for the executable's volume, when available. */
+  getProcessVolumeSerial?(handle: LiveProcessHandle): string | null;
+  /** Stable file index for the executable image, when available. */
+  getProcessFileIndex?(handle: LiveProcessHandle): string | null;
   /** Enumerate committed memory regions for scanning. Bounded/filtered by the caller, not here. */
   getRegions(handle: LiveProcessHandle): MemoryRegion[];
   /** Bulk-read raw bytes for scanning. Throws if the read fails (e.g. region unmapped mid-scan). */

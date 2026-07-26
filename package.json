@@ -83,7 +83,8 @@
     "certify:live-pointer": "tsx scripts/certify-live-pointer.mjs",
     "test:phase3": "tsx --test tests/hub-sync.test.ts tests/community-trust.test.ts tests/community-sync-orchestrator.test.ts tests/write-policy.test.ts",
     "test:registry": "tsx --test tests/registry-query.test.ts tests/registry-schema.test.ts tests/registry-cli.test.ts tests/registry-explorer-page.test.tsx tests/ct-registry.test.ts tests/ce-enrichment.test.ts tests/feature-candidates.test.ts tests/runtime-readonly.test.ts tests/runtime-signature-validation.test.ts tests/headless-verification.test.ts tests/delta-engine.test.ts tests/l4-governance.test.ts",
-    "test:companion": "tsx --test tests/companion-wisp.test.ts"
+    "test:companion": "tsx --test tests/companion-wisp.test.ts",
+    "test:electron-consent-boundary": "playwright test tests/electron-consent-boundary.e2e.test.ts --config playwright.e2e.config.ts"
   },
   "keywords": [
     "trainer",

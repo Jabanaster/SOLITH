@@ -300,8 +300,6 @@ export const LiveMemoryProposeWriteSchema = z.object({
 
 export const LiveMemoryIssueWriteConsentSchema = z.object({
   proposalId: z.string().min(1).max(128),
-  /** Explicit UI confirmation for this exact pending write. */
-  userConfirmed: z.literal(true),
 });
 
 export const LiveMemoryConfirmWriteSchema = z.object({
@@ -618,13 +616,16 @@ export const InProcessProposeInjectorSchema = z.object({
 
 export const InProcessIssueInjectorConsentSchema = z.object({
   proposalId: z.string().uuid(),
-  userConfirmed: z.literal(true),
 });
 
 export const InProcessConfirmInjectorSchema = z.object({
   proposalId: z.string().uuid(),
   userApprovedAction: z.literal(true),
   consentToken: z.string().uuid(),
+});
+
+export const InProcessRegisterInjectorHelperSchema = z.object({
+  exePath: z.string().min(1).max(1024),
 });
 
 export const DefinitionFeedbackSchema = z.object({

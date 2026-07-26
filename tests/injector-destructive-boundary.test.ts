@@ -23,6 +23,11 @@ import {
   clearWriteConsentStore,
   issueWriteConsent,
 } from '../src/core/consent/write-consent.ts';
+import {
+  upsertHelperManifestEntry,
+  relativeHelperPath,
+} from '../src/core/in-process-script/helper-manifest.ts';
+import { createHash } from 'node:crypto';
 
 const pilotGate = {
   featureEnabled: true,
@@ -40,6 +45,12 @@ function makeHelpersRoot(dir: string): string {
 function makeHelperExe(helpersRoot: string, name = 'research-helper.exe', body = 'MZ-helper-v1'): string {
   const exePath = path.join(helpersRoot, name);
   fs.writeFileSync(exePath, Buffer.from(body));
+  const sha256 = createHash('sha256').update(body).digest('hex');
+  upsertHelperManifestEntry(helpersRoot, {
+    relativePath: relativeHelperPath(helpersRoot, exePath),
+    sha256,
+    registeredAt: new Date().toISOString(),
+  });
   return exePath;
 }
 
@@ -50,6 +61,8 @@ function issueConsentFor(proposal: { proposalId: string; exePath: string; sha256
     proposalId: proposal.proposalId,
     attachedPid: proposal.attachedPid,
     attachedExecutableName: 'CrimsonDesert.exe',
+    executablePath: 'C:\\Games\\CrimsonDesert.exe',
+    processStartTime: '2020-01-01T00:00:00.000Z',
     exePath: proposal.exePath,
     exeSha256: proposal.sha256,
   });
@@ -82,6 +95,8 @@ async function confirmOk(input: {
       proposalId: input.proposalId,
       attachedPid: input.consentBindingPid ?? attachedPid,
       attachedExecutableName: 'CrimsonDesert.exe',
+      executablePath: 'C:\\Games\\CrimsonDesert.exe',
+      processStartTime: '2020-01-01T00:00:00.000Z',
       exePath: proposal.exePath,
       exeSha256: proposal.sha256,
     },
@@ -163,6 +178,22 @@ describe('Phase 3 injector destructive-operation boundary', () => {
     );
   });
 
+  test('unregistered helper inside helpers root fails', () => {
+    const exePath = path.join(helpersRoot, 'unregistered.exe');
+    fs.writeFileSync(exePath, Buffer.from('MZ-unregistered'));
+    assert.throws(
+      () =>
+        proposeInjectorLaunch({
+          exePath,
+          helpersRoot,
+          attachedExecutableName: 'CrimsonDesert.exe',
+          attachedPid: 1001,
+          gate: pilotGate,
+        }),
+      /not registered|manifest/i,
+    );
+  });
+
   test('caller path substitution on returned proposal object fails on confirm', async () => {
     const exePath = makeHelperExe(helpersRoot);
     const evilPath = makeHelperExe(helpersRoot, 'evil.exe', 'MZ-evil');
@@ -216,7 +247,7 @@ describe('Phase 3 injector destructive-operation boundary', () => {
           helpersRoot,
           consentToken: consent.tokenId,
         }),
-      /hash changed/i,
+      /hash changed|manifest|SHA-256/i,
     );
     assert.equal(getInjectorLaunchAudit().some((e) => e.op === 'confirm' && e.allowed === false), true);
     assert.ok(getInjectorProposal(proposal.proposalId), 'failed confirm must not consume proposal');
@@ -250,6 +281,8 @@ describe('Phase 3 injector destructive-operation boundary', () => {
             proposalId: proposal.proposalId,
             attachedPid: 1001,
             attachedExecutableName: 'CrimsonDesert.exe',
+            executablePath: 'C:\\Games\\CrimsonDesert.exe',
+            processStartTime: '2020-01-01T00:00:00.000Z',
             exePath: proposal.exePath,
             exeSha256: proposal.sha256,
           },
@@ -420,6 +453,8 @@ describe('Phase 3 injector destructive-operation boundary', () => {
         proposalId: proposal.proposalId,
         attachedPid: 1001,
         attachedExecutableName: 'CrimsonDesert.exe',
+        executablePath: 'C:\\Games\\CrimsonDesert.exe',
+        processStartTime: '2020-01-01T00:00:00.000Z',
         exePath: proposal.exePath,
         exeSha256: proposal.sha256,
       },
@@ -501,6 +536,8 @@ describe('Phase 3 injector destructive-operation boundary', () => {
       proposalId: proposal.proposalId,
       attachedPid: 1001,
       attachedExecutableName: 'CrimsonDesert.exe',
+      executablePath: 'C:\\Games\\CrimsonDesert.exe',
+      processStartTime: '2020-01-01T00:00:00.000Z',
       exePath,
       exeSha256: proposal.sha256,
     });
@@ -519,6 +556,8 @@ describe('Phase 3 injector destructive-operation boundary', () => {
             proposalId: proposal.proposalId,
             attachedPid: 1001,
             attachedExecutableName: 'CrimsonDesert.exe',
+            executablePath: 'C:\\Games\\CrimsonDesert.exe',
+            processStartTime: '2020-01-01T00:00:00.000Z',
             exePath,
             exeSha256: proposal.sha256,
           },
@@ -545,6 +584,8 @@ describe('Phase 3 injector destructive-operation boundary', () => {
       proposalId: fakeId,
       attachedPid: 1001,
       attachedExecutableName: 'CrimsonDesert.exe',
+      executablePath: 'C:\\Games\\CrimsonDesert.exe',
+      processStartTime: '2020-01-01T00:00:00.000Z',
       exePath: path.join(helpersRoot, 'x.exe'),
       exeSha256: 'abc',
     });
@@ -563,6 +604,8 @@ describe('Phase 3 injector destructive-operation boundary', () => {
             proposalId: fakeId,
             attachedPid: 1001,
             attachedExecutableName: 'CrimsonDesert.exe',
+            executablePath: 'C:\\Games\\CrimsonDesert.exe',
+            processStartTime: '2020-01-01T00:00:00.000Z',
             exePath: path.join(helpersRoot, 'x.exe'),
             exeSha256: 'abc',
           },

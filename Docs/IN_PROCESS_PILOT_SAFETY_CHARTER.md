@@ -22,11 +22,12 @@ This is **not** a general trainer injection framework.
 1. Feature flag **OFF** until you turn it on in Settings
 2. Solo / offline confirmation for the session (session-owned; not client-asserted alone)
 3. Explicit per-action approval (hook install / injector launch) via short-lived, single-use consent tokens bound to the operation
-4. Hook install rechecks the session online-guard; injector propose/confirm require an attached **`CrimsonDesert.exe`** session with matching PID **and** live OS identity (basename, path, creation time), offline waiver, consent token, online fail-closed observation, matching file hash, and helper path under **`userData/injector-helpers`**
+4. Hook install rechecks the session online-guard; injector propose/confirm require an attached **`CrimsonDesert.exe`** session with matching PID **and** fail-closed live OS identity (basename, path, creation time; volume/file index/hash when captured), offline waiver, **main-process privileged confirmation dialog**, consent token, online fail-closed observation, matching file hash, helper path under **`userData/injector-helpers`**, and a **sealed hash manifest** entry
 5. Attached executable name must be exactly **`CrimsonDesert.exe`**
-6. Injector launch outcomes are appended to **`userData/logs/injector-audit.jsonl`** (durable audit), not only in-memory diagnostics
+6. Injector launch outcomes are appended to **`userData/logs/injector-audit.jsonl`** (durable audit)
+7. Helper registration requires a privileged main-process approval and writes a sealed manifest
 
-Source of truth: `src/core/in-process-script/charter.ts` + `guards.ts` + `injector-launcher.ts` + `src/core/consent/write-consent.ts`.
+Source of truth: `src/core/in-process-script/charter.ts` + `guards.ts` + `injector-launcher.ts` + `helper-manifest.ts` + `src/core/consent/write-consent.ts` + `electron/privileged-consent-dialog.ts`.
 
 ## Ban / account / AV risk
 

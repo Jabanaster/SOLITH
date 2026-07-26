@@ -18,8 +18,11 @@ function baseBinding(overrides: Partial<WriteConsentBinding> = {}): WriteConsent
     proposalId: 'prop-1',
     attachedPid: 4242,
     attachedExecutableName: 'CrimsonDesert.exe',
+    executablePath: 'C:\\Games\\CrimsonDesert.exe',
+    processStartTime: '2026-07-01T00:00:00.000Z',
     address: '4096',
     dataType: 'int32',
+    currentValue: 10,
     requestedValue: 99,
     ...overrides,
   };
@@ -36,6 +39,13 @@ describe('write consent artifacts', () => {
     assert.equal(artifact.bindingHash, hashConsentBinding(binding));
     assert.equal(consumeWriteConsent(artifact.tokenId, binding).ok, true);
     assert.equal(consumeWriteConsent(artifact.tokenId, binding).ok, false);
+  });
+
+  test('rejects incomplete identity bindings', () => {
+    assert.throws(
+      () => issueWriteConsent(baseBinding({ executablePath: undefined })),
+      /path and creation time/i,
+    );
   });
 
   test('rejects binding mismatch (address / pid / session)', () => {
@@ -64,6 +74,7 @@ describe('write consent artifacts', () => {
       operation: 'injector_confirm_launch',
       address: undefined,
       dataType: undefined,
+      currentValue: undefined,
       requestedValue: undefined,
       exePath: 'C:\\Solith\\injector-helpers\\helper.exe',
       exeSha256: 'abc123',

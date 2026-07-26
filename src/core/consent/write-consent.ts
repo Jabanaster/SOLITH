@@ -2,8 +2,9 @@
  * Operation-bound write / injector consent artifacts.
  *
  * Short-lived, single-use tokens bound to an operation hash (proposal, session,
- * PID, executable, optional address/value/path). Privileged code must issue
- * these only after an explicit UI confirmation; confirm paths must consume them.
+ * PID, executable identity, optional address/value/path). Privileged code must
+ * issue these only after a main-process confirmation surface; confirm paths must
+ * consume them.
  */
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -19,9 +20,17 @@ export interface WriteConsentBinding {
   proposalId: string;
   attachedPid: number;
   attachedExecutableName: string;
+  /** Canonical attached executable path (required for privileged destructive ops). */
+  executablePath?: string;
+  /** UTC ISO process creation time. */
+  processStartTime?: string;
+  volumeSerialNumber?: string;
+  fileIndex?: string;
+  attachedExeSha256?: string;
   /** Memory write target address as decimal string. */
   address?: string;
   dataType?: string;
+  currentValue?: number;
   requestedValue?: number;
   /** Injector helper absolute path. */
   exePath?: string;
@@ -54,8 +63,14 @@ export function hashConsentBinding(binding: WriteConsentBinding): string {
     proposalId: binding.proposalId,
     attachedPid: binding.attachedPid,
     attachedExecutableName: binding.attachedExecutableName.toLowerCase(),
+    executablePath: binding.executablePath ? binding.executablePath.toLowerCase() : null,
+    processStartTime: binding.processStartTime ?? null,
+    volumeSerialNumber: binding.volumeSerialNumber ?? null,
+    fileIndex: binding.fileIndex ?? null,
+    attachedExeSha256: binding.attachedExeSha256 ? binding.attachedExeSha256.toLowerCase() : null,
     address: binding.address ?? null,
     dataType: binding.dataType ?? null,
+    currentValue: binding.currentValue ?? null,
     requestedValue: binding.requestedValue ?? null,
     exePath: binding.exePath ? binding.exePath.toLowerCase() : null,
     exeSha256: binding.exeSha256 ? binding.exeSha256.toLowerCase() : null,
@@ -72,6 +87,9 @@ export function issueWriteConsent(
   }
   if (!binding.sessionKey || !binding.proposalId || !binding.attachedExecutableName.trim()) {
     throw new Error('Consent binding is incomplete.');
+  }
+  if (!binding.executablePath?.trim() || !binding.processStartTime?.trim()) {
+    throw new Error('Consent requires fail-closed process path and creation time.');
   }
   const nowMs = options.nowMs ?? Date.now();
   const ttlMs = options.ttlMs ?? WRITE_CONSENT_TTL_MS;
