@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFreezeLifecycleWiring } from '../../src/core/live-memory/freeze-lifecycle-wiring.js';
+import { appendFreezeAuditWithFallback } from '../../src/core/live-memory/freeze-audit-routing.js';
 
 class Emitter {
   private listeners = new Map<string, ((...args: any[]) => void)[]>();
@@ -50,4 +51,18 @@ test('freeze lifecycle cleanup is owner-scoped, idempotent, and covers renderer 
     '42:window_closed',
     'all:app_quit',
   ]);
+});
+
+test('lifecycle audit falls back after the renderer bundle is disposed', () => {
+  const fallback: Record<string, unknown>[] = [];
+  appendFreezeAuditWithFallback(undefined, {
+    append: (entry) => fallback.push(entry),
+  }, {
+    op: 'freeze_cleanup_failed',
+    reason: 'renderer_destroyed',
+  });
+  assert.deepEqual(fallback, [{
+    op: 'freeze_cleanup_failed',
+    reason: 'renderer_destroyed',
+  }]);
 });

@@ -7,6 +7,7 @@ export {
 } from './single-player-waiver.js';
 export type { WaiverRecord, WaiverStoreFile } from './single-player-waiver.js';
 export { observeRemoteConnections } from './remote-connection-observer.js';
+export { appendFreezeAuditWithFallback } from './freeze-audit-routing.js';
 export { nativeMemoryDriver, listLiveMemoryProcesses } from './native-memory-driver.js';
 export type { LiveProcessListEntry } from './native-memory-driver.js';
 export { LiveMemorySession } from './live-memory-session.js';

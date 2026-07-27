@@ -109,7 +109,7 @@ Phase 2 review-fix verification
 
 Targeted command:
 npx tsx --test tests/live-memory/freeze-consent.test.ts tests/live-memory/freeze-session-registry.test.ts tests/live-memory/freeze-lifecycle-wiring.test.ts tests/live-memory/live-memory-session.test.ts
-Result: 41 tests, 41 pass, 0 fail, 0 cancelled, 0 skipped.
+Result: 42 tests, 42 pass, 0 fail, 0 cancelled, 0 skipped.
 The additional tests cover request-vs-approval target/PID/renderer binding,
 disposed-owner cleanup failure, and both navigation listeners firing
 idempotently.
@@ -122,14 +122,14 @@ reported 29/29 checks passed.
 
 Live-memory suite after review fixes:
 npm run test:live-memory
-Result: 200 tests, 197 pass, 3 fail, 0 cancelled, 0 skipped.
+Result: 201 tests, 198 pass, 3 fail, 0 cancelled, 0 skipped.
 The three failures remain the same Linux invalid-PID remote-connection
 assertions (`actual 'unavailable'`, `expected 'error'`) reproduced on
 origin/master.
 
 Full suite after review fixes and Electron build:
 npm test
-Result: 872 tests, 868 pass, 4 fail, 0 cancelled, 0 skipped.
+Result: 873 tests, 869 pass, 4 fail, 0 cancelled, 0 skipped.
 The four failures are the same three Linux invalid-PID assertions and the
 same safety-integration cleanup assertion reproduced on origin/master.
 Trainer-host E2E tests ran rather than being cancelled.

@@ -48,6 +48,7 @@ import {
   buildFreezeConsentBinding,
   redactFreezeConsentRecord,
 } from '../src/core/live-memory/freeze-consent.js';
+import { appendFreezeAuditWithFallback } from '../src/core/live-memory/freeze-audit-routing.js';
 import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
 import { setCrashReportContext } from '../src/core/crash/local-crash-reporter.js';
 import { hashInstalledExecutableForCatalog } from '../src/core/live-memory/installed-exe-hash.js';
@@ -99,8 +100,7 @@ function getFreezeSessionRegistry(mod: any): any {
       audit: {
         emit: (event: any) => {
           const bundle = sessions.get(event.rendererId);
-          const audit = bundle?.audit ?? freezeFallbackAudit;
-          audit.append({
+          appendFreezeAuditWithFallback(bundle?.audit, freezeFallbackAudit, {
             op: event.op,
             at: new Date(event.at).toISOString(),
             pid: event.pid,
@@ -109,7 +109,7 @@ function getFreezeSessionRegistry(mod: any): any {
             freezeToState: event.to,
             reason: event.reason,
             ...(event.error ? { error: event.error } : {}),
-          } as any);
+          });
         },
       },
       cleanup: () => {

@@ -13,6 +13,7 @@ src/app/hooks/useGameCheatSession.ts
 src/app/pages/LiveMemoryTrainerPage.tsx
 src/core/live-memory/audit-log.ts
 src/core/live-memory/freeze-consent.ts
+src/core/live-memory/freeze-audit-routing.ts
 src/core/live-memory/freeze-lifecycle-wiring.ts
 src/core/live-memory/freeze-session-registry.ts
 src/core/live-memory/live-memory-session.ts
