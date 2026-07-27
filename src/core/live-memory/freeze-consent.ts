@@ -129,6 +129,8 @@ export class FreezeConsentStore {
   }
 
   propose(details: FreezeConsentDetails): FreezeConsentPreview {
+    this.pruneExpired();
+    this.pruneReplayHistory();
     const now = this.now();
     const record: FreezeConsentRecord = {
       proposalId: randomUUID(),
@@ -154,6 +156,7 @@ export class FreezeConsentStore {
     request: FreezeConsentConfirmation = {},
   ): Promise<FreezeConsentApprovalResult> {
     this.pruneExpired();
+    this.pruneReplayHistory();
     const record = this.records.get(proposalId);
     if (!record) return { ok: false, code: 'missing' };
     if (this.now() >= record.expiresAt) {
