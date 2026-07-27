@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import {
   FreezeConsentStore,
   LIVE_MEMORY_FREEZE_START_OPERATION,
+  buildFreezeConsentBinding,
   redactFreezeConsentRecord,
 } from '../../src/core/live-memory/freeze-consent.js';
 
@@ -74,6 +75,32 @@ describe('FreezeConsentStore', () => {
         rendererId: binding.rendererId,
       }), { ok: false, code });
     }
+  });
+
+  test('request binding rejects approved target, reattached PID, and renderer divergence', async () => {
+    const store = makeStore();
+    const token = await issue(store);
+    const approvedRequest = buildFreezeConsentBinding({
+      ...details,
+      maxAllowedDurationMs: 21_600_000,
+    });
+
+    assert.deepEqual(
+      store.consume(token, { ...approvedRequest, address: '0x2000', value: 9999, intervalMs: 500, maxDurationMs: 1_000 }),
+      { ok: false, code: 'target_mismatch' },
+    );
+
+    const pidToken = await issue(store);
+    assert.deepEqual(
+      store.consume(pidToken, { ...approvedRequest, pid: 4321, processIdentity: 'C:\\Games\\other.exe' }),
+      { ok: false, code: 'pid_mismatch' },
+    );
+
+    const rendererToken = await issue(store);
+    assert.deepEqual(
+      store.consume(rendererToken, { ...approvedRequest, rendererId: 99 }),
+      { ok: false, code: 'renderer_mismatch' },
+    );
   });
 
   test('caller boolean cannot bypass the confirmation provider', async () => {

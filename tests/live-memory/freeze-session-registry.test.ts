@@ -82,6 +82,20 @@ describe('FreezeSessionRegistry', () => {
     assert.equal(!result.ok && result.code, 'cleanup_failed');
   });
 
+  test('disposed owners fail closed and emit cleanup failure instead of reporting success', () => {
+    let disposed = false;
+    const { registry, events } = makeRegistry(() => {
+      if (disposed) throw new Error('freeze_cleanup_owner_unavailable');
+    });
+    registry.register(input('disposed'));
+    activate(registry, 'disposed');
+    disposed = true;
+    const result = registry.stopByRenderer(7, 'renderer_destroyed');
+    assert.equal(result[0]?.ok, false);
+    assert.equal(registry.get('disposed')?.state, 'CLEANUP_FAILED');
+    assert.equal(events.at(-1)?.op, 'freeze_cleanup_failed');
+  });
+
   test('stopByRenderer only affects sessions owned by that renderer', () => {
     const { registry } = makeRegistry();
     for (const record of [input('one', 7, 1234), input('two', 8, 1234), input('three', 7, 9999)]) {

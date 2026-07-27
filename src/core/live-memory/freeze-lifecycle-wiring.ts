@@ -1,7 +1,11 @@
+export interface FreezeNavigationEvent {
+  readonly isDefaultPrevented?: () => boolean;
+}
+
 export interface FreezeLifecycleWebContents {
   readonly id: number;
   once(event: 'destroyed', listener: () => void): unknown;
-  on(event: 'render-process-gone' | 'did-start-navigation' | 'will-navigate', listener: (...args: any[]) => void): unknown;
+  on(event: string, listener: (...args: never[]) => unknown): unknown;
 }
 
 export interface FreezeLifecycleWindow {
@@ -35,10 +39,15 @@ export function createFreezeLifecycleWiring(
       const stop = (reason: string) => cleanup.stopByRenderer(rendererId, reason);
       window.webContents.once('destroyed', () => stop('renderer_destroyed'));
       window.webContents.on('render-process-gone', () => stop('renderer_crashed'));
-      window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+      window.webContents.on('did-start-navigation', (
+        _event: FreezeNavigationEvent,
+        _url: string,
+        isInPlace: boolean,
+        isMainFrame: boolean,
+      ) => {
         if (isMainFrame && !isInPlace) stop('navigation_started');
       });
-      window.webContents.on('will-navigate', () => stop('will_navigate'));
+      window.webContents.on('will-navigate', (_event: FreezeNavigationEvent, _url: string) => stop('will_navigate'));
       window.on('closed', () => stop('window_closed'));
     },
   };

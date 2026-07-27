@@ -23,6 +23,7 @@ import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
 import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
 import { assessProtectedTarget } from '../runtime/protected-target-guard.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
+import { MAX_FREEZE_DURATION_MS } from './types.js';
 import type {
   FreezeStatus,
   FreezeStopReason,
@@ -58,7 +59,7 @@ const DEFAULT_FREEZE_SCHEDULER: FreezeScheduler = {
 };
 
 const DEFAULT_FREEZE_INTERVAL_MS = 200;
-export const MAX_FREEZE_DURATION_MS = 6 * 60 * 60 * 1000;
+export { MAX_FREEZE_DURATION_MS } from './types.js';
 
 interface FreezeState {
   target: FreezeTarget;

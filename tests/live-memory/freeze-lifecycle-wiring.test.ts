@@ -35,6 +35,7 @@ test('freeze lifecycle cleanup is owner-scoped, idempotent, and covers renderer 
   wiring.wireWindow(window);
   wiring.wireWindow(window);
   webContents.emit('did-start-navigation', {}, 'https://example.test', false, true);
+  webContents.emit('will-navigate', {}, 'https://example.test');
   webContents.emit('did-start-navigation', {}, 'https://example.test/#hash', true, true);
   webContents.emit('render-process-gone');
   webContents.emit('destroyed');
@@ -43,6 +44,7 @@ test('freeze lifecycle cleanup is owner-scoped, idempotent, and covers renderer 
 
   assert.deepEqual(calls, [
     '42:navigation_started',
+    '42:will_navigate',
     '42:renderer_crashed',
     '42:renderer_destroyed',
     '42:window_closed',

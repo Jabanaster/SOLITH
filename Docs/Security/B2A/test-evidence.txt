@@ -104,3 +104,54 @@ Result: 870 tests, 866 pass, 4 fail, 0 cancelled, 0 skipped.
 The four remaining failures are the same three Linux invalid-PID
 remote-connection assertions and the same safety-integration cleanup
 assertion reproduced on master. Trainer-host E2E cancellation is eliminated.
+
+Phase 2 review-fix verification
+
+Targeted command:
+npx tsx --test tests/live-memory/freeze-consent.test.ts tests/live-memory/freeze-session-registry.test.ts tests/live-memory/freeze-lifecycle-wiring.test.ts tests/live-memory/live-memory-session.test.ts
+Result: 41 tests, 41 pass, 0 fail, 0 cancelled, 0 skipped.
+The additional tests cover request-vs-approval target/PID/renderer binding,
+disposed-owner cleanup failure, and both navigation listeners firing
+idempotently.
+
+Electron build:
+npm run build:electron
+Result: exit code 0. The scanner step explicitly skipped its native
+Windows-only helper. tsup generated all Electron bundles and the verifier
+reported 29/29 checks passed.
+
+Live-memory suite after review fixes:
+npm run test:live-memory
+Result: 200 tests, 197 pass, 3 fail, 0 cancelled, 0 skipped.
+The three failures remain the same Linux invalid-PID remote-connection
+assertions (`actual 'unavailable'`, `expected 'error'`) reproduced on
+origin/master.
+
+Full suite after review fixes and Electron build:
+npm test
+Result: 872 tests, 868 pass, 4 fail, 0 cancelled, 0 skipped.
+The four failures are the same three Linux invalid-PID assertions and the
+same safety-integration cleanup assertion reproduced on origin/master.
+Trainer-host E2E tests ran rather than being cancelled.
+
+Renderer/source typecheck after review fixes:
+./node_modules/.bin/tsc --noEmit
+Result: PASS, exit code 0.
+
+Electron/core typecheck after review fixes:
+./node_modules/.bin/tsc -p tsconfig.electron.json --noEmit
+Result: FAIL with 36 existing diagnostics in unrelated files. No diagnostics
+were reported for the touched review-fix files, including
+electron/ipc-validation.ts, electron/live-memory-ipc.ts, electron/main.ts,
+src/core/live-memory/freeze-consent.ts,
+src/core/live-memory/freeze-lifecycle-wiring.ts,
+src/core/live-memory/freeze-session-registry.ts,
+src/core/live-memory/live-memory-session.ts, or
+src/core/live-memory/types.ts.
+
+Raw-token audit check:
+rg -n "bindingForToken" . --glob '!node_modules/**'
+Result: no matches. The only approvalToken use in the IPC implementation is
+the renderer return value or the single-use consume input; audit fields use
+the redacted first-four-characters representation. No raw token appears in
+an audit field or error string.

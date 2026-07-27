@@ -68,6 +68,30 @@ export interface FreezeConsentBinding {
   rendererId?: number | null;
 }
 
+export function buildFreezeConsentBinding(input: {
+  address: string;
+  dataType: string;
+  value: number;
+  intervalMs?: number;
+  maxDurationMs?: number;
+  pid: number;
+  processIdentity: string;
+  rendererId: number;
+  maxAllowedDurationMs: number;
+}): FreezeConsentBinding {
+  return {
+    operation: LIVE_MEMORY_FREEZE_START_OPERATION,
+    pid: input.pid,
+    processIdentity: input.processIdentity,
+    address: input.address,
+    dataType: input.dataType,
+    value: input.value,
+    intervalMs: input.intervalMs ?? 200,
+    maxDurationMs: Math.min(input.maxDurationMs ?? input.maxAllowedDurationMs, input.maxAllowedDurationMs),
+    rendererId: input.rendererId,
+  };
+}
+
 export type FreezeConsentConsumeResult =
   | { ok: true; record: FreezeConsentRecord }
   | {
@@ -229,22 +253,6 @@ export class FreezeConsentStore {
       return { ok: false, code: 'renderer_mismatch' };
     }
     return { ok: true, record: { ...record } };
-  }
-
-  bindingForToken(tokenId: string): FreezeConsentBinding | null {
-    const record = this.records.get(tokenId);
-    if (!record || record.state !== 'APPROVED' || !record.tokenId) return null;
-    return {
-      operation: record.operation,
-      pid: record.pid,
-      processIdentity: record.processIdentity,
-      address: record.address,
-      dataType: record.dataType,
-      value: record.value,
-      intervalMs: record.intervalMs,
-      maxDurationMs: record.maxDurationMs,
-      rendererId: record.rendererId,
-    };
   }
 
   private preview(record: FreezeConsentRecord): FreezeConsentPreview {

@@ -23,6 +23,7 @@ export {
   MAX_FREEZE_DURATION_MS,
 } from './live-memory-session.js';
 export {
+  buildFreezeConsentBinding,
   DEFAULT_FREEZE_CONSENT_TTL_MS,
   FreezeConsentStore,
   LIVE_MEMORY_FREEZE_START_OPERATION,

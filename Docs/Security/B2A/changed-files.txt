@@ -15,6 +15,8 @@ src/core/live-memory/audit-log.ts
 src/core/live-memory/freeze-consent.ts
 src/core/live-memory/freeze-lifecycle-wiring.ts
 src/core/live-memory/freeze-session-registry.ts
+src/core/live-memory/live-memory-session.ts
+src/core/live-memory/types.ts
 src/core/live-memory/index.ts
 src/types/global.d.ts
 tests/live-memory/freeze-consent.test.ts

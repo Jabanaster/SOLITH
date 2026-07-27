@@ -18,10 +18,19 @@ The main process stops records owned by a renderer on:
 - `BrowserWindow.closed`
 
 Application `before-quit` stops all records. Cleanup is idempotent and routes
-to the owning `LiveMemorySession.stopFreeze()` callback. Failures transition
-the registry record to `CLEANUP_FAILED` and are audited. Terminal records are
-retained only for a bounded period/count so duplicate cleanup remains safe
-without unbounded memory growth.
+to a direct callback retained with the owning record, rather than looking up a
+renderer bundle at cleanup time. Session disposal first asks the registry to
+stop its records, then detaches the session; a missing or disposed cleanup
+owner fails closed to `CLEANUP_FAILED` instead of reporting successful cleanup.
+Failures transition the registry record to `CLEANUP_FAILED` and are audited.
+Lifecycle audit events use a process-wide fallback `MemoryAuditLog` when the
+renderer bundle has already been removed. Terminal records are retained only
+for a bounded period/count so duplicate cleanup remains safe without
+unbounded memory growth.
+
+If a legacy active session is found without a registry ownership record, the
+explicit stop handler stops it directly and audits an unowned legacy stop
+instead of leaving an orphaned freeze running.
 
 There is no reattachment protocol: reload and navigation stop the old freeze.
 A new renderer receives a new `webContents.id` and cannot inherit an old

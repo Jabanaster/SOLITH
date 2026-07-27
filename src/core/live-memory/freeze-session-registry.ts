@@ -52,9 +52,11 @@ export interface FreezeSessionScheduler {
   cancel(handle: unknown): void;
 }
 
+export type FreezeSessionCleanup = (record: FreezeSessionRecord) => void;
+
 export interface FreezeSessionRegistryOptions {
   audit: FreezeSessionAuditSink;
-  cleanup: (record: FreezeSessionRecord) => void;
+  cleanup: FreezeSessionCleanup;
   now?: () => number;
   scheduler?: FreezeSessionScheduler;
   terminalRetentionMs?: number;
@@ -88,6 +90,7 @@ export class FreezeSessionRegistry {
   private readonly expiryTimers = new Map<string, unknown>();
   private readonly audit: FreezeSessionAuditSink;
   private readonly cleanup: (record: FreezeSessionRecord) => void;
+  private readonly cleanups = new Map<string, FreezeSessionCleanup>();
   private readonly now: () => number;
   private readonly scheduler: FreezeSessionScheduler;
   private readonly terminalRetentionMs: number;
@@ -105,14 +108,17 @@ export class FreezeSessionRegistry {
 
   register(input: Omit<FreezeSessionRecord, 'state' | 'cleanupState'> & {
     state?: FreezeSessionState;
+    cleanup?: FreezeSessionCleanup;
   }): FreezeSessionRecord {
     this.pruneTerminalRecords();
+    const { cleanup, ...recordInput } = input;
     const record: FreezeSessionRecord = {
-      ...input,
+      ...recordInput,
       state: input.state ?? 'PROPOSED',
       cleanupState: 'PENDING',
     };
     this.sessions.set(record.freezeSessionId, record);
+    this.cleanups.set(record.freezeSessionId, cleanup ?? this.cleanup);
     this.emit(record, record.state, 'freeze_proposed');
     this.scheduleExpiry(record);
     return { ...record };
@@ -170,7 +176,9 @@ export class FreezeSessionRegistry {
     if (!stopping.ok) return stopping;
     const current = this.sessions.get(id)!;
     try {
-      this.cleanup({ ...current });
+      const cleanup = this.cleanups.get(id);
+      if (!cleanup) throw new Error('cleanup_unavailable');
+      cleanup({ ...current });
       current.cleanupState = 'SUCCEEDED';
       return this.transition(id, terminal, reason, terminal === 'EXPIRED' ? 'freeze_expired' : 'freeze_stopped');
     } catch (error) {
@@ -256,6 +264,7 @@ export class FreezeSessionRegistry {
       if (at < cutoff) {
         this.terminalAt.delete(id);
         this.sessions.delete(id);
+        this.cleanups.delete(id);
       }
     }
     while (this.terminalAt.size > this.terminalMaxEntries) {
@@ -263,6 +272,7 @@ export class FreezeSessionRegistry {
       if (!oldest) break;
       this.terminalAt.delete(oldest);
       this.sessions.delete(oldest);
+      this.cleanups.delete(oldest);
     }
   }
 }

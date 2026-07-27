@@ -208,6 +208,8 @@ export type FreezeStopReason =
   | 'detached'
   | 'max_duration';
 
+export const MAX_FREEZE_DURATION_MS = 6 * 60 * 60 * 1000;
+
 export interface FreezeStatus {
   active: boolean;
   target: FreezeTarget | null;
