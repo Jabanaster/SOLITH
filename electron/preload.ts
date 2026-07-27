@@ -178,7 +178,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     sourceId: string;
     roi: { x: number; y: number; width: number; height: number };
   }) => ipcRenderer.invoke('local-ocr-read-window-region', payload),
-  liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
+  liveMemoryFreezePropose: (payload: {
+    address: string;
+    dataType: string;
+    value: number;
+    intervalMs?: number;
+    maxDurationMs?: number;
+  }) => ipcRenderer.invoke('live-memory-freeze-propose', payload),
+  liveMemoryFreezeApprove: (payload: { proposalId: string }) =>
+    ipcRenderer.invoke('live-memory-freeze-approve', payload),
+  liveMemoryFreezeStart: (payload: {
+    address: string;
+    dataType: string;
+    value: number;
+    intervalMs?: number;
+    maxDurationMs?: number;
+    approvalToken: string;
+  }) =>
     ipcRenderer.invoke('live-memory-freeze-start', payload),
   liveMemoryFreezeStop: () => ipcRenderer.invoke('live-memory-freeze-stop'),
   liveMemoryFreezeStatus: () => ipcRenderer.invoke('live-memory-freeze-status'),

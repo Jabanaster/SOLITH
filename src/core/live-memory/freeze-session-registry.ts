@@ -130,6 +130,10 @@ export class FreezeSessionRegistry {
     return this.transition(id, 'ACTIVE', 'freeze_started');
   }
 
+  markFailed(id: string, reason = 'freeze_failed'): FreezeSessionTransitionResult {
+    return this.transition(id, 'FAILED', reason, 'freeze_stopped');
+  }
+
   stopByRenderer(rendererId: number, reason = 'renderer_stopped'): FreezeSessionTransitionResult[] {
     this.pruneTerminalRecords();
     return [...this.sessions.values()]

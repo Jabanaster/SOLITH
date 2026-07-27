@@ -86,6 +86,15 @@ export {
 export type { FuzzyScanOptions, SignatureMatch } from './signature-engine.js';
 export { MemoryAuditLog } from './audit-log.js';
 export type { MemoryAuditEntry, MemoryAuditOp, MemoryAuditLogOptions } from './audit-log.js';
+export {
+  createFreezeLifecycleWiring,
+} from './freeze-lifecycle-wiring.js';
+export type {
+  FreezeLifecycleApp,
+  FreezeLifecycleWindow,
+  FreezeLifecycleWebContents,
+  FreezeLifecycleWiring,
+} from './freeze-lifecycle-wiring.js';
 export { MemoryManager } from './memory-manager.js';
 export type { SafeWriteResult, MemoryManagerSnapshotListener } from './memory-manager.js';
 export {

@@ -228,6 +228,22 @@ export class FreezeConsentStore {
     return { ok: true, record: { ...record } };
   }
 
+  bindingForToken(tokenId: string): FreezeConsentBinding | null {
+    const record = this.records.get(tokenId);
+    if (!record || record.state !== 'APPROVED' || !record.tokenId) return null;
+    return {
+      operation: record.operation,
+      pid: record.pid,
+      processIdentity: record.processIdentity,
+      address: record.address,
+      dataType: record.dataType,
+      value: record.value,
+      intervalMs: record.intervalMs,
+      maxDurationMs: record.maxDurationMs,
+      rendererId: record.rendererId,
+    };
+  }
+
   private preview(record: FreezeConsentRecord): FreezeConsentPreview {
     const { tokenId: _tokenId, state: _state, ...details } = record;
     return { ...details, state: 'PROPOSED' };

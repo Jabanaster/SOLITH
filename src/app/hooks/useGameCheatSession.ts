@@ -784,11 +784,29 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       }
 
       const value = Number(cheat.infiniteValue ?? 1);
+      const proposal = await window.electronAPI.liveMemoryFreezePropose({
+        address: current.confirmedAddress,
+        dataType,
+        value,
+        intervalMs: 200,
+      });
+      if (!proposal.success || !proposal.proposal?.proposalId) {
+        patchState(cheat.id, { status: 'error', error: proposal.error ?? 'Freeze proposal failed' });
+        return;
+      }
+      const approval = await window.electronAPI.liveMemoryFreezeApprove({
+        proposalId: proposal.proposal.proposalId,
+      });
+      if (!approval.success || !approval.approvalToken) {
+        patchState(cheat.id, { status: 'error', error: approval.error ?? 'Freeze approval rejected' });
+        return;
+      }
       const result = await window.electronAPI.liveMemoryFreezeStart({
         address: current.confirmedAddress,
         dataType,
         value,
         intervalMs: 200,
+        approvalToken: approval.approvalToken,
       });
       if (!result.success) {
         patchState(cheat.id, { status: 'error', error: result.error ?? 'Freeze failed to start' });

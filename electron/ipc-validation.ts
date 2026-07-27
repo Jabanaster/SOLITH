@@ -469,6 +469,20 @@ export const LiveMemoryFreezeStartSchema = z.object({
   value: z.number().finite(),
   // Floor prevents a runaway tight loop from hammering the target process/CPU.
   intervalMs: z.number().int().min(50).max(5000).optional(),
+  maxDurationMs: z.number().int().positive().max(7 * 24 * 60 * 60 * 1000).optional(),
+  approvalToken: z.string().regex(/^[0-9a-f]{64}$/i),
+});
+
+export const LiveMemoryFreezeProposeSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  dataType: LIVE_VALUE_TYPE,
+  value: z.number().finite(),
+  intervalMs: z.number().int().min(50).max(5000).optional(),
+  maxDurationMs: z.number().int().positive().max(7 * 24 * 60 * 60 * 1000).optional(),
+});
+
+export const LiveMemoryFreezeApproveSchema = z.object({
+  proposalId: z.string().uuid(),
 });
 
 export const LiveMemoryFreezeStopSchema = z.object({});

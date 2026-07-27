@@ -25,6 +25,11 @@ export type MemoryAuditOp =
 export interface MemoryAuditEntry {
   at: string;
   op: MemoryAuditOp;
+  freezeSessionId?: string;
+  freezeFromState?: string;
+  freezeToState?: string;
+  freezeCleanupState?: string;
+  freezeTokenId?: string;
   featureId?: string;
   address?: string;
   valueType?: string;

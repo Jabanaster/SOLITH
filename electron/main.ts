@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
+import { createFreezeLifecycleWiring } from '../src/core/live-memory/freeze-lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -41,7 +42,11 @@ import {
   validateSaveDataFileAccess
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
-import { registerLiveMemoryIpc } from './live-memory-ipc.js';
+import {
+  registerLiveMemoryIpc,
+  stopAllLiveMemoryFreezes,
+  stopLiveMemoryFreezesByRenderer,
+} from './live-memory-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
@@ -119,6 +124,11 @@ if (!gotSingleInstanceLock) {
   app.quit();
   process.exit(0);
 }
+
+const freezeLifecycleWiring = createFreezeLifecycleWiring(app, {
+  stopByRenderer: stopLiveMemoryFreezesByRenderer,
+  stopAll: stopAllLiveMemoryFreezes,
+});
 
 app.on('second-instance', () => {
   // If a second instance tries to launch, focus the existing window instead
@@ -253,6 +263,7 @@ function createWindow() {
     mainWindow?.setMenu(null);
   });
 
+  freezeLifecycleWiring.wireWindow(mainWindow);
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
