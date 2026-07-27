@@ -1,0 +1,157 @@
+B2A Phase 2 test evidence
+
+Targeted command:
+npx tsx --test tests/live-memory/freeze-consent.test.ts tests/live-memory/freeze-session-registry.test.ts tests/live-memory/freeze-lifecycle-wiring.test.ts tests/live-memory/live-memory-session.test.ts
+Result: 39 tests, 39 pass, 0 fail, 0 cancelled, 0 skipped.
+
+Live-memory command:
+npm run test:live-memory
+Result: 198 tests, 195 pass, 3 fail, 0 cancelled, 0 skipped.
+The three failures are pre-existing Linux-platform expectations in
+tests/live-memory/remote-connection-observer.test.ts: invalid PID cases
+report `unavailable` on Linux while the tests expect `error`. No Phase 2
+files are involved.
+
+Full command:
+npm test
+Result: 870 tests, 862 pass, 4 fail, 4 cancelled, 0 skipped.
+The four failures include the same three remote-connection Linux-platform
+expectations and one pre-existing safety-integration failure. The four
+cancelled tests are trainer-host E2E tests whose prerequisite
+dist-electron/host-entry.js was not built:
+`host-entry.js not found at /home/ubuntu/repos/SOLITH/dist-electron/host-entry.js`.
+
+Renderer/source typecheck:
+./node_modules/.bin/tsc --noEmit
+Result: PASS, exit code 0.
+
+Electron/core typecheck:
+./node_modules/.bin/tsc -p tsconfig.electron.json --noEmit
+Result: FAIL with the existing 36 diagnostics in unrelated Electron/core
+files. There are no diagnostics for Phase 2 touched files:
+electron/ipc-validation.ts
+electron/live-memory-ipc.ts
+electron/main.ts
+electron/preload.ts
+src/core/live-memory/audit-log.ts
+src/core/live-memory/freeze-consent.ts
+src/core/live-memory/freeze-lifecycle-wiring.ts
+src/core/live-memory/freeze-session-registry.ts
+src/core/live-memory/index.ts
+src/types/global.d.ts
+
+The existing diagnostics include local-ocr-ipc.ts, registry-verification-ipc.ts,
+trainer-catalog-ipc.ts, trainer-research-ipc.ts, drill-core-settings.ts,
+catalog-definition-capabilities.ts, import-definition.ts, schema.v1.ts,
+memory-manager.ts, headless-verification.ts, trainer-catalog/sync/hub-client.ts,
+and trainer-health/index.ts. The Phase 1 baseline already reported these
+pre-existing Electron/core type errors; no unrelated repairs were made.
+
+Master-vs-branch reproducibility evidence
+
+Clean master worktree setup:
+git worktree add /tmp/solith-master origin/master
+Result: detached HEAD at origin/master commit 12f55a8.
+
+Master dependency setup:
+cd /tmp/solith-master && npm install --ignore-scripts
+Result: exit code 0; 448 packages added. The same Node engine warnings and
+17 high-severity npm audit findings were reported. This avoids the Windows-only
+native memoryjs build.
+
+Remote-connection tests on master:
+cd /tmp/solith-master && npx tsx --test tests/live-memory/remote-connection-observer.test.ts
+Result: 10 tests, 7 pass, 3 fail, 0 cancelled, 0 skipped.
+All three failures are the invalid-PID cases:
+`tests/live-memory/remote-connection-observer.test.ts:62`,
+`:68`, and `:74`; exact assertion output was:
+`actual 'unavailable'`, `expected 'error'`.
+
+The branch had the same three failures in `npm run test:live-memory` and
+`npm test`, with the same actual/expected values. The tested implementation
+file is unchanged by this B2A phase.
+
+Safety integration on master:
+cd /tmp/solith-master && npx tsx --test tests/safety-integration.test.ts
+Result: 10 tests, 9 pass, 1 fail, 0 cancelled, 0 skipped.
+The failing test is `1. Path Containment and Safety Validation` at
+`tests/safety-integration.test.ts:60`, where the `after()` cleanup assertion
+fails because the temporary test root remains. The branch full suite reports
+the identical failure at the identical test line and assertion. The safety
+test and related safety files were not changed by B2A.
+
+Trainer-host E2E on master before building:
+cd /tmp/solith-master && npx tsx --test tests/trainer-host/e2e.test.ts
+Result: 4 tests, 0 pass, 0 fail, 4 cancelled.
+The suite hook failed with:
+`host-entry.js not found at /tmp/solith-master/dist-electron/host-entry.js`
+and instructed running `npm run build:electron`.
+
+Electron build on the B2A branch:
+npm run build:electron
+Result: exit code 0. `build:scanner` explicitly skipped the native scanner
+build as a Windows-only helper, while tsup produced main.js, preload.cjs,
+host-entry.js, and headless-verification-worker.js. The Electron output
+verifier reported `29/29 checks passed`.
+
+Trainer-host E2E on the B2A branch after building:
+npx tsx --test tests/trainer-host/e2e.test.ts
+Result: 4 tests, 4 pass, 0 fail, 0 cancelled, 0 skipped.
+
+Full suite on the B2A branch after `npm run build:electron`:
+npm test
+Result: 870 tests, 866 pass, 4 fail, 0 cancelled, 0 skipped.
+The four remaining failures are the same three Linux invalid-PID
+remote-connection assertions and the same safety-integration cleanup
+assertion reproduced on master. Trainer-host E2E cancellation is eliminated.
+
+Phase 2 review-fix verification
+
+Targeted command:
+npx tsx --test tests/live-memory/freeze-consent.test.ts tests/live-memory/freeze-session-registry.test.ts tests/live-memory/freeze-lifecycle-wiring.test.ts tests/live-memory/live-memory-session.test.ts
+Result: 42 tests, 42 pass, 0 fail, 0 cancelled, 0 skipped.
+The additional tests cover request-vs-approval target/PID/renderer binding,
+disposed-owner cleanup failure, and both navigation listeners firing
+idempotently.
+
+Electron build:
+npm run build:electron
+Result: exit code 0. The scanner step explicitly skipped its native
+Windows-only helper. tsup generated all Electron bundles and the verifier
+reported 29/29 checks passed.
+
+Live-memory suite after review fixes:
+npm run test:live-memory
+Result: 201 tests, 198 pass, 3 fail, 0 cancelled, 0 skipped.
+The three failures remain the same Linux invalid-PID remote-connection
+assertions (`actual 'unavailable'`, `expected 'error'`) reproduced on
+origin/master.
+
+Full suite after review fixes and Electron build:
+npm test
+Result: 873 tests, 869 pass, 4 fail, 0 cancelled, 0 skipped.
+The four failures are the same three Linux invalid-PID assertions and the
+same safety-integration cleanup assertion reproduced on origin/master.
+Trainer-host E2E tests ran rather than being cancelled.
+
+Renderer/source typecheck after review fixes:
+./node_modules/.bin/tsc --noEmit
+Result: PASS, exit code 0.
+
+Electron/core typecheck after review fixes:
+./node_modules/.bin/tsc -p tsconfig.electron.json --noEmit
+Result: FAIL with 36 existing diagnostics in unrelated files. No diagnostics
+were reported for the touched review-fix files, including
+electron/ipc-validation.ts, electron/live-memory-ipc.ts, electron/main.ts,
+src/core/live-memory/freeze-consent.ts,
+src/core/live-memory/freeze-lifecycle-wiring.ts,
+src/core/live-memory/freeze-session-registry.ts,
+src/core/live-memory/live-memory-session.ts, or
+src/core/live-memory/types.ts.
+
+Raw-token audit check:
+rg -n "bindingForToken" . --glob '!node_modules/**'
+Result: no matches. The only approvalToken use in the IPC implementation is
+the renderer return value or the single-use consume input; audit fields use
+the redacted first-four-characters representation. No raw token appears in
+an audit field or error string.

@@ -1,0 +1,25 @@
+Phase 2 B2A changed files:
+
+Docs/Security/B2A/changed-files.txt
+Docs/Security/B2A/freeze-consent-design.md
+Docs/Security/B2A/freeze-lifecycle-ownership.md
+Docs/Security/B2A/test-evidence.txt
+electron/ipc-validation.ts
+electron/live-memory-ipc.ts
+electron/main.ts
+electron/preload.ts
+package.json
+src/app/hooks/useGameCheatSession.ts
+src/app/pages/LiveMemoryTrainerPage.tsx
+src/core/live-memory/audit-log.ts
+src/core/live-memory/freeze-consent.ts
+src/core/live-memory/freeze-audit-routing.ts
+src/core/live-memory/freeze-lifecycle-wiring.ts
+src/core/live-memory/freeze-session-registry.ts
+src/core/live-memory/live-memory-session.ts
+src/core/live-memory/types.ts
+src/core/live-memory/index.ts
+src/types/global.d.ts
+tests/live-memory/freeze-consent.test.ts
+tests/live-memory/freeze-lifecycle-wiring.test.ts
+tests/live-memory/freeze-session-registry.test.ts

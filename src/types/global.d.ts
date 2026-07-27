@@ -226,7 +226,9 @@ interface Window {
       sourceName?: string;
       error?: string;
     }>;
-    liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) => Promise<{ success: boolean; error?: string }>;
+    liveMemoryFreezePropose: (payload: { address: string; dataType: string; value: number; intervalMs?: number; maxDurationMs?: number }) => Promise<{ success: boolean; proposal?: { proposalId: string }; error?: string }>;
+    liveMemoryFreezeApprove: (payload: { proposalId: string }) => Promise<{ success: boolean; approvalToken?: string; error?: string }>;
+    liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number; maxDurationMs?: number; approvalToken: string }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryFreezeStop: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryFreezeStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryListControls: () => Promise<{

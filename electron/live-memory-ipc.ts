@@ -1,5 +1,6 @@
-import { app, ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import { app, dialog, ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import {
   LiveMemoryListProcessesSchema,
   LiveMemoryAttachSchema,
@@ -19,6 +20,8 @@ import {
   LiveMemoryCorrelationEventSchema,
   LiveMemoryCorrelationStartSchema,
   LiveMemoryFreezeStartSchema,
+  LiveMemoryFreezeProposeSchema,
+  LiveMemoryFreezeApproveSchema,
   LiveMemoryFreezeStopSchema,
   LiveMemoryFreezeStatusSchema,
   LiveMemoryListControlsSchema,
@@ -41,6 +44,11 @@ import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
+import {
+  buildFreezeConsentBinding,
+  redactFreezeConsentRecord,
+} from '../src/core/live-memory/freeze-consent.js';
+import { appendFreezeAuditWithFallback } from '../src/core/live-memory/freeze-audit-routing.js';
 import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
 import { setCrashReportContext } from '../src/core/crash/local-crash-reporter.js';
 import { hashInstalledExecutableForCatalog } from '../src/core/live-memory/installed-exe-hash.js';
@@ -65,12 +73,77 @@ import {
  */
 
 let liveMemoryModule: any = null;
+let freezeConsentStore: any = null;
+let freezeSessionRegistry: any = null;
+let freezeFallbackAudit: any = null;
 
 async function getLiveMemoryModule() {
   if (!liveMemoryModule) {
     liveMemoryModule = await import('../src/core/live-memory/index.js');
   }
   return liveMemoryModule;
+}
+
+function getFreezeConsentStore(mod: any): any {
+  if (!freezeConsentStore) {
+    freezeConsentStore = new mod.FreezeConsentStore({
+      confirmationProvider: (preview: any) => showFreezeConfirmation(preview),
+    });
+  }
+  return freezeConsentStore;
+}
+
+function getFreezeSessionRegistry(mod: any): any {
+  if (!freezeSessionRegistry) {
+    freezeFallbackAudit ??= new mod.MemoryAuditLog({ filePath: memoryAuditFilePath() });
+    freezeSessionRegistry = new mod.FreezeSessionRegistry({
+      audit: {
+        emit: (event: any) => {
+          const bundle = sessions.get(event.rendererId);
+          appendFreezeAuditWithFallback(bundle?.audit, freezeFallbackAudit, {
+            op: event.op,
+            at: new Date(event.at).toISOString(),
+            pid: event.pid,
+            freezeSessionId: event.freezeSessionId,
+            freezeFromState: event.from,
+            freezeToState: event.to,
+            reason: event.reason,
+            ...(event.error ? { error: event.error } : {}),
+          });
+        },
+      },
+      cleanup: () => {
+        throw new Error('freeze_cleanup_owner_unavailable');
+      },
+    });
+  }
+  return freezeSessionRegistry;
+}
+
+async function showFreezeConfirmation(preview: any): Promise<boolean> {
+  const owner = preview.rendererId == null
+    ? null
+    : BrowserWindow.getAllWindows().find((window) => !window.isDestroyed() && window.webContents.id === preview.rendererId);
+  if (!owner) return false;
+  const result = await dialog.showMessageBox(owner, {
+    type: 'warning',
+    title: 'Confirm live-memory freeze',
+    message: 'Confirm this live-memory freeze operation?',
+    detail: [
+      `PID: ${preview.pid}`,
+      `Executable: ${preview.processIdentity}`,
+      `Address: ${preview.address}`,
+      `Type: ${preview.dataType}`,
+      `Value: ${preview.value}`,
+      `Interval: ${preview.intervalMs} ms`,
+      `Maximum duration: ${preview.maxDurationMs} ms`,
+    ].join('\n'),
+    buttons: ['Cancel', 'Approve'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  return result.response === 1;
 }
 
 export function registerLiveMemoryIpc(): void {
@@ -539,15 +612,133 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  ipcMain.handle('live-memory-freeze-propose', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = LiveMemoryFreezeProposeSchema.parse(payload);
+      const mod = await getLiveMemoryModule();
+      const store = getFreezeConsentStore(mod);
+      const pid = bundle.session.getAttachedPid();
+      const processIdentity = bundle.session.getAttachedExecutableName();
+      if (pid == null || !processIdentity) return { success: false, error: 'freeze_target_unavailable' };
+      const maxDurationMs = Math.min(
+        parsed.maxDurationMs ?? mod.MAX_FREEZE_DURATION_MS,
+        mod.MAX_FREEZE_DURATION_MS,
+      );
+      const preview = store.propose({
+        pid,
+        processIdentity,
+        address: parsed.address,
+        dataType: parsed.dataType,
+        value: parsed.value,
+        intervalMs: parsed.intervalMs ?? 200,
+        maxDurationMs,
+        rendererId: event.sender.id,
+      });
+      appendFreezeAudit(bundle, 'freeze_proposed', {
+        pid,
+        address: preview.address,
+        valueType: preview.dataType,
+        valueAfter: preview.value,
+        reason: `proposal:${preview.proposalId}`,
+      });
+      return { success: true, proposal: preview };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'freeze_propose_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-freeze-approve', async (event, payload: unknown) => {
+    try {
+      const bundle = requireBundle(event);
+      const parsed = LiveMemoryFreezeApproveSchema.parse(payload);
+      const mod = await getLiveMemoryModule();
+      const store = getFreezeConsentStore(mod);
+      const result = await store.approve(parsed.proposalId, { rendererId: event.sender.id });
+      if (!result.ok) {
+        appendFreezeAudit(bundle, 'abort', {
+          reason: `freeze_approval_rejected:${result.code}`,
+          pid: bundle.session.getAttachedPid() ?? undefined,
+        });
+        return { success: false, error: `freeze_approval_${result.code}` };
+      }
+      appendFreezeAudit(bundle, 'freeze_approved', {
+        pid: result.record.pid,
+        address: result.record.address,
+        valueType: result.record.dataType,
+        valueAfter: result.record.value,
+        freezeTokenId: redactFreezeConsentRecord(result.record).tokenId,
+        reason: `proposal:${result.record.proposalId}`,
+      });
+      return { success: true, approvalToken: result.tokenId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'freeze_approve_failed') };
+    }
+  });
+
   ipcMain.handle('live-memory-freeze-start', async (event, payload: unknown) => {
     try {
-      const session = requireSession(event);
+      const bundle = requireBundle(event);
       const parsed = LiveMemoryFreezeStartSchema.parse(payload);
-      const result = session.startFreeze(
-        { address: BigInt(parsed.address), dataType: parsed.dataType },
-        parsed.value,
-        parsed.intervalMs,
+      const mod = await getLiveMemoryModule();
+      const store = getFreezeConsentStore(mod);
+      const currentPid = bundle.session.getAttachedPid() ?? -1;
+      const currentIdentity = bundle.session.getAttachedExecutableName() ?? '';
+      const binding = buildFreezeConsentBinding({
+        pid: currentPid,
+        processIdentity: currentIdentity,
+        address: parsed.address,
+        dataType: parsed.dataType,
+        value: parsed.value,
+        intervalMs: parsed.intervalMs ?? 200,
+        maxDurationMs: parsed.maxDurationMs,
+        rendererId: event.sender.id,
+        maxAllowedDurationMs: mod.MAX_FREEZE_DURATION_MS,
+      });
+      const consumed = store.consume(parsed.approvalToken, binding);
+      if (!consumed.ok) {
+        appendFreezeAudit(bundle, 'abort', {
+          pid: bundle.session.getAttachedPid() ?? undefined,
+          freezeTokenId: `${parsed.approvalToken.slice(0, 4)}…redacted`,
+          reason: `freeze_start_rejected:${consumed.code}`,
+        });
+        return { success: false, error: `freeze_start_${consumed.code}` };
+      }
+
+      const registry = getFreezeSessionRegistry(mod);
+      const now = Date.now();
+      const freezeSessionId = randomUUID();
+      registry.register({
+        freezeSessionId,
+        rendererId: event.sender.id,
+        frameId: event.senderFrame?.routingId,
+        pid: consumed.record.pid,
+        startedAt: now,
+        expiresAt: now + consumed.record.maxDurationMs,
+        approvalTokenId: consumed.record.tokenId!,
+        cleanup: () => {
+          if (!bundle.session.isAttached()) {
+            throw new Error('freeze_cleanup_session_disposed');
+          }
+          bundle.session.stopFreeze();
+          if (bundle.session.getFreezeStatus().active) {
+            throw new Error('freeze_cleanup_still_active');
+          }
+        },
+      });
+      registry.markApproved(freezeSessionId);
+      registry.markStarting(freezeSessionId);
+      const result = bundle.session.startFreeze(
+        { address: BigInt(consumed.record.address), dataType: consumed.record.dataType },
+        consumed.record.value,
+        consumed.record.intervalMs,
+        consumed.record.maxDurationMs,
       );
+      if (!result.success) {
+        registry.markFailed(freezeSessionId, result.error ?? 'freeze_start_failed');
+        return result;
+      }
+      registry.markActive(freezeSessionId);
       return result;
     } catch (error) {
       return { success: false, error: sanitize(error, 'freeze_start_failed') };
@@ -556,9 +747,22 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-freeze-stop', async (event) => {
     try {
-      const session = requireSession(event);
+      const bundle = requireBundle(event);
       LiveMemoryFreezeStopSchema.parse({});
-      const status = session.stopFreeze();
+      const registry = getFreezeSessionRegistry(await getLiveMemoryModule());
+      const owned = registry.stopByRenderer(event.sender.id, 'user_stopped');
+      if (owned.some((result: any) => !result.ok)) {
+        return { success: false, error: 'freeze_cleanup_failed' };
+      }
+      if (owned.length === 0 && bundle.session.getFreezeStatus().active) {
+        bundle.session.stopFreeze();
+        if (bundle.session.getFreezeStatus().active) {
+          appendFreezeAudit(bundle, 'abort', { reason: 'freeze_stop_unowned_failed' });
+          return { success: false, error: 'freeze_cleanup_failed' };
+        }
+        appendFreezeAudit(bundle, 'freeze_stopped', { reason: 'freeze_stop_unowned_legacy' });
+      }
+      const status = bundle.session.getFreezeStatus();
       return { success: true, status: serializeFreezeStatus(status) };
     } catch (error) {
       return { success: false, error: sanitize(error, 'freeze_stop_failed') };
@@ -1029,6 +1233,9 @@ function maybeStartAvowedWingdkBackups(input: {
 function disposeSession(senderId: number): void {
   const existing = sessions.get(senderId);
   if (existing) {
+    if (freezeSessionRegistry) {
+      freezeSessionRegistry.stopByRenderer(senderId, 'session_disposed');
+    }
     existing.correlationWatcher?.stop();
     existing.manager.setSnapshotListener(null);
     existing.session.detach();
@@ -1038,6 +1245,36 @@ function disposeSession(senderId: number): void {
     resetAvowedWingdkBackupSession();
     setCrashReportContext(undefined);
   }
+}
+
+export function stopLiveMemoryFreezesByRenderer(rendererId: number, reason: string): void {
+  if (!freezeSessionRegistry) return;
+  freezeSessionRegistry.stopByRenderer(rendererId, reason);
+}
+
+export function stopAllLiveMemoryFreezes(reason: string): void {
+  if (!freezeSessionRegistry) return;
+  freezeSessionRegistry.stopAll(reason);
+}
+
+function appendFreezeAudit(
+  bundle: SessionBundle,
+  op: any,
+  fields: {
+    reason?: string;
+    pid?: number;
+    address?: string;
+    valueType?: string;
+    valueAfter?: number;
+    freezeTokenId?: string;
+  },
+): void {
+  bundle.audit.append({
+    op,
+    ...fields,
+    at: new Date().toISOString(),
+  } as any);
+  refreshCrashContext(bundle);
 }
 
 function requireBundle(event: IpcMainInvokeEvent): SessionBundle {

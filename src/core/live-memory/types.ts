@@ -200,7 +200,15 @@ export interface FreezeTarget {
   value: number;
 }
 
-export type FreezeStopReason = 'user_stopped' | 'guard_blocked' | 'identity_mismatch' | 'write_failed' | 'detached';
+export type FreezeStopReason =
+  | 'user_stopped'
+  | 'guard_blocked'
+  | 'identity_mismatch'
+  | 'write_failed'
+  | 'detached'
+  | 'max_duration';
+
+export const MAX_FREEZE_DURATION_MS = 6 * 60 * 60 * 1000;
 
 export interface FreezeStatus {
   active: boolean;

@@ -4,6 +4,7 @@ import path from 'path';
 import { isContainedWithin, validatePathSafety } from '../src/core/safety/path-safety.js';
 import { getGameById } from '../src/core/games/index.js';
 import { isPathApproved } from '../src/core/saves/locations.js';
+import { MAX_FREEZE_DURATION_MS } from '../src/core/live-memory/types.js';
 
 /**
  * Zod validation schemas for all Electron IPC payloads.
@@ -469,6 +470,20 @@ export const LiveMemoryFreezeStartSchema = z.object({
   value: z.number().finite(),
   // Floor prevents a runaway tight loop from hammering the target process/CPU.
   intervalMs: z.number().int().min(50).max(5000).optional(),
+  maxDurationMs: z.number().int().positive().max(MAX_FREEZE_DURATION_MS).optional(),
+  approvalToken: z.string().regex(/^[0-9a-f]{64}$/i),
+});
+
+export const LiveMemoryFreezeProposeSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  dataType: LIVE_VALUE_TYPE,
+  value: z.number().finite(),
+  intervalMs: z.number().int().min(50).max(5000).optional(),
+  maxDurationMs: z.number().int().positive().max(MAX_FREEZE_DURATION_MS).optional(),
+});
+
+export const LiveMemoryFreezeApproveSchema = z.object({
+  proposalId: z.string().uuid(),
 });
 
 export const LiveMemoryFreezeStopSchema = z.object({});

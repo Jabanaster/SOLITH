@@ -502,6 +502,23 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     if (result?.success) setFreezeStatus(result.status);
   }, [apiAvailable, attached, api]);
 
+  const startFreezeWithConsent = async (payload: {
+    address: string;
+    dataType: string;
+    value: number;
+    intervalMs: number;
+  }) => {
+    const proposal = await api.liveMemoryFreezePropose(payload);
+    if (!proposal?.success || !proposal.proposal?.proposalId) {
+      return { success: false, error: proposal?.error ?? 'Freeze proposal failed' };
+    }
+    const approval = await api.liveMemoryFreezeApprove({ proposalId: proposal.proposal.proposalId });
+    if (!approval?.success || !approval.approvalToken) {
+      return { success: false, error: approval?.error ?? 'Freeze approval rejected' };
+    }
+    return api.liveMemoryFreezeStart({ ...payload, approvalToken: approval.approvalToken });
+  };
+
   useEffect(() => {
     if (!attached) return;
     const id = setInterval(() => { void refreshFreezeStatus(); }, 1000);
@@ -515,7 +532,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
       const baseInterval = freezeIntervalMs.trim() ? Number(freezeIntervalMs) : 200;
       const multiplier = Math.max(1, Math.min(8, Number(speedhackMultiplier) || 1));
       const intervalMs = Math.max(50, Math.floor(baseInterval / multiplier));
-      const result = await api.liveMemoryFreezeStart({
+      const result = await startFreezeWithConsent({
         address: address.trim(),
         dataType,
         value: Number(freezeValue),
@@ -1053,7 +1070,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
               return result.address;
             }}
             onFreeze={async (addr, value, type) => {
-              const result = await api.liveMemoryFreezeStart({
+              const result = await startFreezeWithConsent({
                 address: addr,
                 dataType: type,
                 value,

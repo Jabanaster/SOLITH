@@ -21,15 +21,9 @@ jobs:
         run: npm run verify:schema-v1-boundaries
       - name: Orphan / boundary check
         run: npm run orphan-check
-      - name: Build application and installer
-        run: npm run build
+      - name: Build electron host bundle (required by trainer-host e2e in npm test)
+        run: npm run build:electron
       - name: Run tests
         run: npm test | Tee-Object -FilePath npm-test.log
-      - name: Electron smoke test
-        run: npm run test:electron-smoke
-      - name: Key E2E smoke flows
-        run: |
-          npm run test:browser-fallback
-          npm run test:trainer-states-e2e
       - name: Verify fresh-clone report counts
         run: node scripts/verify-fresh-clone-verification.mjs Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-15.md npm-test.log

@@ -367,6 +367,26 @@ describe('LiveMemorySession freeze', () => {
     assert.equal(driver.isOpen(), false);
     assert.equal(pendingCount(), 0);
   });
+
+  test('freeze auto-stops at the six-hour maximum duration', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    const { scheduler, fireNext } = makeFakeFreezeScheduler();
+    let now = 1_000;
+    session._injectFreezeScheduler(scheduler);
+    session._injectFreezeClock(() => now);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    session.startFreeze(HEALTH_ADDR, 9999, 100);
+    await flushMicrotasks();
+    assert.equal(session.getFreezeStatus().active, true);
+
+    now += 6 * 60 * 60 * 1000;
+    await fireNext();
+
+    assert.equal(session.getFreezeStatus().active, false);
+    assert.equal(session.getFreezeStatus().stopReason, 'max_duration');
+  });
 });
 
 describe('LiveMemorySession catalog controls', () => {

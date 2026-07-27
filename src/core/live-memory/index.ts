@@ -7,6 +7,7 @@ export {
 } from './single-player-waiver.js';
 export type { WaiverRecord, WaiverStoreFile } from './single-player-waiver.js';
 export { observeRemoteConnections } from './remote-connection-observer.js';
+export { appendFreezeAuditWithFallback } from './freeze-audit-routing.js';
 export { nativeMemoryDriver, listLiveMemoryProcesses } from './native-memory-driver.js';
 export type { LiveProcessListEntry } from './native-memory-driver.js';
 export { LiveMemorySession } from './live-memory-session.js';
@@ -19,6 +20,37 @@ export type {
   FreezeScheduler,
   StartFreezeResult,
 } from './live-memory-session.js';
+export {
+  MAX_FREEZE_DURATION_MS,
+} from './live-memory-session.js';
+export {
+  buildFreezeConsentBinding,
+  DEFAULT_FREEZE_CONSENT_TTL_MS,
+  FreezeConsentStore,
+  LIVE_MEMORY_FREEZE_START_OPERATION,
+  redactFreezeConsentRecord,
+} from './freeze-consent.js';
+export type {
+  FreezeConsentApprovalResult,
+  FreezeConsentBinding,
+  FreezeConsentConfirmation,
+  FreezeConsentDetails,
+  FreezeConsentPreview,
+  FreezeConsentRecord,
+  FreezeConsentConsumeResult,
+  FreezeConsentConfirmationProvider,
+} from './freeze-consent.js';
+export { FreezeSessionRegistry } from './freeze-session-registry.js';
+export type {
+  FreezeCleanupState,
+  FreezeSessionAuditEvent,
+  FreezeSessionAuditSink,
+  FreezeSessionRecord,
+  FreezeSessionRegistryOptions,
+  FreezeSessionScheduler,
+  FreezeSessionState,
+  FreezeSessionTransitionResult,
+} from './freeze-session-registry.js';
 export { scanFirst, scanFirstRange, scanNext } from './memory-scanner.js';
 export type { ScanResult } from './memory-scanner.js';
 export { RealtimeScanner } from './real-time-scanner.js';
@@ -56,6 +88,15 @@ export {
 export type { FuzzyScanOptions, SignatureMatch } from './signature-engine.js';
 export { MemoryAuditLog } from './audit-log.js';
 export type { MemoryAuditEntry, MemoryAuditOp, MemoryAuditLogOptions } from './audit-log.js';
+export {
+  createFreezeLifecycleWiring,
+} from './freeze-lifecycle-wiring.js';
+export type {
+  FreezeLifecycleApp,
+  FreezeLifecycleWindow,
+  FreezeLifecycleWebContents,
+  FreezeLifecycleWiring,
+} from './freeze-lifecycle-wiring.js';
 export { MemoryManager } from './memory-manager.js';
 export type { SafeWriteResult, MemoryManagerSnapshotListener } from './memory-manager.js';
 export {
