@@ -1,0 +1,48 @@
+B2A Phase 2 test evidence
+
+Targeted command:
+npx tsx --test tests/live-memory/freeze-consent.test.ts tests/live-memory/freeze-session-registry.test.ts tests/live-memory/freeze-lifecycle-wiring.test.ts tests/live-memory/live-memory-session.test.ts
+Result: 39 tests, 39 pass, 0 fail, 0 cancelled, 0 skipped.
+
+Live-memory command:
+npm run test:live-memory
+Result: 198 tests, 195 pass, 3 fail, 0 cancelled, 0 skipped.
+The three failures are pre-existing Linux-platform expectations in
+tests/live-memory/remote-connection-observer.test.ts: invalid PID cases
+report `unavailable` on Linux while the tests expect `error`. No Phase 2
+files are involved.
+
+Full command:
+npm test
+Result: 870 tests, 862 pass, 4 fail, 4 cancelled, 0 skipped.
+The four failures include the same three remote-connection Linux-platform
+expectations and one pre-existing safety-integration failure. The four
+cancelled tests are trainer-host E2E tests whose prerequisite
+dist-electron/host-entry.js was not built:
+`host-entry.js not found at /home/ubuntu/repos/SOLITH/dist-electron/host-entry.js`.
+
+Renderer/source typecheck:
+./node_modules/.bin/tsc --noEmit
+Result: PASS, exit code 0.
+
+Electron/core typecheck:
+./node_modules/.bin/tsc -p tsconfig.electron.json --noEmit
+Result: FAIL with the existing 36 diagnostics in unrelated Electron/core
+files. There are no diagnostics for Phase 2 touched files:
+electron/ipc-validation.ts
+electron/live-memory-ipc.ts
+electron/main.ts
+electron/preload.ts
+src/core/live-memory/audit-log.ts
+src/core/live-memory/freeze-consent.ts
+src/core/live-memory/freeze-lifecycle-wiring.ts
+src/core/live-memory/freeze-session-registry.ts
+src/core/live-memory/index.ts
+src/types/global.d.ts
+
+The existing diagnostics include local-ocr-ipc.ts, registry-verification-ipc.ts,
+trainer-catalog-ipc.ts, trainer-research-ipc.ts, drill-core-settings.ts,
+catalog-definition-capabilities.ts, import-definition.ts, schema.v1.ts,
+memory-manager.ts, headless-verification.ts, trainer-catalog/sync/hub-client.ts,
+and trainer-health/index.ts. The Phase 1 baseline already reported these
+pre-existing Electron/core type errors; no unrelated repairs were made.

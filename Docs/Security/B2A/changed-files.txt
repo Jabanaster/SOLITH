@@ -1,5 +1,9 @@
 Phase 2 B2A changed files:
 
+Docs/Security/B2A/changed-files.txt
+Docs/Security/B2A/freeze-consent-design.md
+Docs/Security/B2A/freeze-lifecycle-ownership.md
+Docs/Security/B2A/test-evidence.txt
 electron/ipc-validation.ts
 electron/live-memory-ipc.ts
 electron/main.ts
