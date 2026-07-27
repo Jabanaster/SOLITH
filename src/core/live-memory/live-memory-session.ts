@@ -58,11 +58,14 @@ const DEFAULT_FREEZE_SCHEDULER: FreezeScheduler = {
 };
 
 const DEFAULT_FREEZE_INTERVAL_MS = 200;
+export const MAX_FREEZE_DURATION_MS = 6 * 60 * 60 * 1000;
 
 interface FreezeState {
   target: FreezeTarget;
   active: boolean;
   timer: unknown;
+  startedAt: number;
+  expiresAt: number;
   tickCount: number;
   lastGuard: OnlineGuardResult | null;
   stopReason?: FreezeStopReason;
@@ -127,6 +130,7 @@ export class LiveMemorySession {
   private pendingProposals = new Map<string, LiveWriteProposal>();
   private remoteConnectionObserver: RemoteConnectionObserverFn = observeRemoteConnections;
   private freezeScheduler: FreezeScheduler = DEFAULT_FREEZE_SCHEDULER;
+  private freezeClock: () => number = Date.now;
   private freeze: FreezeState | null = null;
   private freezeGeneration = 0;
   private unknownSnapshots = new Map<string, UnknownScanSnapshot>();
@@ -144,6 +148,11 @@ export class LiveMemorySession {
   /** Testing seam — inject a fake scheduler so freeze-loop tests don't need real timers. */
   _injectFreezeScheduler(scheduler: FreezeScheduler): void {
     this.freezeScheduler = scheduler;
+  }
+
+  /** Testing seam — inject a clock for deterministic maximum-duration tests. */
+  _injectFreezeClock(clock: () => number): void {
+    this.freezeClock = clock;
   }
 
   isAttached(): boolean {
@@ -579,7 +588,12 @@ export class LiveMemorySession {
    * are advisory only and do not stop the freeze. Waiver loss or identity
    * mismatch stops the freeze.
    */
-  startFreeze(address: LiveMemoryAddress, value: number, intervalMs = DEFAULT_FREEZE_INTERVAL_MS): StartFreezeResult {
+  startFreeze(
+    address: LiveMemoryAddress,
+    value: number,
+    intervalMs = DEFAULT_FREEZE_INTERVAL_MS,
+    maxDurationMs = MAX_FREEZE_DURATION_MS,
+  ): StartFreezeResult {
     if (!this.handle || !this.target) {
       return { success: false, error: 'No process attached.' };
     }
@@ -590,16 +604,23 @@ export class LiveMemorySession {
     this.freezeGeneration += 1;
     const generation = this.freezeGeneration;
 
+    const startedAt = this.freezeClock();
     this.freeze = {
       target: { address, value },
       active: true,
       timer: null,
+      startedAt,
+      expiresAt: startedAt + Math.min(Math.max(1, maxDurationMs), MAX_FREEZE_DURATION_MS),
       tickCount: 0,
       lastGuard: null,
     };
 
     const tick = async (): Promise<void> => {
       if (generation !== this.freezeGeneration || !this.freeze?.active || !this.handle || !this.target) return;
+      if (this.freezeClock() >= this.freeze.expiresAt) {
+        this.stopFreezeInternal('max_duration');
+        return;
+      }
 
       const evidence = await this.remoteConnectionObserver(this.target.pid);
       const guard = evaluateWriteConsent({
@@ -632,9 +653,14 @@ export class LiveMemorySession {
       }
 
       if (generation === this.freezeGeneration && this.freeze?.active) {
+        const remainingMs = Math.max(0, this.freeze.expiresAt - this.freezeClock());
+        if (remainingMs <= 0) {
+          this.stopFreezeInternal('max_duration');
+          return;
+        }
         this.freeze.timer = this.freezeScheduler.schedule(() => {
           void tick();
-        }, intervalMs);
+        }, Math.min(intervalMs, remainingMs));
       }
     };
 

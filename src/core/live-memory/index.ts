@@ -19,6 +19,36 @@ export type {
   FreezeScheduler,
   StartFreezeResult,
 } from './live-memory-session.js';
+export {
+  MAX_FREEZE_DURATION_MS,
+} from './live-memory-session.js';
+export {
+  DEFAULT_FREEZE_CONSENT_TTL_MS,
+  FreezeConsentStore,
+  LIVE_MEMORY_FREEZE_START_OPERATION,
+  redactFreezeConsentRecord,
+} from './freeze-consent.js';
+export type {
+  FreezeConsentApprovalResult,
+  FreezeConsentBinding,
+  FreezeConsentConfirmation,
+  FreezeConsentDetails,
+  FreezeConsentPreview,
+  FreezeConsentRecord,
+  FreezeConsentConsumeResult,
+  FreezeConsentConfirmationProvider,
+} from './freeze-consent.js';
+export { FreezeSessionRegistry } from './freeze-session-registry.js';
+export type {
+  FreezeCleanupState,
+  FreezeSessionAuditEvent,
+  FreezeSessionAuditSink,
+  FreezeSessionRecord,
+  FreezeSessionRegistryOptions,
+  FreezeSessionScheduler,
+  FreezeSessionState,
+  FreezeSessionTransitionResult,
+} from './freeze-session-registry.js';
 export { scanFirst, scanFirstRange, scanNext } from './memory-scanner.js';
 export type { ScanResult } from './memory-scanner.js';
 export { RealtimeScanner } from './real-time-scanner.js';
