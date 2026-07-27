@@ -19,7 +19,8 @@ export type MemoryAuditOp =
   | 'freeze_started'
   | 'freeze_stopped'
   | 'freeze_expired'
-  | 'freeze_cleanup_failed';
+  | 'freeze_cleanup_failed'
+  | 'freeze_invalid_transition';
 
 export interface MemoryAuditEntry {
   at: string;

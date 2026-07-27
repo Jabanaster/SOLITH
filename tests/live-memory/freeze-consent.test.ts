@@ -56,6 +56,7 @@ describe('FreezeConsentStore', () => {
       ['pid_mismatch', { ...details, pid: 9999 }],
       ['duration_mismatch', { ...details, maxDurationMs: 1 }],
       ['operation_mismatch', { ...details, operation: 'wrong-operation' as never }],
+      ['target_mismatch', { ...details, address: '0x2000' }],
       ['renderer_mismatch', { ...details, rendererId: 8 }],
     ] as const;
     for (const [code, binding] of cases) {
@@ -101,5 +102,22 @@ describe('FreezeConsentStore', () => {
     const rendered = JSON.stringify(redactFreezeConsentRecord(approval.record));
     assert.match(rendered, /aaaa…redacted/);
     assert.equal(rendered.includes(approval.tokenId), false);
+  });
+
+  test('retains replay detection for the configured window, then prunes it', async () => {
+    let now = 1_000;
+    const store = new FreezeConsentStore({
+      now: () => now,
+      ttlMs: 1_000,
+      replayRetentionMs: 2_000,
+      replayMaxEntries: 4,
+      randomToken: () => 'b'.repeat(64),
+      confirmationProvider: () => true,
+    });
+    const token = await issue(store);
+    assert.equal(store.consume(token, details).ok, true);
+    assert.deepEqual(store.consume(token, details), { ok: false, code: 'replayed' });
+    now += 2_001;
+    assert.deepEqual(store.consume(token, details), { ok: false, code: 'missing' });
   });
 });

@@ -2,6 +2,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 
 export const LIVE_MEMORY_FREEZE_START_OPERATION = 'live-memory-freeze-start' as const;
 export const DEFAULT_FREEZE_CONSENT_TTL_MS = 60_000;
+export const DEFAULT_FREEZE_REPLAY_RETENTION_MS = DEFAULT_FREEZE_CONSENT_TTL_MS * 2;
+export const DEFAULT_FREEZE_REPLAY_MAX_ENTRIES = 10_000;
 
 export interface FreezeConsentDetails {
   operation?: typeof LIVE_MEMORY_FREEZE_START_OPERATION;
@@ -71,7 +73,7 @@ export type FreezeConsentConsumeResult =
   | {
       ok: false;
       code: 'missing' | 'expired' | 'replayed' | 'pid_mismatch' | 'duration_mismatch' |
-        'operation_mismatch' | 'renderer_mismatch' | 'not_approved' | 'malformed';
+        'operation_mismatch' | 'target_mismatch' | 'renderer_mismatch' | 'not_approved' | 'malformed';
     };
 
 export type FreezeConsentConfirmationProvider = (
@@ -80,6 +82,8 @@ export type FreezeConsentConfirmationProvider = (
 
 export interface FreezeConsentStoreOptions {
   ttlMs?: number;
+  replayRetentionMs?: number;
+  replayMaxEntries?: number;
   now?: () => number;
   randomToken?: () => string;
   confirmationProvider?: FreezeConsentConfirmationProvider;
@@ -99,21 +103,27 @@ export function redactFreezeConsentRecord(
 
 export class FreezeConsentStore {
   private readonly records = new Map<string, FreezeConsentRecord>();
-  private readonly consumed = new Set<string>();
-  private readonly expired = new Set<string>();
+  private readonly consumed = new Map<string, number>();
+  private readonly expired = new Map<string, number>();
   private readonly ttlMs: number;
+  private readonly replayRetentionMs: number;
+  private readonly replayMaxEntries: number;
   private readonly now: () => number;
   private readonly randomToken: () => string;
   private readonly confirmationProvider?: FreezeConsentConfirmationProvider;
 
   constructor(options: FreezeConsentStoreOptions = {}) {
     this.ttlMs = options.ttlMs ?? DEFAULT_FREEZE_CONSENT_TTL_MS;
+    this.replayRetentionMs = options.replayRetentionMs ?? DEFAULT_FREEZE_REPLAY_RETENTION_MS;
+    this.replayMaxEntries = options.replayMaxEntries ?? DEFAULT_FREEZE_REPLAY_MAX_ENTRIES;
     this.now = options.now ?? Date.now;
     this.randomToken =
       options.randomToken ??
       (() => randomBytes(32).toString('hex'));
     this.confirmationProvider = options.confirmationProvider;
-    if (!Number.isFinite(this.ttlMs) || this.ttlMs <= 0) {
+    if (!Number.isFinite(this.ttlMs) || this.ttlMs <= 0 ||
+        !Number.isFinite(this.replayRetentionMs) || this.replayRetentionMs <= this.ttlMs ||
+        !Number.isInteger(this.replayMaxEntries) || this.replayMaxEntries <= 0) {
       throw new Error('Freeze consent TTL must be positive.');
     }
   }
@@ -179,6 +189,7 @@ export class FreezeConsentStore {
 
   consume(tokenId: string, expected: FreezeConsentBinding): FreezeConsentConsumeResult {
     this.pruneExpired();
+    this.pruneReplayHistory();
     if (typeof tokenId !== 'string' || !/^[0-9a-f]{64}$/i.test(tokenId)) {
       return { ok: false, code: 'malformed' };
     }
@@ -189,22 +200,24 @@ export class FreezeConsentStore {
     if (!record) {
       if (this.consumed.has(tokenId)) return { ok: false, code: 'replayed' };
       if (this.expired.has(tokenId)) {
-        this.consumed.add(tokenId);
+        this.remember(this.consumed, tokenId);
         return { ok: false, code: 'expired' };
       }
       return { ok: false, code: 'missing' };
     }
     this.records.delete(tokenId);
-    this.consumed.add(tokenId);
+    this.remember(this.consumed, tokenId);
 
     if (this.now() >= record.expiresAt) return { ok: false, code: 'expired' };
     if (record.state !== 'APPROVED' || !record.tokenId) return { ok: false, code: 'not_approved' };
     if (!isBindingValid(expected)) return { ok: false, code: 'malformed' };
     if (record.operation !== expected.operation) return { ok: false, code: 'operation_mismatch' };
-    if (record.pid !== expected.pid || record.processIdentity !== expected.processIdentity ||
-        record.address !== expected.address || record.dataType !== expected.dataType ||
-        record.value !== expected.value) {
+    if (record.pid !== expected.pid || record.processIdentity !== expected.processIdentity) {
       return { ok: false, code: 'pid_mismatch' };
+    }
+    if (record.address !== expected.address || record.dataType !== expected.dataType ||
+        record.value !== expected.value) {
+      return { ok: false, code: 'target_mismatch' };
     }
     if (record.intervalMs !== expected.intervalMs || record.maxDurationMs !== expected.maxDurationMs) {
       return { ok: false, code: 'duration_mismatch' };
@@ -225,8 +238,29 @@ export class FreezeConsentStore {
     for (const [key, record] of this.records) {
       if (now >= record.expiresAt) {
         this.records.delete(key);
-        if (record.tokenId) this.expired.add(record.tokenId);
+        if (record.tokenId) this.remember(this.expired, record.tokenId);
       }
+    }
+  }
+
+  private pruneReplayHistory(): void {
+    const cutoff = this.now() - this.replayRetentionMs;
+    for (const [tokenId, at] of this.consumed) {
+      if (at < cutoff) this.consumed.delete(tokenId);
+    }
+    for (const [tokenId, at] of this.expired) {
+      if (at < cutoff) this.expired.delete(tokenId);
+    }
+  }
+
+  private remember(history: Map<string, number>, tokenId: string): void {
+    const now = this.now();
+    history.delete(tokenId);
+    history.set(tokenId, now);
+    while (history.size > this.replayMaxEntries) {
+      const oldest = history.keys().next().value as string | undefined;
+      if (!oldest) break;
+      history.delete(oldest);
     }
   }
 }

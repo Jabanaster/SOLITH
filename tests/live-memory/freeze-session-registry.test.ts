@@ -53,9 +53,10 @@ function activate(registry: FreezeSessionRegistry, id: string) {
 
 describe('FreezeSessionRegistry', () => {
   test('rejects invalid transitions', () => {
-    const { registry } = makeRegistry();
+    const { registry, events } = makeRegistry();
     registry.register(input('one'));
     assert.deepEqual(registry.markActive('one'), { ok: false, code: 'invalid_transition' });
+    assert.equal(events.at(-1)?.op, 'freeze_invalid_transition');
   });
 
   test('cleanup is idempotent and returns the same terminal state', () => {
@@ -104,5 +105,24 @@ describe('FreezeSessionRegistry', () => {
     activate(registry, 'two');
     registry.stopAll('app_quit');
     assert.equal(registry.get('two')?.state, 'STOPPED');
+  });
+
+  test('retains recent terminal IDs for idempotence, then bounds terminal history', () => {
+    const events: FreezeSessionAuditEvent[] = [];
+    const registry = new FreezeSessionRegistry({
+      audit: { emit: (event) => events.push(event) },
+      cleanup: () => {},
+      now: () => 1_000,
+      terminalMaxEntries: 1,
+      scheduler: scheduler().scheduler,
+    });
+    for (const id of ['one', 'two']) {
+      registry.register(input(id));
+      activate(registry, id);
+      registry.stopById(id);
+    }
+    assert.deepEqual(registry.stopById('two').ok, true);
+    assert.deepEqual(registry.stopById('one'), { ok: false, code: 'missing' });
+    assert.ok(events.some((event) => event.op === 'freeze_invalid_transition') === false);
   });
 });

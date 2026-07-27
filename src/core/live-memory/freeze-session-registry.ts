@@ -31,7 +31,8 @@ export interface FreezeSessionAuditEvent {
     | 'freeze_started'
     | 'freeze_stopped'
     | 'freeze_expired'
-    | 'freeze_cleanup_failed';
+    | 'freeze_cleanup_failed'
+    | 'freeze_invalid_transition';
   at: number;
   freezeSessionId: string;
   from: FreezeSessionState;
@@ -56,6 +57,8 @@ export interface FreezeSessionRegistryOptions {
   cleanup: (record: FreezeSessionRecord) => void;
   now?: () => number;
   scheduler?: FreezeSessionScheduler;
+  terminalRetentionMs?: number;
+  terminalMaxEntries?: number;
 }
 
 export type FreezeSessionTransitionResult =
@@ -87,17 +90,23 @@ export class FreezeSessionRegistry {
   private readonly cleanup: (record: FreezeSessionRecord) => void;
   private readonly now: () => number;
   private readonly scheduler: FreezeSessionScheduler;
+  private readonly terminalRetentionMs: number;
+  private readonly terminalMaxEntries: number;
+  private readonly terminalAt = new Map<string, number>();
 
   constructor(options: FreezeSessionRegistryOptions) {
     this.audit = options.audit;
     this.cleanup = options.cleanup;
     this.now = options.now ?? Date.now;
     this.scheduler = options.scheduler ?? DEFAULT_SCHEDULER;
+    this.terminalRetentionMs = options.terminalRetentionMs ?? 5 * 60 * 1000;
+    this.terminalMaxEntries = options.terminalMaxEntries ?? 1_000;
   }
 
   register(input: Omit<FreezeSessionRecord, 'state' | 'cleanupState'> & {
     state?: FreezeSessionState;
   }): FreezeSessionRecord {
+    this.pruneTerminalRecords();
     const record: FreezeSessionRecord = {
       ...input,
       state: input.state ?? 'PROPOSED',
@@ -122,12 +131,14 @@ export class FreezeSessionRegistry {
   }
 
   stopByRenderer(rendererId: number, reason = 'renderer_stopped'): FreezeSessionTransitionResult[] {
+    this.pruneTerminalRecords();
     return [...this.sessions.values()]
       .filter((record) => record.rendererId === rendererId && !isTerminal(record.state))
       .map((record) => this.stop(record.freezeSessionId, reason));
   }
 
   stopAll(reason = 'app_quit'): FreezeSessionTransitionResult[] {
+    this.pruneTerminalRecords();
     return [...this.sessions.values()]
       .filter((record) => !isTerminal(record.state))
       .map((record) => this.stop(record.freezeSessionId, reason));
@@ -138,6 +149,7 @@ export class FreezeSessionRegistry {
   }
 
   get(id: string): FreezeSessionRecord | undefined {
+    this.pruneTerminalRecords();
     const record = this.sessions.get(id);
     return record ? { ...record } : undefined;
   }
@@ -176,7 +188,7 @@ export class FreezeSessionRegistry {
     if (!record) return { ok: false, code: 'missing' };
     if (!TRANSITIONS[record.state].includes(to)) {
       this.audit.emit({
-        op: 'freeze_stopped',
+        op: 'freeze_invalid_transition',
         at: this.now(),
         freezeSessionId: id,
         from: record.state,
@@ -191,7 +203,11 @@ export class FreezeSessionRegistry {
     const from = record.state;
     record.state = to;
     this.emit(record, from, op ?? operationFor(to), reason, error);
-    if (isTerminal(to)) this.cancelExpiry(id);
+    if (isTerminal(to)) {
+      this.cancelExpiry(id);
+      this.terminalAt.set(id, this.now());
+      this.pruneTerminalRecords();
+    }
     return { ok: true, record: { ...record } };
   }
 
@@ -228,6 +244,22 @@ export class FreezeSessionRegistry {
     const timer = this.expiryTimers.get(id);
     if (timer !== undefined) this.scheduler.cancel(timer);
     this.expiryTimers.delete(id);
+  }
+
+  private pruneTerminalRecords(): void {
+    const cutoff = this.now() - this.terminalRetentionMs;
+    for (const [id, at] of this.terminalAt) {
+      if (at < cutoff) {
+        this.terminalAt.delete(id);
+        this.sessions.delete(id);
+      }
+    }
+    while (this.terminalAt.size > this.terminalMaxEntries) {
+      const oldest = this.terminalAt.keys().next().value as string | undefined;
+      if (!oldest) break;
+      this.terminalAt.delete(oldest);
+      this.sessions.delete(oldest);
+    }
   }
 }
 
