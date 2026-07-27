@@ -21,6 +21,8 @@ jobs:
         run: npm run verify:schema-v1-boundaries
       - name: Orphan / boundary check
         run: npm run orphan-check
+      - name: Build electron host bundle (required by trainer-host e2e in npm test)
+        run: npm run build:electron
       - name: Build application and installer
         run: npm run build
       - name: Run tests
