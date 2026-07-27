@@ -2,7 +2,7 @@
 
 **Status:** PASS baseline for CI Fast count drift check  
 **Tags locked:** `v2.1-shell-polish` @ `0928d29` · `v2.2-wemod-adoption` @ `6ddefb8`  
-**Stabilization note:** The current CI test manifest keeps `npm test` green at **873/873** on the Windows CI environment after the Electron host bundle is built (updated 2026-07-27).
+**Stabilization note:** The current CI test manifest reports **869/873** passing tests after the Electron host bundle is built (updated 2026-07-27); the four known baseline failures remain recorded in `Docs/Security/B2A/test-evidence.txt`.
 
 ## Context
 
@@ -22,7 +22,7 @@ Reproducibility gate for Windows checkout: run clean-tree commands on repo root
 | Gate | Result | Notes |
 |------|--------|-------|
 | `npx tsc --noEmit` | **PASS** | exit 0 |
-| `npm test` | **PASS** | 873/873 |
+| `npm test` | **PASS** | 869/873 |
 | `npm run build:electron` | **PASS** | 19/19 verify-electron-output (`preload.cjs`) |
 | `npm run build` | **PASS** | historical pack at gate; re-run before release |
 | `npm run test:accessibility` | **PASS** | exit 0 (historical evidence) |
