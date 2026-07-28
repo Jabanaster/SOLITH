@@ -271,8 +271,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     offset?: number;
   }) => ipcRenderer.invoke('ct-library-search', payload),
   ctLibraryGameDetail: (payload: { gameId: string }) => ipcRenderer.invoke('ct-library-game-detail', payload),
+  ctLibraryPickZip: () => ipcRenderer.invoke('ct-library-pick-zip'),
+  ctLibraryImportZipPreview: (payload: {
+    selectionId: string;
+    jobId?: string;
+    limit?: number;
+  }) => ipcRenderer.invoke('ct-library-import-zip-preview', payload),
   ctLibraryImportZipStart: (payload: {
-    archivePath: string;
+    selectionId: string;
     jobId?: string;
     limit?: number;
     maxShardBytes?: number;

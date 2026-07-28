@@ -1,9 +1,11 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { compileCtZipArchive } from '../src/core/registry/compile-ct-zip.js';
 import { compileCtLibraryArchive } from '../src/core/ct-library/write-library.js';
+import { createCtZipPickerBridge } from '../src/core/ct-library/ct-zip-picker-bridge.js';
 import {
   defaultCtLibraryPaths,
   getCtLibraryGameDetail,
@@ -16,6 +18,7 @@ const moduleDirectory = path.dirname(moduleFilename);
 const projectRoot = path.resolve(moduleDirectory, '..');
 const paths = defaultCtLibraryPaths(projectRoot);
 const activeImports = new Map<string, AbortController>();
+const pickerBridge = createCtZipPickerBridge({});
 
 const SearchSchema = z.object({
   query: z.string().max(200).optional().default(''),
@@ -30,10 +33,16 @@ const GameDetailSchema = z.object({
 }).strict();
 
 const ImportStartSchema = z.object({
-  archivePath: z.string().min(1).max(2048),
+  selectionId: z.string().uuid(),
   jobId: z.string().min(1).max(120).optional(),
   limit: z.number().int().min(1).max(100_000).optional(),
   maxShardBytes: z.number().int().min(1024).max(100 * 1024 * 1024).optional(),
+}).strict();
+
+const ImportPreviewSchema = z.object({
+  selectionId: z.string().uuid(),
+  jobId: z.string().min(1).max(120).optional(),
+  limit: z.number().int().min(1).max(100_000).optional(),
 }).strict();
 
 const ImportCancelSchema = z.object({
@@ -59,6 +68,20 @@ function errorCode(error: unknown): string | undefined {
 }
 
 export function registerCtLibraryIpc(): void {
+  ipcMain.handle('ct-library-pick-zip', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    console.info('[ct-library] ZIP picker opened');
+    const result = await pickerBridge.pick(event.sender.id, () => dialog.showOpenDialog(win ?? undefined, {
+      title: 'Import Cheat Engine CT ZIP',
+      properties: ['openFile'],
+      filters: [{ name: 'ZIP archives', extensions: ['zip'] }],
+    }));
+    if (result.status === 'cancelled') console.info('[ct-library] ZIP picker cancelled');
+    else if (result.status === 'selected') console.info(`[ct-library] ZIP selected: ${result.filename}`);
+    else console.warn(`[ct-library] ZIP picker rejected selection: ${result.errorCode}`);
+    return result;
+  });
+
   ipcMain.handle('ct-library-summary', async () => {
     try {
       const summary = await loadCtLibrarySummary(paths);
@@ -90,6 +113,68 @@ export function registerCtLibraryIpc(): void {
     }
   });
 
+  ipcMain.handle('ct-library-import-zip-preview', async (event, payload: unknown) => {
+    const parsed = ImportPreviewSchema.safeParse(payload);
+    if (!parsed.success) {
+      return { success: false, jobId: 'invalid', errorCode: 'INVALID_PAYLOAD', error: parsed.error.message };
+    }
+    const jobId = parsed.data.jobId ?? randomUUID();
+    if (activeImports.has(jobId)) {
+      return { success: false, jobId, errorCode: 'JOB_ALREADY_RUNNING', error: 'ct_import_job_already_running' };
+    }
+    const selected = pickerBridge.resolve(event.sender.id, parsed.data.selectionId);
+    if (!selected.success) return { success: false, jobId, ...selected };
+    const archivePath = selected.archivePath;
+
+    const controller = new AbortController();
+    activeImports.set(jobId, controller);
+    console.info(`[ct-library] preview started: ${path.basename(archivePath)}`);
+    try {
+      const preview = await compileCtZipArchive(archivePath, {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          event.sender.send('ct-library-import-progress', { jobId, ...progress });
+        },
+        limit: parsed.data.limit,
+      });
+      if (preview.totals.compiledTables === 0) {
+        return {
+          success: false,
+          jobId,
+          errorCode: 'NO_SUPPORTED_CT',
+          error: 'The ZIP contains no supported Cheat Engine table content.',
+        };
+      }
+      console.info(
+        `[ct-library] preview completed: ${preview.totals.compiledTables}/${preview.totals.ctFiles} CT tables`,
+      );
+      return {
+        success: true,
+        jobId,
+        archivePath,
+        filename: path.basename(archivePath),
+        totals: preview.totals,
+        rejected: preview.rejected,
+        games: preview.tables.slice(0, 40).map((table) => ({
+          game: table.game,
+          tableName: table.tableName,
+          archivePath: table.archivePath,
+          counts: table.counts,
+        })),
+      };
+    } catch (error) {
+      console.error('[ct-library] preview failed:', error);
+      return {
+        success: false,
+        jobId,
+        error: sanitize(error),
+        errorCode: errorCode(error) ?? 'PREVIEW_FAILED',
+      };
+    } finally {
+      activeImports.delete(jobId);
+    }
+  });
+
   ipcMain.handle('ct-library-import-zip-start', async (event, payload: unknown) => {
     const parsed = ImportStartSchema.safeParse(payload);
     if (!parsed.success) {
@@ -99,6 +184,9 @@ export function registerCtLibraryIpc(): void {
     if (activeImports.has(jobId)) {
       return { success: false, jobId, error: 'ct_import_job_already_running' };
     }
+    const selected = pickerBridge.resolve(event.sender.id, parsed.data.selectionId);
+    if (!selected.success) return { success: false, jobId, ...selected };
+    const archivePath = selected.archivePath;
 
     const controller = new AbortController();
     activeImports.set(jobId, controller);
@@ -106,7 +194,8 @@ export function registerCtLibraryIpc(): void {
     const registryDirectory = path.join(projectRoot, 'data', 'registry');
 
     try {
-      const result = await compileCtLibraryArchive(parsed.data.archivePath, {
+      console.info(`[ct-library] confirmed import started: ${path.basename(archivePath)}`);
+      const result = await compileCtLibraryArchive(archivePath, {
         signal: controller.signal,
         onProgress: (progress) => {
           event.sender.send('ct-library-import-progress', { jobId, ...progress });
@@ -117,6 +206,9 @@ export function registerCtLibraryIpc(): void {
         limit: parsed.data.limit,
         maxShardBytes: parsed.data.maxShardBytes,
       });
+      console.info(
+        `[ct-library] confirmed import completed: ${result.index.totals.compiledTables}/${result.index.totals.ctFiles} CT tables`,
+      );
       return {
         success: true,
         jobId,
@@ -126,6 +218,7 @@ export function registerCtLibraryIpc(): void {
         totals: result.index.totals,
       };
     } catch (error) {
+      console.error('[ct-library] confirmed import failed:', error);
       return {
         success: false,
         jobId,

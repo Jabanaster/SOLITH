@@ -450,8 +450,33 @@ interface Window {
       tables: import('../core/registry/compile-ct-zip.js').CtZipCatalogEntry[];
       error?: string;
     }>;
+    ctLibraryPickZip: () => Promise<
+      | { status: 'selected'; selectionId: string; path: string; filename: string }
+      | { status: 'cancelled' }
+      | { status: 'error'; error: string; errorCode: string }
+    >;
+    ctLibraryImportZipPreview: (payload: {
+      selectionId: string;
+      jobId?: string;
+      limit?: number;
+    }) => Promise<{
+      success: boolean;
+      jobId: string;
+      archivePath?: string;
+      filename?: string;
+      totals?: import('../core/registry/compile-ct-zip.js').CtZipCatalogIndex['totals'];
+      rejected?: import('../core/registry/compile-ct-zip.js').CtZipCatalogIndex['rejected'];
+      games?: Array<{
+        game: string;
+        tableName: string;
+        archivePath: string;
+        counts: import('../core/registry/compile-ct-zip.js').CtZipCatalogEntry['counts'];
+      }>;
+      error?: string;
+      errorCode?: string;
+    }>;
     ctLibraryImportZipStart: (payload: {
-      archivePath: string;
+      selectionId: string;
       jobId?: string;
       limit?: number;
       maxShardBytes?: number;

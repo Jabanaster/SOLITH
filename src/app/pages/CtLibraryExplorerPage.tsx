@@ -8,6 +8,7 @@ import {
   friendlyCtImportError,
   idleCtImportUiState,
 } from '../../core/ct-library/import-state.js';
+import { createCtImportSingleFlight } from '../../core/ct-library/import-single-flight.js';
 import styles from './CtLibraryExplorerPage.module.css';
 
 type KindFilter = 'all' | 'pointer' | 'script' | 'aob';
@@ -27,6 +28,31 @@ interface DetailResponse {
   game?: CtLibraryGameSummary;
   tables: CtZipCatalogEntry[];
   error?: string;
+}
+
+interface CtZipPreviewResponse {
+  success: boolean;
+  jobId: string;
+  archivePath?: string;
+  filename?: string;
+  totals?: CtZipCatalogEntry extends never ? never : {
+    ctFiles: number;
+    compiledTables: number;
+    rejectedTables: number;
+    pointers: number;
+    scripts: number;
+    aobSignatures: number;
+    cheats: number;
+  };
+  rejected?: Array<{ archivePath: string; reason: string }>;
+  games?: Array<{
+    game: string;
+    tableName: string;
+    archivePath: string;
+    counts: CtZipCatalogEntry['counts'];
+  }>;
+  error?: string;
+  errorCode?: string;
 }
 
 function formatNumber(value: number | undefined): string {
@@ -184,7 +210,9 @@ export default function CtLibraryExplorerPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [importState, dispatchImport] = useReducer(ctImportUiReducer, idleCtImportUiState);
-  const importZipRef = useRef<HTMLInputElement>(null);
+  const [pendingPreview, setPendingPreview] = useState<CtZipPreviewResponse | null>(null);
+  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
+  const importSingleFlight = useRef(createCtImportSingleFlight()).current;
 
   const selected = useMemo(
     () => results.find((result) => result.id === selectedId) ?? results[0] ?? null,
@@ -243,22 +271,76 @@ export default function CtLibraryExplorerPage() {
 
   const games = summary?.games ?? [];
 
-  const handleImportZip = async (file: File) => {
-    const filePath = (file as File & { path?: string }).path;
+  const handlePickZipForPreview = async () => {
+    await importSingleFlight.run(async () => {
     const api = window.electronAPI;
-    if (!api?.ctLibraryImportZipStart) {
+    if (!api?.ctLibraryPickZip || !api?.ctLibraryImportZipPreview) {
       setMessage('CT ZIP import is unavailable outside the Electron shell.');
       return;
     }
-    if (!filePath) {
-      setMessage('CT ZIP import requires the Electron desktop app file path bridge.');
+    const picked = await api.ctLibraryPickZip();
+    if (picked.status === 'cancelled') return;
+    if (picked.status === 'error') {
+      setMessage(friendlyCtImportError(picked.errorCode, picked.error));
       return;
     }
     const jobId = newImportJobId();
-    dispatchImport({ type: 'start', jobId, label: 'Hashing Source...' });
+    dispatchImport({ type: 'start', jobId, label: 'Building Preview...' });
+    setPendingPreview(null);
+    setPendingSelectionId(null);
     setMessage('');
     try {
-      const result = await api.ctLibraryImportZipStart({ archivePath: filePath, jobId });
+      const result = await api.ctLibraryImportZipPreview({ selectionId: picked.selectionId, jobId }) as CtZipPreviewResponse;
+      if (result.success) {
+        dispatchImport({
+          type: 'complete',
+          progress: {
+            jobId,
+            phase: 'complete',
+            label: 'Preview Ready.',
+            processedTables: result.totals?.compiledTables,
+            totalTables: result.totals?.ctFiles,
+          },
+        });
+        setPendingPreview(result);
+        setPendingSelectionId(picked.selectionId);
+        setMessage(
+          `Preview ready — ${formatNumber(result.totals?.compiledTables)} tables, ${formatNumber(result.totals?.cheats)} metadata entries. Confirm Import to persist.`,
+        );
+      } else {
+        dispatchImport({
+          type: result.errorCode === 'ABORT_ERR' ? 'cancelled' : 'failed',
+          errorCode: result.errorCode,
+          errorMessage: result.error,
+        });
+        setMessage(friendlyCtImportError(result.errorCode, result.error));
+      }
+    } catch (error) {
+      dispatchImport({ type: 'failed', errorCode: 'PREVIEW_FAILED', errorMessage: String(error) });
+      setMessage(friendlyCtImportError('PREVIEW_FAILED', String(error)));
+    }
+    });
+  };
+
+  const handleConfirmImportZip = async () => {
+    await importSingleFlight.run(async () => {
+    const api = window.electronAPI;
+    if (!api?.ctLibraryImportZipStart || !pendingSelectionId) {
+      setMessage('No CT ZIP preview is ready to confirm.');
+      return;
+    }
+    const confirmed = window.confirm(
+      'Confirm metadata-only CT ZIP import? Solith will persist parsed pointers, scripts, AOBs, rejections, and warnings. It will not execute CT scripts or attach to a process.',
+    );
+    if (!confirmed) {
+      setMessage('CT ZIP import declined. Preview wrote no catalog records.');
+      return;
+    }
+    const jobId = newImportJobId();
+    dispatchImport({ type: 'start', jobId, label: 'Writing Metadata Catalog...' });
+    setMessage('');
+    try {
+      const result = await api.ctLibraryImportZipStart({ selectionId: pendingSelectionId, jobId });
       if (result.success) {
         dispatchImport({
           type: 'complete',
@@ -273,6 +355,8 @@ export default function CtLibraryExplorerPage() {
         setMessage(
           `Imported CT library archive — ${formatNumber(result.totals?.compiledTables)} tables, ${formatNumber(result.totals?.cheats)} metadata entries.`,
         );
+        setPendingPreview(null);
+        setPendingSelectionId(null);
         await load();
       } else {
         dispatchImport({
@@ -282,9 +366,18 @@ export default function CtLibraryExplorerPage() {
         });
         setMessage(friendlyCtImportError(result.errorCode, result.error));
       }
-    } finally {
-      if (importZipRef.current) importZipRef.current.value = '';
+    } catch (error) {
+      dispatchImport({ type: 'failed', errorMessage: String(error) });
+      setMessage(friendlyCtImportError(null, String(error)));
     }
+    });
+  };
+
+  const handleDeclineImportZip = () => {
+    setPendingPreview(null);
+    setPendingSelectionId(null);
+    dispatchImport({ type: 'reset' });
+    setMessage('CT ZIP import declined. Preview wrote no catalog records.');
   };
 
   const handleCancelImport = async () => {
@@ -298,22 +391,14 @@ export default function CtLibraryExplorerPage() {
         artwork="hoodedProfile"
         title="CT Library Explorer"
         description="Search and inspect compiled Cheat Engine table metadata without executing scripts or touching a live process."
+        walkthroughId="ct-library"
         actions={
           <div className={styles.headerActions}>
-            <input
-              ref={importZipRef}
-              type="file"
-              accept=".zip,application/zip"
-              className={styles.hiddenFileInput}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void handleImportZip(file);
-              }}
-            />
             <button
+              id="ct-library-import-zip"
               type="button"
               className={styles.primaryBtn}
-              onClick={() => importZipRef.current?.click()}
+              onClick={() => void handlePickZipForPreview()}
               disabled={importState.status === 'running'}
             >
               Import CT ZIP
@@ -352,12 +437,54 @@ export default function CtLibraryExplorerPage() {
                 className={styles.primaryBtn}
                 onClick={() => {
                   dispatchImport({ type: 'reset' });
-                  importZipRef.current?.click();
+                  setPendingPreview(null);
+                  setPendingSelectionId(null);
+                  void handlePickZipForPreview();
                 }}
               >
                 Retry / Import Another ZIP
               </button>
             )}
+          </div>
+        </section>
+      )}
+
+      {pendingPreview?.success && (
+        <section className={styles.importPanel} aria-label="CT ZIP import preview">
+          <div>
+            <h2>Preview: {pendingPreview.filename ?? 'CT ZIP archive'}</h2>
+            <p>
+              Nothing has been written yet. Review the metadata summary, then confirm or decline the import.
+            </p>
+            <small>
+              CT files: {formatNumber(pendingPreview.totals?.ctFiles)}
+              {' · '}Compiled: {formatNumber(pendingPreview.totals?.compiledTables)}
+              {' · '}Rejected: {formatNumber(pendingPreview.totals?.rejectedTables)}
+              {' · '}Cheats: {formatNumber(pendingPreview.totals?.cheats)}
+              {' · '}Pointers: {formatNumber(pendingPreview.totals?.pointers)}
+              {' · '}Scripts: {formatNumber(pendingPreview.totals?.scripts)}
+              {' · '}AOBs: {formatNumber(pendingPreview.totals?.aobSignatures)}
+            </small>
+            {(pendingPreview.games?.length ?? 0) > 0 && (
+              <small>
+                Preview sample: {pendingPreview.games!.slice(0, 5).map((entry) => entry.game).join(', ')}
+                {pendingPreview.games!.length > 5 ? '…' : ''}
+              </small>
+            )}
+            {(pendingPreview.rejected?.length ?? 0) > 0 && (
+              <small>
+                Rejections: {pendingPreview.rejected!.slice(0, 3).map((entry) => `${entry.archivePath}: ${entry.reason}`).join(' | ')}
+                {pendingPreview.rejected!.length > 3 ? '…' : ''}
+              </small>
+            )}
+          </div>
+          <div className={styles.importActions}>
+            <button type="button" className={styles.primaryBtn} onClick={() => void handleConfirmImportZip()}>
+              Confirm Import
+            </button>
+            <button type="button" className={styles.cancelBtn} onClick={handleDeclineImportZip}>
+              Decline
+            </button>
           </div>
         </section>
       )}
