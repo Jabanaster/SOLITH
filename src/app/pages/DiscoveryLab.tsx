@@ -266,6 +266,7 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
         artwork="hoodedProfile"
         title="Discovery Lab"
         description="Find offsets by comparing save state transitions. Discovery remains advisory and does not by itself grant executable write support."
+        walkthroughId="discovery-lab"
       />
 
       {/* Guided Steps Header */}

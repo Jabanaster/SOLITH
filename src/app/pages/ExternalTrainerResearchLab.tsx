@@ -536,6 +536,7 @@ const ExternalTrainerResearchLab: React.FC = () => {
           artwork="hoodedProfile"
           title="External Trainer Research Lab"
           description="Desktop app required for PE analysis and live memory diffing."
+          walkthroughId="trainer-research-lab"
         />
       </div>
     );
@@ -548,6 +549,7 @@ const ExternalTrainerResearchLab: React.FC = () => {
           artwork="hoodedProfile"
           title="External Trainer Research Lab"
           description="Enable v2LiveModeEnabled and v2FreeformMemoryEnabled in settings."
+          walkthroughId="trainer-research-lab"
         />
       </div>
     );
@@ -559,6 +561,7 @@ const ExternalTrainerResearchLab: React.FC = () => {
         artwork="hoodedProfile"
         title="External Trainer Research Lab"
         description="Analyze a user-supplied trainer .exe (never executed), diff game memory while you toggle cheats externally, then export CT / schema drafts for Trainer Library."
+        walkthroughId="trainer-research-lab"
       />
 
       <div className="glass" style={{ padding: '12px 16px', marginBottom: '20px', border: '1px solid #ffb30055' }}>

@@ -56,6 +56,12 @@ export function friendlyCtImportError(errorCode?: string | null, fallback?: stri
       return 'Import rejected: the archive contains an absolute file path.';
     case 'REJECTED_SIZE_CAP':
       return 'Import rejected: the CT file or archive exceeds Solith’s bounded import cap.';
+    case 'REJECTED_FILE_TYPE':
+      return 'Import rejected: choose a .zip archive containing one or more .CT files.';
+    case 'PICKER_FAILED':
+      return 'Could not open the native ZIP picker. Use the installed Electron desktop app and try again.';
+    case 'PREVIEW_FAILED':
+      return 'CT ZIP preview failed. No metadata was written.';
     default:
       return fallback || 'Import failed. The file was not added to the metadata catalog.';
   }

@@ -1,4 +1,6 @@
-import { ipcMain, app } from 'electron';
+import { BrowserWindow, dialog, ipcMain, app } from 'electron';
+import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -21,7 +23,7 @@ import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
 import { getSetting } from '../src/core/settings/index.js';
 import { importDefinitionYaml } from '../src/core/definitions/import-definition.js';
-import { importDefinitionCt } from '../src/core/definitions/import-definition-ct.js';
+import { importDefinitionCt, previewDefinitionCt } from '../src/core/definitions/import-definition-ct.js';
 import {
   recordDefinitionFeedback,
   getDefinitionFeedbackSummary,
@@ -65,6 +67,13 @@ const CatalogGameIdSchema = z.object({
 const ImportYamlSchema = z.object({
   yamlText: z.string().min(1).max(2_000_000),
 });
+
+const PickedCtSchema = z.object({
+  filePath: z.string().min(1).max(4096),
+  xmlText: z.string().min(1).max(8_000_000),
+  title: z.string().min(1).max(200),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/i),
+}).strict();
 
 const PublishToCommunitySchema = z.object({
   definition: SolithDefinitionV1Schema,
@@ -252,6 +261,71 @@ export function registerTrainerCatalogIpc(): void {
       return { success: true, locationId: result.location?.id };
     } catch (error) {
       return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-pick-ct', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      const picked = await dialog.showOpenDialog(win ?? undefined, {
+        title: 'Import Cheat Engine table as inert Solith metadata',
+        properties: ['openFile'],
+        filters: [{ name: 'Cheat Engine tables', extensions: ['ct', 'xml'] }],
+      });
+      if (picked.canceled || picked.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      const filePath = picked.filePaths[0];
+      if (!/\.(ct|xml)$/i.test(filePath)) {
+        return { success: false, error: 'unsupported_ct_file_type' };
+      }
+      const stat = await fs.stat(filePath);
+      if (!stat.isFile()) return { success: false, error: 'not_a_file' };
+      if (stat.size < 1) return { success: false, error: 'empty_ct_file' };
+      if (stat.size > 8_000_000) return { success: false, error: 'ct_file_too_large' };
+      const xmlText = await fs.readFile(filePath, 'utf8');
+      const sha256 = crypto.createHash('sha256').update(xmlText, 'utf8').digest('hex');
+      return {
+        success: true,
+        filePath,
+        xmlText,
+        title: path.basename(filePath).replace(/\.(ct|xml)$/i, ''),
+        sha256,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-preview-ct', async (_event, payload: unknown) => {
+    try {
+      const parsed = PickedCtSchema.parse(payload);
+      const currentHash = crypto.createHash('sha256').update(parsed.xmlText, 'utf8').digest('hex');
+      if (currentHash !== parsed.sha256) {
+        return { success: false, errors: ['source_hash_changed_before_preview'] };
+      }
+      const result = await previewDefinitionCt(parsed.xmlText, { title: parsed.title });
+      if (!result.success) {
+        return { success: false, errors: result.errors, rejected: result.rejected };
+      }
+      return {
+        success: true,
+        catalogGameId: result.catalogGameId,
+        packId: result.packId,
+        cheatCount: result.cheatCount,
+        title: result.title,
+        acceptedCount: result.acceptedCount,
+        rejectedCount: result.rejectedCount,
+        rejected: result.rejected,
+        validationErrors: result.validationErrors,
+        metadataImport: result.metadataImport,
+        scriptOnlyCount: result.scriptOnlyCount,
+        scriptAnalysisCount: result.scriptAnalysisCount,
+        sourceHash: parsed.sha256,
+        filePath: parsed.filePath,
+      };
+    } catch (error) {
+      return { success: false, errors: [sanitize(error)] };
     }
   });
 
