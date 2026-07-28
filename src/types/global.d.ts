@@ -44,7 +44,7 @@ interface Window {
     getAllProfiles: () => Promise<any[]>;
     // Live Memory Trainer (V2, feature-flagged off by default, single-player/
     // offline only — see PROJECT_SPEC.md Section 3.1)
-    liveMemoryListProcesses: () => Promise<{ success: boolean; processes?: { pid: number; name: string }[]; error?: string }>;
+    liveMemoryListProcesses: () => Promise<{ success: boolean; processes?: { pid: number; name: string; executablePath?: string; parentPid?: number; parentProcessName?: string; startTime?: string }[]; error?: string }>;
     liveMemoryAttach: (payload: {
       pid: number;
       executableName: string;
@@ -269,6 +269,52 @@ interface Window {
     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
     wispOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
     wispOverlayHide: () => Promise<{ success: boolean; error?: string }>;
+    trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
+    trainerHotkeysGetBindings: () => Promise<{
+      success: boolean;
+      hotkeys?: Record<string, string>;
+      conflicts?: Array<{ accelerator: string; actions: string[] }>;
+      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
+      error?: string;
+    }>;
+    trainerHotkeysSetBindings: (payload: { hotkeys: Record<string, string> }) => Promise<{
+      success: boolean;
+      hotkeys?: Record<string, string>;
+      conflicts?: Array<{ accelerator: string; actions: string[] }>;
+      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
+      error?: string;
+    }>;
+    onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
+    trainerCatalogSearch: (payload: {
+      query?: string;
+      limit?: number;
+      offset?: number;
+      categories?: string[];
+      verificationStatus?: 'all' | 'verified' | 'community' | 'metadata-only' | 'unverified';
+    }) => Promise<{
+      success: boolean;
+      entries?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry[];
+      total?: number;
+      error?: string;
+    }>;
+    trainerCatalogStats: () => Promise<{ success: boolean; total?: number; error?: string }>;
+    trainerCatalogGet: (payload: { catalogGameId: string }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
+    trainerCatalogSeed: () => Promise<{ success: boolean; total?: number; error?: string }>;
+    trainerCatalogSyncRemote: () => Promise<{
+      success: boolean;
+      report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
+      error?: string;
+    }>;
+    trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) => Promise<{
+      success: boolean;
+      report?: {
+        status: 'disabled' | 'synced';
+        imported: number;
+        skippedUserDefinitions: number;
+        rejected: number;
+        pages: number;
+        maxLocalTimestamp: number;
+      };
       error?: string;
     }>;
     trainerCatalogGetDefinition: (payload: { catalogGameId: string }) => Promise<{
