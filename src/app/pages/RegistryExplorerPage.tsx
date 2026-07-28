@@ -6,6 +6,7 @@ import type { RegistryResultType, RegistrySearchResult } from '../../core/regist
 import { searchRegistry } from '../../core/registry/query-registry.js';
 import type { L4CertificationTier, L4EntryEvidence } from '../../core/registry/l4-governance.js';
 import { L4GovernancePanel } from '../components/L4GovernancePanel.js';
+import { PageWalkthrough } from '../components/PageWalkthrough.js';
 
 interface RegistryExplorerPageProps {
   registry?: CompiledCtRegistry | null;
@@ -509,15 +510,18 @@ const RegistryExplorerPage: React.FC<RegistryExplorerPageProps> = ({ registry: i
   return (
     <main className="page registry-explorer-page">
       <header className="page-module-header">
-        <p className="eyebrow">Read-only research</p>
-        <h1>CT Registry Explorer</h1>
-        <p>Search compiled CT registry artifacts without executing scripts, attaching to a process, or writing memory.</p>
+        <div>
+          <p className="eyebrow">Read-only research</p>
+          <h1>CT Registry Explorer</h1>
+          <p>Search compiled CT registry artifacts without executing scripts, attaching to a process, or writing memory.</p>
+        </div>
+        <PageWalkthrough pageId="registry-explorer" />
       </header>
 
       <section className="panel-card" aria-label="Load registry">
         <label>
           Load compiled registry JSON
-          <input type="file" accept="application/json,.json" onChange={onPickRegistryFile} />
+          <input id="registry-explorer-load-json-file" type="file" accept="application/json,.json" onChange={onPickRegistryFile} />
         </label>
         <p className="safety-note">
           Local file only — schemas are validated in-renderer. Scripts remain inert (<code>executable=false</code>).

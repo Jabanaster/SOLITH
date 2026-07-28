@@ -66,6 +66,7 @@ const Journal: React.FC<JournalProps> = ({ gameId }) => {
         artwork="recoveryPhoenix"
         title="Activity Journal"
         description="A detailed audit log of all automated scans, save comparisons, editor tweaks, backups, and restores performed locally."
+        walkthroughId="activity-journal"
       />
 
       {loading ? (

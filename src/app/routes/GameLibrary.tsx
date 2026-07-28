@@ -80,7 +80,8 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
         artwork="gameLibraryControllerMonitors"
         title="Game Library"
         description="Manage local game folders, scan files, and edit saves"
-        actions={<button onClick={() => setShowAddModal(true)} className="btn-add">+ Add Game</button>}
+        walkthroughId="game-library"
+        actions={<button id="game-library-add-manual" onClick={() => setShowAddModal(true)} className="btn-add">+ Add Game</button>}
       />
 
       <div className="settings-panel glass">

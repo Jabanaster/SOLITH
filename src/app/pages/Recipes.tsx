@@ -95,6 +95,7 @@ const Recipes: React.FC<RecipesProps> = ({ gameId }) => {
         artwork="hoodedProfile"
         title="Trainer Recipes"
         description="Manage your saved trainer configurations. These recipes represent offsets and targets discovered in your game files."
+        walkthroughId="recipes"
       />
 
       <div className="categories-filter" style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '8px' }}>

@@ -28,6 +28,7 @@ import { OpeningCinematic } from './components/OpeningCinematic.js';
 import { SolithWispCompanion } from './components/SolithWispCompanion.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
+import { WalkthroughOwner } from './components/PageWalkthrough.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -290,6 +291,12 @@ const App: React.FC = () => {
   };
 
   const isNavActive = (view: View) => currentView === view;
+  const walkthroughOwnerKey = [
+    currentView,
+    selectedGame?.id ?? '',
+    deckCatalogGameId ?? '',
+    libraryLaunchGameId ?? '',
+  ].join(':');
 
   const renderContent = () => {
     switch (currentView) {
@@ -487,7 +494,9 @@ const App: React.FC = () => {
               <span>Loading Solith…</span>
             </div>
           ) : (
-            <ContentErrorBoundary key={currentView}>{renderContent()}</ContentErrorBoundary>
+            <WalkthroughOwner key={walkthroughOwnerKey}>
+              <ContentErrorBoundary key={currentView}>{renderContent()}</ContentErrorBoundary>
+            </WalkthroughOwner>
           )}
         </main>
       </div>

@@ -185,6 +185,7 @@ const SessionMonitorPage: React.FC = () => {
           artwork="advancedDragon"
           title={<>Session Lifecycle Monitor <span className="v2-badge">V2 Preview</span></>}
           description="Read-only session monitoring · No game modifications are performed"
+          walkthroughId="session-monitor"
         />
         <div className="v2-monitor-disabled glass">
           <p><strong>Session Monitor is disabled.</strong></p>
@@ -218,6 +219,7 @@ const SessionMonitorPage: React.FC = () => {
         artwork="advancedDragon"
         title={<>Session Lifecycle Monitor <span className="v2-badge">V2 Preview</span></>}
         description="Read-only session monitoring · No game modifications are performed"
+        walkthroughId="session-monitor"
       />
 
       {/* ── State ── */}

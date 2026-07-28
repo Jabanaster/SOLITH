@@ -851,6 +851,7 @@ export default function TrainerLibraryPage({
         className={styles.header}
         title="Trainer Library"
         description={`${total.toLocaleString()} games${activeFilterSummary ? ` · ${activeFilterSummary}` : ''} · virtualized grid`}
+        walkthroughId="trainer-library"
         actions={
           <div className={styles.actions}>
             <input
