@@ -59,6 +59,7 @@ const CompatibilityDashboard: React.FC = () => {
         artwork="hoodedProfile"
         title="Compatibility Dashboard"
         description="Profile coverage, evidence tiers, and version drift status for all evaluated games. Support matrix output is local and evidence-based."
+        walkthroughId="compatibility"
       />
 
       <div className="glass" style={{ padding: '12px', marginBottom: '16px' }}>

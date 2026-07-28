@@ -153,6 +153,7 @@ const SaveLocations: React.FC<SaveLocationsProps> = ({ gameId: initialGameId }) 
         artwork="recoveryPhoenix"
         title="Save Locations"
         description="Discover, approve, and manage folders where Solith may read or write save files."
+        walkthroughId="save-locations"
         actions={
           <button
             type="button"

@@ -227,6 +227,7 @@ const SaveEditor: React.FC<SaveEditorProps> = ({ gameId: initialGameId, mode = '
       <PageModuleHeader
         artwork={mode === 'save' ? 'saveTools' : 'hoodedProfile'}
         title={mode === 'save' ? 'Save Editor' : 'Data Editor'}
+        walkthroughId={mode === 'save' ? 'save-editor' : 'data-editor'}
         description={
           mode === 'save'
             ? 'Inspect local save values and apply supported save-field edits with backup and rollback.'

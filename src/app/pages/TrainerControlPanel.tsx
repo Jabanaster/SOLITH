@@ -509,6 +509,7 @@ const TrainerControlPanel: React.FC<TrainerControlPanelProps> = ({
         artwork="saveTools"
         title={panelTitle ?? 'Trainer Controls'}
         description="Save-backed trainer controls loaded from verified game profiles."
+        walkthroughId="trainer-controls"
         actions={
           <div className="save-editor-toolbar">
             {!hostRunning ? (

@@ -76,6 +76,7 @@ const Backups: React.FC<BackupsProps> = ({ gameId }) => {
         artwork="recoveryPhoenix"
         title="Backup & Rollback"
         description="Solith takes an automatic snapshot of files before applying any trainer edits or custom tweaks. Rollback actions are explicit and require your confirmation."
+        walkthroughId="backups"
       />
 
       {!loading && (
