@@ -59,7 +59,6 @@ export const walkthroughs: Record<WalkthroughId, PageWalkthroughDefinition> = {
     sections: [
       { id: 'does', title: 'What this page does', body: 'Trainer Library shows local, verified, community, installed, running, and needs re-verification definitions.' },
       { id: 'workflow', title: 'Step-by-step workflow', body: 'Use Scan installed games for local detection, Import CT for Cheat Engine metadata, Import YAML for Solith definitions, or Sync community listings for opt-in hub metadata.', targetControlId: 'trainer-library-scan-installed' },
-      { id: 'preview', title: 'Preview and confirmation', body: 'Imports and scans show previews before persistence. Declining a preview writes nothing.', targetControlId: 'trainer-library-discovery-preview' },
       { id: 'safe', title: 'Safety rules', body: 'Community entries stay L0/Scan-Required until verified. Opening a trainer deck does not execute CT scripts or write memory.', warning: true },
       { id: 'status', title: 'Status labels', body: 'Verified means Solith has local evidence. Community means metadata only. Installed means the game appears locally present. Needs re-verification means the executable/build evidence is stale.' },
     ],

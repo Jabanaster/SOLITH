@@ -874,7 +874,7 @@ export default function TrainerLibraryPage({
                 if (file) void handleImportCt(file);
               }}
             />
-            <button type="button" className={styles.syncBtn} onClick={() => void handleScanInstalled()} disabled={scanningInstalls}>
+            <button id="trainer-library-scan-installed" type="button" className={styles.syncBtn} onClick={() => void handleScanInstalled()} disabled={scanningInstalls}>
               {scanningInstalls ? 'Scanning…' : 'Scan installed games'}
             </button>
             <button type="button" className={styles.syncBtn} onClick={() => importCtRef.current?.click()} disabled={importing}>

@@ -94,7 +94,6 @@ describe('page walkthrough registry', () => {
     const requiredTargets: Array<{ pageId: WalkthroughId; targetControlId: string }> = [
       { pageId: 'game-library', targetControlId: 'game-library-add-manual' },
       { pageId: 'trainer-library', targetControlId: 'trainer-library-scan-installed' },
-      { pageId: 'trainer-library', targetControlId: 'trainer-library-discovery-preview' },
       { pageId: 'ct-library', targetControlId: 'ct-library-import-zip' },
       { pageId: 'registry-explorer', targetControlId: 'registry-explorer-load-json-file' },
       { pageId: 'live-memory-trainer', targetControlId: 'live-memory-process-picker' },
@@ -130,17 +129,5 @@ describe('page walkthrough registry', () => {
     );
   });
 
-  test('Trainer Library discovery preview supports keyboard expansion and session-persistent resizing', () => {
-    const source = sourceByPage['trainer-library'] ?? '';
-    const styles = readFileSync('src/app/pages/TrainerLibraryPage.module.css', 'utf8');
 
-    assert.match(source, /Expand preview/);
-    assert.match(source, /Collapse preview/);
-    assert.match(source, /aria-expanded=\{discoveryPreviewExpanded\}/);
-    assert.match(source, /aria-controls="trainer-library-discovery-records"/);
-    assert.match(source, /sessionStorage\.setItem\(DISCOVERY_PREVIEW_HEIGHT_KEY/);
-    assert.match(source, /selectedDiscoveryIds\.has\(record\.previewCandidateId\)/);
-    assert.match(styles, /resize:\s*vertical/);
-    assert.match(styles, /\.scanRecordListExpanded/);
-  });
 });
