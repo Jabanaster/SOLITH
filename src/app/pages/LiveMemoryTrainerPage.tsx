@@ -12,12 +12,21 @@ import AddressDataResearchPanel from '../components/AddressDataResearchPanel.js'
 import LiveCorrelationWatcherPanel from '../components/LiveCorrelationWatcherPanel.js';
 import LiveToggleCardsPanel from '../components/LiveToggleCardsPanel.js';
 import SinglePlayerWaiverModal from '../components/SinglePlayerWaiverModal.js';
+import { ALL_GAMES } from '../../core/cheat-system/games.js';
 import {
   buildLiveToggleCards,
   RESEARCH_PROMOTE_SEED_KEY,
   type LiveToggleCard,
   type ResearchPromoteSeed,
 } from '../../core/live-memory/ct-promote.js';
+import {
+  buildProcessPickerOptions,
+  describeProcessMatch,
+  groupProcessPickerOptions,
+  isSameProcessInstance,
+  type ProcessPickerInstalledGame,
+  type ProcessPickerSort,
+} from '../live-memory/process-picker.js';
 import { SessionSinglePlayerWaiverStore } from '../../core/live-memory/single-player-waiver-shared.js';
 import type {
   CorrelationCandidate,
@@ -28,6 +37,10 @@ import type {
 interface ProcessEntry {
   pid: number;
   name: string;
+  executablePath?: string;
+  parentPid?: number;
+  parentProcessName?: string;
+  startTime?: string;
 }
 
 interface GuardResult {
@@ -81,7 +94,11 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
 
   const [featureEnabled, setFeatureEnabled] = useState<boolean>(true);
   const [processes, setProcesses] = useState<ProcessEntry[]>([]);
+  const [installedGames, setInstalledGames] = useState<ProcessPickerInstalledGame[]>([]);
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
+  const [processSearch, setProcessSearch] = useState('');
+  const [processSort, setProcessSort] = useState<ProcessPickerSort>('az');
+  const [showAllProcesses, setShowAllProcesses] = useState(false);
   const [userConfirmedOffline, setUserConfirmedOffline] = useState(false);
   const [attached, setAttached] = useState(false);
   const [attachedExecutable, setAttachedExecutable] = useState('');
@@ -157,6 +174,19 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     setWatchBookmarks(listWatchListBookmarks());
   }, []);
 
+  const processOptions = buildProcessPickerOptions({
+    processes,
+    catalogGames: ALL_GAMES,
+    installedGames,
+    currentCatalogGameId: initialCatalogGameId ?? null,
+    showAllProcesses,
+    sort: processSort,
+    search: processSearch,
+  });
+
+  const processGroups = groupProcessPickerOptions(processOptions);
+  const selectedProcessVisible = selectedPid == null || processOptions.some((option) => option.pid === selectedPid);
+
   const handleBookmarkCurrent = () => {
     if (!address.trim()) return;
     addWatchListBookmark({
@@ -182,6 +212,19 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     api.getSettings().then((s: any) => {
       setFeatureEnabled(s?.v2FreeformMemoryEnabled !== false && s?.v2LiveModeEnabled !== false);
     }).catch(() => setFeatureEnabled(true));
+  }, [apiAvailable, api]);
+
+  useEffect(() => {
+    if (!apiAvailable || !api?.getGames) return;
+    let cancelled = false;
+    void api.getGames()
+      .then((games: ProcessPickerInstalledGame[]) => {
+        if (!cancelled && Array.isArray(games)) setInstalledGames(games);
+      })
+      .catch(() => {
+        if (!cancelled) setInstalledGames([]);
+      });
+    return () => { cancelled = true; };
   }, [apiAvailable, api]);
 
   const loadProcesses = useCallback(async () => {
@@ -227,6 +270,14 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
     setBusy(true);
     setMessage('');
     try {
+      const refreshed = await api.liveMemoryListProcesses();
+      const current = refreshed?.success ? refreshed.processes?.find((item: ProcessEntry) => item.pid === selectedPid) : null;
+      if (!current || !isSameProcessInstance(proc, current)) {
+        setProcesses(refreshed?.processes ?? []);
+        setSelectedPid(null);
+        setMessage('The selected process exited or changed identity. Refresh and select the game again.');
+        return;
+      }
       const result: AttachResult = await api.liveMemoryAttach({
         pid: selectedPid,
         executableName: proc.name,
@@ -662,6 +713,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
         artwork="trainerController"
         title={<>Advanced Scan Mode</>}
         description="Freeform ReadProcessMemory/WriteProcessMemory — scan any value, enter any address, freeze, pointer workflows"
+        walkthroughId="live-memory-trainer"
       />
 
       <section className="v2-monitor-section" aria-label="Process selection">
@@ -672,17 +724,69 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
           </button>
         </div>
         {processes.length > 0 && (
-          <select
-            aria-label="Select target process"
-            value={selectedPid ?? ''}
-            onChange={e => setSelectedPid(e.target.value ? Number(e.target.value) : null)}
-            disabled={attached}
-          >
-            <option value="">Select a process…</option>
-            {processes.map(p => (
-              <option key={p.pid} value={p.pid}>{p.name} (PID {p.pid})</option>
-            ))}
-          </select>
+          <>
+            <div className="v2-controls-row">
+              <label htmlFor="lm-process-search">Search</label>
+              <input
+                id="lm-process-search"
+                type="search"
+                value={processSearch}
+                onChange={e => setProcessSearch(e.target.value)}
+                placeholder="Game title or executable…"
+                disabled={attached}
+              />
+              <label htmlFor="lm-process-sort">Sort</label>
+              <select
+                id="lm-process-sort"
+                aria-label="Process sort order"
+                value={processSort}
+                onChange={e => setProcessSort(e.target.value as ProcessPickerSort)}
+                disabled={attached}
+              >
+                <option value="az">A–Z</option>
+                <option value="za">Z–A</option>
+                <option value="confidence">Confidence</option>
+                <option value="recent">Recently detected</option>
+                <option value="pid">PID</option>
+              </select>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={showAllProcesses}
+                  onChange={(e) => setShowAllProcesses(e.target.checked)}
+                  disabled={attached}
+                />{' '}
+                Show all processes
+              </label>
+            </div>
+            <select
+              id="live-memory-process-picker"
+              aria-label="Select target process"
+              value={selectedPid ?? ''}
+              onChange={e => setSelectedPid(e.target.value ? Number(e.target.value) : null)}
+              disabled={attached}
+            >
+              <option value="">Select a game process…</option>
+              {processGroups.map(group => (
+                <optgroup key={group.group} label={group.label}>
+                  {group.options.map(p => (
+                    <option key={p.pid} value={p.pid}>
+                      {p.title} — {p.processName} (PID {p.pid}) — {describeProcessMatch(p)}{p.executablePath ? ' — ' + p.executablePath : ''}{p.parentProcessName ? ' — parent: ' + p.parentProcessName : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <p className="v2-meta">
+              Showing {processOptions.length} filtered candidate(s) from {processes.length} running process(es).
+              Unknown/system/tool processes stay hidden unless “Show all processes” is enabled.
+            </p>
+            {!selectedProcessVisible && (
+              <p className="v2-session-ended-notice" role="status">
+                The selected process is hidden by the current search/filter. Clear the search or enable “Show all processes” before attaching.
+              </p>
+            )}
+          </>
         )}
 
         <label>
@@ -691,7 +795,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
             checked={userConfirmedOffline}
             onChange={(e) => {
               if (e.target.checked) {
-                const scope = processes.find((p) => p.pid === selectedPid)?.name ?? 'global';
+                const scope = processOptions.find((p) => p.pid === selectedPid)?.processName ?? 'global';
                 if (waiverStore.isAccepted(scope)) {
                   setUserConfirmedOffline(true);
                 } else {
@@ -711,7 +815,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
             <button
               className="btn-primary"
               onClick={handleAttach}
-              disabled={busy || !selectedPid || !userConfirmedOffline}
+              disabled={busy || !selectedPid || !selectedProcessVisible || !userConfirmedOffline}
             >
               Attach
             </button>
@@ -872,7 +976,12 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
               onChange={e => setScanTargetValue(e.target.value)}
               placeholder="e.g. 100"
             />
-            <button className="btn-secondary" onClick={handleScanFirst} disabled={busy || scanTargetValue.trim() === ''}>
+            <button
+              id="live-memory-auto-scan-all-types"
+              className="btn-secondary"
+              onClick={handleScanFirst}
+              disabled={busy || scanTargetValue.trim() === ''}
+            >
               Auto Scan All Types
             </button>
           </div>
@@ -1104,7 +1213,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
 
       <SinglePlayerWaiverModal
         open={waiverModalOpen}
-        scopeKey={processes.find((p) => p.pid === selectedPid)?.name ?? 'global'}
+        scopeKey={processOptions.find((p) => p.pid === selectedPid)?.processName ?? 'global'}
         store={waiverStore}
         onCancel={() => setWaiverModalOpen(false)}
         onAccept={() => {
