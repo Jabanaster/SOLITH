@@ -6,6 +6,7 @@ import { listRegistrySubkeys, readRegistryString } from './registry-win.js';
 const GOG_GAMES_KEY = 'HKLM\\SOFTWARE\\WOW6432Node\\GOG.com\\Games';
 
 interface GogFixtureEntry {
+  launcherAppId?: string;
   path?: string;
   PATH?: string;
   exe?: string;
@@ -32,6 +33,7 @@ function resolveFromEntry(entry: GogFixtureEntry, keyFallback = 'unknown'): RawI
     installPath: path.resolve(installPath),
     executablePath: executablePath ? path.resolve(executablePath) : undefined,
     displayName: displayName || undefined,
+    launcherAppId: entry.launcherAppId ?? (keyFallback !== 'unknown' ? `gog:${keyFallback}` : undefined),
   };
 }
 
@@ -74,6 +76,7 @@ export function scanGogInstalls(options: InstallDiscoveryOptions = {}): RawInsta
         path: installPath,
         exe: exeName ?? undefined,
         gameName: displayName ?? undefined,
+        launcherAppId: `gog:${subkey}`,
       },
       subkey,
     );

@@ -1,0 +1,10 @@
+Electron process.versions (captured by launching the real electron binary and printing process.versions inside app.whenReady):
+captured separately above via print-electron-versions.js run
+electron: 42.4.1
+modules (NODE_MODULE_VERSION / ABI): 146
+napi: 10
+node (bundled inside Electron, informational only - NOT the ABI used for native modules): 24.16.0
+arch: x64
+platform: win32
+electron-builder version: 26.15.3
+node-gyp will be invoked with --target=42.4.1 --arch=x64 --dist-url=https://electronjs.org/headers (the standard @electron/rebuild / electron-builder header source for Electron native module builds).

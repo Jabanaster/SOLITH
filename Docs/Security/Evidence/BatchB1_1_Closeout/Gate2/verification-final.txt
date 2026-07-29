@@ -1,0 +1,123 @@
+# Gate 2 — B1.1 Residual-Risk Disposition and Packaged Windows Certification
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node: v22.23.1 (G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64\node.exe)
+npm: 10.9.8
+
+## Phase 1 — Baseline
+
+Confirmed evidence paths exist: BatchB1_1, BatchB1_1_Closeout/Lifecycle,
+BatchB1_1_Closeout/Node22GateStableRerun2. Read all required prior evidence
+before making any change. See baseline-status.txt / baseline-diff-*.txt.
+
+## Phase 2 — Raw-byte rollback feasibility
+
+Feasible, implemented. `readBuffer` already existed and was wired to the
+real native driver; the vendored `memoryjs` package already exports a
+native `writeBuffer` that was simply never exposed through this project's
+`MemoryDriver` interface. Additive interface + driver + session changes
+only — no native-driver redesign. See rollback-byte-feasibility.md.
+
+## Phase 3 — Rollback tests
+
+19 new tests in tests/live-memory/rollback-byte-integrity.test.ts, all
+passing. Full requirement matrix in rollback-byte-test-matrix.csv. A
+genuine partial-mutation bug (sequential writeMemory-then-writeBuffer
+restore) was found and fixed during test-writing, before shipping.
+
+## Phase 4 — Packaged Windows build workflow
+
+Identified and used the project's existing mechanism:
+`npm run build:vite && npm run build:electron && npm run dist:dir`
+(electron-builder --dir → unpacked build, no installer). All three stages
+exit 0. dist/win-unpacked/Solith.exe produced (232MB), native `memoryjs`
+successfully rebuilt for the packaged Electron ABI. See
+packaged-build-info.txt / packaged-build-output.txt.
+
+## Phase 5 — Packaged Windows lifecycle certification
+
+Packaged build boots correctly and passes the existing 23-point
+`tests/packaged-smoke.test.ts` Playwright harness against the real
+`dist/win-unpacked/Solith.exe` (23/23, exit 0, 0 renderer/main errors,
+clean exit). See packaged-audit-review.txt.
+
+The 6 required interactive lifecycle scenarios (renderer crash, shutdown,
+feature disable, window identity, PID reuse, cleanup-failure containment)
+were NOT newly certified against the real packaged process this cycle —
+building a reliable new real-process E2E harness for all 6 was judged too
+large to complete safely and correctly in this session for a
+security-critical write-authorization surface. All 6 remain covered by
+existing deterministic-fake unit/integration tests tied to real Electron
+event/source wiring, re-run and confirmed passing (64/64) this cycle. See
+packaged-windows-lifecycle-matrix.csv and packaged-failure-classification.csv
+for the honest, scenario-by-scenario disposition.
+
+## Phase 6 — Regression gate
+
+- npm test: PASS, exit 0, 1,034/1,034
+- npm run test:live-memory: PASS, exit 0, 221/221
+- Main TypeScript: PASS, exit 0, 0 diagnostics
+- Electron TypeScript: FAIL, exit 2, 31 diagnostics/13 files — line-for-line
+  identical (zero diff) to the prior recorded baseline
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286/303 only — matches
+  the established baseline exactly (a transient new finding introduced by
+  this session's own edit to fake-memory-driver.ts was caught and fixed
+  before this final run)
+
+Additionally (disclosed, not part of the wired npm scripts):
+- 7 pre-existing orphaned test files: 20/20 pass (direct run)
+- 19 new rollback-byte-integrity tests: 19/19 pass (direct run)
+- 64 fake-driven lifecycle/security tests: 64/64 pass (direct re-run)
+
+## Phase 7 — Evidence
+
+All required files created under
+Docs\Security\Evidence\BatchB1_1_Closeout\Gate2\ — see the directory
+listing; nothing under Node22Gate, Node22GateReconciliation,
+Node22GateStableRerun, or Node22GateStableRerun2 was overwritten.
+
+## Phase 8 — Scope integrity
+
+Confirmed by diffing this session's Gate 2 baseline-status.txt against the
+current git status:
+- No Batch B2 or B2A work began.
+- No unrelated TypeScript cleanup occurred.
+- GameLibrary.tsx was not modified.
+- No package.json/package-lock.json/CI/release file changed.
+- No release or published artifact was created (dist/ is gitignored build
+  output, not a repository change).
+- No staging-state manipulation occurred (index remains empty throughout).
+- No file was staged, unstaged, committed, pushed, reset, cleaned, stashed,
+  reverted, checked out, or tagged.
+- No unrelated source file changed — only src/core/live-memory/types.ts,
+  native-memory-driver.ts, live-memory-session.ts, and
+  tests/fixtures/fake-memory-driver.ts were touched (all already carried
+  pre-existing, pre-Gate-2 uncommitted B1.1 diffs — Gate 2 added further,
+  additive changes on top, exactly as authorized), plus one new file
+  (tests/live-memory/rollback-byte-integrity.test.ts).
+- No prior evidence was overwritten.
+- No raw memory bytes appear in any evidence file, log, or the public
+  LiveWriteManifest/ConfirmWriteResult/RollbackResult IPC shapes — raw
+  bytes live only in private, in-process Map entries cleared by the
+  existing cleanup paths.
+
+## Verdict
+
+NODE 22 RUNTIME: recovered and used throughout (see Node22GateStableRerun2).
+
+Raw-byte rollback equality: IMPLEMENTED (narrowed residual risk, not fully
+closed — see remaining-risks.md).
+
+Packaged Windows certification: PARTIAL — build + boot + existing smoke
+suite verified against the real package; the 6 interactive lifecycle
+scenarios remain fake-only, honestly disclosed as incomplete rather than
+fabricated as passing.
+
+BATCH B1.1 CONDITIONAL PASS.
+
+No proven B1.1 regression. Gate 2 work is complete for what could be
+responsibly and reliably verified this cycle; the packaged real-process E2E
+gap for the 6 lifecycle scenarios, and the test-wiring gap for 8 test
+files, are explicitly carried forward as owner decisions, not silently
+resolved or silently hidden.

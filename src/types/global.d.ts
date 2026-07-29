@@ -8,7 +8,21 @@ interface Window {
     // Games
     getGames: () => Promise<any[]>;
     addGame: (gameData: any) => Promise<any>;
+    updateGame: (gameData: {
+      gameId: string;
+      name: string;
+      path: string;
+      engine?: string;
+      executablePath?: string;
+      coverPath?: string;
+      iconPath?: string;
+      saveLocations?: string[];
+      notes?: string;
+      metadataId?: string;
+    }) => Promise<any>;
     deleteGame: (gameId: string) => Promise<any>;
+    pickGameFolder: () => Promise<{ success: boolean; folderPath?: string; canceled?: boolean; error?: string }>;
+    pickGameExecutable: () => Promise<{ success: boolean; filePath?: string; folderPath?: string; canceled?: boolean; error?: string }>;
     scanGame: (gameId: string) => Promise<any>;
     // Recipes
     getRecipes: (gameId: string) => Promise<any[]>;
@@ -74,7 +88,7 @@ interface Window {
       error?: string;
     }>;
     liveMemoryConfirmWrite: (payload: { proposalId: string; consentToken: string }) => Promise<any>;
-    liveMemoryRollback: (payload: { manifest: unknown }) => Promise<{ success: boolean; error?: string }>;
+    liveMemoryRollback: (payload: { proposalId: string }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryScanFirst: (payload: {
       dataType: string;
       targetValue: number;
@@ -231,7 +245,17 @@ interface Window {
       sourceName?: string;
       error?: string;
     }>;
-    liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) => Promise<{ success: boolean; error?: string }>;
+    liveMemoryFreezePropose: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) => Promise<{
+      success: boolean;
+      proposal?: { proposalId: string; target: { address: string; dataType: string }; value: number; intervalMs?: number };
+      error?: string;
+    }>;
+    liveMemoryFreezeRequestConsent: (payload: { proposalId: string }) => Promise<{
+      success: boolean;
+      consent?: { tokenId: string; expiresAt: string; bindingHash: string };
+      error?: string;
+    }>;
+    liveMemoryFreezeStart: (payload: { proposalId: string; consentToken: string }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryFreezeStop: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryFreezeStatus: () => Promise<{ success: boolean; status?: any; error?: string }>;
     liveMemoryListControls: () => Promise<{
@@ -269,6 +293,20 @@ interface Window {
     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
     wispOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
     wispOverlayHide: () => Promise<{ success: boolean; error?: string }>;
+    wispOverlaySetExpanded?: (payload: { expanded: boolean }) => Promise<{
+      success: boolean;
+      expanded?: boolean;
+      error?: string;
+    }>;
+    wispOverlayMoveBy?: (payload: { deltaX: number; deltaY: number }) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    wispOverlaySetInteractive?: (payload: { interactive: boolean }) => Promise<{
+      success: boolean;
+      interactive?: boolean;
+      error?: string;
+    }>;
     trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
     trainerHotkeysGetBindings: () => Promise<{
       success: boolean;
@@ -277,7 +315,9 @@ interface Window {
       osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
       error?: string;
     }>;
-    trainerHotkeysSetBindings: (payload: { hotkeys: Record<string, string> }) => Promise<{
+    trainerHotkeysSetBindings: (payload: {
+      hotkeys: Record<string, string>;
+    }) => Promise<{
       success: boolean;
       hotkeys?: Record<string, string>;
       conflicts?: Array<{ accelerator: string; actions: string[] }>;
@@ -285,6 +325,7 @@ interface Window {
       error?: string;
     }>;
     onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
+
     trainerCatalogSearch: (payload: {
       query?: string;
       limit?: number;
@@ -364,6 +405,38 @@ interface Window {
       packId?: string;
       cheatCount?: number;
       title?: string;
+      errors?: string[];
+      error?: string;
+    }>;
+    trainerCatalogPickCt: () => Promise<{
+      success: boolean;
+      canceled?: boolean;
+      filePath?: string;
+      xmlText?: string;
+      title?: string;
+      sha256?: string;
+      error?: string;
+    }>;
+    trainerCatalogPreviewCt: (payload: {
+      filePath: string;
+      xmlText: string;
+      title: string;
+      sha256: string;
+    }) => Promise<{
+      success: boolean;
+      catalogGameId?: string;
+      packId?: string;
+      cheatCount?: number;
+      title?: string;
+      acceptedCount?: number;
+      rejectedCount?: number;
+      rejected?: Array<{ name: string; reason: string }>;
+      validationErrors?: string[];
+      metadataImport?: boolean;
+      scriptOnlyCount?: number;
+      scriptAnalysisCount?: number;
+      sourceHash?: string;
+      filePath?: string;
       errors?: string[];
       error?: string;
     }>;
@@ -544,11 +617,15 @@ interface Window {
     onCtLibraryImportProgress?: (
       callback: (payload: import('../core/ct-library/import-state.js').CtImportProgress) => void,
     ) => (() => void) | undefined;
+    registrySelectProcess: (payload: { pid: number; executableName: string }) => Promise<{
+      success: boolean;
+      selectionId?: string;
+      expiresAt?: string;
+      error?: string;
+    }>;
     registryRunReadOnlyVerification: (payload: {
       registry: unknown;
-      pid: number;
-      executableName: string;
-      executablePath?: string;
+      selectionId: string;
       timeoutMs?: number;
     }) => Promise<{
       success: boolean;
@@ -698,7 +775,10 @@ interface Window {
     installDiscoveryScan: (payload?: {
       steamInstallPath?: string;
       epicManifestsPath?: string;
+      gogFixturePath?: string;
       offlineRootsOnly?: boolean;
+      userSelectedRoots?: string[];
+      includeCommonRoots?: boolean;
     }) => Promise<{
       success: boolean;
       discovered?: number;
@@ -708,13 +788,80 @@ interface Window {
       installedCount?: number;
       error?: string;
     }>;
+    installDiscoveryPickFolder: () => Promise<{
+      success: boolean;
+      folderPath?: string;
+      canceled?: boolean;
+      error?: string;
+    }>;
+    installDiscoveryPreview: (payload?: {
+      steamInstallPath?: string;
+      epicManifestsPath?: string;
+      gogFixturePath?: string;
+      offlineRootsOnly?: boolean;
+      userSelectedRoots?: string[];
+      includeCommonRoots?: boolean;
+    }) => Promise<{
+      success: boolean;
+      discovered?: number;
+      matched?: number;
+      platforms?: Record<string, number>;
+      scannedAt?: string;
+      records?: Array<{
+        id: string;
+        previewCandidateId: string;
+        installIdentity: string;
+        canonicalInstallPath: string;
+        canonicalExecutablePath?: string;
+        launcherAppId?: string;
+        identityVersion: number;
+        identityStatus: 'verified' | 'backfilled' | 'ambiguous' | 'legacy';
+        needsReverification: boolean;
+        catalogGameId?: string;
+        catalogDisplayName?: string;
+        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+        installPath: string;
+        executablePath?: string;
+        displayName?: string;
+        steamAppId?: number;
+        detectedAt: string;
+        lastSeenAt: string;
+        duplicate: boolean;
+        duplicateReason?: 'same_executable_path' | 'same_launcher_app_id_and_path' | 'same_install_identity';
+        duplicateOfId?: string;
+        source: string;
+        unsupportedReason?: string;
+        classification: 'likely_game' | 'uncertain';
+        classificationReason: string;
+      }>;
+      locationsChecked?: string[];
+      duplicatesSkipped?: number;
+      unsupported?: number;
+      rejected?: Array<{ installPath: string; executablePath?: string; displayName?: string; reason: string }>;
+      failures?: Array<{ location: string; reason: string }>;
+      error?: string;
+    }>;
+    installDiscoveryCommit: (payload: { records: Array<{ platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual'; installPath: string; executablePath?: string; displayName?: string; steamAppId?: number; launcherAppId?: string }> }) => Promise<{
+      success: boolean;
+      added?: number;
+      skipped?: number;
+      installedCount?: number;
+      error?: string;
+    }>;
     installDiscoveryList: () => Promise<{
       success: boolean;
       games?: Array<{
         id: string;
+        installIdentity: string;
+        canonicalInstallPath: string;
+        canonicalExecutablePath?: string;
+        launcherAppId?: string;
+        identityVersion: number;
+        identityStatus: 'verified' | 'backfilled' | 'ambiguous' | 'legacy';
+        needsReverification: boolean;
         catalogGameId?: string;
         catalogDisplayName?: string;
-        platform: string;
+        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
         installPath: string;
         executablePath?: string;
         displayName?: string;

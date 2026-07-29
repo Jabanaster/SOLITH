@@ -1,0 +1,5 @@
+Condition,Classification,Notes
+Electron TypeScript 31 diagnostics/13 files,Pre-existing baseline — out of scope,Identical to Gate 2/2.1/2.2A baseline; zero diff
+GameLibrary.tsx trailing whitespace (lines 286/303),Pre-existing baseline — out of scope,Identical to established baseline; file not touched
+Packaged copy of memoryjs.node does not byte-match the standalone Electron-ABI rebuild,Expected, not a defect,Separate compiler invocations of identical source embed different PE timestamps; resolved via direct behavioral verification (packaged-native-binary-behavioral-verification.txt) rather than relying on hash equality alone
+Vendor build/Release/memoryjs.node was left in Electron-ABI form mid-cycle,Transient, corrected before regression gate,node-gyp rebuild writes to the same path for whichever ABI was last targeted; restored to Node 22 ABI immediately before Phase 10's Node-based regression gate; documented in native-binary-inventory.csv and verification-final.txt

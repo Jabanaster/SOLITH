@@ -1,23 +1,51 @@
-import React, { useMemo, useReducer, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   createWispMessage,
   DEFAULT_WISP_STATE,
   isWispActionAllowed,
   type WispAction,
   type WispActionKind,
+  type WispForm,
   type WispMessage,
   wispReducer,
 } from '../../core/companion/wisp.js';
 import { WISP_FORM_ARTWORK } from '../assets/wisp/index.js';
+import {
+  DEFAULT_WISP_PREFERENCES,
+  WISP_FORMS,
+  clampWispPosition,
+  parseWispPreferences,
+  positionForPreset,
+  type WispPosition,
+  type WispPositionPreset,
+  type WispPreferences,
+} from '../wisp/preferences.js';
 
-const POSITION_KEY = 'solith:wisp-position:v1';
+const POSITION_KEY = 'solith:wisp-position:v2';
+const LEGACY_POSITION_KEY = 'solith:wisp-position:v1';
 const QUIET_KEY = 'solith:wisp-quiet:v1';
+const PREFERENCES_KEY = 'solith:wisp-preferences:v1';
+const DRAG_THRESHOLD_PX = 4;
+const WISP_SPRITE_BOUNDS = { width: 150, height: 150 };
+const WISP_SAFE_PADDING = 12;
+const WISP_CONTROLS_BOTTOM_SPACE = 360;
 
-type WispPosition = {
-  corner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+type DragState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  moved: boolean;
 };
 
-const DEFAULT_POSITION: WispPosition = { corner: 'bottom-right' };
+function defaultPosition(): WispPosition {
+  if (typeof window === 'undefined') return { x: 0, y: 0 };
+  return clampPosition({
+    x: window.innerWidth - WISP_SPRITE_BOUNDS.width - 28,
+    y: window.innerHeight - WISP_SPRITE_BOUNDS.height - 28,
+  });
+}
 
 const QUICK_ACTIONS: WispAction[] = [
   { kind: 'scan_now', label: 'Scan now', description: 'Start an approved read-only scan.' },
@@ -33,20 +61,22 @@ const QUICK_ACTIONS: WispAction[] = [
 function loadPosition(): WispPosition {
   try {
     const raw = localStorage.getItem(POSITION_KEY);
-    if (!raw) return DEFAULT_POSITION;
+    if (!raw) {
+      const legacyRaw = localStorage.getItem(LEGACY_POSITION_KEY);
+      if (legacyRaw) {
+        const legacy = JSON.parse(legacyRaw) as { corner?: string };
+        return legacyPositionToCoordinates(legacy.corner);
+      }
+      return defaultPosition();
+    }
     const parsed = JSON.parse(raw) as Partial<WispPosition>;
-    if (
-      parsed.corner === 'bottom-right' ||
-      parsed.corner === 'bottom-left' ||
-      parsed.corner === 'top-right' ||
-      parsed.corner === 'top-left'
-    ) {
-      return { corner: parsed.corner };
+    if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
+      return clampPosition({ x: Number(parsed.x), y: Number(parsed.y) });
     }
   } catch {
     // fall through to safe default
   }
-  return DEFAULT_POSITION;
+  return defaultPosition();
 }
 
 function savePosition(position: WispPosition): void {
@@ -73,17 +103,47 @@ function saveQuietMode(quietMode: boolean): void {
   }
 }
 
-function nextCorner(corner: WispPosition['corner']): WispPosition['corner'] {
+function legacyPositionToCoordinates(corner: string | undefined): WispPosition {
+  if (typeof window === 'undefined') return { x: 0, y: 0 };
+  const maxX = window.innerWidth - WISP_SPRITE_BOUNDS.width - 28;
+  const maxY = window.innerHeight - WISP_SPRITE_BOUNDS.height - 28;
   switch (corner) {
     case 'bottom-right':
-      return 'bottom-left';
-    case 'bottom-left':
-      return 'top-left';
+      return clampPosition({ x: maxX, y: maxY });
     case 'top-left':
-      return 'top-right';
+      return clampPosition({ x: 28, y: 28 });
     case 'top-right':
-      return 'bottom-right';
+      return clampPosition({ x: maxX, y: 28 });
+    case 'bottom-left':
+    default:
+      return clampPosition({ x: 28, y: maxY });
   }
+}
+
+function loadPreferences(): WispPreferences {
+  try {
+    return parseWispPreferences(localStorage.getItem(PREFERENCES_KEY));
+  } catch {
+    return { ...DEFAULT_WISP_PREFERENCES };
+  }
+}
+
+function savePreferences(preferences: WispPreferences): void {
+  try {
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+  } catch {
+    // Persistence is best-effort in restricted renderer contexts.
+  }
+}
+
+function clampPosition(position: WispPosition): WispPosition {
+  if (typeof window === 'undefined') return position;
+  return clampWispPosition(
+    position,
+    { width: window.innerWidth, height: window.innerHeight },
+    WISP_SPRITE_BOUNDS,
+    WISP_SAFE_PADDING,
+  );
 }
 
 function actionMessage(kind: WispActionKind): WispMessage {
@@ -168,29 +228,133 @@ function actionMessage(kind: WispActionKind): WispMessage {
   }
 }
 
-export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boolean }) {
+type WispNavigationTarget = 'library' | 'trainer-library' | 'ct-library';
+
+type SolithWispCompanionProps = {
+  overlayMode?: boolean;
+  currentPage?: string;
+  onNavigate?: (target: WispNavigationTarget) => void;
+};
+
+export function SolithWispCompanion({
+  overlayMode = false,
+  currentPage = 'Solith',
+  onNavigate,
+}: SolithWispCompanionProps) {
+  const [preferences, setPreferences] = useState(loadPreferences);
   const [state, dispatch] = useReducer(wispReducer, {
     ...DEFAULT_WISP_STATE,
     quietMode: loadQuietMode(),
+    form: preferences.form,
+    preferredForm: preferences.form,
   });
   const [position, setPosition] = useState(loadPosition);
   const [quickInput, setQuickInput] = useState('');
   const [reaction, setReaction] = useState<'idle' | 'ack' | 'thinking' | 'dismissed'>('idle');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState('Wisp ready in offline companion mode');
+  const dragRef = useRef<DragState | null>(null);
+  const creatureRef = useRef<HTMLButtonElement>(null);
 
   const artwork = WISP_FORM_ARTWORK[state.form];
-  const positionClass = overlayMode ? 'solith-wisp--overlay' : `solith-wisp--${position.corner}`;
+  const overlayExpanded = overlayMode && state.visible && (state.interactionOpen || state.bubbles.length > 0);
+  const interactionPlacement =
+    !overlayMode && typeof window !== 'undefined'
+      ? [
+          position.x > window.innerWidth - 520 ? 'solith-wisp--controls-left' : 'solith-wisp--controls-right',
+          position.y > window.innerHeight - WISP_CONTROLS_BOTTOM_SPACE ? 'solith-wisp--controls-above' : 'solith-wisp--controls-below',
+        ].join(' ')
+      : '';
+  const positionClass = overlayMode ? 'solith-wisp--overlay' : `solith-wisp--app ${interactionPlacement}`;
+  const appPositionStyle = overlayMode
+    ? undefined
+    : ({
+        '--wisp-x': `${position.x}px`,
+        '--wisp-y': `${position.y}px`,
+        '--wisp-scale': preferences.scale,
+        '--wisp-opacity': preferences.opacity,
+      } as React.CSSProperties);
 
   const visibleActions = useMemo(() => {
     if (state.message?.actions.length) return state.message.actions;
     return QUICK_ACTIONS.slice(0, 6);
   }, [state.message]);
 
+  useEffect(() => {
+    if (!overlayMode) return;
+    void window.electronAPI?.wispOverlaySetExpanded?.({ expanded: overlayExpanded });
+  }, [overlayExpanded, overlayMode]);
+
+  useEffect(() => {
+    if (!overlayMode) return;
+    const setInteractive = (event: PointerEvent | FocusEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const interactive = Boolean(target?.closest('[data-wisp-interactive="true"]'));
+      void window.electronAPI?.wispOverlaySetInteractive?.({ interactive });
+    };
+    const clearInteractive = () => {
+      void window.electronAPI?.wispOverlaySetInteractive?.({ interactive: false });
+    };
+    window.addEventListener('pointermove', setInteractive, { passive: true });
+    window.addEventListener('pointerdown', setInteractive, { passive: true });
+    window.addEventListener('focusin', setInteractive);
+    window.addEventListener('pointerleave', clearInteractive);
+    window.addEventListener('blur', clearInteractive);
+    clearInteractive();
+    return () => {
+      window.removeEventListener('pointermove', setInteractive);
+      window.removeEventListener('pointerdown', setInteractive);
+      window.removeEventListener('focusin', setInteractive);
+      window.removeEventListener('pointerleave', clearInteractive);
+      window.removeEventListener('blur', clearInteractive);
+      clearInteractive();
+    };
+  }, [overlayMode]);
+
+  useEffect(() => {
+    if (overlayMode) return;
+    const handleResize = () => {
+      setPosition((current) => {
+        const next = clampPosition(current);
+        if (next.x === current.x && next.y === current.y) return current;
+        savePosition(next);
+        return next;
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [overlayMode]);
+
+  useEffect(() => {
+    savePreferences(preferences);
+  }, [preferences]);
+
+  useEffect(() => {
+    if (!state.interactionOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      dispatch({ type: 'closeInteraction' });
+      setSettingsOpen(false);
+      setHelpOpen(false);
+      setAnnouncement('Wisp controls closed');
+      window.setTimeout(() => creatureRef.current?.focus(), 0);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [state.interactionOpen]);
+
   if (!state.visible) {
     return (
       <button
         type="button"
-        className={`solith-wisp-restore ${overlayMode ? 'solith-wisp-restore--overlay' : `solith-wisp-restore--${position.corner}`}`}
-        onClick={() => dispatch({ type: 'show' })}
+        className={`solith-wisp-restore ${overlayMode ? 'solith-wisp-restore--overlay' : 'solith-wisp-restore--app'}`}
+        data-wisp-interactive="true"
+        style={appPositionStyle}
+        onClick={() => {
+          dispatch({ type: 'show' });
+          setAnnouncement('Wisp restored');
+        }}
         title="Wake Solith Wisp"
         aria-label="Wake Solith Wisp"
       >
@@ -213,6 +377,7 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
     }
     if (kind === 'hide') {
       dispatch({ type: 'hide' });
+      setAnnouncement('Wisp hidden');
       return;
     }
     dispatch({ type: 'message', message: actionMessage(kind) });
@@ -227,15 +392,50 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
 
   const openInteraction = () => {
     dispatch({ type: 'toggleInteraction' });
+    setSettingsOpen(false);
+    setHelpOpen(false);
+    setAnnouncement(state.interactionOpen ? 'Wisp controls closed' : 'Wisp opened in offline companion mode');
     pulse('ack');
   };
 
-  const cyclePosition = () => {
+  const resetPosition = () => {
     if (overlayMode) return;
-    const next = { corner: nextCorner(position.corner) };
+    const next = defaultPosition();
     setPosition(next);
     savePosition(next);
     pulse('ack');
+    setAnnouncement('Wisp position reset');
+  };
+
+  const applyPositionPreset = (preset: WispPositionPreset) => {
+    if (overlayMode || typeof window === 'undefined') return;
+    const next = positionForPreset(
+      preset,
+      { width: window.innerWidth, height: window.innerHeight },
+      WISP_SPRITE_BOUNDS,
+      WISP_SAFE_PADDING,
+    );
+    setPosition(next);
+    if (preferences.rememberPosition) savePosition(next);
+    setAnnouncement(`Wisp moved to ${preset.replace('-', ' ')}`);
+  };
+
+  const updatePreferences = (next: Partial<WispPreferences>) => {
+    setPreferences((current) => ({ ...current, ...next }));
+  };
+
+  const selectForm = (form: WispForm) => {
+    dispatch({ type: 'selectForm', form });
+    updatePreferences({ form });
+    setAnnouncement(`Wisp form changed to ${form}`);
+  };
+
+  const restoreDefaults = () => {
+    const next = { ...DEFAULT_WISP_PREFERENCES };
+    setPreferences(next);
+    dispatch({ type: 'selectForm', form: next.form });
+    resetPosition();
+    setAnnouncement('Wisp preferences restored to defaults');
   };
 
   const toggleQuietMode = () => {
@@ -298,34 +498,113 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
     pulse('dismissed');
   };
 
+  const startDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.screenX,
+      startY: event.screenY,
+      lastX: event.screenX,
+      lastY: event.screenY,
+      moved: false,
+    };
+  };
+
+  const moveDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.screenX - drag.lastX;
+    const deltaY = event.screenY - drag.lastY;
+    const totalDistance = Math.hypot(event.screenX - drag.startX, event.screenY - drag.startY);
+    if (totalDistance >= DRAG_THRESHOLD_PX) {
+      drag.moved = true;
+    }
+    drag.lastX = event.screenX;
+    drag.lastY = event.screenY;
+    if (deltaX !== 0 || deltaY !== 0) {
+      if (overlayMode) {
+        void window.electronAPI?.wispOverlayMoveBy?.({ deltaX, deltaY });
+      } else {
+        setPosition((current) => {
+          const next = clampPosition({ x: current.x + deltaX, y: current.y + deltaY });
+          savePosition(next);
+          return next;
+        });
+      }
+    }
+  };
+
+  const endDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    dragRef.current = null;
+    if (!drag.moved) {
+      openInteraction();
+    }
+  };
+
   return (
     <aside
-      className={`solith-wisp ${positionClass} solith-wisp--${state.mood} solith-wisp--reaction-${reaction}${state.interactionOpen ? ' solith-wisp--interacting' : ''}${state.message ? ' solith-wisp--has-bubble' : ''}`}
+      className={`solith-wisp ${positionClass} solith-wisp--${state.mood} solith-wisp--reaction-${reaction}${state.interactionOpen ? ' solith-wisp--interacting' : ''}${state.message ? ' solith-wisp--has-bubble' : ''}${preferences.reducedMotion || preferences.animationIntensity === 'off' ? ' solith-wisp--reduced-motion' : ''}${preferences.animationIntensity === 'reduced' ? ' solith-wisp--reduced-animation' : ''}`}
+      style={appPositionStyle}
       aria-label="Solith Wisp companion"
     >
+      <span className="sr-only" aria-live="polite">{announcement}</span>
       <button
+        ref={creatureRef}
         type="button"
         className="solith-wisp__creature"
-        onClick={openInteraction}
-        onDoubleClick={cyclePosition}
-        title={overlayMode ? 'Click to talk to Solith Wisp.' : 'Click to talk to Solith Wisp. Double-click to move corners.'}
+        data-wisp-interactive="true"
+        onClick={undefined}
+        onDoubleClick={resetPosition}
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          openInteraction();
+        }}
+        aria-expanded={state.interactionOpen}
+        aria-controls="solith-wisp-controls"
+        aria-label="Solith Wisp. Press Enter or Space to open controls. Drag to move."
+        title="Drag Wisp to move it. Click to talk. Double-click to reset position."
       >
         <span className="solith-wisp__aura" aria-hidden="true" />
-        <img src={artwork} alt="" decoding="async" />
+        <img
+          src={artwork}
+          alt=""
+          decoding="async"
+          draggable={false}
+          onError={() => {
+            if (state.form !== 'base') {
+              dispatch({ type: 'setForm', form: 'base' });
+              setAnnouncement('Wisp image unavailable. Base form restored.');
+            }
+          }}
+        />
         <span className="solith-wisp__eyes" aria-hidden="true" />
         <span className="solith-wisp__shadow" aria-hidden="true" />
       </button>
 
       <div className="solith-wisp__bubble-stack" aria-live="polite">
         {state.bubbles.map((bubble) => (
-          <section key={bubble.id} className={`solith-wisp__bubble solith-wisp__bubble--${bubble.severity}`}>
+          <section
+            key={bubble.id}
+            className={`solith-wisp__bubble solith-wisp__bubble--${bubble.severity}`}
+            data-wisp-interactive="true"
+          >
             <header className="solith-wisp__header">
               <div>
                 <span className={`solith-wisp__severity solith-wisp__severity--${bubble.severity}`} />
                 <strong>{bubble.title}</strong>
                 <small>{bubble.source}</small>
               </div>
-              <button type="button" onClick={() => closeBubble(bubble.id)} aria-label={`Close ${bubble.title}`}>
+              <button type="button" data-wisp-interactive="true" onClick={() => closeBubble(bubble.id)} aria-label={`Close ${bubble.title}`}>
                 ×
               </button>
             </header>
@@ -339,11 +618,12 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
             )}
 
             {bubble.actions.length > 0 && (
-              <div className="solith-wisp__actions" aria-label="Solith Wisp message actions">
+              <div className="solith-wisp__message-actions" aria-label="Solith Wisp message actions">
                 {bubble.actions.map((action) => (
                   <button
                     key={action.kind}
                     type="button"
+                    data-wisp-interactive="true"
                     onClick={() => executeAction(action.kind)}
                     title={action.description}
                   >
@@ -354,62 +634,143 @@ export function SolithWispCompanion({ overlayMode = false }: { overlayMode?: boo
             )}
           </section>
         ))}
-
-        {state.interactionOpen && (
-          <section className="solith-wisp__bubble solith-wisp__command-bubble">
-            <header className="solith-wisp__header">
-              <div>
-                <span className="solith-wisp__severity solith-wisp__severity--info" />
-                <strong>Solith Wisp</strong>
-                <small>safe companion controls</small>
-              </div>
-              <button type="button" onClick={() => dispatch({ type: 'closeInteraction' })} aria-label="Close Wisp controls">
-                ×
-              </button>
-            </header>
-
-            <p>I can mark read-only events, request safe scans, and open the overlay. I cannot write memory or run scripts.</p>
-
-            <div className="solith-wisp__actions" aria-label="Solith Wisp quick actions">
-              {visibleActions.map((action) => (
-                <button
-                  key={action.kind}
-                  type="button"
-                  onClick={() => executeAction(action.kind)}
-                  title={action.description}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="solith-wisp__quick-input">
-              <input
-                value={quickInput}
-                onChange={(event) => setQuickInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') submitQuickInput();
-                }}
-                placeholder="try: spent gold, took damage, scan"
-                aria-label="Send a safe Solith Wisp command"
-              />
-              <button type="button" onClick={submitQuickInput}>Send</button>
-            </div>
-
-            <footer>
-              <button type="button" onClick={toggleOverlayWindow}>
-                {overlayMode ? 'Close overlay' : 'Open overlay'}
-              </button>
-              <button type="button" onClick={toggleQuietMode} aria-pressed={state.quietMode}>
-                {state.quietMode ? 'Quiet mode on' : 'Quiet mode off'}
-              </button>
-              <button type="button" onClick={() => executeAction('hide')}>
-                Hide Wisp
-              </button>
-            </footer>
-          </section>
-        )}
       </div>
+
+      {state.interactionOpen && (
+        <div id="solith-wisp-controls" className="solith-wisp__response-orbit" aria-label="Solith Wisp quick controls">
+          <button type="button" className="solith-wisp__response-chip" data-wisp-interactive="true" onClick={toggleOverlayWindow}>
+            {overlayMode ? 'Close overlay' : 'Open overlay'}
+          </button>
+          <button
+            type="button"
+            className="solith-wisp__response-chip"
+            data-wisp-interactive="true"
+            onClick={toggleQuietMode}
+            aria-pressed={state.quietMode}
+          >
+            {state.quietMode ? 'Quiet mode on' : 'Quiet mode off'}
+          </button>
+          <button type="button" className="solith-wisp__response-chip" data-wisp-interactive="true" onClick={() => executeAction('hide')}>
+            Hide Wisp
+          </button>
+          <button
+            type="button"
+            className="solith-wisp__response-chip"
+            data-wisp-interactive="true"
+            aria-expanded={settingsOpen}
+            aria-controls="solith-wisp-settings"
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            Settings
+          </button>
+          <button
+            type="button"
+            className="solith-wisp__response-chip"
+            data-wisp-interactive="true"
+            aria-expanded={helpOpen}
+            aria-controls="solith-wisp-help"
+            onClick={() => setHelpOpen((open) => !open)}
+          >
+            Help
+          </button>
+          <div className="solith-wisp__offline-status" role="status" data-wisp-interactive="true">
+            <strong>Offline companion mode</strong>
+            <span>No active trainer session · Current page: {currentPage}</span>
+          </div>
+          {!overlayMode && onNavigate && (
+            <div className="solith-wisp__response-group" aria-label="Offline navigation">
+              <button type="button" className="solith-wisp__response-chip" data-wisp-interactive="true" onClick={() => onNavigate('library')}>Game Library</button>
+              <button type="button" className="solith-wisp__response-chip" data-wisp-interactive="true" onClick={() => onNavigate('trainer-library')}>Trainer Library</button>
+              <button type="button" className="solith-wisp__response-chip" data-wisp-interactive="true" onClick={() => onNavigate('ct-library')}>CT Library</button>
+            </div>
+          )}
+
+          {helpOpen && (
+            <section id="solith-wisp-help" className="solith-wisp__settings" data-wisp-interactive="true" aria-label="How to use Wisp">
+              <strong>How to use Wisp</strong>
+              <p>Click Wisp to open controls. Drag the character to move it. Use Settings for keyboard position presets, forms, scale, opacity, and motion.</p>
+              <p>Hide removes the character but leaves a reachable restore button. Escape closes controls and returns focus to Wisp.</p>
+              <p>Offline mode offers navigation only. Trainer controls appear only after a supported, certified session is connected.</p>
+              <p>The desktop overlay is a fallback. Xbox Game Bar remains a separate prototype and certification phase.</p>
+            </section>
+          )}
+
+          {settingsOpen && (
+            <section id="solith-wisp-settings" className="solith-wisp__settings" data-wisp-interactive="true" aria-label="Wisp settings">
+              <label>
+                Form
+                <select value={preferences.form} onChange={(event) => selectForm(event.target.value as WispForm)}>
+                  {WISP_FORMS.map((form) => <option key={form} value={form}>{form}</option>)}
+                </select>
+              </label>
+              <label>
+                Scale {Math.round(preferences.scale * 100)}%
+                <input type="range" min="0.75" max="1.5" step="0.05" value={preferences.scale} onChange={(event) => updatePreferences({ scale: Number(event.target.value) })} />
+              </label>
+              <label>
+                Opacity {Math.round(preferences.opacity * 100)}%
+                <input type="range" min="0.5" max="1" step="0.05" value={preferences.opacity} onChange={(event) => updatePreferences({ opacity: Number(event.target.value) })} />
+              </label>
+              <label>
+                Animation
+                <select value={preferences.animationIntensity} onChange={(event) => updatePreferences({ animationIntensity: event.target.value as WispPreferences['animationIntensity'] })}>
+                  <option value="off">Off</option>
+                  <option value="reduced">Reduced</option>
+                  <option value="normal">Normal</option>
+                </select>
+              </label>
+              <label className="solith-wisp__setting-check">
+                <input type="checkbox" checked={preferences.reducedMotion} onChange={(event) => updatePreferences({ reducedMotion: event.target.checked })} />
+                Reduced motion
+              </label>
+              <div className="solith-wisp__position-presets" aria-label="Keyboard position presets">
+                {(['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right'] as const).map((preset) => (
+                  <button key={preset} type="button" onClick={() => applyPositionPreset(preset)}>{preset.replace('-', ' ')}</button>
+                ))}
+              </div>
+              <button type="button" onClick={restoreDefaults}>Restore defaults</button>
+            </section>
+          )}
+
+          <div className="solith-wisp__response-group">
+            {visibleActions.map((action) => (
+              <button
+                key={action.kind}
+                type="button"
+                className="solith-wisp__response-chip"
+                data-wisp-interactive="true"
+                onClick={() => executeAction(action.kind)}
+                title={action.description}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="solith-wisp__response-input-chip" data-wisp-interactive="true">
+            <input
+              data-wisp-interactive="true"
+              value={quickInput}
+              onChange={(event) => setQuickInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') submitQuickInput();
+              }}
+              placeholder="try: spent gold"
+              aria-label="Send a safe Solith Wisp command"
+            />
+            <button type="button" data-wisp-interactive="true" onClick={submitQuickInput}>Send</button>
+          </div>
+
+          <button
+            type="button"
+            className="solith-wisp__response-chip solith-wisp__response-chip--ghost"
+            data-wisp-interactive="true"
+            onClick={() => dispatch({ type: 'closeInteraction' })}
+          >
+            Close
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

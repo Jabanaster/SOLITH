@@ -4,11 +4,20 @@ import type { InstalledGameRecord } from './types.js';
 export function upsertInstalledGames(records: InstalledGameRecord[]): void {
   const stmt = db.prepare(`
     INSERT INTO installed_games (
-      id, catalog_game_id, platform, install_path, executable_path,
-      display_name, steam_app_id, detected_at, last_seen_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(platform, install_path) DO UPDATE SET
+      id, install_identity, canonical_install_path, canonical_executable_path,
+      launcher_app_id, identity_version, identity_status, needs_reverification,
+      catalog_game_id, platform, install_path, executable_path, display_name,
+      steam_app_id, detected_at, last_seen_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(install_identity) DO UPDATE SET
       catalog_game_id = excluded.catalog_game_id,
+      canonical_install_path = excluded.canonical_install_path,
+      canonical_executable_path = excluded.canonical_executable_path,
+      launcher_app_id = excluded.launcher_app_id,
+      identity_version = excluded.identity_version,
+      identity_status = excluded.identity_status,
+      needs_reverification = excluded.needs_reverification,
+      install_path = excluded.install_path,
       executable_path = excluded.executable_path,
       display_name = excluded.display_name,
       steam_app_id = excluded.steam_app_id,
@@ -18,6 +27,13 @@ export function upsertInstalledGames(records: InstalledGameRecord[]): void {
   for (const record of records) {
     stmt.run(
       record.id,
+      record.installIdentity,
+      record.canonicalInstallPath,
+      record.canonicalExecutablePath ?? null,
+      record.launcherAppId ?? null,
+      record.identityVersion,
+      record.identityStatus,
+      record.needsReverification ? 1 : 0,
       record.catalogGameId ?? null,
       record.platform,
       record.installPath,
@@ -34,13 +50,25 @@ export function listInstalledGames(): InstalledGameRecord[] {
   const rows = db.prepare(
     `SELECT id, catalog_game_id AS catalogGameId, platform, install_path AS installPath,
             executable_path AS executablePath, display_name AS displayName,
-            steam_app_id AS steamAppId, detected_at AS detectedAt, last_seen_at AS lastSeenAt
+            steam_app_id AS steamAppId, detected_at AS detectedAt, last_seen_at AS lastSeenAt,
+            install_identity AS installIdentity,
+            canonical_install_path AS canonicalInstallPath,
+            canonical_executable_path AS canonicalExecutablePath,
+            launcher_app_id AS launcherAppId, identity_version AS identityVersion,
+            identity_status AS identityStatus, needs_reverification AS needsReverification
      FROM installed_games
      ORDER BY display_name COLLATE NOCASE`,
   ).all() as Array<Record<string, unknown>>;
 
   return rows.map((row) => ({
     id: String(row.id),
+    installIdentity: String(row.installIdentity),
+    canonicalInstallPath: String(row.canonicalInstallPath),
+    canonicalExecutablePath: row.canonicalExecutablePath ? String(row.canonicalExecutablePath) : undefined,
+    launcherAppId: row.launcherAppId ? String(row.launcherAppId) : undefined,
+    identityVersion: Number(row.identityVersion),
+    identityStatus: String(row.identityStatus) as InstalledGameRecord['identityStatus'],
+    needsReverification: Boolean(row.needsReverification),
     catalogGameId: row.catalogGameId ? String(row.catalogGameId) : undefined,
     platform: String(row.platform) as InstalledGameRecord['platform'],
     installPath: String(row.installPath),

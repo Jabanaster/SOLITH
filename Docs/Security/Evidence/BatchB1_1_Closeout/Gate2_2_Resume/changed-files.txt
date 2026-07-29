@@ -1,0 +1,35 @@
+ M electron/live-memory-ipc.ts
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/baseline-diff-check.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/baseline-diff-name-status.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/baseline-diff-stat.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/baseline-staged-name-status.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/baseline-status.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/changed-files.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/control-provenance.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/debug-run.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/debug-run2.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/failure-classification.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/final-git-diff-name-only.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/final-git-diff-stat.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/final-git-status.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/fixture-prerequisite-matrix.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/lifecycle-final.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/lifecycle-run1.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/lifecycle-run2.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/lifecycle-run3.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/lifecycle-run4.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/normal-build-test-hook-absence-final-matrix.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-active-shutdown-matrix.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-audit-review.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-build-output.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-environment.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-feature-disable-final-matrix.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-regression-gate2-1.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-regression-matrix.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-regression-write-proof.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-smoke-output.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/packaged-window-identity-final-matrix.csv
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/tests-run.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2_Resume/tests-summary.csv
+?? tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts
+dist/ (gitignored packaged output, contains rebuilt candidate with the new test hook)

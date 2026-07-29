@@ -175,17 +175,27 @@ function GovernanceDashboard({
       setVerificationError('Enter the executable name for the selected PID.');
       return;
     }
-    if (!window.electronAPI?.registryRunReadOnlyVerification) {
+    if (!window.electronAPI?.registryRunReadOnlyVerification || !window.electronAPI?.registrySelectProcess) {
       setVerificationError('Read-only registry verification is only available inside Electron.');
       return;
     }
 
     setRunning(true);
     try {
-      const response = await window.electronAPI.registryRunReadOnlyVerification({
-        registry,
+      // Batch B1.1: the main process independently re-verifies this pid/executableName
+      // against the live OS process before creating a selection — the renderer's input
+      // is no longer trusted directly, only used to REQUEST a selection.
+      const selection = await window.electronAPI.registrySelectProcess({
         pid,
         executableName: executableName.trim(),
+      });
+      if (!selection.success || !selection.selectionId) {
+        setVerificationError(selection.error ?? 'Could not select the specified process.');
+        return;
+      }
+      const response = await window.electronAPI.registryRunReadOnlyVerification({
+        registry,
+        selectionId: selection.selectionId,
         timeoutMs: 30_000,
       });
       if (!response.success || !response.artifact) {
@@ -382,7 +392,13 @@ function GovernanceDashboard({
               placeholder="Game-Win64-Shipping.exe"
             />
           </label>
-          <button className="btn-primary" type="button" onClick={runVerification} disabled={running}>
+          <button
+            id="registry-explorer-load-json"
+            className="btn-primary"
+            type="button"
+            onClick={runVerification}
+            disabled={running}
+          >
             {running ? 'Verifying…' : 'Run Read-Only Verification'}
           </button>
         </div>

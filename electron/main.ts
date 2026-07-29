@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   AddGameSchema,
+  UpdateGameSchema,
   ScanGameSchema,
   GetRecipesSchema,
   CreateRecipeSchema,
@@ -41,7 +42,7 @@ import {
   validateSaveDataFileAccess
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
-import { registerLiveMemoryIpc } from './live-memory-ipc.js';
+import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
@@ -49,6 +50,7 @@ import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
+import { registerTrustedSolithWindow } from './sender-validation.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
@@ -250,6 +252,11 @@ function createWindow() {
     mainWindow.loadFile(path.join(moduleDirectory, 'dist/index.html'));
   }
 
+  registerTrustedSolithWindow(mainWindow.webContents, 'main', [
+    'http://localhost:3000',
+    pathToFileURL(path.join(moduleDirectory, 'dist/index.html')).href,
+  ]);
+
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.setMenuBarVisibility(false);
     mainWindow?.setMenu(null);
@@ -304,6 +311,9 @@ app.whenReady().then(async () => {
   createWindow();
 });
 
+app.on('render-process-gone', (_event, webContents) => {
+  disposeLiveMemorySessionForOwner(webContents.id);
+});
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
@@ -315,6 +325,9 @@ app.on('will-quit', () => {
   destroyTrainerOverlay();
   destroyWispOverlay();
   stopCommunitySyncPolling();
+  const cleanupResults = disposeAllLiveMemorySessions();
+  const failures = cleanupResults.filter((result) => !result.success).length;
+  if (failures > 0) console.error('live_memory_cleanup_failed', { failedOwners: failures });
 });
 
 // Remove the app-level 'before-quit' listener installed by lifecycle wiring.
@@ -347,6 +360,40 @@ ipcMain.handle('get-games', async () => {
   }
 });
 
+ipcMain.handle('pick-game-folder', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win ?? undefined, {
+      title: 'Select game install folder',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+    return { success: true, folderPath: result.filePaths[0] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('pick-game-executable', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win ?? undefined, {
+      title: 'Select game executable',
+      properties: ['openFile'],
+      filters: [{ name: 'Windows executables', extensions: ['exe'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+    const filePath = result.filePaths[0];
+    return { success: true, filePath, folderPath: path.dirname(filePath) };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
 ipcMain.handle('add-game', async (event, gameData) => {
   try {
     const parsed = AddGameSchema.parse(gameData);
@@ -365,6 +412,38 @@ ipcMain.handle('add-game', async (event, gameData) => {
   } catch (error) {
     console.error('add-game error:', error);
     return { error: String(error) };
+  }
+});
+
+ipcMain.handle('update-game', async (_event, gameData) => {
+  try {
+    const parsed = UpdateGameSchema.parse(gameData);
+    const safetyModule = await import('../src/core/safety/path-safety.js');
+    const safety = safetyModule.validatePathSafety(parsed.path);
+    if (!safety.safe) {
+      return { success: false, error: `Path safety violation: ${safety.reason}` };
+    }
+
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+
+    const gamesModule = await import('../src/core/games/index.js');
+    const game = gamesModule.updateGame(parsed.gameId, {
+      name: parsed.name,
+      path: parsed.path,
+      engine: parsed.engine,
+      executablePath: parsed.executablePath,
+      coverPath: parsed.coverPath,
+      iconPath: parsed.iconPath,
+      saveLocations: parsed.saveLocations,
+      notes: parsed.notes,
+      metadataId: parsed.metadataId,
+    });
+    if (!game) return { success: false, error: 'Game not found' };
+    return { success: true, game };
+  } catch (error) {
+    console.error('update-game error:', error);
+    return { success: false, error: String(error) };
   }
 });
 

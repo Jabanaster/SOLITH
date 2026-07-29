@@ -105,6 +105,14 @@ export interface MemoryDriver {
   getRegions(handle: LiveProcessHandle): MemoryRegion[];
   /** Bulk-read raw bytes for scanning. Throws if the read fails (e.g. region unmapped mid-scan). */
   readBuffer(handle: LiveProcessHandle, address: bigint, size: number): Buffer;
+  /**
+   * Bulk-write raw bytes at an address, bypassing typed value encoding.
+   * (Gate 2) Backs exact-byte-fidelity rollback: restoring the literal bytes
+   * read before a write reproduces the original bit pattern exactly (matters
+   * for distinguishing NaN payloads / signed zero), unlike re-encoding a
+   * decoded `number` through `writeMemory`.
+   */
+  writeBuffer(handle: LiveProcessHandle, address: bigint, buffer: Buffer): void;
   /** Enumerate loaded modules (exe/dlls) — used to build restart-stable, module-relative pointer paths. */
   getModules(handle: LiveProcessHandle): MemoryModule[];
   /**
@@ -154,6 +162,15 @@ export interface LiveWriteManifest {
   valueBefore: number;
   valueAfter: number;
   appliedAt: string;
+}
+
+/** A staged, not-yet-authorized freeze request — mirrors LiveWriteProposal. */
+export interface FreezeProposal {
+  proposalId: string;
+  target: LiveMemoryAddress;
+  value: number;
+  intervalMs: number;
+  createdAt: string;
 }
 
 // ── Memory scanning (Cheat-Engine-style first-scan / next-scan) ─────────────
@@ -214,7 +231,14 @@ export interface FreezeTarget {
   value: number;
 }
 
-export type FreezeStopReason = 'user_stopped' | 'guard_blocked' | 'identity_mismatch' | 'write_failed' | 'detached';
+export type FreezeStopReason =
+  | 'user_stopped'
+  | 'guard_blocked'
+  | 'identity_mismatch'
+  | 'write_failed'
+  | 'detached'
+  | 'max_duration_exceeded'
+  | 'feature_disabled';
 
 export interface FreezeStatus {
   active: boolean;

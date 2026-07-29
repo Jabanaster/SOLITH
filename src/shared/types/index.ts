@@ -5,6 +5,12 @@ export interface Game {
   dateAdded: string;
   lastScan?: string;
   engine?: string;
+  executablePath?: string;
+  coverPath?: string;
+  iconPath?: string;
+  saveLocations?: string[];
+  notes?: string;
+  metadataId?: string;
   fingerprint?: GameFingerprint;
   needsRescan?: boolean;
 }

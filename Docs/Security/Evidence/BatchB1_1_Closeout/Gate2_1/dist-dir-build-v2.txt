@@ -1,0 +1,18 @@
+
+> solith@2.4.0-alpha.2 dist:dir
+> electron-builder --dir
+
+  • electron-builder  version=26.15.3 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=42.4.1 arch=x64 buildFromSource=false workspaceRoot=G:\ACTIVE_PROJECTS\SOLITH projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • preparing       moduleName=vendor/memoryjs-3.5.1-patched arch=x64
+  • finished        moduleName=vendor/memoryjs-3.5.1-patched arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=42.4.1 appOutDir=dist\win-unpacked
+  • downloaded      label=electron progress=100%
+  • downloaded electron zip extracted successfully  output=G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked
+  • searching for node modules  pm=npm searchDir=G:\ACTIVE_PROJECTS\SOLITH
+  • updating asar integrity executable resource  executablePath=dist\win-unpacked\Solith.exe
+  • signing with signtool.exe  path=dist\win-unpacked\Solith.exe
+  • signing with signtool.exe  path=dist\win-unpacked\resources\app.asar.unpacked\dist-electron\solith-readonly-scanner.exe

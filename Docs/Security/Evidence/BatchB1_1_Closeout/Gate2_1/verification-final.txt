@@ -1,0 +1,131 @@
+# Gate 2.1 — Test-Gate Integration and Packaged Lifecycle Certification
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node: v22.23.1 (G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64\node.exe)
+npm: bundled with the above Node 22 distribution
+
+## Phase 1 — Baseline
+
+Confirmed clean starting point matching the established chain: git status,
+diff --check (GameLibrary.tsx only), and the exact Node 22.23.1 runtime
+re-verified. See baseline-status.txt / baseline-diff-*.txt /
+packaged-environment.txt.
+
+## Phase 2 — Test-wiring integration
+
+All 8 previously orphaned test files (7 pre-existing + Gate 2's
+rollback-byte-integrity.test.ts) confirmed passing directly first
+(orphaned-tests-direct-before.txt, 39/39), then wired into package.json's
+`test`/`test:live-memory` scripts via a diff limited to exactly two
+script-value lines (re-verified: JSON still parses, `git diff -- package.json`
+shows only the intended lines beyond pre-existing unrelated diffs already in
+the working tree before this cycle started).
+
+## Phase 3 — Test-only production hooks
+
+Three narrow, env-gated (`SOLITH_TEST_BUILD=1`) seams added, all fail-closed
+otherwise, all proven absent-by-default and working-when-enabled
+(tests/live-memory/gate2-1-test-build-hooks.test.ts, 3/3 pass):
+
+1. `__setTestProcessIdentityOverride` / `__clearTestProcessIdentityOverrides`
+   (src/core/live-memory/windows-process-identity.ts) — simulates PID reuse.
+2. `__setTestForcedCleanupFailureStep` / `__clearTestForcedCleanupFailureSteps`
+   (electron/live-memory-ipc.ts) — forces one cleanup step to throw.
+3. `__testHasSessionForOwner` (electron/live-memory-ipc.ts, read-only) —
+   session-presence introspection for post-crash verification.
+
+None are exposed via IPC/contextBridge; all are main-process-only, reachable
+by the harness via `electronApp.evaluate`.
+
+## Phase 4 — Packaged rebuild
+
+`npm run build:vite && build:electron && dist:dir` re-run three times as
+hooks were iterated. Final packaged build: 29/29 electron-output checks
+pass, dist/win-unpacked/Solith.exe produced. Existing 23-point
+`tests/packaged-smoke.test.ts` re-run against the rebuilt exe: 23/23 pass,
+confirming the hooks are inert in a normal (non-test-build) launch.
+
+## Phase 5 — Packaged lifecycle harness and certification
+
+New `tests/packaged-lifecycle-gate2-1.e2e.test.ts` run against the real
+`dist/win-unpacked/Solith.exe` launched with `SOLITH_TEST_BUILD=1`: 5/5 pass
+(packaged-lifecycle-run2.txt). Covers, for real, against the real packaged
+process:
+
+- Cleanup-failure containment (forced real step failure, session still torn
+  down, future reads still rejected).
+- Renderer crash (real `forcefullyCrashRenderer()`, session for that owner
+  disposed).
+- Identity mismatch / simulated PID reuse (real spawned+killed process, real
+  `queryWindowsProcessIdentity`/`compareProcessIdentity` fail-closed path).
+- App shutdown (`will-quit` resolves within 15s, no hang), in a narrowed form
+  — see remaining-risks.md for the specific scope narrowing and why.
+
+Feature-disable (mid-freeze) and window-identity/navigation real-packaged
+E2E were not newly built this cycle — both would require an active real
+freeze against a known-writable address in a real target process, for which
+no fixture exists in this repo. Not attempted rather than faked. Both remain
+covered by existing deterministic-fake tests (now wired into
+`test:live-memory`).
+
+No leftover processes confirmed after the run (Get-CimInstance/Get-Process
+checks show no dangling harness-spawned processes and no lingering
+Solith.exe instance).
+
+## Phase 6 — Regression gate
+
+- npm run test:live-memory: PASS, exit 0, 257/257 (was 221 before this
+  cycle's wiring)
+- npm test: PASS, exit 0, 1040/1040 (1030 + 10; was 1034 before this cycle's
+  2 additions to the main script)
+- Main TypeScript: PASS, exit 0, 0 diagnostics
+- Electron TypeScript: FAIL, exit 2, 31 diagnostics/13 files — line-for-line
+  identical (zero diff) to the Gate 2 baseline
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286/303 only — matches the
+  established baseline exactly
+
+## Phase 7 — Evidence
+
+All files created under Docs\Security\Evidence\BatchB1_1_Closeout\Gate2_1\;
+nothing under Gate2 or any earlier evidence directory was overwritten.
+
+## Phase 8 — Scope integrity
+
+- No Batch B2 or B2A work began.
+- No unrelated TypeScript/source cleanup occurred.
+- GameLibrary.tsx was not modified (its pre-existing whitespace finding is
+  unchanged from every prior gate).
+- package.json changed only the two authorized script-value lines (test
+  wiring for the 9 identified files); no dependency, build-system, release,
+  or metadata changes. package-lock.json unchanged (confirmed via
+  git status --porcelain).
+- No CI/release-workflow file changed (.github unchanged).
+- No file was staged, unstaged, committed, pushed, reset, cleaned, stashed,
+  reverted, checked out, or tagged — index confirmed empty throughout
+  (git diff --cached --name-only empty at close).
+- Test-only production hooks touched exactly two files
+  (src/core/live-memory/windows-process-identity.ts,
+  electron/live-memory-ipc.ts), all narrowly scoped, env-gated, fail-closed,
+  and verified absent-by-default.
+- The process-spawn/kill harness created and destroyed only its own
+  dedicated benign test processes; targeted no unrelated process; left no
+  background processes running.
+- No prior evidence directory was overwritten.
+
+## Verdict
+
+Test-wiring gap (R-new-001 from Gate 2): RESOLVED.
+
+Packaged Windows lifecycle certification: IMPROVED — 4 of 6 scenarios (plus
+a 5th in narrowed form) now genuinely certified against the real packaged
+process; 2 remain fake-only, honestly disclosed as incomplete.
+
+BATCH B1.1 CONDITIONAL PASS (unchanged verdict class from Gate 2; narrowed
+further, not reversed).
+
+No proven B1.1 regression. Remaining conditions are the same class as
+before (unrelated Electron TypeScript baseline, unrelated GameLibrary.tsx
+whitespace, 2 remaining real-packaged E2E gaps, and the acknowledged
+env-gated-rather-than-build-variant nature of the test-only hooks) — none
+of which constitute a proven functional regression requiring FAIL.

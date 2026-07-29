@@ -1,0 +1,15 @@
+Gate 2.5 packaged audit review
+
+Build identity: Solith 2.4.0-alpha.2; Electron 42.4.1 ABI 146; win32 x64; exeSHA256=0aec0dc0f5cdefc8d2c01dd4873b5722d4516fc068df8b37687586bd3ad2c602
+App asar SHA256: 6c4b1f9ed17d937992048957f8bf06f1434e54ed1ff5bd3382b7b98aa16e590a
+Result: PASS
+
+- Fresh Vite, Electron, scanner, and unpacked package build completed.
+- Electron output verifier: 29/29 PASS.
+- Final full packaged regression: 49/49 PASS.
+- Packaged smoke subset: 23/23 PASS.
+- Gate 2.5 final focused suite after adding HTTP cross-origin child: 7/7 PASS.
+- No generic renderer-controlled URL, PID, process, command, address, value, memory, frame, DevTools, or overlay interface was added.
+- DevTools was opened only through Playwright main-process evaluation in a SOLITH_TEST_BUILD=1 candidate.
+- Overlay was destroyed only through Playwright main-process evaluation and recreated through the real renderer toggle.
+- Evidence omits runtime PIDs, raw addresses, target values, consent tokens, and rollback bytes.

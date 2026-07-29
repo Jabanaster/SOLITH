@@ -1,0 +1,64 @@
+# Changed Files — Gate 2
+
+## Production/test files modified during Gate 2 (narrow, rollback-validation-scoped)
+
+- src/core/live-memory/types.ts — added writeBuffer to MemoryDriver interface
+- src/core/live-memory/native-memory-driver.ts — implemented writeBuffer
+- src/core/live-memory/live-memory-session.ts — byteWidthForType, raw-byte
+  capture/comparison/restore in proposeWrite/confirmWrite/rollback, 4
+  pendingRawBefore.clear() cleanup-path additions
+- tests/fixtures/fake-memory-driver.ts — byte-level read/write support for
+  the fake driver (test-support only)
+
+Note: all three live-memory production files above already carried
+pre-existing, pre-Gate-2 uncommitted changes from earlier Batch B1.1 work
+(confirmed via Docs/Security/Evidence/BatchB1_1_Closeout/Gate2/baseline-status.txt,
+captured before any Gate 2 code edit). Gate 2 added further, additive changes
+on top of that pre-existing diff — see rollback-byte-feasibility.md and
+control-provenance.csv for exactly what Gate 2 itself added.
+
+## New file created during Gate 2
+
+- tests/live-memory/rollback-byte-integrity.test.ts — 19 new tests (see
+  rollback-byte-test-matrix.csv). Not wired into any npm script (see
+  control-provenance.csv — owner decision required, package.json edits are
+  prohibited in this scope).
+
+## Evidence files created during Gate 2
+
+All under Docs/Security/Evidence/BatchB1_1_Closeout/Gate2/ (this directory).
+
+## Everything else
+
+Every other modified/untracked path present at the start of Gate 2 (per
+baseline-status.txt) remains exactly as it was — confirmed by diffing
+baseline-status.txt against the current git status: the only new lines are
+the ones listed above plus this evidence directory's own files.
+
+- .gitignore
+- electron/install-discovery-ipc.ts
+- electron/ipc-validation.ts
+- electron/live-memory-ipc.ts
+- electron/main.ts
+- electron/preload.ts
+- electron/privileged-consent-dialog.ts
+- electron/registry-verification-ipc.ts
+- electron/trainer-catalog-ipc.ts
+- electron/trainer-overlay.ts
+- electron/wisp-overlay.ts
+- package.json (pre-existing diff only — NOT touched by Gate 2)
+- src/app/* (pre-existing diff only — NOT touched by Gate 2)
+- src/core/* other than the 3 live-memory files listed above (pre-existing
+  diff only — NOT touched by Gate 2)
+- tests/* other than fake-memory-driver.ts and the new
+  rollback-byte-integrity.test.ts (pre-existing diff only — NOT touched by
+  Gate 2)
+- All untracked Docs/Security/*, Docs/Reports/*, src/app/assets/wisp/*.png,
+  and other pre-existing untracked files (unchanged, pre-existing before
+  Gate 2 began)
+
+No file was staged, unstaged, committed, pushed, reset, cleaned, stashed,
+reverted, checked out, or tagged. No package.json, package-lock.json,
+tsconfig, CI, or release file was modified. dist/win-unpacked/ was created
+by the authorized packaging build (electron-builder --dir) and is
+gitignored build output, not a repository source change.

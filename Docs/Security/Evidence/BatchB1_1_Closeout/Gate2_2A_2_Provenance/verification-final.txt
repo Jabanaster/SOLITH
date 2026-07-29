@@ -1,0 +1,107 @@
+# Gate 2.2A.2 — Native Binary Provenance Reconciliation
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+
+## Task
+
+Evidence-reconciliation only. No native source modified, no addon rebuilt (the existing
+recorded hashes and log lines from Gate 2.2A.1 were sufficient to reconstruct the full
+timeline; no new rebuild was needed to explain the transition).
+
+## Binary states identified (7)
+
+1. Node-22 ABI development binary (Gate 2.2A) — 72847fc0...8902
+2. Pre-fix packaged binary (historical, predates Gate 2.2A) — c89a33ed...c75a98
+3. Standalone Electron-ABI rebuild (Gate 2.2A.1 Phase 4, manual) — 616f2e9c...988c8
+4. Electron-builder-produced binary (electron-builder's own internal rebuild during dist:dir) — e286fd07...12cf
+5. Restored Node-22 ABI development binary (Gate 2.2A.1 Phase 9) — d8ebfd68...b6fac
+6. Final packaged binary (byte-identical to state 4 — a direct copy) — e286fd07...12cf
+7. Temporary scratch copy of state 3 (preservation only, not separately exercised) — 616f2e9c...988c8
+
+Full detail: native-binary-timeline.csv
+
+## Cause of the prior apparent contradiction
+
+`packaged-native-binary-verification.csv` compared the final packaged binary (state 6) against
+the STANDALONE Electron-ABI rebuild (state 3) and correctly found no match. `native-binary-
+inventory.csv` compared the final packaged binary (state 6) against the vendor-tree build output
+AS IT STOOD AT PHASE 9 (state 4) and correctly found a match. States 3 and 4 are two different
+files that happened to occupy the same file path (`vendor/memoryjs-3.5.1-patched/build/Release/
+memoryjs.node`) at two different times — electron-builder's own `@electron/rebuild` step
+overwrote state 3 with state 4 in place, before packaging copied state 4 out to become state 6.
+Both original statements were factually correct for their respective comparison pairs; neither
+disambiguated which vendor-tree snapshot it meant, which read as a contradiction when the two
+files were cross-referenced without the full timeline. Root cause: documentation clarity gap,
+not a data or verification defect. See evidence-corrections.md for the full Phase 3 answer set.
+
+## Exact binary used for each verification
+
+- Electron-runtime 18/18 verification (Phase 5): state 3 (616f2e9c..., in place at the vendor
+  path at the time Phase 5 ran, before electron-builder's rebuild).
+- Packaged smoke (23/23): state 6 (e286fd07..., the shipped packaged file).
+- Packaged native binary behavioral verification (defect-1/defect-2 direct proof): state 6,
+  loaded by its exact packaged path (not inferred from the vendor path).
+- Packaged real-process write/read/restore/failure proof: state 6 (same packaged file, dist/
+  not modified between Phase 7 and Phase 8).
+- Node-ABI regression gate (npm test / test:live-memory): state 5 (d8ebfd68..., the restored
+  Node-22 build).
+
+Full detail: behavioral-binary-provenance.csv
+
+## Byte-identity conclusion
+
+State 3 (standalone rebuild) and state 4/6 (electron-builder's own rebuild / the shipped
+packaged binary) are NOT byte-identical. This is expected — two independent `node-gyp`
+invocations of identical, unchanged source produce different PE-embedded build metadata.
+State 4 and state 6 ARE byte-identical (state 6 is a direct file copy of state 4).
+
+## Behavioral-provenance conclusion
+
+The shipped packaged binary (state 6) was independently, directly verified to contain both
+Gate 2.2A fixes (access rights + write-result checking) by loading that EXACT packaged file
+path under the real Electron runtime and exercising both defects against the real Gate 2.2
+fixture — not inferred from any hash comparison. This proof stands regardless of which prior
+rebuild state 6 does or does not hash-match.
+
+## Evidence files corrected
+
+- `Gate2_2A_1_PackagedNative/packaged-native-binary-verification.csv` — correction notice appended.
+- `Gate2_2A_1_PackagedNative/native-binary-inventory.csv` — cross-reference notice appended.
+- `Gate2_2A_1_PackagedNative/verification-final.txt` — clarifying paragraph appended.
+- No historical raw output file was rewritten; all corrections are additive notices preserving
+  the original statements alongside their resolution.
+
+## Roadmap correction result
+
+`SOLITH_SECURITY_ROADMAP.md` (canonical root copy): reviewed — its existing Gate 2.2A.1 section
+already stated the hash mismatch was expected/not a defect and did not itself contain a factual
+error. A clarifying provenance note was added pointing to this evidence directory. No PASS/FAIL
+verdict in the roadmap changed as a result of this reconciliation.
+
+## Provenance verdict
+
+**PROVENANCE RECONCILED — FUNCTIONALLY EQUIVALENT, NOT BYTE IDENTICAL.**
+
+The standalone rebuild and electron-builder's own rebuild are separate valid rebuilds of the
+identical corrected source; the packaged binary (byte-identical to electron-builder's own
+rebuild) passed full behavioral verification independent of hash comparison.
+
+## Gate 2.2 resumption
+
+Per the required-conclusion rule, Gate 2.2 may resume for either "BYTE IDENTICAL" or
+"FUNCTIONALLY EQUIVALENT, NOT BYTE IDENTICAL" conclusions. This cycle reached the latter.
+**Gate 2.2's remaining lifecycle scenarios (feature-disable mid-freeze — Phase 3.7; window-
+identity/navigation — Phase 3.8) may resume.** This task did not resume them (out of scope by
+explicit instruction).
+
+## B1.1 verdict
+
+BATCH B1.1 CONDITIONAL PASS (unchanged — this was an evidence-clarity reconciliation, not a
+functional finding; no new risk, defect, or regression was introduced or discovered).
+
+## Scope integrity
+
+No native source modified. No addon rebuilt. No production code or tests modified. No
+package.json/package-lock.json changes. No CI/release-workflow changes. No git mutation
+commands run. Gate 2.2 lifecycle scenarios were not resumed during this task.

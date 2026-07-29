@@ -1,0 +1,191 @@
+====================================================================
+BATCH B1 — PRE-EXISTING DIFF PRESERVED (proof of non-interference)
+====================================================================
+
+This file documents every hunk found in the 3 'MM'-at-baseline mixed
+files (electron/preload.ts, package.json, src/types/global.d.ts) that
+is NOT authored by Batch B1, to prove these were preserved untouched.
+Full raw diffs captured via 'git diff -- <file>' immediately before
+writing this document.
+
+==================== electron/preload.ts — pre-existing hunk ====================
+     dataType: string;
+@@ -210,6 +210,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
+   trainerOverlayHide: () => ipcRenderer.invoke('trainer-overlay-hide'),
+   wispOverlayToggle: () => ipcRenderer.invoke('wisp-overlay-toggle'),
+   wispOverlayHide: () => ipcRenderer.invoke('wisp-overlay-hide'),
++  wispOverlaySetExpanded: (payload: { expanded: boolean }) =>
++    ipcRenderer.invoke('wisp-overlay-set-expanded', payload),
++  wispOverlayMoveBy: (payload: { deltaX: number; deltaY: number }) =>
++    ipcRenderer.invoke('wisp-overlay-move-by', payload),
+
+==================== package.json — pre-existing hunk (test:install-discovery) ====================
+-    "test:install-discovery": "tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts tests/install-discovery-epic-gog.test.ts",
++    "test:install-discovery": "tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts tests/install-discovery-epic-gog.test.ts tests/installed-game-identity.test.ts tests/trainer-library-preview-gates.test.ts",
+     "test:trainer-health": "tsx --test tests/trainer-health.test.ts tests/trainer-deck-rows.test.ts tests/catalog-demand.test.ts",
+     "test:drill-core": "tsx --test tests/drill-core-settings.test.ts",
+
+NOTE: the two other package.json hunks (test:live-memory and test script
+lines) are each a MIX of one long pre-existing line plus a Batch B1
+substring insertion — see batchb1-owned-diff.txt for the exact substrings
+added; everything else on those two lines is pre-existing and unchanged
+in content (only the insertion point shifts surrounding text in the diff
+view because git diffs whole lines, not substrings).
+
+==================== src/types/global.d.ts — pre-existing hunks (5 of 7) ====================
+diff --git a/src/types/global.d.ts b/src/types/global.d.ts
+index 1a2049d..bcf363f 100644
+--- a/src/types/global.d.ts
++++ b/src/types/global.d.ts
+     getAllProfiles: () => Promise<any[]>;
+     // Live Memory Trainer (V2, feature-flagged off by default, single-player/
+     // offline only — see PROJECT_SPEC.md Section 3.1)
+-    liveMemoryListProcesses: () => Promise<{ success: boolean; processes?: { pid: number; name: string }[]; error?: string }>;
++    liveMemoryListProcesses: () => Promise<{ success: boolean; processes?: { pid: number; name: string; executablePath?: string; parentPid?: number; parentProcessName?: string; startTime?: string }[]; error?: string }>;
+     liveMemoryAttach: (payload: {
+       pid: number;
+@@ -283,6 +283,69 @@ interface Window {
+     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
+     wispOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
+     wispOverlayHide: () => Promise<{ success: boolean; error?: string }>;
++    wispOverlaySetExpanded?: (payload: { expanded: boolean }) => Promise<{
++      success: boolean;
++      expanded?: boolean;
++      error?: string;
++    }>;
++    wispOverlayMoveBy?: (payload: { deltaX: number; deltaY: number }) => Promise<{
++      success: boolean;
++      error?: string;
++    }>;
++    wispOverlaySetInteractive?: (payload: { interactive: boolean }) => Promise<{
++      success: boolean;
++      interactive?: boolean;
++      error?: string;
++    }>;
++    trainerHotkeysGetDefaults: () => Promise<{ success: boolean; hotkeys?: Record<string, string>; error?: string }>;
++    trainerHotkeysGetBindings: () => Promise<{
++      success: boolean;
++      hotkeys?: Record<string, string>;
++      conflicts?: Array<{ accelerator: string; actions: string[] }>;
++      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
++      error?: string;
++    }>;
++    trainerHotkeysSetBindings: (payload: {
++      hotkeys: Record<string, string>;
++    }) => Promise<{
++      success: boolean;
++      hotkeys?: Record<string, string>;
++      conflicts?: Array<{ accelerator: string; actions: string[] }>;
++      osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
++      error?: string;
++    }>;
++    onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
++
++    trainerCatalogSearch: (payload: {
++      query?: string;
++      limit?: number;
++      offset?: number;
++      categories?: string[];
++      verificationStatus?: 'all' | 'verified' | 'community' | 'metadata-only' | 'unverified';
++    }) => Promise<{
++      success: boolean;
++      entries?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry[];
++      total?: number;
++      error?: string;
++    }>;
++    trainerCatalogStats: () => Promise<{ success: boolean; total?: number; error?: string }>;
++    trainerCatalogGet: (payload: { catalogGameId: string }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
++    trainerCatalogSeed: () => Promise<{ success: boolean; total?: number; error?: string }>;
++    trainerCatalogSyncRemote: () => Promise<{
++      success: boolean;
++      report?: { totalImported: number; providers: Array<{ provider: string; imported: number; errors: string[] }> };
++      error?: string;
++    }>;
++    trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) => Promise<{
++      success: boolean;
++      report?: {
++        status: 'disabled' | 'synced';
++        imported: number;
++        skippedUserDefinitions: number;
++        rejected: number;
++        pages: number;
++        maxLocalTimestamp: number;
++      };
+       error?: string;
+     }>;
+     trainerCatalogGetDefinition: (payload: { catalogGameId: string }) => Promise<{
+@@ -735,9 +799,17 @@ interface Window {
+       scannedAt?: string;
+       records?: Array<{
+         id: string;
++        previewCandidateId: string;
++        installIdentity: string;
++        canonicalInstallPath: string;
++        canonicalExecutablePath?: string;
++        launcherAppId?: string;
++        identityVersion: number;
++        identityStatus: 'verified' | 'backfilled' | 'ambiguous' | 'legacy';
++        needsReverification: boolean;
+         catalogGameId?: string;
+         catalogDisplayName?: string;
+-        platform: string;
++        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+         installPath: string;
+         executablePath?: string;
+         displayName?: string;
+@@ -745,16 +817,21 @@ interface Window {
+         detectedAt: string;
+         lastSeenAt: string;
+         duplicate: boolean;
++        duplicateReason?: 'same_executable_path' | 'same_launcher_app_id_and_path' | 'same_install_identity';
++        duplicateOfId?: string;
+         source: string;
+         unsupportedReason?: string;
++        classification: 'likely_game' | 'uncertain';
++        classificationReason: string;
+       }>;
+       locationsChecked?: string[];
+       duplicatesSkipped?: number;
+       unsupported?: number;
++      rejected?: Array<{ installPath: string; executablePath?: string; displayName?: string; reason: string }>;
+       failures?: Array<{ location: string; reason: string }>;
+       error?: string;
+     }>;
+-    installDiscoveryCommit: (payload: { records: unknown[] }) => Promise<{
++    installDiscoveryCommit: (payload: { records: Array<{ platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual'; installPath: string; executablePath?: string; displayName?: string; steamAppId?: number; launcherAppId?: string }> }) => Promise<{
+       success: boolean;
+       added?: number;
+       skipped?: number;
+@@ -765,9 +842,16 @@ interface Window {
+       success: boolean;
+       games?: Array<{
+         id: string;
++        installIdentity: string;
++        canonicalInstallPath: string;
++        canonicalExecutablePath?: string;
++        launcherAppId?: string;
++        identityVersion: number;
++        identityStatus: 'verified' | 'backfilled' | 'ambiguous' | 'legacy';
++        needsReverification: boolean;
+         catalogGameId?: string;
+         catalogDisplayName?: string;
+-        platform: string;
++        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+         installPath: string;
+         executablePath?: string;
+         displayName?: string;
+
+==================== Files modified during this session's wall-clock window that are NOT Batch B1 work at all ====================
+
+DISCOVERED DURING THIS VERIFICATION PASS: tests/csp-static.test.ts,
+tests/packaged-smoke.test.ts, vite.config.ts (all modified), and
+src/configure-zod-csp.ts (new file) appeared in `git status` during this
+session but were NEVER touched by Batch B1 — this session made zero
+references to CSP, vite.config, or configure-zod-csp at any point (verified
+by searching this session's own tool-call history for those strings: zero
+matches). File timestamps (2026-07-26 23:48–23:50) fall within/after this
+session's wall-clock window but the content is unrelated to any of the 3
+target handlers. These are presumed to be concurrent, independent work
+(e.g. a separate session or the user) and are explicitly EXCLUDED from
+Batch B1's scope and from all "files changed" claims in this batch's
+evidence. They are left completely untouched by this verification pass.

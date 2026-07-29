@@ -1,0 +1,11 @@
+Layer,File,Function,CurrentInput,RequiredInput,CurrentOutput,RequiredOutput,Status,Risk,RequiredChange
+Preload,electron/preload.ts,liveMemoryFreezeStart,"{address,dataType,value,intervalMs}","{proposalId,consentToken}","freeze_start_failed (schema parse error)","{success,error?}",BROKEN,HIGH — renderer freeze-start completely non-functional,Fix signature to {proposalId,consentToken}; done this cycle
+Preload,electron/preload.ts,liveMemoryFreezePropose,MISSING,"{address,dataType,value,intervalMs}",N/A,"{success,proposal}",MISSING,HIGH — no path to server-generated proposalId,Add preload method; done this cycle
+Preload,electron/preload.ts,liveMemoryFreezeRequestConsent,MISSING,{proposalId},N/A,"{success,consent}",MISSING,HIGH — no path to real consent dialog,Add preload method; done this cycle
+Renderer,src/app/pages/LiveMemoryTrainerPage.tsx,handleStartFreeze,legacy liveMemoryFreezeStart call,propose->requestConsent->start sequence,freeze never starts,freeze starts via real flow,BROKEN,HIGH,Rewired this cycle
+Renderer,src/app/pages/LiveMemoryTrainerPage.tsx,onFreeze (toggle cards),legacy liveMemoryFreezeStart call,propose->requestConsent->start sequence,freeze never starts,freeze starts via real flow,BROKEN,HIGH,Rewired this cycle
+Renderer,src/app/hooks/useGameCheatSession.ts,startFreeze,legacy liveMemoryFreezeStart call,propose->requestConsent->start sequence,freeze never starts,freeze starts via real flow,BROKEN,HIGH,Rewired this cycle
+IPC handler,electron/live-memory-ipc.ts,live-memory-freeze-propose,"{address,dataType,value,intervalMs}",unchanged,"{success,proposal}",unchanged,ALREADY CORRECT,none,No change required
+IPC handler,electron/live-memory-ipc.ts,live-memory-freeze-issue-consent,{proposalId},unchanged,"{success,consent}",unchanged,ALREADY CORRECT,none,No change required
+IPC handler,electron/live-memory-ipc.ts,live-memory-freeze-start,"{proposalId,consentToken}",unchanged,"{success,error?}",unchanged,ALREADY CORRECT,none,No change required
+Test-only hook,electron/live-memory-ipc.ts,__testStartFreezeForOwner,globalThis-only test seam,N/A once real flow works,called real session/manager functions directly,N/A,SUPERSEDED,none once removed,Removed this cycle

@@ -1,0 +1,197 @@
+BATCH B1 — FINAL VERIFICATION (CORRECTED, 2026-07-27)
+Original date: 2026-07-26. This file was rewritten during a subsequent
+verification-only correction pass after external review identified
+unsupported claims in the original version. See
+Docs/Security/Evidence/BatchB1/finding-revalidation-v2.md for the full
+correction record; this file states only the corrected, evidence-backed
+conclusions.
+Scope: live-memory-rollback, live-memory-freeze-start, registry-run-readonly-verification ONLY
+
+===== GIT VERIFICATION (CORRECTED) =====
+
+Baseline captured BEFORE any Batch B1 edit:
+Docs/Security/Evidence/BatchB1/baseline-files.txt
+
+Per-file classification against that baseline (full detail and hunk-level
+attribution in batchb1-owned-diff.txt / preexisting-diff-preserved.txt):
+
+  Batch B1 only (untouched at baseline):
+    electron/live-memory-ipc.ts
+    electron/registry-verification-ipc.ts
+    src/core/live-memory/live-memory-session.ts
+    src/core/live-memory/memory-manager.ts
+    src/core/live-memory/types.ts
+    tests/live-memory/live-memory-session.test.ts
+    tests/live-memory/memory-manager.test.ts
+
+  New Batch B1 files:
+    src/core/live-memory/session-cleanup.ts
+    tests/live-memory/session-cleanup-on-destroy.test.ts
+    tests/live-memory-rollback-freeze-ipc-validation.test.ts
+    Docs/Security/Evidence/BatchB1/ (this evidence directory)
+
+  Batch B1 only, isolated cleanly from pre-existing staged content
+  (baseline was "M " staged-only; `git diff` with no ref shows unstaged-only,
+  which was 100% Batch B1 for these two files):
+    electron/ipc-validation.ts
+    src/app/pages/RegistryExplorerPage.tsx
+
+  Pre-existing PLUS Batch B1 (mixed — baseline was "MM", already had
+  unstaged changes before this session; hunk-level attribution performed
+  and recorded in batchb1-owned-diff.txt / preexisting-diff-preserved.txt):
+    electron/preload.ts       (3 hunks: 2 are Batch B1, 1 is pre-existing)
+    package.json              (3 hunks: 1 is pre-existing untouched;
+                                2 are single long lines containing both a
+                                pre-existing baseline string and a Batch B1
+                                substring insertion)
+    src/types/global.d.ts     (7 hunks: 2 are Batch B1, 5 are pre-existing)
+
+  Discovered during this verification pass, NOT Batch B1 work, explicitly
+  excluded (see finding-revalidation-v2.md section 1 for full reasoning —
+  this session made zero references to any of these at any point):
+    tests/csp-static.test.ts
+    tests/packaged-smoke.test.ts
+    vite.config.ts
+    src/configure-zod-csp.ts (new file)
+
+CORRECTED CLAIM: the original version of this file asserted "no unrelated
+file touched" without baseline proof. That claim is WITHDRAWN in its
+unqualified form. The provable claim, backed by the baseline capture and
+hunk-level diffing above, is: no file was touched by Batch B1 that Batch B1
+did not intend to touch, and where a file had pre-existing unrelated content
+mixed in, that content has been individually verified byte-for-byte as
+unchanged.
+
+Command: git diff --check
+Exit code: 0 (no whitespace errors).
+
+No commit, merge, push, reset, clean, or stash was performed at any point.
+
+===== BUILD/TYPE VERIFICATION =====
+
+Command: npx tsc --noEmit -p tsconfig.json
+Exit code: 0. Re-verified after the verification-pass test additions — still 0.
+
+===== TEST VERIFICATION (CORRECTED TOTALS) =====
+
+The original version of this document, and this session's own narration,
+stated conflicting full-suite totals (976 in written evidence vs. "986"
+spoken once mid-session, never backed by a captured command). CORRECTED,
+single authoritative totals, each captured twice with identical results:
+
+  - Targeted files (rollback/freeze schema + session + manager + cleanup):
+      73 tests, 73 pass, 0 fail — exit code 0
+      (69 before this verification pass; +4 new tests added to directly
+      answer binding/eviction questions raised in review)
+  - Full live-memory suite (24 files): 206 tests, 206 pass, 0 fail — exit code 0
+      (202 before this pass; same +4 tests)
+  - Full registry/headless-verification suite (12 files): 36 tests, 36 pass,
+    0 fail — exit code 0
+  - Full repository suite (127 files across 2 chained invocations per
+    package.json's "test" script): 976 tests, 976 pass, 0 fail — exit code 0
+    (966 + 10; NOT re-run after the verification-pass additions, since those
+    additions were test-only with zero production-code change — only the
+    directly affected files were re-run)
+
+Full command-by-command detail: Docs/Security/Evidence/BatchB1/tests-run.txt
+
+Two of the 4 new tests are explicitly named "KNOWN GAP" and pass BY DESIGN
+to document currently-imperfect behavior (no expected-current-value check on
+rollback; no expiration/TTL on the confirmed-write ledger) — they are not
+claims that the system is secure in those respects.
+
+===== FINDING DISPOSITION (CORRECTED) =====
+
+live-memory-rollback:
+  PARTIALLY FIXED. The arbitrary-manifest write primitive (the original,
+  most severe defect — a renderer could supply any address/value/dataType
+  under the guise of "rollback") is closed: rollback now takes only a
+  proposalId, resolved server-side against a ledger of writes this session
+  actually confirmed. CONFIRMED STILL ABSENT: an expected-current-value
+  (compare-and-swap) check before the restore write, a fresh consent
+  requirement for the rollback operation itself, and any expiration/TTL on
+  ledger entries. See finding-revalidation-v2.md section 2 for the full
+  binding matrix and the 2 new "KNOWN GAP" tests that prove these gaps
+  empirically rather than asserting them.
+
+live-memory-freeze-start:
+  PARTIALLY FIXED. Session-level bound enforcement, a 6-hour duration cap,
+  and renderer-window-destroy cleanup were added. CONFIRMED STILL ABSENT,
+  and NOT merely a deferred nice-to-have: a per-operation consent token,
+  which Batch A explicitly named as the defining characteristic of this
+  handler's HIGH risk rating. Also newly identified this pass: no
+  survives-reload protection, no per-process/global concurrency limit
+  (two Solith windows share the same preload/API surface and could each
+  independently freeze the same process), and no feature-flag re-check
+  during an active freeze's tick loop. See finding-revalidation-v2.md
+  sections 4-5.
+
+registry-run-readonly-verification:
+  PARTIALLY FIXED. A concrete prior defect (hardcoded `selectedByUser: true`
+  regardless of renderer input) is closed — the renderer must now
+  explicitly send `userSelectedProcess: true` or the schema rejects the
+  call. This is a self-attestation, not server-verified proof of user
+  action, and was mischaracterized as stronger than that in the original
+  version of this evidence. Sender validation remains liveness-only
+  (`event.sender.isDestroyed()`), consistent with — not worse than — every
+  other one of the 149 handlers audited in Batch A; no handler in this
+  codebase does BrowserWindow/frame/origin validation, which is a systemic
+  characteristic, not specific to this handler. Read-only enforcement and
+  the non-shell (worker_threads, not child_process) execution model were
+  re-verified this pass with exact file/function citations proving no
+  mutation-capable API is reachable. See finding-revalidation-v2.md
+  sections 6-7.
+
+Full detail: Docs/Security/Evidence/BatchB1/finding-revalidation.md (original
+file:line citations, still accurate) and finding-revalidation-v2.md
+(corrected disposition, matrices, and honest gap disclosure — v2
+supersedes v1's PASS characterization, not its factual code-change record).
+
+===== SCOPE COMPLIANCE =====
+
+- Only the 3 named handlers' production code was modified in the original
+  pass; this verification pass added only tests and documentation, zero
+  production code.
+- No package identity, code signing, or installer behavior was touched.
+- No security control was weakened; every existing check remains in place.
+- No package installed, no application registered, no Windows Registry key
+  read or written by the test suite, no live process attached to during
+  automated testing, nothing deployed/packaged.
+
+===== BATCH A HISTORY =====
+
+Docs/Security/Evidence/BatchA/ipc-channel-reconciliation.csv has been
+reverted to be byte-identical to its state before Batch B1 began (an
+earlier in-place edit to 3 of its rows was undone as a correction). Batch
+B1's disposition for those 3 rows now lives in a separate file,
+Docs/Security/Evidence/BatchB1/batcha-disposition-updates.csv, which
+preserves the original Batch A values verbatim alongside the new
+disposition — per the requirement that Batch A evidence remain an
+immutable historical record.
+
+===== VERDICT =====
+
+BATCH B1 CONDITIONAL PASS
+
+Not an unconditional PASS. Reasoning:
+- The most severe, concrete defect in each of the 3 targeted handlers
+  (arbitrary rollback manifest; hardcoded process-selection bypass) IS
+  closed and IS regression-tested.
+- But live-memory-freeze-start's per-operation consent gap — the specific
+  control Batch A identified as defining its HIGH risk rating — remains
+  open. A confirmed, high-severity, Batch-A-defining gap that is still
+  present cannot support an unconditional pass regardless of how much
+  other hardening was done around it.
+- live-memory-rollback has newly-identified, tested, and honestly
+  documented residual gaps (no expected-current-value check, no
+  expiration) that are real data-integrity/freshness weaknesses, even
+  though the primary authorization bypass is closed.
+- registry-run-readonly-verification's trust model (a renderer-supplied
+  boolean) is weaker than the original report characterized it as being.
+
+All 9 remaining risks are individually named, ranked, and evidenced in
+finding-revalidation-v2.md section 8, with enough specificity to scope a
+Batch B2 if the user authorizes it.
+
+Batch B1 (as a verification-only correction pass) is complete. Do not
+begin another batch without separate, explicit authorization from the user.

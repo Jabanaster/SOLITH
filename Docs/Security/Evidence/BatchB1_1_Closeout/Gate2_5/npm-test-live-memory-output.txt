@@ -1,0 +1,1727 @@
+COMMAND=npm run test:live-memory
+NODE_PATH_PREFIX=G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64
+EXIT_CODE=0
+
+> solith@2.4.0-alpha.2 test:live-memory
+> tsx --test tests/live-memory/online-guard.test.ts tests/live-memory/live-memory-session.test.ts tests/live-memory/remote-connection-observer.test.ts tests/live-memory/memory-scanner.test.ts tests/live-memory/real-time-scanner.test.ts tests/live-memory/game-connection-baselines.test.ts tests/live-memory/pointer-scanner.test.ts tests/live-memory/aob-resolver.test.ts tests/live-memory/feature-resolver.test.ts tests/live-memory/signature-engine.test.ts tests/live-memory/process-watcher.test.ts tests/live-memory/memory-manager.test.ts tests/live-memory/session-cleanup-on-destroy.test.ts tests/live-memory/local-crash-reporter.test.ts tests/live-memory/zero-input-prepare.test.ts tests/live-memory/installed-exe-hash.test.ts tests/live-memory/local-sandbox.test.ts tests/live-memory/research-tools.test.ts tests/live-memory/write-policy-gate.test.ts tests/live-memory/write-policy.test.ts tests/live-memory/write-consent.test.ts tests/live-memory/ct-promote-pack.test.ts tests/live-memory/live-correlation-watcher.test.ts tests/backups/avowed-wingdk.test.ts tests/live-memory/app-shutdown-cleanup.test.ts tests/live-memory/cleanup-failure-handling.test.ts tests/live-memory/feature-disable-cleanup.test.ts tests/live-memory/renderer-crash-cleanup.test.ts tests/live-memory/rollback-float-integrity.test.ts tests/live-memory/rollback-byte-integrity.test.ts tests/live-memory/gate2-1-test-build-hooks.test.ts
+
+TAP version 13
+# Subtest: executable helpers recognize Steam and WinGDK names
+ok 1 - executable helpers recognize Steam and WinGDK names
+  ---
+  duration_ms: 1.8473
+  type: 'test'
+  ...
+# Subtest: fuzzy-matches Microsoft.Avowed* package and prefers wgs-bearing dir
+ok 2 - fuzzy-matches Microsoft.Avowed* package and prefers wgs-bearing dir
+  ---
+  duration_ms: 19.075
+  type: 'test'
+  ...
+# Subtest: resolves Alabama WinGDK config directory
+ok 3 - resolves Alabama WinGDK config directory
+  ---
+  duration_ms: 8.9719
+  type: 'test'
+  ...
+# Subtest: copyDirectoryContents is read-from-source write-to-dest only
+ok 4 - copyDirectoryContents is read-from-source write-to-dest only
+  ---
+  duration_ms: 11.5047
+  type: 'test'
+  ...
+# Subtest: save snapshot copies wgs into userData/backups/avowed-wingdk/saves
+ok 5 - save snapshot copies wgs into userData/backups/avowed-wingdk/saves
+  ---
+  duration_ms: 18.0001
+  type: 'test'
+  ...
+# Subtest: config launch snapshot copies Alabama WinGDK ini into backups/config
+ok 6 - config launch snapshot copies Alabama WinGDK ini into backups/config
+  ---
+  duration_ms: 12.7641
+  type: 'test'
+  ...
+# Subtest: snapshots skip cleanly when WinGDK paths are absent
+ok 7 - snapshots skip cleanly when WinGDK paths are absent
+  ---
+  duration_ms: 1.925
+  type: 'test'
+  ...
+# Subtest: aob-resolver
+    # Subtest: parseAobSignature handles wildcards
+    ok 1 - parseAobSignature handles wildcards
+      ---
+      duration_ms: 1.13
+      type: 'test'
+      ...
+    # Subtest: findAobInBuffer finds first match
+    ok 2 - findAobInBuffer finds first match
+      ---
+      duration_ms: 0.1791
+      type: 'test'
+      ...
+    # Subtest: scanAobInProcess searches module-overlapping regions
+    ok 3 - scanAobInProcess searches module-overlapping regions
+      ---
+      duration_ms: 0.4022
+      type: 'test'
+      ...
+    # Subtest: scanAobInProcess returns null on miss
+    ok 4 - scanAobInProcess returns null on miss
+      ---
+      duration_ms: 0.1848
+      type: 'test'
+      ...
+    1..4
+ok 8 - aob-resolver
+  ---
+  duration_ms: 2.8715
+  type: 'suite'
+  ...
+# Subtest: will-quit cleanup stops every session and records accurate sanitized results
+ok 9 - will-quit cleanup stops every session and records accurate sanitized results
+  ---
+  duration_ms: 6.7253
+  type: 'test'
+  ...
+# Subtest: cleanup failure containment
+    # Subtest: runs the required cleanup order and records success
+    ok 1 - runs the required cleanup order and records success
+      ---
+      duration_ms: 1.3981
+      type: 'test'
+      ...
+    # Subtest: contains multiple failures, continues every later step, and reports sanitized codes
+    ok 2 - contains multiple failures, continues every later step, and reports sanitized codes
+      ---
+      duration_ms: 0.3784
+      type: 'test'
+      ...
+    # Subtest: audit failure cannot prevent the revocation barrier or remaining cleanup
+    ok 3 - audit failure cannot prevent the revocation barrier or remaining cleanup
+      ---
+      duration_ms: 0.134
+      type: 'test'
+      ...
+    1..3
+ok 10 - cleanup failure containment
+  ---
+  duration_ms: 2.6936
+  type: 'suite'
+  ...
+# Subtest: CtLiveResolution + promote + local pack
+    # Subtest: classifies module+offset as resolvable and freeze-eligible
+    ok 1 - classifies module+offset as resolvable and freeze-eligible
+      ---
+      duration_ms: 0.8447
+      type: 'test'
+      ...
+    # Subtest: absolute / unknown-module is absolute_only and never freezes
+    ok 2 - absolute / unknown-module is absolute_only and never freezes
+      ---
+      duration_ms: 0.2622
+      type: 'test'
+      ...
+    # Subtest: parseCheatTableXml stamps liveResolution on accepted entries
+    ok 3 - parseCheatTableXml stamps liveResolution on accepted entries
+      ---
+      duration_ms: 5.7697
+      type: 'test'
+      ...
+    # Subtest: toggle cards mark absolute_only as not freezeEligible
+    ok 4 - toggle cards mark absolute_only as not freezeEligible
+      ---
+      duration_ms: 0.2158
+      type: 'test'
+      ...
+    # Subtest: local pack export is air-gap marked and round-trips
+    ok 5 - local pack export is air-gap marked and round-trips
+      ---
+      duration_ms: 1.4158
+      type: 'test'
+      ...
+    1..5
+ok 11 - CtLiveResolution + promote + local pack
+  ---
+  duration_ms: 9.6064
+  type: 'suite'
+  ...
+# Subtest: feature-disable cleanup
+    # Subtest: stops an active freeze, revokes pending authorization, and prevents later writes
+    ok 1 - stops an active freeze, revokes pending authorization, and prevents later writes
+      ---
+      duration_ms: 5.9637
+      type: 'test'
+      ...
+    1..1
+ok 12 - feature-disable cleanup
+  ---
+  duration_ms: 6.828
+  type: 'suite'
+  ...
+# Subtest: feature-resolver
+    # Subtest: resolves static pointer path
+    ok 1 - resolves static pointer path
+      ---
+      duration_ms: 0.9844
+      type: 'test'
+      ...
+    # Subtest: resolves AOB then caches for second call
+    ok 2 - resolves AOB then caches for second call
+      ---
+      duration_ms: 0.6371
+      type: 'test'
+      ...
+    # Subtest: falls back to pointer path when AOB misses
+    ok 3 - falls back to pointer path when AOB misses
+      ---
+      duration_ms: 0.1537
+      type: 'test'
+      ...
+    # Subtest: scan_unknown features cannot be resolved upfront
+    ok 4 - scan_unknown features cannot be resolved upfront
+      ---
+      duration_ms: 0.3481
+      type: 'test'
+      ...
+    1..4
+ok 13 - feature-resolver
+  ---
+  duration_ms: 3.2407
+  type: 'suite'
+  ...
+# Subtest: getConnectionBaseline returns 0 (strict default) for an unreviewed executable
+ok 14 - getConnectionBaseline returns 0 (strict default) for an unreviewed executable
+  ---
+  duration_ms: 0.6487
+  type: 'test'
+  ...
+# Subtest: getConnectionBaseline returns the reviewed baseline for Stardew Valley
+ok 15 - getConnectionBaseline returns the reviewed baseline for Stardew Valley
+  ---
+  duration_ms: 0.1014
+  type: 'test'
+  ...
+# Subtest: getConnectionBaseline matches case-insensitively
+ok 16 - getConnectionBaseline matches case-insensitively
+  ---
+  duration_ms: 0.0716
+  type: 'test'
+  ...
+# Subtest: listReviewedConnectionBaselines includes evidence for every entry
+ok 17 - listReviewedConnectionBaselines includes evidence for every entry
+  ---
+  duration_ms: 0.1468
+  type: 'test'
+  ...
+# Subtest: process-identity override seam throws when SOLITH_TEST_BUILD is unset
+ok 18 - process-identity override seam throws when SOLITH_TEST_BUILD is unset
+  ---
+  duration_ms: 7.6608
+  type: 'test'
+  ...
+# Subtest: process-identity override seam works and is scoped when SOLITH_TEST_BUILD=1
+ok 19 - process-identity override seam works and is scoped when SOLITH_TEST_BUILD=1
+  ---
+  duration_ms: 6.3803
+  type: 'test'
+  ...
+# Subtest: cleanup-failure injection seam source is gated behind SOLITH_TEST_BUILD (static check)
+ok 20 - cleanup-failure injection seam source is gated behind SOLITH_TEST_BUILD (static check)
+  ---
+  duration_ms: 1.0906
+  type: 'test'
+  ...
+# Subtest: installed executable hashing
+    # Subtest: returns the full-file SHA-256 digest
+    ok 1 - returns the full-file SHA-256 digest
+      ---
+      duration_ms: 130.323
+      type: 'test'
+      ...
+    # Subtest: returns null for missing files
+    ok 2 - returns null for missing files
+      ---
+      duration_ms: 0.4523
+      type: 'test'
+      ...
+    1..2
+ok 21 - installed executable hashing
+  ---
+  duration_ms: 132.046
+  type: 'suite'
+  ...
+# Subtest: LiveCorrelationWatcher scores a candidate that matches a declared decrease event
+ok 22 - LiveCorrelationWatcher scores a candidate that matches a declared decrease event
+  ---
+  duration_ms: 11.8672
+  type: 'test'
+  ...
+# Subtest: LiveCorrelationWatcher keeps noisy every-poll values separate from event-correlated candidates
+ok 23 - LiveCorrelationWatcher keeps noisy every-poll values separate from event-correlated candidates
+  ---
+  duration_ms: 0.6537
+  type: 'test'
+  ...
+# Subtest: LiveCorrelationWatcher matches recent decreases even after regen starts before the event click
+ok 24 - LiveCorrelationWatcher matches recent decreases even after regen starts before the event click
+  ---
+  duration_ms: 0.6732
+  type: 'test'
+  ...
+# Subtest: LiveCorrelationWatcher exposes recent delta trails for UI research without write affordances
+ok 25 - LiveCorrelationWatcher exposes recent delta trails for UI research without write affordances
+  ---
+  duration_ms: 0.2663
+  type: 'test'
+  ...
+# Subtest: LiveCorrelationWatcher uses OCR observed values as a read-only tie-break boost
+ok 26 - LiveCorrelationWatcher uses OCR observed values as a read-only tie-break boost
+  ---
+  duration_ms: 0.3909
+  type: 'test'
+  ...
+# Subtest: LiveCorrelationWatcher supports mixed value types without collapsing to one data type
+ok 27 - LiveCorrelationWatcher supports mixed value types without collapsing to one data type
+  ---
+  duration_ms: 0.34
+  type: 'test'
+  ...
+# Subtest: LiveCorrelationWatcher marks unreadable candidates instead of crashing
+ok 28 - LiveCorrelationWatcher marks unreadable candidates instead of crashing
+  ---
+  duration_ms: 0.2238
+  type: 'test'
+  ...
+# Subtest: LiveMemorySession
+    # Subtest: attach fails without user confirmation, process is never opened
+    ok 1 - attach fails without user confirmation, process is never opened
+      ---
+      duration_ms: 1.5758
+      type: 'test'
+      ...
+    # Subtest: attach succeeds when remote connections are present if waiver accepted (Trust Shift)
+    ok 2 - attach succeeds when remote connections are present if waiver accepted (Trust Shift)
+      ---
+      duration_ms: 0.7686
+      type: 'test'
+      ...
+    # Subtest: attach succeeds with confirmation and clean evidence
+    ok 3 - attach succeeds with confirmation and clean evidence
+      ---
+      duration_ms: 0.3947
+      type: 'test'
+      ...
+    # Subtest: attach fails closed and closes handle when protected target modules are present
+    ok 4 - attach fails closed and closes handle when protected target modules are present
+      ---
+      duration_ms: 0.4354
+      type: 'test'
+      ...
+    # Subtest: propose then confirm writes the new value and produces a manifest
+    ok 5 - propose then confirm writes the new value and produces a manifest
+      ---
+      duration_ms: 2.4054
+      type: 'test'
+      ...
+    # Subtest: confirmWrite proceeds when connection count rises between propose and confirm (Trust Shift)
+    ok 6 - confirmWrite proceeds when connection count rises between propose and confirm (Trust Shift)
+      ---
+      duration_ms: 0.3839
+      type: 'test'
+      ...
+    # Subtest: confirmWrite is blocked if the OS executable name no longer matches the attached target
+    ok 7 - confirmWrite is blocked if the OS executable name no longer matches the attached target
+      ---
+      duration_ms: 0.388
+      type: 'test'
+      ...
+    # Subtest: verifyAttachedProcessIdentity fails closed on path or creation-time mismatch
+    ok 8 - verifyAttachedProcessIdentity fails closed on path or creation-time mismatch
+      ---
+      duration_ms: 0.3877
+      type: 'test'
+      ...
+    # Subtest: rollback restores the value captured before the write
+    ok 9 - rollback restores the value captured before the write
+      ---
+      duration_ms: 0.5837
+      type: 'test'
+      ...
+    # Subtest: rollback rejects a caller-supplied manifest for a write that was never confirmed
+    ok 10 - rollback rejects a caller-supplied manifest for a write that was never confirmed
+      ---
+      duration_ms: 0.4243
+      type: 'test'
+      ...
+    # Subtest: rollback cannot be replayed after it has already consumed the confirmed write
+    ok 11 - rollback cannot be replayed after it has already consumed the confirmed write
+      ---
+      duration_ms: 0.4952
+      type: 'test'
+      ...
+    # Subtest: rollback fails closed when the attached process identity no longer matches
+    ok 12 - rollback fails closed when the attached process identity no longer matches
+      ---
+      duration_ms: 0.3403
+      type: 'test'
+      ...
+    # Subtest: rollback ledger is cleared on detach — a re-attached session cannot roll back a prior session's write
+    ok 13 - rollback ledger is cleared on detach — a re-attached session cannot roll back a prior session's write
+      ---
+      duration_ms: 0.3337
+      type: 'test'
+      ...
+    # Subtest: rollback fails closed against a same-PID process restart (path + start time both changed, PID unchanged)
+    ok 14 - rollback fails closed against a same-PID process restart (path + start time both changed, PID unchanged)
+      ---
+      duration_ms: 0.318
+      type: 'test'
+      ...
+    # Subtest: Batch B1.1: confirmWrite is REJECTED (not evicted-and-allowed) once the ledger is full of still-valid entries
+    ok 15 - Batch B1.1: confirmWrite is REJECTED (not evicted-and-allowed) once the ledger is full of still-valid entries
+      ---
+      duration_ms: 1.6767
+      type: 'test'
+      ...
+    # Subtest: Batch B1.1: rollback FAILS CLOSED when current memory no longer matches the confirmed write (fixes the prior "silently overwrites intervening change" gap)
+    ok 16 - Batch B1.1: rollback FAILS CLOSED when current memory no longer matches the confirmed write (fixes the prior "silently overwrites intervening change" gap)
+      ---
+      duration_ms: 0.2715
+      type: 'test'
+      ...
+    # Subtest: Batch B1.1: rollback succeeds when current memory still matches the confirmed write (no false positives from the new check)
+    ok 17 - Batch B1.1: rollback succeeds when current memory still matches the confirmed write (no false positives from the new check)
+      ---
+      duration_ms: 1.3825
+      type: 'test'
+      ...
+    # Subtest: Batch B1.1: a confirmed write expires after its TTL and can no longer be rolled back (fixes the prior "indefinite" gap)
+    ok 18 - Batch B1.1: a confirmed write expires after its TTL and can no longer be rolled back (fixes the prior "indefinite" gap)
+      ---
+      duration_ms: 0.2529
+      type: 'test'
+      ...
+    # Subtest: Batch B1.1: a confirmed write is still rollback-able just before its TTL boundary (no off-by-one)
+    ok 19 - Batch B1.1: a confirmed write is still rollback-able just before its TTL boundary (no off-by-one)
+      ---
+      duration_ms: 0.2646
+      type: 'test'
+      ...
+    # Subtest: detach closes the process handle and clears pending proposals
+    ok 20 - detach closes the process handle and clears pending proposals
+      ---
+      duration_ms: 0.1262
+      type: 'test'
+      ...
+    # Subtest: confirmWrite on unknown proposal id fails without touching memory
+    ok 21 - confirmWrite on unknown proposal id fails without touching memory
+      ---
+      duration_ms: 0.0856
+      type: 'test'
+      ...
+    # Subtest: scanFirstAutoMatrix fans out modes and value types while storing unknown baseline internally
+    ok 22 - scanFirstAutoMatrix fans out modes and value types while storing unknown baseline internally
+      ---
+      duration_ms: 0.7396
+      type: 'test'
+      ...
+    1..22
+ok 29 - LiveMemorySession
+  ---
+  duration_ms: 15.4661
+  type: 'suite'
+  ...
+# Subtest: LiveMemorySession freeze
+    # Subtest: startFreeze fails when no process is attached
+    ok 1 - startFreeze fails when no process is attached
+      ---
+      duration_ms: 0.1775
+      type: 'test'
+      ...
+    # Subtest: startFreeze fails if a freeze is already active on this session
+    ok 2 - startFreeze fails if a freeze is already active on this session
+      ---
+      duration_ms: 7.5687
+      type: 'test'
+      ...
+    # Subtest: freeze writes immediately on the first tick and schedules the next one
+    ok 3 - freeze writes immediately on the first tick and schedules the next one
+      ---
+      duration_ms: 0.978
+      type: 'test'
+      ...
+    # Subtest: freeze re-writes the value on each subsequent scheduled tick
+    ok 4 - freeze re-writes the value on each subsequent scheduled tick
+      ---
+      duration_ms: 0.7484
+      type: 'test'
+      ...
+    # Subtest: freeze continues when connection count rises mid-freeze (Trust Shift advisory only)
+    ok 5 - freeze continues when connection count rises mid-freeze (Trust Shift advisory only)
+      ---
+      duration_ms: 0.7544
+      type: 'test'
+      ...
+    # Subtest: stopFreeze halts scheduling and reports user_stopped
+    ok 6 - stopFreeze halts scheduling and reports user_stopped
+      ---
+      duration_ms: 0.6336
+      type: 'test'
+      ...
+    # Subtest: stopFreeze is a safe no-op when no freeze is active
+    ok 7 - stopFreeze is a safe no-op when no freeze is active
+      ---
+      duration_ms: 0.1335
+      type: 'test'
+      ...
+    # Subtest: detach stops an active freeze with stopReason "detached"
+    ok 8 - detach stops an active freeze with stopReason "detached"
+      ---
+      duration_ms: 0.7854
+      type: 'test'
+      ...
+    # Subtest: startFreeze rejects an interval below the minimum bound
+    ok 9 - startFreeze rejects an interval below the minimum bound
+      ---
+      duration_ms: 0.2733
+      type: 'test'
+      ...
+    # Subtest: startFreeze rejects an interval above the maximum bound
+    ok 10 - startFreeze rejects an interval above the maximum bound
+      ---
+      duration_ms: 0.1441
+      type: 'test'
+      ...
+    # Subtest: startFreeze rejects a non-finite freeze value even though the IPC schema would also catch it
+    ok 11 - startFreeze rejects a non-finite freeze value even though the IPC schema would also catch it
+      ---
+      duration_ms: 0.1585
+      type: 'test'
+      ...
+    # Subtest: freeze auto-stops once the maximum duration is exceeded
+    ok 12 - freeze auto-stops once the maximum duration is exceeded
+      ---
+      duration_ms: 2.7399
+      type: 'test'
+      ...
+    # Subtest: freeze auto-stops when the target process identity no longer matches (process exited or PID reused)
+    ok 13 - freeze auto-stops when the target process identity no longer matches (process exited or PID reused)
+      ---
+      duration_ms: 0.4368
+      type: 'test'
+      ...
+    1..13
+ok 30 - LiveMemorySession freeze
+  ---
+  duration_ms: 15.9673
+  type: 'suite'
+  ...
+# Subtest: LiveMemorySession catalog controls
+    # Subtest: getAttachedExecutableName returns null before attach, and the target name after
+    ok 1 - getAttachedExecutableName returns null before attach, and the target name after
+      ---
+      duration_ms: 0.1237
+      type: 'test'
+      ...
+    # Subtest: resolveControl resolves a catalog control's pointer path to a live, readable address
+    ok 2 - resolveControl resolves a catalog control's pointer path to a live, readable address
+      ---
+      duration_ms: 0.2672
+      type: 'test'
+      ...
+    # Subtest: resolveControl throws when not attached
+    ok 3 - resolveControl throws when not attached
+      ---
+      duration_ms: 0.1574
+      type: 'test'
+      ...
+    # Subtest: attach blocks on executable fingerprint mismatch until drift acknowledged
+    ok 4 - attach blocks on executable fingerprint mismatch until drift acknowledged
+      ---
+      duration_ms: 0.1868
+      type: 'test'
+      ...
+    # Subtest: resolveMemoryFeature uses session cache cleared on detach
+    ok 5 - resolveMemoryFeature uses session cache cleared on detach
+      ---
+      duration_ms: 0.2225
+      type: 'test'
+      ...
+    1..5
+ok 31 - LiveMemorySession catalog controls
+  ---
+  duration_ms: 1.0672
+  type: 'suite'
+  ...
+# Subtest: local-crash-reporter
+    # Subtest: formatCrashReport includes message, stack, diagnostics, and audit lines
+    ok 1 - formatCrashReport includes message, stack, diagnostics, and audit lines
+      ---
+      duration_ms: 2.3256
+      type: 'test'
+      ...
+    # Subtest: writeCrashReportSync writes crash_report.txt under logs dir
+    ok 2 - writeCrashReportSync writes crash_report.txt under logs dir
+      ---
+      duration_ms: 6.3211
+      type: 'test'
+      ...
+    # Subtest: installElectronAppCrashHooks writes on render-process-gone
+    ok 3 - installElectronAppCrashHooks writes on render-process-gone
+      ---
+      duration_ms: 6.5641
+      type: 'test'
+      ...
+    # Subtest: process crash handling monitors without consuming uncaught exceptions
+    ok 4 - process crash handling monitors without consuming uncaught exceptions
+      ---
+      duration_ms: 1.0335
+      type: 'test'
+      ...
+    # Subtest: setCrashReportContext is readable for live-session wiring
+    ok 5 - setCrashReportContext is readable for live-session wiring
+      ---
+      duration_ms: 0.7819
+      type: 'test'
+      ...
+    1..5
+ok 32 - local-crash-reporter
+  ---
+  duration_ms: 17.9435
+  type: 'suite'
+  ...
+# Subtest: local-sandbox
+    # Subtest: evaluates pure arithmetic
+    ok 1 - evaluates pure arithmetic
+      ---
+      duration_ms: 1.939
+      type: 'test'
+      ...
+    # Subtest: blocks require-like bindings
+    ok 2 - blocks require-like bindings
+      ---
+      duration_ms: 0.1475
+      type: 'test'
+      ...
+    # Subtest: copies JSON-safe bindings into the sandbox without host prototypes
+    ok 3 - copies JSON-safe bindings into the sandbox without host prototypes
+      ---
+      duration_ms: 0.9417
+      type: 'test'
+      ...
+    # Subtest: rejects functions and forbidden nested binding keys
+    ok 4 - rejects functions and forbidden nested binding keys
+      ---
+      duration_ms: 0.4488
+      type: 'test'
+      ...
+    # Subtest: blocks constructor code-generation escapes
+    ok 5 - blocks constructor code-generation escapes
+      ---
+      duration_ms: 0.2019
+      type: 'test'
+      ...
+    # Subtest: rejects Promise microtasks to keep execution synchronous
+    ok 6 - rejects Promise microtasks to keep execution synchronous
+      ---
+      duration_ms: 0.1125
+      type: 'test'
+      ...
+    # Subtest: scriptLooksUnsafe flags network/inject tokens
+    ok 7 - scriptLooksUnsafe flags network/inject tokens
+      ---
+      duration_ms: 0.1214
+      type: 'test'
+      ...
+    # Subtest: run rejects scripts that reference forbidden surfaces
+    ok 8 - run rejects scripts that reference forbidden surfaces
+      ---
+      duration_ms: 0.1307
+      type: 'test'
+      ...
+    # Subtest: rejects oversized source
+    ok 9 - rejects oversized source
+      ---
+      duration_ms: 0.2819
+      type: 'test'
+      ...
+    1..9
+ok 33 - local-sandbox
+  ---
+  duration_ms: 5.4197
+  type: 'suite'
+  ...
+# Subtest: memory-manager + audit-log
+    # Subtest: audit log keeps recent entries in ring buffer
+    ok 1 - audit log keeps recent entries in ring buffer
+      ---
+      duration_ms: 2.653
+      type: 'test'
+      ...
+    # Subtest: safeWrite without userApproved is denied by fail-closed defaults
+    ok 2 - safeWrite without userApproved is denied by fail-closed defaults
+      ---
+      duration_ms: 1.7838
+      type: 'test'
+      ...
+    # Subtest: safeWrite proposes, confirms, verifies, and audits
+    ok 3 - safeWrite proposes, confirms, verifies, and audits
+      ---
+      duration_ms: 1.0561
+      type: 'test'
+      ...
+    # Subtest: proposeWrite + confirmWrite append audit lines to jsonl file
+    ok 4 - proposeWrite + confirmWrite append audit lines to jsonl file
+      ---
+      duration_ms: 6.4587
+      type: 'test'
+      ...
+    # Subtest: snapshot listener fires after successful confirmWrite
+    ok 5 - snapshot listener fires after successful confirmWrite
+      ---
+      duration_ms: 0.5779
+      type: 'test'
+      ...
+    # Subtest: snapshot listener failure is audited and returned without lying
+    ok 6 - snapshot listener failure is audited and returned without lying
+      ---
+      duration_ms: 0.4381
+      type: 'test'
+      ...
+    # Subtest: default trainer policy does not require researchWriteMode
+    ok 7 - default trainer policy does not require researchWriteMode
+      ---
+      duration_ms: 0.3098
+      type: 'test'
+      ...
+    # Subtest: safeWrite denies research_probe when Research Write Mode is off
+    ok 8 - safeWrite denies research_probe when Research Write Mode is off
+      ---
+      duration_ms: 0.399
+      type: 'test'
+      ...
+    # Subtest: proposeWrite throws and confirmWrite fails when policy denies
+    ok 9 - proposeWrite throws and confirmWrite fails when policy denies
+      ---
+      duration_ms: 0.689
+      type: 'test'
+      ...
+    # Subtest: research_probe safeWrite succeeds when mode + backup pass
+    ok 10 - research_probe safeWrite succeeds when mode + backup pass
+      ---
+      duration_ms: 0.5535
+      type: 'test'
+      ...
+    # Subtest: MemoryManager.rollback accepts only a proposalId and restores the confirmed write
+    ok 11 - MemoryManager.rollback accepts only a proposalId and restores the confirmed write
+      ---
+      duration_ms: 0.7577
+      type: 'test'
+      ...
+    # Subtest: MemoryManager.rollback rejects an unconfirmed/forged proposalId without writing memory or crashing
+    ok 12 - MemoryManager.rollback rejects an unconfirmed/forged proposalId without writing memory or crashing
+      ---
+      duration_ms: 0.2208
+      type: 'test'
+      ...
+    # Subtest: MemoryManager.rollback cannot replay the same proposalId twice
+    ok 13 - MemoryManager.rollback cannot replay the same proposalId twice
+      ---
+      duration_ms: 0.4438
+      type: 'test'
+      ...
+    1..13
+ok 34 - memory-manager + audit-log
+  ---
+  duration_ms: 17.4859
+  type: 'suite'
+  ...
+# Subtest: Batch B1.1 — freeze propose/issue-consent/confirm
+    # Subtest: proposeFreeze stages a request without touching memory
+    ok 1 - proposeFreeze stages a request without touching memory
+      ---
+      duration_ms: 0.2769
+      type: 'test'
+      ...
+    # Subtest: MemoryManager.freezeStart requires BOTH a valid consentToken and a matching binding — a generic approved:true is not accepted
+    ok 2 - MemoryManager.freezeStart requires BOTH a valid consentToken and a matching binding — a generic approved:true is not accepted
+      ---
+      duration_ms: 0.2052
+      type: 'test'
+      ...
+    # Subtest: freezeStart succeeds end-to-end with a properly issued, matching consent token
+    ok 3 - freezeStart succeeds end-to-end with a properly issued, matching consent token
+      ---
+      duration_ms: 1.4158
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects consent denial (token never issued because the dialog was denied)
+    ok 4 - freezeStart rejects consent denial (token never issued because the dialog was denied)
+      ---
+      duration_ms: 0.1697
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects an expired consent token
+    ok 5 - freezeStart rejects an expired consent token
+      ---
+      duration_ms: 0.1937
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects a replayed (already-consumed) consent token
+    ok 6 - freezeStart rejects a replayed (already-consumed) consent token
+      ---
+      duration_ms: 0.2392
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects a token whose binding no longer matches (address changed since issuance)
+    ok 7 - freezeStart rejects a token whose binding no longer matches (address changed since issuance)
+      ---
+      duration_ms: 0.1443
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects a token bound to a different value than what confirm would apply
+    ok 8 - freezeStart rejects a token bound to a different value than what confirm would apply
+      ---
+      duration_ms: 0.3365
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects a token bound to a different interval than what confirm would apply
+    ok 9 - freezeStart rejects a token bound to a different interval than what confirm would apply
+      ---
+      duration_ms: 0.2032
+      type: 'test'
+      ...
+    # Subtest: freezeStart rejects a token bound to a different PID (process identity mismatch)
+    ok 10 - freezeStart rejects a token bound to a different PID (process identity mismatch)
+      ---
+      duration_ms: 0.1463
+      type: 'test'
+      ...
+    # Subtest: confirm structurally cannot start a freeze with different parameters than approved — confirm takes only proposalId, never fresh address/value/interval
+    ok 11 - confirm structurally cannot start a freeze with different parameters than approved — confirm takes only proposalId, never fresh address/value/interval
+      ---
+      duration_ms: 0.1823
+      type: 'test'
+      ...
+    # Subtest: attachment replacement (detach) invalidates a pending freeze proposal — confirm fails after re-attach
+    ok 12 - attachment replacement (detach) invalidates a pending freeze proposal — confirm fails after re-attach
+      ---
+      duration_ms: 0.2175
+      type: 'test'
+      ...
+    # Subtest: concurrent confirmation attempts for the same proposal: only one can succeed (single-use)
+    ok 13 - concurrent confirmation attempts for the same proposal: only one can succeed (single-use)
+      ---
+      duration_ms: 0.1965
+      type: 'test'
+      ...
+    1..13
+ok 35 - Batch B1.1 — freeze propose/issue-consent/confirm
+  ---
+  duration_ms: 4.202
+  type: 'suite'
+  ...
+# Subtest: scanFirst finds a value at an aligned offset within a single writable region
+ok 36 - scanFirst finds a value at an aligned offset within a single writable region
+  ---
+  duration_ms: 1.199
+  type: 'test'
+  ...
+# Subtest: scanFirst finds matches across multiple regions
+ok 37 - scanFirst finds matches across multiple regions
+  ---
+  duration_ms: 0.7771
+  type: 'test'
+  ...
+# Subtest: scanFirst excludes non-writable regions entirely
+ok 38 - scanFirst excludes non-writable regions entirely
+  ---
+  duration_ms: 0.1294
+  type: 'test'
+  ...
+# Subtest: scanFirst only counts occurrences aligned to the value size, not raw byte matches
+ok 39 - scanFirst only counts occurrences aligned to the value size, not raw byte matches
+  ---
+  duration_ms: 0.2318
+  type: 'test'
+  ...
+# Subtest: scanFirst skips a region larger than maxRegionBytes
+ok 40 - scanFirst skips a region larger than maxRegionBytes
+  ---
+  duration_ms: 0.175
+  type: 'test'
+  ...
+# Subtest: scanFirst stops and reports truncated when maxTotalBytes is exceeded
+ok 41 - scanFirst stops and reports truncated when maxTotalBytes is exceeded
+  ---
+  duration_ms: 0.1691
+  type: 'test'
+  ...
+# Subtest: scanFirst stops and reports truncated when maxMatches is reached
+ok 42 - scanFirst stops and reports truncated when maxMatches is reached
+  ---
+  duration_ms: 0.2356
+  type: 'test'
+  ...
+# Subtest: scanFirst skips a region that becomes unreadable without aborting the whole scan
+ok 43 - scanFirst skips a region that becomes unreadable without aborting the whole scan
+  ---
+  duration_ms: 0.2201
+  type: 'test'
+  ...
+# Subtest: scanNext (exact): keeps only addresses whose current value matches the target
+ok 44 - scanNext (exact): keeps only addresses whose current value matches the target
+  ---
+  duration_ms: 0.3751
+  type: 'test'
+  ...
+# Subtest: scanNext (changed): keeps addresses whose value differs from the prior scan
+ok 45 - scanNext (changed): keeps addresses whose value differs from the prior scan
+  ---
+  duration_ms: 0.3407
+  type: 'test'
+  ...
+# Subtest: scanNext (unchanged): keeps addresses whose value matches the prior scan
+ok 46 - scanNext (unchanged): keeps addresses whose value matches the prior scan
+  ---
+  duration_ms: 0.1266
+  type: 'test'
+  ...
+# Subtest: scanNext (increased / decreased): direction-based narrowing, e.g. health went down
+ok 47 - scanNext (increased / decreased): direction-based narrowing, e.g. health went down
+  ---
+  duration_ms: 0.1148
+  type: 'test'
+  ...
+# Subtest: scanNext drops addresses that fail to read instead of throwing
+ok 48 - scanNext drops addresses that fail to read instead of throwing
+  ---
+  duration_ms: 0.1188
+  type: 'test'
+  ...
+# Subtest: scanFirstRange keeps aligned floats inside an inclusive window
+ok 49 - scanFirstRange keeps aligned floats inside an inclusive window
+  ---
+  duration_ms: 0.3109
+  type: 'test'
+  ...
+# Subtest: scanFirstRange ignores unaligned values at memory boundaries
+ok 50 - scanFirstRange ignores unaligned values at memory boundaries
+  ---
+  duration_ms: 0.2437
+  type: 'test'
+  ...
+# Subtest: scanFirstRange does not read past short region ends
+ok 51 - scanFirstRange does not read past short region ends
+  ---
+  duration_ms: 0.1303
+  type: 'test'
+  ...
+# Subtest: scanFirstRange includes exact min and max edge values
+ok 52 - scanFirstRange includes exact min and max edge values
+  ---
+  duration_ms: 0.1811
+  type: 'test'
+  ...
+# Subtest: scanFirstRange rejects inverted ranges before reading memory
+ok 53 - scanFirstRange rejects inverted ranges before reading memory
+  ---
+  duration_ms: 0.3182
+  type: 'test'
+  ...
+# Subtest: scanFirstRange stops and reports truncated when total byte budget is exceeded
+ok 54 - scanFirstRange stops and reports truncated when total byte budget is exceeded
+  ---
+  duration_ms: 0.1294
+  type: 'test'
+  ...
+# Subtest: scanFirstRange stops and reports truncated when maxMatches is reached
+ok 55 - scanFirstRange stops and reports truncated when maxMatches is reached
+  ---
+  duration_ms: 0.1597
+  type: 'test'
+  ...
+# Subtest: scanFirstRange skips unreadable regions without aborting later matches
+ok 56 - scanFirstRange skips unreadable regions without aborting later matches
+  ---
+  duration_ms: 0.1253
+  type: 'test'
+  ...
+# Subtest: scanFirstAutoMatrix scans all requested modes and value types in one read-only matrix
+ok 57 - scanFirstAutoMatrix scans all requested modes and value types in one read-only matrix
+  ---
+  duration_ms: 1.4921
+  type: 'test'
+  ...
+# Subtest: scanFirstAutoMatrix marks incompatible buckets skipped instead of guessing missing values
+ok 58 - scanFirstAutoMatrix marks incompatible buckets skipped instead of guessing missing values
+  ---
+  duration_ms: 0.1277
+  type: 'test'
+  ...
+# Subtest: evaluateOnlineGuard
+    # Subtest: blocks when user has not confirmed offline play, even with clean evidence
+    ok 1 - blocks when user has not confirmed offline play, even with clean evidence
+      ---
+      duration_ms: 0.9172
+      type: 'test'
+      ...
+    # Subtest: allows when user confirmed offline and no remote connections observed
+    ok 2 - allows when user confirmed offline and no remote connections observed
+      ---
+      duration_ms: 0.104
+      type: 'test'
+      ...
+    # Subtest: blocks when remote connections are present, overriding user confirmation
+    ok 3 - blocks when remote connections are present, overriding user confirmation
+      ---
+      duration_ms: 0.1152
+      type: 'test'
+      ...
+    # Subtest: fails closed when evidence is unavailable, even with user confirmation
+    ok 4 - fails closed when evidence is unavailable, even with user confirmation
+      ---
+      duration_ms: 0.0976
+      type: 'test'
+      ...
+    # Subtest: fails closed on permission_denied evidence
+    ok 5 - fails closed on permission_denied evidence
+      ---
+      duration_ms: 0.0607
+      type: 'test'
+      ...
+    # Subtest: fails closed on error evidence
+    ok 6 - fails closed on error evidence
+      ---
+      duration_ms: 0.1213
+      type: 'test'
+      ...
+    # Subtest: omitting acceptedConnectionBaseline behaves identically to today's strict policy (no regression)
+    ok 7 - omitting acceptedConnectionBaseline behaves identically to today's strict policy (no regression)
+      ---
+      duration_ms: 0.0608
+      type: 'test'
+      ...
+    # Subtest: a count at the declared baseline is allowed
+    ok 8 - a count at the declared baseline is allowed
+      ---
+      duration_ms: 0.2004
+      type: 'test'
+      ...
+    # Subtest: a count under the declared baseline is allowed
+    ok 9 - a count under the declared baseline is allowed
+      ---
+      duration_ms: 0.1724
+      type: 'test'
+      ...
+    # Subtest: a count above the declared baseline still blocks
+    ok 10 - a count above the declared baseline still blocks
+      ---
+      duration_ms: 0.269
+      type: 'test'
+      ...
+    # Subtest: unavailable evidence still fails closed regardless of baseline
+    ok 11 - unavailable evidence still fails closed regardless of baseline
+      ---
+      duration_ms: 0.0821
+      type: 'test'
+      ...
+    # Subtest: missing user confirmation still blocks regardless of baseline
+    ok 12 - missing user confirmation still blocks regardless of baseline
+      ---
+      duration_ms: 0.0608
+      type: 'test'
+      ...
+    # Subtest: baseline of 0 behaves exactly like the default (any connection blocks)
+    ok 13 - baseline of 0 behaves exactly like the default (any connection blocks)
+      ---
+      duration_ms: 0.1212
+      type: 'test'
+      ...
+    1..13
+ok 59 - evaluateOnlineGuard
+  ---
+  duration_ms: 3.5638
+  type: 'suite'
+  ...
+# Subtest: finds a direct (depth 1) module -> heap pointer path, and resolvePointerPath reconstructs the target
+ok 60 - finds a direct (depth 1) module -> heap pointer path, and resolvePointerPath reconstructs the target
+  ---
+  duration_ms: 2.028
+  type: 'test'
+  ...
+# Subtest: finds a two-level (depth 2) pointer chain through an intermediate heap object
+ok 61 - finds a two-level (depth 2) pointer chain through an intermediate heap object
+  ---
+  duration_ms: 1.4765
+  type: 'test'
+  ...
+# Subtest: does not find a path when maxDepth is too shallow to reach the module
+ok 62 - does not find a path when maxDepth is too shallow to reach the module
+  ---
+  duration_ms: 0.5281
+  type: 'test'
+  ...
+# Subtest: does not find a path when the real offset exceeds maxOffsetPerLevel
+ok 63 - does not find a path when the real offset exceeds maxOffsetPerLevel
+  ---
+  duration_ms: 0.306
+  type: 'test'
+  ...
+# Subtest: a pointer stored in a region larger than maxRegionBytes is not found (region skipped)
+ok 64 - a pointer stored in a region larger than maxRegionBytes is not found (region skipped)
+  ---
+  duration_ms: 0.123
+  type: 'test'
+  ...
+# Subtest: resolvePointerPath throws a clear error when the module is not loaded
+ok 65 - resolvePointerPath throws a clear error when the module is not loaded
+  ---
+  duration_ms: 0.3868
+  type: 'test'
+  ...
+# Subtest: resolvePointerPath re-resolves correctly against a moved module base (simulating ASLR across a restart)
+ok 66 - resolvePointerPath re-resolves correctly against a moved module base (simulating ASLR across a restart)
+  ---
+  duration_ms: 0.1522
+  type: 'test'
+  ...
+# Subtest: process-watcher
+    # Subtest: matchCatalogProcess returns first catalog hit
+    ok 1 - matchCatalogProcess returns first catalog hit
+      ---
+      duration_ms: 0.7842
+      type: 'test'
+      ...
+    # Subtest: buildZeroInputAttachPlan blocks without definition
+    ok 2 - buildZeroInputAttachPlan blocks without definition
+      ---
+      duration_ms: 1.3529
+      type: 'test'
+      ...
+    # Subtest: buildZeroInputAttachPlan blocks fingerprint mismatch without drift ack
+    ok 3 - buildZeroInputAttachPlan blocks fingerprint mismatch without drift ack
+      ---
+      duration_ms: 0.1892
+      type: 'test'
+      ...
+    # Subtest: buildZeroInputAttachPlan allows offline confirmed + matching hash
+    ok 4 - buildZeroInputAttachPlan allows offline confirmed + matching hash
+      ---
+      duration_ms: 0.1128
+      type: 'test'
+      ...
+    # Subtest: buildZeroInputAttachPlan allows with waiver when remote connections present (Trust Shift)
+    ok 5 - buildZeroInputAttachPlan allows with waiver when remote connections present (Trust Shift)
+      ---
+      duration_ms: 0.1436
+      type: 'test'
+      ...
+    1..5
+ok 67 - process-watcher
+  ---
+  duration_ms: 3.2333
+  type: 'suite'
+  ...
+# Subtest: RealtimeScanner establishes a baseline without isolating immediately
+ok 68 - RealtimeScanner establishes a baseline without isolating immediately
+  ---
+  duration_ms: 0.8789
+  type: 'test'
+  ...
+# Subtest: RealtimeScanner narrows to candidates that changed with gameplay value
+ok 69 - RealtimeScanner narrows to candidates that changed with gameplay value
+  ---
+  duration_ms: 0.5616
+  type: 'test'
+  ...
+# Subtest: RealtimeScanner reports isolation after a changed pool reaches one candidate
+ok 70 - RealtimeScanner reports isolation after a changed pool reaches one candidate
+  ---
+  duration_ms: 0.2946
+  type: 'test'
+  ...
+# Subtest: RealtimeScanner stalls when every candidate becomes unreadable
+ok 71 - RealtimeScanner stalls when every candidate becomes unreadable
+  ---
+  duration_ms: 0.1832
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: empty output means zero connections, available
+ok 72 - parsePowerShellConnections: empty output means zero connections, available
+  ---
+  duration_ms: 0.5204
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: whitespace-only output means zero connections, available
+ok 73 - parsePowerShellConnections: whitespace-only output means zero connections, available
+  ---
+  duration_ms: 0.0984
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: single connection (ConvertTo-Json emits a bare object, not an array)
+ok 74 - parsePowerShellConnections: single connection (ConvertTo-Json emits a bare object, not an array)
+  ---
+  duration_ms: 0.0678
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: multiple connections, this is the real Stardew Valley evidence shape
+ok 75 - parsePowerShellConnections: multiple connections, this is the real Stardew Valley evidence shape
+  ---
+  duration_ms: 0.0555
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: loopback remote addresses are excluded from the count
+ok 76 - parsePowerShellConnections: loopback remote addresses are excluded from the count
+  ---
+  duration_ms: 0.08
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: malformed JSON fails closed as an error, not a crash
+ok 77 - parsePowerShellConnections: malformed JSON fails closed as an error, not a crash
+  ---
+  duration_ms: 0.135
+  type: 'test'
+  ...
+# Subtest: parsePowerShellConnections: entries missing RemoteAddress are skipped, not counted
+ok 78 - parsePowerShellConnections: entries missing RemoteAddress are skipped, not counted
+  ---
+  duration_ms: 0.085
+  type: 'test'
+  ...
+# Subtest: observeRemoteConnections: rejects a non-positive-integer pid before touching the OS
+ok 79 - observeRemoteConnections: rejects a non-positive-integer pid before touching the OS
+  ---
+  duration_ms: 1.0972
+  type: 'test'
+  ...
+# Subtest: observeRemoteConnections: rejects a non-integer pid before touching the OS
+ok 80 - observeRemoteConnections: rejects a non-integer pid before touching the OS
+  ---
+  duration_ms: 0.1567
+  type: 'test'
+  ...
+# Subtest: observeRemoteConnections: rejects pid=0 before touching the OS
+ok 81 - observeRemoteConnections: rejects pid=0 before touching the OS
+  ---
+  duration_ms: 0.2396
+  type: 'test'
+  ...
+# Subtest: real render-process-gone wiring performs owner-scoped idempotent cleanup
+ok 82 - real render-process-gone wiring performs owner-scoped idempotent cleanup
+  ---
+  duration_ms: 7.1703
+  type: 'test'
+  ...
+# Subtest: parseResearchAddress accepts hex and decimal
+ok 83 - parseResearchAddress accepts hex and decimal
+  ---
+  duration_ms: 0.9932
+  type: 'test'
+  ...
+# Subtest: MemoryViewer reads typed values and lists bounded regions
+ok 84 - MemoryViewer reads typed values and lists bounded regions
+  ---
+  duration_ms: 0.5853
+  type: 'test'
+  ...
+# Subtest: HexInspector formats rows and clamps window size
+ok 85 - HexInspector formats rows and clamps window size
+  ---
+  duration_ms: 0.4373
+  type: 'test'
+  ...
+# Subtest: HexInspector reports unreadable pages without throwing
+ok 86 - HexInspector reports unreadable pages without throwing
+  ---
+  duration_ms: 0.1241
+  type: 'test'
+  ...
+# Subtest: PointerCandidateAnalyzer prefers module roots and reports moduleRootOk=0 honestly
+ok 87 - PointerCandidateAnalyzer prefers module roots and reports moduleRootOk=0 honestly
+  ---
+  duration_ms: 0.1995
+  type: 'test'
+  ...
+# Subtest: SessionSnapshotManager diffs watches and persists under a root directory
+ok 88 - SessionSnapshotManager diffs watches and persists under a root directory
+  ---
+  duration_ms: 5.9935
+  type: 'test'
+  ...
+# Subtest: Gate 2: raw-byte rollback equality
+    # Subtest: identical bytes: rollback succeeds when nothing else touched memory
+    ok 1 - identical bytes: rollback succeeds when nothing else touched memory
+      ---
+      duration_ms: 5.0971
+      type: 'test'
+      ...
+    # Subtest: one-bit mismatch in a non-NaN double is detected and rejected
+    ok 2 - one-bit mismatch in a non-NaN double is detected and rejected
+      ---
+      duration_ms: 0.5763
+      type: 'test'
+      ...
+    # Subtest: one-byte mismatch (uint32) is detected and rejected
+    ok 3 - one-byte mismatch (uint32) is detected and rejected
+      ---
+      duration_ms: 0.3459
+      type: 'test'
+      ...
+    # Subtest: NaN payload mismatch: numeric check alone would pass, byte check must reject (the documented gap this closes)
+    ok 4 - NaN payload mismatch: numeric check alone would pass, byte check must reject (the documented gap this closes)
+      ---
+      duration_ms: 0.7174
+      type: 'test'
+      ...
+    # Subtest: positive zero vs negative zero: rollback rejects (both numeric Object.is and byte check concur)
+    ok 5 - positive zero vs negative zero: rollback rejects (both numeric Object.is and byte check concur)
+      ---
+      duration_ms: 0.9416
+      type: 'test'
+      ...
+    # Subtest: positive vs negative infinity: rollback rejects
+    ok 6 - positive vs negative infinity: rollback rejects
+      ---
+      duration_ms: 0.4641
+      type: 'test'
+      ...
+    # Subtest: float precision boundary: Math.fround-normalized rollback still succeeds and restores exact bytes
+    ok 7 - float precision boundary: Math.fround-normalized rollback still succeeds and restores exact bytes
+      ---
+      duration_ms: 0.2563
+      type: 'test'
+      ...
+    # Subtest: double precision boundary (Number.MAX_SAFE_INTEGER as a double) rolls back exactly
+    ok 8 - double precision boundary (Number.MAX_SAFE_INTEGER as a double) rolls back exactly
+      ---
+      duration_ms: 0.2188
+      type: 'test'
+      ...
+    # Subtest: large integer boundary: uint32 max (0xFFFFFFFF) rolls back exactly
+    ok 9 - large integer boundary: uint32 max (0xFFFFFFFF) rolls back exactly
+      ---
+      duration_ms: 0.5002
+      type: 'test'
+      ...
+    # Subtest: large integer boundary: int64 rejects unsafe precision even though raw bytes were captured
+    ok 10 - large integer boundary: int64 rejects unsafe precision even though raw bytes were captured
+      ---
+      duration_ms: 0.4761
+      type: 'test'
+      ...
+    # Subtest: boolean is not a supported LiveValueType — no boolean rollback path exists to test (documented, not a regression)
+    ok 11 - boolean is not a supported LiveValueType — no boolean rollback path exists to test (documented, not a regression)
+      ---
+      duration_ms: 0.1097
+      type: 'test'
+      ...
+    # Subtest: concurrent external mutation via raw writeBuffer (not just setValue) is detected
+    ok 12 - concurrent external mutation via raw writeBuffer (not just setValue) is detected
+      ---
+      duration_ms: 0.2676
+      type: 'test'
+      ...
+    # Subtest: expired record cannot be rolled back, and the session remains usable afterward (no stale-entry corruption)
+    ok 13 - expired record cannot be rolled back, and the session remains usable afterward (no stale-entry corruption)
+      ---
+      duration_ms: 0.4893
+      type: 'test'
+      ...
+    # Subtest: failed current-byte read during rollback fails closed without writing
+    ok 14 - failed current-byte read during rollback fails closed without writing
+      ---
+      duration_ms: 0.4261
+      type: 'test'
+      ...
+    # Subtest: failed rollback write leaves the ledger entry intact for a later retry
+    ok 15 - failed rollback write leaves the ledger entry intact for a later retry
+      ---
+      duration_ms: 0.5104
+      type: 'test'
+      ...
+    # Subtest: cleanup (detach) destroys retained rollback bytes — later rollback on the same proposalId fails
+    ok 16 - cleanup (detach) destroys retained rollback bytes — later rollback on the same proposalId fails
+      ---
+      duration_ms: 0.3561
+      type: 'test'
+      ...
+    # Subtest: cleanup (revokePendingAuthorizationsForCleanup) destroys a pending proposal's captured raw bytes before confirm
+    ok 17 - cleanup (revokePendingAuthorizationsForCleanup) destroys a pending proposal's captured raw bytes before confirm
+      ---
+      duration_ms: 0.2648
+      type: 'test'
+      ...
+    # Subtest: full ledger rejects the 51st confirm before mutation; a fresh address is unaffected afterward
+    ok 18 - full ledger rejects the 51st confirm before mutation; a fresh address is unaffected afterward
+      ---
+      duration_ms: 1.5321
+      type: 'test'
+      ...
+    # Subtest: failed initial write retains nothing — no ledger entry, no leaked pending raw bytes
+    ok 19 - failed initial write retains nothing — no ledger entry, no leaked pending raw bytes
+      ---
+      duration_ms: 0.4382
+      type: 'test'
+      ...
+    1..19
+ok 89 - Gate 2: raw-byte rollback equality
+  ---
+  duration_ms: 15.3652
+  type: 'suite'
+  ...
+# Subtest: rollback type integrity
+    # Subtest: supported integer types compare exactly
+    ok 1 - supported integer types compare exactly
+      ---
+      duration_ms: 1.0671
+      type: 'test'
+      ...
+    # Subtest: int64 rejects unsafe precision
+    ok 2 - int64 rejects unsafe precision
+      ---
+      duration_ms: 0.1312
+      type: 'test'
+      ...
+    # Subtest: float compares exact float32 encodings
+    ok 3 - float compares exact float32 encodings
+      ---
+      duration_ms: 0.1784
+      type: 'test'
+      ...
+    # Subtest: NaN policy is Object.is equality for floats
+    ok 4 - NaN policy is Object.is equality for floats
+      ---
+      duration_ms: 0.1576
+      type: 'test'
+      ...
+    # Subtest: signed zero remains distinct
+    ok 5 - signed zero remains distinct
+      ---
+      duration_ms: 0.1025
+      type: 'test'
+      ...
+    # Subtest: infinities compare by exact sign
+    ok 6 - infinities compare by exact sign
+      ---
+      duration_ms: 0.0803
+      type: 'test'
+      ...
+    # Subtest: integer comparisons reject non-finite and fractional values
+    ok 7 - integer comparisons reject non-finite and fractional values
+      ---
+      duration_ms: 0.2036
+      type: 'test'
+      ...
+    # Subtest: unknown types fail closed
+    ok 8 - unknown types fail closed
+      ---
+      duration_ms: 0.1704
+      type: 'test'
+      ...
+    1..8
+ok 90 - rollback type integrity
+  ---
+  duration_ms: 3.032
+  type: 'suite'
+  ...
+# Subtest: wireSessionCleanupOnDestroy
+    # Subtest: invokes the cleanup callback when the emitter fires "destroyed"
+    ok 1 - invokes the cleanup callback when the emitter fires "destroyed"
+      ---
+      duration_ms: 0.5841
+      type: 'test'
+      ...
+    # Subtest: does not register a second listener for the same emitter across repeated attach cycles
+    ok 2 - does not register a second listener for the same emitter across repeated attach cycles
+      ---
+      duration_ms: 0.1783
+      type: 'test'
+      ...
+    # Subtest: two different emitters (two windows) are wired independently
+    ok 3 - two different emitters (two windows) are wired independently
+      ---
+      duration_ms: 0.1084
+      type: 'test'
+      ...
+    1..3
+ok 91 - wireSessionCleanupOnDestroy
+  ---
+  duration_ms: 1.6138
+  type: 'suite'
+  ...
+# Subtest: signature-engine
+    # Subtest: aobHammingDistance counts non-wildcard mismatches
+    ok 1 - aobHammingDistance counts non-wildcard mismatches
+      ---
+      duration_ms: 0.8849
+      type: 'test'
+      ...
+    # Subtest: findBestFuzzyAobInBuffer finds closest match within maxDistance
+    ok 2 - findBestFuzzyAobInBuffer finds closest match within maxDistance
+      ---
+      duration_ms: 0.2406
+      type: 'test'
+      ...
+    # Subtest: aobBoundedEditDistance tolerates a one-byte insert (byte-shift)
+    ok 3 - aobBoundedEditDistance tolerates a one-byte insert (byte-shift)
+      ---
+      duration_ms: 0.2155
+      type: 'test'
+      ...
+    # Subtest: edit matching tolerates a one-byte deletion at the buffer boundary
+    ok 4 - edit matching tolerates a one-byte deletion at the buffer boundary
+      ---
+      duration_ms: 0.1233
+      type: 'test'
+      ...
+    # Subtest: findBestDriftAobInBuffer recovers inserted-byte drift via edit kind
+    ok 5 - findBestDriftAobInBuffer recovers inserted-byte drift via edit kind
+      ---
+      duration_ms: 0.1559
+      type: 'test'
+      ...
+    # Subtest: resolveSignatureInBuffer prefers exact over fuzzy
+    ok 6 - resolveSignatureInBuffer prefers exact over fuzzy
+      ---
+      duration_ms: 0.6432
+      type: 'test'
+      ...
+    # Subtest: scanFuzzySignature finds drifted pattern in process region
+    ok 7 - scanFuzzySignature finds drifted pattern in process region
+      ---
+      duration_ms: 0.4868
+      type: 'test'
+      ...
+    # Subtest: scanFuzzySignature respects hintAddress shift window
+    ok 8 - scanFuzzySignature respects hintAddress shift window
+      ---
+      duration_ms: 0.1942
+      type: 'test'
+      ...
+    # Subtest: hint window includes a match exactly at maxShiftBytes
+    ok 9 - hint window includes a match exactly at maxShiftBytes
+      ---
+      duration_ms: 0.2185
+      type: 'test'
+      ...
+    # Subtest: module-scoped resolution fails closed when module is absent
+    ok 10 - module-scoped resolution fails closed when module is absent
+      ---
+      duration_ms: 0.3961
+      type: 'test'
+      ...
+    # Subtest: module-scoped resolution does not match bytes outside module bounds
+    ok 11 - module-scoped resolution does not match bytes outside module bounds
+      ---
+      duration_ms: 0.2682
+      type: 'test'
+      ...
+    # Subtest: resolveSignature returns exact when available
+    ok 12 - resolveSignature returns exact when available
+      ---
+      duration_ms: 0.1344
+      type: 'test'
+      ...
+    1..12
+ok 92 - signature-engine
+  ---
+  duration_ms: 4.9557
+  type: 'suite'
+  ...
+# Subtest: evaluateWriteConsent (Trust Shift)
+    # Subtest: blocks without waiver even when network is clean
+    ok 1 - blocks without waiver even when network is clean
+      ---
+      duration_ms: 0.583
+      type: 'test'
+      ...
+    # Subtest: allows with waiver when remote connections are present (advisory only)
+    ok 2 - allows with waiver when remote connections are present (advisory only)
+      ---
+      duration_ms: 0.153
+      type: 'test'
+      ...
+    # Subtest: allows with waiver when evidence unavailable (advisory)
+    ok 3 - allows with waiver when evidence unavailable (advisory)
+      ---
+      duration_ms: 0.1368
+      type: 'test'
+      ...
+    1..3
+ok 93 - evaluateWriteConsent (Trust Shift)
+  ---
+  duration_ms: 1.5531
+  type: 'suite'
+  ...
+# Subtest: SinglePlayerWaiverStore
+    # Subtest: persists sticky accept and session cache
+    ok 1 - persists sticky accept and session cache
+      ---
+      duration_ms: 4.897
+      type: 'test'
+      ...
+    1..1
+ok 94 - SinglePlayerWaiverStore
+  ---
+  duration_ms: 5.0278
+  type: 'suite'
+  ...
+# Subtest: Phase 10 WritePolicyGate
+    # Subtest: denies when research mode off for research_probe
+    ok 1 - denies when research mode off for research_probe
+      ---
+      duration_ms: 0.5401
+      type: 'test'
+      ...
+    # Subtest: denies research_probe without snapshot backup
+    ok 2 - denies research_probe without snapshot backup
+      ---
+      duration_ms: 0.0872
+      type: 'test'
+      ...
+    # Subtest: denies trainer path with unset default context
+    ok 3 - denies trainer path with unset default context
+      ---
+      duration_ms: 0.1065
+      type: 'test'
+      ...
+    # Subtest: allows trainer path only with explicit waiver and approval
+    ok 4 - allows trainer path only with explicit waiver and approval
+      ---
+      duration_ms: 0.0624
+      type: 'test'
+      ...
+    # Subtest: denies research / no approval / read-only / no waiver
+    ok 5 - denies research / no approval / read-only / no waiver
+      ---
+      duration_ms: 0.1111
+      type: 'test'
+      ...
+    # Subtest: MemoryManager blocks safeWrite when policy denies
+    ok 6 - MemoryManager blocks safeWrite when policy denies
+      ---
+      duration_ms: 2.6002
+      type: 'test'
+      ...
+    1..6
+ok 95 - Phase 10 WritePolicyGate
+  ---
+  duration_ms: 4.191
+  type: 'suite'
+  ...
+# Subtest: WritePolicyGate
+    # Subtest: trainer default context denies until waiver and approval are set
+    ok 1 - trainer default context denies until waiver and approval are set
+      ---
+      duration_ms: 0.9054
+      type: 'test'
+      ...
+    # Subtest: trainer path allows when waiver + approval are explicit
+    ok 2 - trainer path allows when waiver + approval are explicit
+      ---
+      duration_ms: 0.1149
+      type: 'test'
+      ...
+    # Subtest: denies when read-only mode is enabled
+    ok 3 - denies when read-only mode is enabled
+      ---
+      duration_ms: 0.1202
+      type: 'test'
+      ...
+    # Subtest: denies when single-player waiver not accepted
+    ok 4 - denies when single-player waiver not accepted
+      ---
+      duration_ms: 0.1106
+      type: 'test'
+      ...
+    # Subtest: legacy isOffline:false maps to NO_CONSENT
+    ok 5 - legacy isOffline:false maps to NO_CONSENT
+      ---
+      duration_ms: 0.1089
+      type: 'test'
+      ...
+    # Subtest: denies when user approval is missing
+    ok 6 - denies when user approval is missing
+      ---
+      duration_ms: 0.0966
+      type: 'test'
+      ...
+    # Subtest: research_probe denies when Research Write Mode is off (default)
+    ok 7 - research_probe denies when Research Write Mode is off (default)
+      ---
+      duration_ms: 0.1081
+      type: 'test'
+      ...
+    # Subtest: research_probe denies when mode on but no backup snapshot
+    ok 8 - research_probe denies when mode on but no backup snapshot
+      ---
+      duration_ms: 0.1949
+      type: 'test'
+      ...
+    # Subtest: research_probe allows when mode on, backup present, waiver, approved
+    ok 9 - research_probe allows when mode on, backup present, waiver, approved
+      ---
+      duration_ms: 0.1827
+      type: 'test'
+      ...
+    # Subtest: fail-closed order: readOnly wins before consent
+    ok 10 - fail-closed order: readOnly wins before consent
+      ---
+      duration_ms: 0.2912
+      type: 'test'
+      ...
+    1..10
+ok 96 - WritePolicyGate
+  ---
+  duration_ms: 3.4522
+  type: 'suite'
+  ...
+# Subtest: zero-input-prepare
+    # Subtest: planZeroInputDetection blocks when offline not confirmed (watch preview)
+    ok 1 - planZeroInputDetection blocks when offline not confirmed (watch preview)
+      ---
+      duration_ms: 0.522
+      type: 'test'
+      ...
+    # Subtest: prepareZeroInputSession blocks fingerprint mismatch
+    ok 2 - prepareZeroInputSession blocks fingerprint mismatch
+      ---
+      duration_ms: 1.474
+      type: 'test'
+      ...
+    # Subtest: prepareZeroInputSession allows with waiver even when remote connections present (Trust Shift)
+    ok 3 - prepareZeroInputSession allows with waiver even when remote connections present (Trust Shift)
+      ---
+      duration_ms: 0.9515
+      type: 'test'
+      ...
+    # Subtest: prepareZeroInputSession attaches and resolves pointer + marks scan_required
+    ok 4 - prepareZeroInputSession attaches and resolves pointer + marks scan_required
+      ---
+      duration_ms: 0.2784
+      type: 'test'
+      ...
+    # Subtest: prepareZeroInputSession accepts featureHints map without failing
+    ok 5 - prepareZeroInputSession accepts featureHints map without failing
+      ---
+      duration_ms: 0.6302
+      type: 'test'
+      ...
+    1..5
+ok 97 - zero-input-prepare
+  ---
+  duration_ms: 4.3928
+  type: 'suite'
+  ...
+1..97
+# tests 257
+# suites 24
+# pass 257
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1799.7313

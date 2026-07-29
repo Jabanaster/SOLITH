@@ -1,0 +1,6 @@
+No memory-audit.jsonl content was inspected for raw sensitive values this
+cycle beyond confirming (via the new gate2-4-final-certification.e2e.test.ts
+Phase 4 assertion and manual source review) that no raw address, PID, token,
+or rollback byte value is written into any Gate 2.4 evidence file or test
+assertion string. Audit-log content itself is unchanged from prior gates
+(memoryAuditFilePath()/electron/live-memory-ipc.ts, untouched this cycle).

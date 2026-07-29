@@ -1,0 +1,113 @@
+# Gate 2.2 Resume — Complete Remaining Packaged Lifecycle Certification
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node: v22.23.1, npm: 10.9.8, Electron: 42.4.1 (ABI 146), arch x64, platform win32
+
+## Baseline
+
+Confirmed clean starting point matching the established chain (GameLibrary.tsx-only
+whitespace). See baseline-status.txt / baseline-diff-*.txt / baseline-file-manifest.csv.
+
+## New finding before proceeding
+
+`electron/live-memory-ipc.ts`'s `'live-memory-freeze-start'` handler requires
+`{proposalId, consentToken}`, but the renderer's exposed `liveMemoryFreezeStart` preload call
+sends `{address, dataType, value, intervalMs}` and no `liveMemoryFreezePropose`/
+`liveMemoryFreezeIssueConsent` preload methods exist — a real, pre-existing gap unrelated to
+Gate 2.2 (see remaining-risks.md R-2.2-RESUME-001). Added one narrow test-only hook
+(`__testStartFreezeForOwner`, `SOLITH_TEST_BUILD=1`-gated) that calls the exact same production
+functions the real (currently broken) flow would call, so real freeze scenarios could still be
+certified. See control-provenance.csv.
+
+## Packaged rebuild
+
+`build:vite` → `build:electron` (29/29 sanity checks) → `dist:dir` (electron-builder --dir),
+all exit 0, producing a fresh `dist/win-unpacked/Solith.exe` containing the new test hook.
+electron-builder's own `@electron/rebuild` re-prepared the vendored memoryjs module during this
+build (same as Gate 2.2A.1) — no native source changed this cycle.
+
+## Fixture prerequisite (Phase 3)
+
+VERIFIED COMPLETE — full attach/read/write/restore cycle against the real packaged native
+driver and the Gate 2.2 fixture. See fixture-prerequisite-matrix.csv.
+
+## Active-session shutdown (Phase 4)
+
+VERIFIED COMPLETE for all 6 required sub-scenarios (4.1-4.6), each proven against a REAL active
+freeze (not merely an attach) where required. Normal main-window close and application quit are
+disclosed as the same underlying event on this single-window Windows app
+(`window-all-closed → app.quit()`). See packaged-active-shutdown-matrix.csv.
+
+## Mid-freeze feature-disable (Phase 5)
+
+VERIFIED COMPLETE — real freeze proven active (applies + restores after external mutation via
+the fixture's own mutate-file mechanism), then `v2LiveModeEnabled` disabled through the real,
+existing `setSetting` IPC; freeze stops with `stopReason === 'feature_disabled'` exactly; no
+further writes; old proposal ID rejected; re-enabling does not restart it. See
+packaged-feature-disable-final-matrix.csv.
+
+## Window identity (Phase 6), recreation (Phase 7), overlay (Phase 8), navigation (Phase 9), frame boundaries (Phase 10)
+
+Phase 6 (reload) and Phase 9.1/9.6 (unauthorized navigation + return) VERIFIED COMPLETE.
+Phases 7, 8, 9.2-9.5, and 10 PENDING with disclosed architecture/scope reasons — not fabricated
+as passing. See packaged-window-identity-final-matrix.csv.
+
+## Normal-build hook absence (Phase 11)
+
+VERIFIED COMPLETE — all Gate 2.1 hooks AND the new Gate 2.2 Resume freeze-start hook are
+`undefined` when the packaged app is launched without `SOLITH_TEST_BUILD=1`. See
+normal-build-test-hook-absence-final-matrix.csv.
+
+## Regression of previously completed packaged controls (Phase 12)
+
+VERIFIED COMPLETE — renderer crash, cleanup-failure containment, identity-mismatch/simulated
+PID-reuse, will-quit-no-hang (Gate 2.1, 5/5), packaged real-process write proof (Gate 2.2A.1,
+1/1), and packaged smoke (23/23) all re-run against this cycle's rebuilt candidate with no
+regression. See packaged-regression-matrix.csv.
+
+## Full regression gate (Phase 13)
+
+- npm test: PASS, exit 0, 1040/1040 (unchanged total)
+- npm run test:live-memory: PASS, exit 0, 257/257 (unchanged total)
+- Main TypeScript: PASS, exit 0, 0 diagnostics
+- Electron TypeScript: FAIL, exit 2, 31 diagnostics/13 files — unchanged established baseline
+  (the new __testStartFreezeForOwner function introduced no new diagnostics)
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286/303 only — unchanged established baseline
+
+Node-22 ABI native addon was restored (via `node-gyp rebuild --target=22.23.1`) after packaged
+verification completed, so this regression gate could run under Node.
+
+## Scope integrity (Phase 16)
+
+- No Batch B2/B2A work began.
+- No unrelated production behavior changed — the only production file touched
+  (`electron/live-memory-ipc.ts`) received exactly one new, additive, `SOLITH_TEST_BUILD`-gated
+  export and its `globalThis` registration; no existing function was modified.
+- No dependency added; package-lock.json unchanged; no CI/release-workflow changes.
+- No production authorization control weakened — the new hook re-uses real proposeFreeze,
+  requestPrivilegedWriteConsent (still respecting SOLITH_PRIVILEGED_CONSENT), identity
+  verification, and manager.freezeStart (which re-validates the consent token) unchanged.
+- No generic renderer-controlled process/memory API was added — the new hook is unreachable
+  from any renderer (no IPC/contextBridge registration).
+- Only harness-created SOLITH and Gate 2.2 fixture processes were terminated this cycle.
+- No raw target values, addresses, tokens, rollback bytes, or sensitive paths appear in any
+  evidence file produced this cycle.
+- No test hook is reachable in the normal production candidate (Phase 11, verified).
+- No source or test file outside authorized scope changed
+  (`electron/live-memory-ipc.ts`, new `tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts`,
+  Gate 2.2 Resume evidence, and this canonical roadmap update — see changed-files.txt).
+- No git mutation command was run this cycle.
+- SOLITH_SECURITY_ROADMAP.md updated (see below).
+
+## Verdict
+
+GATE 2.2 (remaining packaged lifecycle certification): SUBSTANTIALLY COMPLETE — all explicitly
+authorized, attempted scenarios VERIFIED COMPLETE; 3 items PENDING with disclosed reasons; 1 new
+pre-existing defect (R-2.2-RESUME-001) discovered and disclosed, requiring a separate owner
+decision to remediate.
+
+BATCH B1.1 CONDITIONAL PASS (not upgraded to unconditional PASS this cycle — see
+remaining-risks.md for the exact remaining conditions).
+
+Release: DENIED (unchanged).

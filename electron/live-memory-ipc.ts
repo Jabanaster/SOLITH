@@ -20,7 +20,9 @@ import {
   LiveMemoryCorrelationEmptySchema,
   LiveMemoryCorrelationEventSchema,
   LiveMemoryCorrelationStartSchema,
-  LiveMemoryFreezeStartSchema,
+  LiveMemoryFreezeProposeSchema,
+  LiveMemoryFreezeIssueConsentSchema,
+  LiveMemoryFreezeConfirmSchema,
   LiveMemoryFreezeStopSchema,
   LiveMemoryFreezeStatusSchema,
   LiveMemoryListControlsSchema,
@@ -48,6 +50,18 @@ import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
 import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
 import { setCrashReportContext } from '../src/core/crash/local-crash-reporter.js';
 import { hashInstalledExecutableForCatalog } from '../src/core/live-memory/installed-exe-hash.js';
+import {
+  wireSessionCleanupOnDestroy,
+  wireSessionCleanupOnNavigate,
+  type DestroyableEmitter,
+  type NavigableEmitter,
+} from '../src/core/live-memory/session-cleanup.js';
+import { validateIpcSender } from './sender-validation.js';
+import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
+import { revokeWriteConsentsForSession, clearWriteConsentStore } from '../src/core/consent/write-consent.js';
+import { clearSelectionsForWindow, clearAllProcessSelections } from '../src/core/security/process-selection-registry.js';
+import { unregisterTrustedWindow, clearAllTrustedWindows } from '../src/core/security/trusted-sender-registry.js';
+import { runCleanup, type CleanupResult } from '../src/core/live-memory/cleanup-coordinator.js';
 import {
   onAvowedMemoryManagerSnapshotEvent,
   onAvowedProcessAttached,
@@ -169,7 +183,7 @@ export function registerLiveMemoryIpc(): void {
       );
 
       if (result.success) {
-        const bundle = bindSessionBundle(event.sender.id, session, mod);
+        const bundle = bindSessionBundle(event.sender.id, session, mod, event.sender);
         refreshCrashContext(bundle);
         maybeStartAvowedWingdkBackups({
           executableName: parsed.executableName,
@@ -199,7 +213,7 @@ export function registerLiveMemoryIpc(): void {
 
       disposeSession(event.sender.id);
       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
-      const bundle = bindSessionBundle(event.sender.id, session, mod);
+      const bundle = bindSessionBundle(event.sender.id, session, mod, event.sender);
 
       const executableHashSHA256 =
         parsed.executableHashSHA256 ??
@@ -385,7 +399,7 @@ export function registerLiveMemoryIpc(): void {
         }),
         binding,
       });
-      if (!result.approved) {
+      if (result.approved === false) {
         return { success: false, error: result.reason };
       }
       return { success: true, consent: result.consent };
@@ -440,15 +454,13 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-rollback', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = LiveMemoryRollbackSchema.parse(payload);
-      const manifest = {
-        ...parsed.manifest,
-        target: { ...parsed.manifest.target, address: BigInt(parsed.manifest.target.address) },
-      };
-      const result = await bundle.manager.rollback(manifest);
+      const result = await bundle.manager.rollback(parsed.proposalId);
       refreshCrashContext(bundle);
-      return { success: result.success, guard: result.guard, error: result.error };
+      return serializeWriteResult(result);
     } catch (error) {
       return { success: false, error: sanitize(error, 'rollback_failed') };
     }
@@ -636,15 +648,146 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
-  ipcMain.handle('live-memory-freeze-start', async (event, payload: unknown) => {
+  // Freeze propose/issue-consent/confirm (Batch B1.1) — mirrors the write
+  // propose/issue-consent/confirm flow above. A freeze can no longer be
+  // started via a single privileged call (the old 'live-memory-freeze-start'
+  // handler took address/value/interval directly and started writing
+  // immediately). All 3 steps also enforce trusted-sender validation, not
+  // just liveness — see requireTrustedSender below.
+  ipcMain.handle('live-memory-freeze-propose', async (event, payload: unknown) => {
     try {
-      const session = requireSession(event);
-      const parsed = LiveMemoryFreezeStartSchema.parse(payload);
-      const result = session.startFreeze(
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const parsed = LiveMemoryFreezeProposeSchema.parse(payload);
+      const proposal = bundle.session.proposeFreeze(
         { address: BigInt(parsed.address), dataType: parsed.dataType },
         parsed.value,
         parsed.intervalMs,
       );
+      refreshCrashContext(bundle);
+      return {
+        success: true,
+        proposal: { ...proposal, target: { ...proposal.target, address: proposal.target.address.toString() } },
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'freeze_propose_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-freeze-issue-consent', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const parsed = LiveMemoryFreezeIssueConsentSchema.parse(payload);
+      const identityError = bundle.session.verifyAttachedProcessIdentity();
+      if (identityError) {
+        return { success: false, error: identityError };
+      }
+      const proposal = bundle.session.getPendingFreezeProposal(parsed.proposalId);
+      if (!proposal) {
+        return { success: false, error: 'Unknown freeze proposal.' };
+      }
+      const identity = bundle.session.getAttachedIdentity();
+      if (!identity) {
+        return { success: false, error: 'incomplete_process_identity' };
+      }
+      const {
+        requestPrivilegedWriteConsent,
+        formatFreezeConsentLines,
+        parentWindowFromEvent,
+      } = await import('./privileged-consent-dialog.js');
+      const { MAX_FREEZE_DURATION_MS } = await getLiveMemoryModule();
+      const binding = {
+        operation: 'live_memory_freeze_start' as const,
+        sessionKey: String(event.sender.id),
+        proposalId: proposal.proposalId,
+        attachedPid: identity.pid,
+        attachedExecutableName: identity.executableName,
+        executablePath: identity.executablePath,
+        processStartTime: identity.startTime,
+        volumeSerialNumber: identity.volumeSerialNumber,
+        fileIndex: identity.fileIndex,
+        attachedExeSha256: identity.exeSha256,
+        address: proposal.target.address.toString(),
+        dataType: proposal.target.dataType,
+        freezeValue: proposal.value,
+        freezeIntervalMs: proposal.intervalMs,
+        freezeMaxDurationMs: MAX_FREEZE_DURATION_MS,
+        windowId: event.sender.id,
+      };
+      const result = await requestPrivilegedWriteConsent(parentWindowFromEvent(event), {
+        title: 'Approve live memory freeze',
+        lines: formatFreezeConsentLines({
+          attachedExecutableName: identity.executableName,
+          attachedPid: identity.pid,
+          executablePath: identity.executablePath,
+          address: proposal.target.address.toString(),
+          dataType: proposal.target.dataType,
+          value: proposal.value,
+          intervalMs: proposal.intervalMs,
+          maxDurationMs: MAX_FREEZE_DURATION_MS,
+          proposalId: proposal.proposalId,
+        }),
+        binding,
+      });
+      if (result.approved === false) {
+        return { success: false, error: result.reason };
+      }
+      return { success: true, consent: result.consent };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'freeze_issue_consent_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-freeze-start', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      // Re-checked here (not just at propose time): if the feature flag is disabled between
+      // propose and confirm, confirm must fail closed rather than honoring a stale proposal.
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const parsed = LiveMemoryFreezeConfirmSchema.parse(payload);
+      const identityError = bundle.session.verifyAttachedProcessIdentity();
+      if (identityError) {
+        return { success: false, error: identityError };
+      }
+      const proposal = bundle.session.getPendingFreezeProposal(parsed.proposalId);
+      if (!proposal) {
+        return { success: false, error: 'Unknown or already-consumed freeze proposal.' };
+      }
+      const identity = bundle.session.getAttachedIdentity();
+      if (!identity) {
+        return { success: false, error: 'incomplete_process_identity' };
+      }
+      const { MAX_FREEZE_DURATION_MS } = await getLiveMemoryModule();
+      const consentBinding = {
+        operation: 'live_memory_freeze_start' as const,
+        sessionKey: String(event.sender.id),
+        proposalId: proposal.proposalId,
+        attachedPid: identity.pid,
+        attachedExecutableName: identity.executableName,
+        executablePath: identity.executablePath,
+        processStartTime: identity.startTime,
+        volumeSerialNumber: identity.volumeSerialNumber,
+        fileIndex: identity.fileIndex,
+        attachedExeSha256: identity.exeSha256,
+        address: proposal.target.address.toString(),
+        dataType: proposal.target.dataType,
+        freezeValue: proposal.value,
+        freezeIntervalMs: proposal.intervalMs,
+        freezeMaxDurationMs: MAX_FREEZE_DURATION_MS,
+        windowId: event.sender.id,
+      };
+      const result = await bundle.manager.freezeStart(parsed.proposalId, {
+        consentToken: parsed.consentToken,
+        consentBinding,
+      });
+      refreshCrashContext(bundle);
       return result;
     } catch (error) {
       return { success: false, error: sanitize(error, 'freeze_start_failed') };
@@ -653,6 +796,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-freeze-stop', async (event) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       LiveMemoryFreezeStopSchema.parse({});
       const status = session.stopFreeze();
@@ -664,6 +809,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-freeze-status', async (event) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       LiveMemoryFreezeStatusSchema.parse({});
       return { success: true, status: serializeFreezeStatus(session.getFreezeStatus()) };
@@ -1125,7 +1272,7 @@ export function registerLiveMemoryIpc(): void {
         }),
         binding,
       });
-      if (!result.approved) return { success: false, error: result.reason };
+      if (result.approved === false) return { success: false, error: result.reason };
       return { success: true, consent: result.consent };
     } catch (error) {
       return { success: false, error: sanitize(error, 'in_process_issue_injector_consent_failed') };
@@ -1267,6 +1414,22 @@ const sessions = new Map<number, SessionBundle>();
 /** catalogGameId → featureId → last resolved absolute address. */
 const featureHintStore = new Map<string, Record<string, string>>();
 
+// Gate 2.1: narrow, read-only test-only introspection so the packaged
+// lifecycle harness can verify a session was actually torn down after a
+// real renderer crash — the crashed webContents itself can no longer be
+// queried once its JS context is gone. Read-only, no security-relevant
+// side effect. Unavailable unless SOLITH_TEST_BUILD=1.
+export function __testHasSessionForOwner(senderId: number): boolean {
+  if (process.env.SOLITH_TEST_BUILD !== '1') {
+    throw new Error('__testHasSessionForOwner is only available when SOLITH_TEST_BUILD=1.');
+  }
+  return sessions.has(senderId);
+}
+
+if (process.env.SOLITH_TEST_BUILD === '1') {
+  (globalThis as Record<string, unknown>).__solithTestHasSessionForOwner = __testHasSessionForOwner;
+}
+
 function memoryAuditFilePath(): string {
   return path.join(app.getPath('userData'), 'logs', 'memory-audit.jsonl');
 }
@@ -1283,11 +1446,23 @@ function refreshCrashContext(bundle: SessionBundle | undefined): void {
   });
 }
 
-function bindSessionBundle(senderId: number, session: LiveMemorySession, mod: any): SessionBundle {
+function bindSessionBundle(
+  senderId: number,
+  session: LiveMemorySession,
+  mod: any,
+  webContents: DestroyableEmitter & NavigableEmitter,
+): SessionBundle {
   const audit = new mod.MemoryAuditLog({ filePath: memoryAuditFilePath() });
   const manager = new mod.MemoryManager(session, audit);
   const bundle: SessionBundle = { session, audit, manager, correlationWatcher: null };
+  session.setOwnerId(String(senderId));
+  session._injectFreezeFeatureFlagCheck(() => isTrainerCapabilityEnabled('v2LiveModeEnabled'));
   sessions.set(senderId, bundle);
+  wireSessionCleanupOnDestroy(webContents, () => disposeSession(senderId));
+  // Batch B1.1: a full-page reload/navigation of the owning window must tear down the
+  // session too — 'destroyed' alone does not fire on reload, so without this an active
+  // freeze (or a stale rollback ledger) would silently survive a reload.
+  wireSessionCleanupOnNavigate(webContents, () => disposeSession(senderId));
   return bundle;
 }
 
@@ -1307,18 +1482,108 @@ function maybeStartAvowedWingdkBackups(input: {
   }
 }
 
-function disposeSession(senderId: number): void {
-  const existing = sessions.get(senderId);
-  if (existing) {
-    existing.correlationWatcher?.stop();
-    existing.manager.setSnapshotListener(null);
-    existing.session.detach();
-    sessions.delete(senderId);
+// Gate 2.1: narrow test-only seam so the packaged lifecycle harness can
+// certify cleanup-failure containment (one step throwing must not halt the
+// remaining steps or leave writes unblocked) against the real packaged app,
+// not only the fake-driven unit tests. Unavailable unless SOLITH_TEST_BUILD=1
+// is set in the process env — normal packaged launches never set this, so
+// the setter throws and no step is ever forced to fail.
+const IS_TEST_BUILD = process.env.SOLITH_TEST_BUILD === '1';
+const testForcedCleanupFailureSteps = IS_TEST_BUILD ? new Set<string>() : undefined;
+
+export function __setTestForcedCleanupFailureStep(step: string): void {
+  if (!testForcedCleanupFailureSteps) {
+    throw new Error('__setTestForcedCleanupFailureStep is only available when SOLITH_TEST_BUILD=1.');
   }
+  testForcedCleanupFailureSteps.add(step);
+}
+
+export function __clearTestForcedCleanupFailureSteps(): void {
+  if (!testForcedCleanupFailureSteps) {
+    throw new Error('__clearTestForcedCleanupFailureSteps is only available when SOLITH_TEST_BUILD=1.');
+  }
+  testForcedCleanupFailureSteps.clear();
+}
+
+if (IS_TEST_BUILD) {
+  (globalThis as Record<string, unknown>).__solithSetTestForcedCleanupFailureStep =
+    __setTestForcedCleanupFailureStep;
+  (globalThis as Record<string, unknown>).__solithClearTestForcedCleanupFailureSteps =
+    __clearTestForcedCleanupFailureSteps;
+}
+
+// Gate 2.3: the renderer/preload/IPC freeze propose -> issue-consent ->
+// confirmed-start flow is now fully wired (see 'live-memory-freeze-propose',
+// 'live-memory-freeze-issue-consent', and 'live-memory-freeze-start' above,
+// and electron/preload.ts's liveMemoryFreezePropose/
+// liveMemoryFreezeRequestConsent/liveMemoryFreezeStart). The Gate 2.2 Resume
+// test-only __testStartFreezeForOwner hook that previously stood in for this
+// broken path has been removed — packaged lifecycle tests now start freezes
+// through the real production API surface instead.
+
+function maybeThrowForTestInjectedCleanupFailure(step: string): void {
+  if (testForcedCleanupFailureSteps?.has(step)) {
+    throw new Error(`Gate 2.1 test-injected cleanup failure: ${step}`);
+  }
+}
+
+function disposeSession(senderId: number, removeTrustedOwnership = false): CleanupResult | null {
+  const existing = sessions.get(senderId);
+  if (!existing) {
+    clearSelectionsForWindow(senderId);
+    revokeWriteConsentsForSession(String(senderId));
+    if (removeTrustedOwnership) unregisterTrustedWindow(senderId);
+    return null;
+  }
+  const result = runCleanup({
+    ownerId: String(senderId),
+    markRevoking: () => existing.session.beginCleanupRevocation(),
+    blockFutureWrites: () => existing.session.beginCleanupRevocation(),
+    revokeConsentTokens: () => {
+      maybeThrowForTestInjectedCleanupFailure('revoke_consent_tokens');
+      revokeWriteConsentsForSession(String(senderId));
+    },
+    revokePendingProposals: () => existing.session.revokePendingAuthorizationsForCleanup(),
+    stopFreezeSchedulers: () => existing.session.stopFreezeForCleanup(),
+    detachMemorySessions: () => {
+      existing.correlationWatcher?.stop();
+      existing.manager.setSnapshotListener(null);
+      existing.session.detachMemoryForCleanup();
+    },
+    clearRollbackRecords: () => existing.session.clearRollbackRecordsForCleanup(),
+    clearProcessSelections: () => clearSelectionsForWindow(senderId),
+    removeTrustedWindowOwnership: () => { if (removeTrustedOwnership) unregisterTrustedWindow(senderId); },
+    audit: (event) => existing.audit.append({ op: 'abort', reason: event }),
+  });
+  sessions.delete(senderId);
   if (sessions.size === 0) {
     resetAvowedWingdkBackupSession();
     setCrashReportContext(undefined);
   }
+  return result;
+}
+
+export function disposeLiveMemorySessionForOwner(senderId: number): CleanupResult | null {
+  return disposeSession(senderId, true);
+}
+
+/**
+ * Disposes every active live-memory session (Batch B1.1) — call from
+ * app.on('will-quit') so an active freeze/rollback ledger doesn't linger
+ * past a graceful app shutdown signal (process termination would end it
+ * either way, but this makes the teardown deterministic and observable
+ * rather than implicit).
+ */
+export function disposeAllLiveMemorySessions(): CleanupResult[] {
+  const results: CleanupResult[] = [];
+  for (const senderId of Array.from(sessions.keys())) {
+    const result = disposeSession(senderId, true);
+    if (result) results.push(result);
+  }
+  clearWriteConsentStore();
+  clearAllProcessSelections();
+  clearAllTrustedWindows();
+  return results;
 }
 
 function requireBundle(event: IpcMainInvokeEvent): SessionBundle {
@@ -1331,6 +1596,19 @@ function requireBundle(event: IpcMainInvokeEvent): SessionBundle {
 
 function requireSession(event: IpcMainInvokeEvent): LiveMemorySession {
   return requireBundle(event).session;
+}
+
+/**
+ * Real sender identity validation (Batch B1.1) — used by the 3 handlers this
+ * batch targets (freeze propose/issue-consent/confirm, rollback). Beyond
+ * `isDestroyed()`, this confirms the sender is a registered Solith window,
+ * in its own main frame (not devtools/a child frame), still showing an
+ * allowed Solith URL. See src/core/security/trusted-sender-registry.ts.
+ */
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
 }
 
 function serializeControlSummary(control: {
@@ -1470,7 +1748,7 @@ function sanitize(error: unknown, fallback: string): string {
 let injectorAuditSinkWired = false;
 function ensureInjectorAuditSink(
   userDataRoot: string,
-  setSink: (sink: ((entry: { at: string } & Record<string, unknown>) => void) | null) => void,
+  setSink: (sink: ((entry: { at: string; op: 'propose' | 'confirm'; allowed: boolean; reason: string; proposalId?: string; exePath?: string; attachedExecutableName?: string; attachedPid?: number | null; spawnedPid?: number }) => void) | null) => void,
 ): void {
   if (injectorAuditSinkWired) return;
   const logPath = path.join(userDataRoot, 'logs', 'injector-audit.jsonl');

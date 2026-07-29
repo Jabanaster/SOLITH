@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { revokeWriteConsentsForSession } from '../consent/write-consent.js';
 import { evaluateOnlineGuard } from './online-guard.js';
 import { evaluateWriteConsent } from './write-consent.js';
 import { observeRemoteConnections } from './remote-connection-observer.js';
@@ -21,6 +22,11 @@ import {
 } from '../definitions/fingerprint-verify.js';
 import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
 import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
+import {
+  registerActiveFreeze,
+  unregisterActiveFreeze,
+  unregisterAllFreezesForOwner,
+} from './freeze-concurrency-registry.js';
 import { assessProtectedTarget } from '../runtime/protected-target-guard.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
 import {
@@ -29,6 +35,7 @@ import {
   queryWindowsProcessIdentity,
 } from './windows-process-identity.js';
 import type {
+  FreezeProposal,
   FreezeStatus,
   FreezeStopReason,
   FreezeTarget,
@@ -63,6 +70,40 @@ const DEFAULT_FREEZE_SCHEDULER: FreezeScheduler = {
 };
 
 const DEFAULT_FREEZE_INTERVAL_MS = 200;
+const MIN_FREEZE_INTERVAL_MS = 50;
+const MAX_FREEZE_INTERVAL_MS = 5000;
+/**
+ * Hard ceiling on how long a single freeze may run before it auto-stops.
+ * Centralized here as the single source of truth (Batch B1.1) — chosen as a
+ * judgment call ("long enough not to interrupt a normal multi-hour play
+ * session, short enough to eventually self-terminate a forgotten freeze"),
+ * not derived from a documented project policy. Exported so the IPC/consent
+ * layer can display it and bind it into the freeze consent hash without a
+ * second, potentially-drifting copy of the same number.
+ */
+export const MAX_FREEZE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+/**
+ * Bounds how many confirmed-write manifests a session retains for rollback.
+ * (Batch B1.1) When full of still-VALID (non-expired) entries, new confirms
+ * are REJECTED rather than silently evicting a still-valid rollback record
+ * — see recordConfirmedWrite. This is a judgment call, not derived from
+ * measured usage; chosen because a normal single trainer session is very
+ * unlikely to accumulate 50 concurrently-un-rolled-back writes, and because
+ * failing loudly is strictly safer than silently losing a user's ability to
+ * undo an earlier write.
+ */
+const MAX_CONFIRMED_WRITES = 50;
+/**
+ * (Batch B1.1) How long a confirmed write remains rollback-eligible before
+ * it expires and is purged. Centralized, single source of truth. Chosen as
+ * a judgment call: long enough to cover "try a few values in one sitting,
+ * decide what to keep," short enough to bound how long a stale rollback
+ * record (and the small manifest data it holds) is retained, and to reduce
+ * the odds that "current memory still matches the confirmed post-write
+ * value" (see rollback's new expected-value check) coincidentally holds
+ * true again after enough elapsed time and unrelated gameplay.
+ */
+const CONFIRMED_WRITE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 interface FreezeState {
   target: FreezeTarget;
@@ -71,6 +112,7 @@ interface FreezeState {
   tickCount: number;
   lastGuard: OnlineGuardResult | null;
   stopReason?: FreezeStopReason;
+  intervalMs: number;
 }
 
 export interface StartFreezeResult {
@@ -109,6 +151,7 @@ export interface RollbackResult {
   success: boolean;
   guard?: OnlineGuardResult;
   error?: string;
+  manifest?: LiveWriteManifest;
 }
 
 /**
@@ -124,16 +167,105 @@ export interface RollbackResult {
  *
  * One session === one attached process. Create a new instance per attach.
  */
+export type RollbackValueComparison =
+  | { comparable: true; equal: boolean }
+  | { comparable: false; reason: 'unsupported_type' | 'non_finite_integer' | 'unsafe_integer' };
+
+/**
+ * (Gate 2) Fixed byte width per LiveValueType, matching memoryjs's native
+ * encoding. Backs the exact-byte-fidelity rollback safety net: byte:1,
+ * int32/uint32/float:4, double/int64:8 — little-endian throughout (x86/x64
+ * user-mode memory), consistent with FakeMemoryDriver's *LE encode/decode.
+ */
+export function byteWidthForType(dataType: LiveValueType): number {
+  switch (dataType) {
+    case 'byte':
+      return 1;
+    case 'int32':
+    case 'uint32':
+    case 'float':
+      return 4;
+    case 'double':
+    case 'int64':
+      return 8;
+  }
+}
+
+export function compareRollbackValue(dataType: LiveValueType, current: number, expected: number): RollbackValueComparison {
+  switch (dataType) {
+    case 'float':
+      return { comparable: true, equal: Object.is(Math.fround(current), Math.fround(expected)) };
+    case 'double':
+      return { comparable: true, equal: Object.is(current, expected) };
+    case 'byte':
+    case 'int32':
+    case 'uint32':
+      if (!Number.isFinite(current) || !Number.isFinite(expected) || !Number.isInteger(current) || !Number.isInteger(expected)) {
+        return { comparable: false, reason: 'non_finite_integer' };
+      }
+      return { comparable: true, equal: current === expected };
+    case 'int64':
+      if (!Number.isSafeInteger(current) || !Number.isSafeInteger(expected)) {
+        return { comparable: false, reason: 'unsafe_integer' };
+      }
+      return { comparable: true, equal: current === expected };
+    default:
+      return { comparable: false, reason: 'unsupported_type' };
+  }
+}
 export class LiveMemorySession {
+  /**
+   * Opaque per-session owner id (e.g. the owning WebContents id) for
+   * cross-session freeze concurrency tracking. Defaults to a
+   * unique-per-instance id so two independently-constructed
+   * sessions (e.g. in different tests, or any future caller that forgets to
+   * call setOwnerId) never collide in the cross-session freeze-concurrency
+   * registry just because they happen to target the same pid/address. The
+   * IPC layer always overrides this with the real webContents id.
+   */
+  private ownerId: string = randomUUID();
+  private revoking = false;
+  private freezeFeatureFlagCheck: (() => boolean) | null = null;
   private handle: LiveProcessHandle | null = null;
   private target: LiveProcessTarget | null = null;
   private userConfirmedOffline = false;
   private acceptedConnectionBaseline = 0;
   private pendingProposals = new Map<string, LiveWriteProposal>();
+  /**
+   * Writes this session actually confirmed, keyed by proposalId, each with
+   * an expiry timestamp (Batch B1.1). rollback() may ONLY restore a write
+   * recorded here — it never trusts a caller-supplied manifest. Each entry
+   * is consumed (deleted) the moment it is successfully rolled back, so a
+   * rollback authorization cannot be reused.
+   */
+  private confirmedWrites = new Map<
+    string,
+    {
+      manifest: LiveWriteManifest;
+      expiresAtMs: number;
+      /**
+       * (Gate 2) Exact raw bytes at this address immediately before/after the
+       * confirmed write, when capture succeeded. Best-effort — absence just
+       * means rollback falls back to the pre-existing numeric-only safety net
+       * for that entry; it never blocks a confirm whose real memory write
+       * already succeeded. Never exposed outside this class (not part of
+       * LiveWriteManifest) and never logged/serialized — see remaining-risks.
+       */
+      rawBefore: Buffer | null;
+      rawAfter: Buffer | null;
+    }
+  >();
+  /** (Gate 2) Raw bytes captured at proposeWrite time, keyed by proposalId, consumed by confirmWrite. */
+  private pendingRawBefore = new Map<string, Buffer>();
+  /** Testing seam — lets tests move "now" forward without waiting on real TTLs. */
+  private nowMsForTests: (() => number) | null = null;
+  /** Staged, not-yet-authorized freeze requests, keyed by proposalId. See proposeFreeze/startFreezeConfirmed. */
+  private pendingFreezeProposals = new Map<string, FreezeProposal>();
   private remoteConnectionObserver: RemoteConnectionObserverFn = observeRemoteConnections;
   private freezeScheduler: FreezeScheduler = DEFAULT_FREEZE_SCHEDULER;
   private freeze: FreezeState | null = null;
   private freezeGeneration = 0;
+  private maxFreezeDurationMs = MAX_FREEZE_DURATION_MS;
   private unknownSnapshots = new Map<string, UnknownScanSnapshot>();
   private readonly addressCache = new SessionAddressCache();
   private lastFingerprint: FingerprintVerifyResult | null = null;
@@ -149,6 +281,43 @@ export class LiveMemorySession {
   /** Testing seam — inject a fake scheduler so freeze-loop tests don't need real timers. */
   _injectFreezeScheduler(scheduler: FreezeScheduler): void {
     this.freezeScheduler = scheduler;
+  }
+
+  /** Testing seam — override the max-freeze-duration ceiling so tests don't need thousands of ticks. */
+  _setMaxFreezeDurationMsForTests(ms: number): void {
+    this.maxFreezeDurationMs = ms;
+  }
+
+  /** Testing seam — inject a fake clock so rollback-ledger TTL tests don't need real elapsed time. */
+  _injectNowMsForTests(fn: (() => number) | null): void {
+    this.nowMsForTests = fn;
+  }
+
+  /** Set once by the IPC layer after construction — identifies this session for cross-session freeze concurrency tracking. */
+  setOwnerId(id: string): void {
+    this.ownerId = id;
+  }
+
+  /**
+   * Optional re-check run every freeze tick (Batch B1.1) — lets the IPC
+   * layer wire in a live feature-flag read (e.g. v2LiveModeEnabled) without
+   * this core module importing settings directly. Returning false stops the
+   * freeze with stopReason 'feature_disabled'. Unset means no re-check
+   * (matches pre-B1.1 behavior for any caller that doesn't wire one in).
+   */
+  _injectFreezeFeatureFlagCheck(fn: (() => boolean) | null): void {
+    this.freezeFeatureFlagCheck = fn;
+    if (fn && !fn()) {
+      this.pendingProposals.clear();
+      this.pendingRawBefore.clear();
+      this.pendingFreezeProposals.clear();
+      revokeWriteConsentsForSession(this.ownerId);
+      this.stopFreezeInternal('feature_disabled');
+    }
+  }
+
+  private nowMs(): number {
+    return this.nowMsForTests ? this.nowMsForTests() : Date.now();
   }
 
   isAttached(): boolean {
@@ -323,6 +492,7 @@ export class LiveMemorySession {
     userConfirmedOffline: boolean,
     fingerprint?: AttachFingerprintOptions,
   ): Promise<AttachResult> {
+    this.revoking = false;
     if (this.isAttached()) {
       return { success: false, guard: { allowed: false, reason: 'Session already attached.' }, error: 'already_attached' };
     }
@@ -655,6 +825,15 @@ export class LiveMemorySession {
       createdAt: new Date().toISOString(),
     };
     this.pendingProposals.set(proposal.proposalId, proposal);
+    // Gate 2: best-effort exact-byte capture — a failure here does not block
+    // staging a proposal (nothing has been written yet); it only means this
+    // proposal's eventual rollback falls back to the numeric-only safety net.
+    try {
+      const rawBefore = this.driver.readBuffer(this.handle, address.address, byteWidthForType(address.dataType));
+      this.pendingRawBefore.set(proposal.proposalId, rawBefore);
+    } catch {
+      // no-op — numeric rollback safety net still applies for this proposal.
+    }
     return proposal;
   }
 
@@ -665,6 +844,7 @@ export class LiveMemorySession {
 
   /** Re-checks write consent (waiver), then executes a previously staged proposal. */
   async confirmWrite(proposalId: string): Promise<ConfirmWriteResult> {
+    if (this.revoking) return { success: false, error: 'cleanup_in_progress' };
     if (!this.handle || !this.target) {
       return { success: false, error: 'No process attached.' };
     }
@@ -689,6 +869,15 @@ export class LiveMemorySession {
       return { success: false, guard, error: identityError };
     }
 
+    // Batch B1.1: check ledger capacity BEFORE writing memory, so a full
+    // ledger never leaves an orphan write with no rollback safety net.
+    // Expired entries are purged first — only a still-full ledger of VALID
+    // entries blocks the confirm.
+    this.purgeExpiredConfirmedWrites();
+    if (this.confirmedWrites.size >= MAX_CONFIRMED_WRITES) {
+      return { success: false, guard, error: 'rollback_ledger_full' };
+    }
+
     try {
       this.driver.writeMemory(this.handle, proposal.target.address, proposal.target.dataType, proposal.requestedValue);
     } catch (err) {
@@ -696,6 +885,8 @@ export class LiveMemorySession {
     }
 
     this.pendingProposals.delete(proposalId);
+    const rawBefore = this.pendingRawBefore.get(proposalId) ?? null;
+    this.pendingRawBefore.delete(proposalId);
 
     const manifest: LiveWriteManifest = {
       proposalId: proposal.proposalId,
@@ -704,14 +895,72 @@ export class LiveMemorySession {
       valueAfter: proposal.requestedValue,
       appliedAt: new Date().toISOString(),
     };
+    // Gate 2: best-effort exact-byte capture of the just-applied bytes. A
+    // failure here does not undo or fail the confirm — the real write already
+    // succeeded — it only means this entry's rollback falls back to the
+    // numeric-only safety net (compareRollbackValue), exactly like before
+    // this feature existed.
+    let rawAfter: Buffer | null = null;
+    try {
+      rawAfter = this.driver.readBuffer(this.handle, proposal.target.address, byteWidthForType(proposal.target.dataType));
+    } catch {
+      rawAfter = null;
+    }
+    this.recordConfirmedWrite(manifest, rawBefore, rawAfter);
     return { success: true, manifest, guard };
   }
 
-  /** Restores the value captured before a prior confirmed write. Re-checks write consent. */
-  async rollback(manifest: LiveWriteManifest): Promise<RollbackResult> {
+  /**
+   * Records a confirmed write for later rollback. Capacity is enforced in
+   * confirmWrite BEFORE the memory write happens — by the time this runs,
+   * the ledger is known to have room. TTL-expires after CONFIRMED_WRITE_TTL_MS.
+   */
+  private recordConfirmedWrite(manifest: LiveWriteManifest, rawBefore: Buffer | null, rawAfter: Buffer | null): void {
+    this.confirmedWrites.set(manifest.proposalId, {
+      manifest,
+      expiresAtMs: this.nowMs() + CONFIRMED_WRITE_TTL_MS,
+      rawBefore,
+      rawAfter,
+    });
+  }
+
+  /**
+   * Removes ledger entries whose TTL has elapsed. Never removes a
+   * still-valid entry — this is the ONLY eviction mechanism (Batch B1.1
+   * replaces the prior FIFO-evict-when-full policy, which could silently
+   * drop a still-valid, still-wanted rollback record).
+   */
+  private purgeExpiredConfirmedWrites(): void {
+    const now = this.nowMs();
+    for (const [key, entry] of this.confirmedWrites) {
+      if (entry.expiresAtMs <= now) this.confirmedWrites.delete(key);
+    }
+  }
+
+  /**
+   * Restores the value captured before a write THIS SESSION actually confirmed.
+   * Takes only a proposalId — never a caller-supplied manifest — so a renderer
+   * cannot use "rollback" as a disguised arbitrary-address/arbitrary-value write
+   * primitive. The manifest is looked up from confirmedWrites (populated solely
+   * by confirmWrite) and consumed on success, so the same rollback cannot be
+   * replayed. Re-checks write consent and process identity exactly like
+   * confirmWrite. Batch B1.1: also re-reads current memory and refuses to
+   * proceed if it no longer matches the value this write applied — an
+   * intervening independent change (game logic, a concurrent freeze, a
+   * second write) is never silently clobbered.
+   */
+  async rollback(proposalId: string): Promise<RollbackResult> {
+    if (this.revoking) return { success: false, error: 'cleanup_in_progress' };
     if (!this.handle || !this.target) {
       return { success: false, error: 'No process attached.' };
     }
+
+    this.purgeExpiredConfirmedWrites();
+    const entry = this.confirmedWrites.get(proposalId);
+    if (!entry) {
+      return { success: false, error: 'Unknown, expired, or already rolled back write.' };
+    }
+    const manifest = entry.manifest;
 
     const evidence = await this.remoteConnectionObserver(this.target.pid);
     const guard = evaluateWriteConsent({
@@ -728,13 +977,123 @@ export class LiveMemorySession {
       return { success: false, guard, error: identityError };
     }
 
+    let currentValue: number;
     try {
-      this.driver.writeMemory(this.handle, manifest.target.address, manifest.target.dataType, manifest.valueBefore);
+      currentValue = this.driver.readMemory(this.handle, manifest.target.address, manifest.target.dataType);
+    } catch (err) {
+      return { success: false, guard, error: `Unable to verify current memory before rollback: ${String(err)}` };
+    }
+    const comparison = compareRollbackValue(manifest.target.dataType, currentValue, manifest.valueAfter);
+    if (comparison.comparable === false) {
+      return { success: false, guard, error: `rollback_comparison_rejected:${comparison.reason}` };
+    }
+    if (!comparison.equal) {
+      return {
+        success: false,
+        guard,
+        error: 'expected_value_mismatch: current memory no longer matches the value this write applied; refusing to overwrite an independent change.',
+      };
+    }
+
+    // Gate 2: stricter, additive exact-byte check — only runs when this entry
+    // captured raw bytes (best-effort at propose/confirm time). Never loosens
+    // the numeric check above; only ever rejects a case the numeric check
+    // alone would have let through (e.g. a distinct NaN payload, or a
+    // different signed-zero encoding that happens to compare equal/`Object.is`
+    // true under the type-normalized numeric policy but differs at the byte
+    // level — belt-and-suspenders, since compareRollbackValue's Object.is
+    // policy already treats those as equal by design; this exists for the
+    // case where raw bytes reveal an intervening change the numeric read
+    // masked, e.g. a value written and then written back to the same decoded
+    // number by something else).
+    if (entry.rawAfter) {
+      let currentRawBytes: Buffer;
+      try {
+        currentRawBytes = this.driver.readBuffer(this.handle, manifest.target.address, entry.rawAfter.length);
+      } catch (err) {
+        return { success: false, guard, error: `Unable to verify current memory bytes before rollback: ${String(err)}` };
+      }
+      if (!currentRawBytes.equals(entry.rawAfter)) {
+        return {
+          success: false,
+          guard,
+          error:
+            'expected_value_mismatch: current memory bytes no longer match the exact bytes this write applied; refusing to overwrite an independent change.',
+        };
+      }
+    }
+
+    try {
+      if (entry.rawBefore) {
+        // Gate 2: single authoritative byte-exact restore — guarantees
+        // byte-for-byte fidelity (e.g. the precise NaN payload / signed-zero
+        // encoding present before the write), which re-encoding a decoded
+        // `number` through writeMemory cannot guarantee. Intentionally NOT
+        // followed by a separate writeMemory call: two sequential writes
+        // would leave a partial-mutation window if the second one failed
+        // (memory already changed, but the caller told "rollback failed").
+        this.driver.writeBuffer(this.handle, manifest.target.address, entry.rawBefore);
+      } else {
+        // Fallback — pre-Gate-2 behavior when exact-byte capture was
+        // unavailable for this entry.
+        this.driver.writeMemory(this.handle, manifest.target.address, manifest.target.dataType, manifest.valueBefore);
+      }
     } catch (err) {
       return { success: false, guard, error: `Rollback write failed: ${String(err)}` };
     }
 
-    return { success: true, guard };
+    // Single-use: this exact confirmed write can only be rolled back once.
+    this.confirmedWrites.delete(proposalId);
+
+    return { success: true, guard, manifest };
+  }
+
+  /**
+   * Stages a freeze request without starting it. Mirrors proposeWrite: this
+   * only validates and records the request, it never touches the target
+   * process. A native-dialog-backed consent token (see
+   * electron/live-memory-ipc.ts freeze-issue-consent) must be issued and
+   * consumed via startFreezeConfirmed before any memory is written.
+   */
+  proposeFreeze(address: LiveMemoryAddress, value: number, intervalMs = DEFAULT_FREEZE_INTERVAL_MS): FreezeProposal {
+    if (!this.handle || !this.target) throw new Error('No process attached.');
+    if (!Number.isFinite(value)) throw new Error('Freeze value must be a finite number.');
+    if (!Number.isInteger(intervalMs) || intervalMs < MIN_FREEZE_INTERVAL_MS || intervalMs > MAX_FREEZE_INTERVAL_MS) {
+      throw new Error(`Freeze interval must be an integer between ${MIN_FREEZE_INTERVAL_MS} and ${MAX_FREEZE_INTERVAL_MS}ms.`);
+    }
+    const proposal: FreezeProposal = {
+      proposalId: randomUUID(),
+      target: address,
+      value,
+      intervalMs,
+      createdAt: new Date().toISOString(),
+    };
+    this.pendingFreezeProposals.set(proposal.proposalId, proposal);
+    return proposal;
+  }
+
+  /** Look up a staged freeze proposal (for consent binding). */
+  getPendingFreezeProposal(proposalId: string): FreezeProposal | undefined {
+    return this.pendingFreezeProposals.get(proposalId);
+  }
+
+  /**
+   * Starts a previously-proposed freeze using ONLY the parameters recorded
+   * at proposal time — the caller supplies just a proposalId, never fresh
+   * address/value/interval, so a confirm call structurally cannot start a
+   * freeze with different parameters than what was approved. Single-use:
+   * the proposal is consumed (deleted) once consumed here, whether or not
+   * the resulting startFreeze call itself succeeds — a stale/failed attempt
+   * must not remain replayable.
+   */
+  startFreezeConfirmed(proposalId: string): StartFreezeResult {
+    if (this.revoking) return { success: false, error: 'cleanup_in_progress' };
+    const proposal = this.pendingFreezeProposals.get(proposalId);
+    if (!proposal) {
+      return { success: false, error: 'Unknown or already-consumed freeze proposal.' };
+    }
+    this.pendingFreezeProposals.delete(proposalId);
+    return this.startFreeze(proposal.target, proposal.value, proposal.intervalMs);
   }
 
   /**
@@ -751,6 +1110,26 @@ export class LiveMemorySession {
     if (this.freeze?.active) {
       return { success: false, error: 'A freeze is already active on this session. Stop it first.' };
     }
+    // Defense in depth: the IPC schema already bounds these, but the session API is
+    // also callable directly (library/tests) — never rely solely on renderer/IPC validation.
+    if (!Number.isFinite(value)) {
+      return { success: false, error: 'Freeze value must be a finite number.' };
+    }
+    if (!Number.isInteger(intervalMs) || intervalMs < MIN_FREEZE_INTERVAL_MS || intervalMs > MAX_FREEZE_INTERVAL_MS) {
+      return {
+        success: false,
+        error: `Freeze interval must be an integer between ${MIN_FREEZE_INTERVAL_MS} and ${MAX_FREEZE_INTERVAL_MS}ms.`,
+      };
+    }
+
+    // Batch B1.1: cross-session concurrency limits — "one freeze per session" alone does
+    // not stop a DIFFERENT session (e.g. main window + overlay window) from independently
+    // freezing the same process, including the same address.
+    const owner = this.ownerId;
+    const registration = registerActiveFreeze(owner, this.target.pid, address.address.toString(), address.dataType);
+    if (registration.ok === false) {
+      return { success: false, error: `freeze_concurrency_limit:${registration.reason}` };
+    }
 
     this.freezeGeneration += 1;
     const generation = this.freezeGeneration;
@@ -761,6 +1140,7 @@ export class LiveMemorySession {
       timer: null,
       tickCount: 0,
       lastGuard: null,
+      intervalMs,
     };
 
     const tick = async (): Promise<void> => {
@@ -788,6 +1168,11 @@ export class LiveMemorySession {
         return;
       }
 
+      if (this.freezeFeatureFlagCheck && !this.freezeFeatureFlagCheck()) {
+        this.stopFreezeInternal('feature_disabled');
+        return;
+      }
+
       try {
         this.driver.writeMemory(this.handle, address.address, address.dataType, value);
         this.freeze.tickCount += 1;
@@ -797,6 +1182,13 @@ export class LiveMemorySession {
       }
 
       if (generation === this.freezeGeneration && this.freeze?.active) {
+        // tickCount * intervalMs approximates elapsed run time under normal scheduling —
+        // deterministic and testable via the injectable FreezeScheduler, unlike wall-clock time.
+        const elapsedMs = this.freeze.tickCount * this.freeze.intervalMs;
+        if (elapsedMs >= this.maxFreezeDurationMs) {
+          this.stopFreezeInternal('max_duration_exceeded');
+          return;
+        }
         this.freeze.timer = this.freezeScheduler.schedule(() => {
           void tick();
         }, intervalMs);
@@ -832,18 +1224,60 @@ export class LiveMemorySession {
     if (this.freeze.timer !== null) {
       this.freezeScheduler.cancel(this.freeze.timer);
     }
+    if (this.target) {
+      unregisterActiveFreeze(
+        this.ownerId,
+        this.target.pid,
+        this.freeze.target.address.address.toString(),
+        this.freeze.target.address.dataType,
+      );
+    }
     this.freeze.active = false;
     this.freeze.stopReason = reason;
   }
 
+  /** Phase-one cleanup barrier: invalidates in-flight ticks and blocks privileged writes. */
+  beginCleanupRevocation(): void {
+    this.revoking = true;
+    this.freezeGeneration += 1;
+  }
+
+  revokePendingAuthorizationsForCleanup(): void {
+    this.pendingProposals.clear();
+    this.pendingRawBefore.clear();
+    this.pendingFreezeProposals.clear();
+  }
+
+  stopFreezeForCleanup(): void {
+    this.stopFreezeInternal('detached');
+    unregisterAllFreezesForOwner(this.ownerId);
+  }
+
+  clearRollbackRecordsForCleanup(): void {
+    this.confirmedWrites.clear();
+  }
+
+  detachMemoryForCleanup(): void {
+    if (this.handle) this.driver.closeProcess(this.handle);
+    this.handle = null;
+    this.target = null;
+    this.unknownSnapshots.clear();
+    this.addressCache.clear();
+    this.lastFingerprint = null;
+    this.catalogGameId = null;
+  }
   detach(): void {
     this.stopFreezeInternal('detached');
+    unregisterAllFreezesForOwner(this.ownerId);
     if (this.handle) {
       this.driver.closeProcess(this.handle);
     }
     this.handle = null;
     this.target = null;
     this.pendingProposals.clear();
+    this.pendingRawBefore.clear();
+    this.confirmedWrites.clear();
+    this.pendingFreezeProposals.clear();
     this.unknownSnapshots.clear();
     this.addressCache.clear();
     this.lastFingerprint = null;

@@ -1,0 +1,1 @@
+Gate 2.5 prohibited dependency/CI/release path changes: 0

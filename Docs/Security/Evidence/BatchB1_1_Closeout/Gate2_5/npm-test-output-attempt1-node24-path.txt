@@ -1,0 +1,7 @@
+COMMAND=npm test
+EXIT_CODE=1
+
+> solith@2.4.0-alpha.2 pretest
+> node scripts/check-node.mjs && node scripts/ensure-electron-host-entry.mjs
+
+[solith] Unsupported Node.js v24.15.0. Required: Node.js 22.x (see .nvmrc and package.json engines).

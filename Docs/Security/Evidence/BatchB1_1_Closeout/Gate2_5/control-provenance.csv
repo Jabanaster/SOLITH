@@ -1,0 +1,7 @@
+Control,Authorization,Implementation,Validation,Disposition
+Freeze stop sender guard,Gate 2.5 live child and overlay permission scope,electron/live-memory-ipc.ts requireTrustedSender reused,Gate2.5 overlay recreation plus full regression,Retained production correction
+Freeze status sender guard,Gate 2.5 privileged diagnostic state scope,electron/live-memory-ipc.ts requireTrustedSender reused,Gate2.5 overlay recreation plus full regression,Retained production correction
+Frame harness,Authorized narrow packaged security harness,tests/gate2-5-frame-overlay-closeout.e2e.test.ts,7/7 focused and packaged regression,Test file retained; not npm-wired
+DevTools opening,Authorized only in clearly identified test candidate,Playwright main-process evaluation with SOLITH_TEST_BUILD=1,No bridge Node or trusted identity,No production control added
+Overlay destroy/recreate,Authorized harness-created Solith overlay only,Playwright main-process BrowserWindow control,Old identity failed and new identity differed,No production destroy IPC added
+Node ABI restoration,Established post-packaging housekeeping,node-gyp rebuild --target=22.23.1,Node suites 1040 and 257 pass,Generated ignored binary only

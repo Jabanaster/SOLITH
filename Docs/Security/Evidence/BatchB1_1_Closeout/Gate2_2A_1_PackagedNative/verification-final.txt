@@ -1,0 +1,125 @@
+# Gate 2.2A.1 — Electron-ABI Rebuild, Packaged Verification, and Roadmap Reconciliation
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node (test ABI): v22.23.1 (.tools/node-v22.23.1-win-x64/node.exe), npm 10.9.8
+Electron (packaged ABI): 42.4.1, NODE_MODULE_VERSION (ABI) 146, arch x64, platform win32
+electron-builder: 26.15.3
+
+## Baseline
+
+Repository root/branch confirmed exact. git status/diff baseline matched the established
+chain (GameLibrary.tsx whitespace only). Pre-existing native binaries hashed:
+vendor build (Node-22 ABI, Gate 2.2A fix) 72847fc0...8902; existing packaged copy (STALE,
+pre-fix) c89a33ed...c75a98, 235008 bytes — confirmed different from the fix, proving the
+packaged app on disk did not yet contain Gate 2.2A's remediation.
+
+## Electron ABI determination
+
+Launched the real electron.exe (ELECTRON_RUN_AS_NODE=1) and read process.versions directly
+rather than assuming: electron=42.4.1, modules(ABI)=146, napi=10, arch=x64, platform=win32.
+
+## Electron-ABI native rebuild
+
+node-gyp rebuild --target=42.4.1 --arch=x64 --dist-url=https://electronjs.org/headers, run
+from vendor/memoryjs-3.5.1-patched using the trusted Node 22.23.1 runtime. Build succeeded
+("gyp info ok"); same pre-existing unrelated compiler warnings as the Node-22 build, nothing
+new. Standalone rebuilt binary SHA256: 616f2e9c64f613cd136768ecbdf067f71ef73d30d00d79c59dd582e309d988c8
+(238080 bytes).
+
+## Electron-runtime validation (Phase 5)
+
+Loaded the rebuilt addon under the REAL Electron 42.4.1 binary (ELECTRON_RUN_AS_NODE=1,
+not a Node substitute) and re-ran the full Gate 2.2A 18-check write/failure/freeze/rollback
+suite against the Gate 2.2 fixture via the real nativeMemoryDriver/LiveMemorySession:
+18/18 PASS. No leftover fixture process afterward (confirmed via Get-Process).
+
+## Packaged build (Phase 6)
+
+npm run build:vite (exit 0) -> npm run build:electron (29/29 sanity checks, exit 0) ->
+npm run dist:dir (electron-builder --dir, exit 0). electron-builder's own @electron/rebuild
+step re-prepared vendor/memoryjs-3.5.1-patched for the packaged output during this step.
+Packaged native binary: dist/win-unpacked/resources/app.asar.unpacked/node_modules/memoryjs/
+build/Release/memoryjs.node, SHA256 e286fd07a8ce8a6f90d5814a53a37c73b4b36a2bb0b618a9848758eba96412cf
+(238080 bytes) — does not byte-match the standalone rebuild above (expected: separate
+compiler invocations embed different PE timestamps for identical source; see
+failure-classification.csv), so match was confirmed BEHAVIORALLY instead: loading this
+exact packaged file under Electron and exercising both original defects (access rights,
+write-result checking) directly against it — both fixes confirmed present
+(packaged-native-binary-behavioral-verification.txt).
+
+## Packaged smoke (Phase 7)
+
+23/23 PASS (packaged-smoke-output.txt) — unchanged total from the established baseline.
+
+## Packaged real-process write proof (Phase 8)
+
+New tests/gate2-2a1-packaged-real-process-write-proof.e2e.test.ts (not wired into any npm
+script), run directly via Playwright against dist/win-unpacked/Solith.exe with the project's
+PRE-EXISTING SOLITH_PRIVILEGED_CONSENT=auto-approve seam. Real attach -> real read ->
+real propose/issue-consent/confirm write (555222) -> fixture independently observes it ->
+real read-back -> real restore to original -> a deliberately unmapped-address write proposal
+correctly fails closed at propose time (read-first). 1/1 PASS. No leftover processes after
+cleanup.
+
+## Stale-binary inventory (Phase 9)
+
+Both memoryjs.node copies on disk (vendor build output and the packaged copy) hash-identical
+to each other, confirming electron-builder's rebuild and the standalone rebuild both produced
+the same class of fixed binary. No pre-fix binary remains in the active packaged candidate.
+See native-binary-inventory.csv. The vendor build output was then explicitly rebuilt back to
+the Node-22 ABI (node-gyp rebuild --target=22.23.1) so the Node-based regression gate below
+could run — verified loadable under plain Node 22 afterward.
+
+## Regression gate (Phase 10)
+
+- npm test: PASS, exit 0, 1040/1040 (unchanged total)
+- npm run test:live-memory: PASS, exit 0, 257/257 (unchanged total)
+- Main TypeScript: PASS, exit 0, 0 diagnostics
+- Electron TypeScript: FAIL, exit 2, 31 diagnostics/13 files — unchanged established baseline
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286/303 only — unchanged established baseline
+
+## Scope integrity
+
+- No Batch B2/B2A work began; no unrelated source/test edits.
+- No dependency installs/upgrades; package-lock.json unchanged.
+- No CI/release-workflow changes.
+- No git mutation commands run (no add/commit/push/reset/clean/stash/restore/checkout/tag).
+- Only the dedicated Gate 2.2 fixture and non-existent test PIDs were targeted this cycle;
+  no unrelated process was opened, read, or written.
+- Not signed/published/uploaded/released — dist:dir produces an unpacked build only; the
+  signtool.exe invocation during packaging is the project's existing local dev-cert signing
+  step (unchanged from prior gates), not a release-signing/publish action.
+- Authorized files only: vendor memoryjs build outputs (gitignored), dist/ packaged output
+  (gitignored), one new tests/ e2e harness file, Gate 2.2A.1 evidence, and this canonical
+  roadmap update.
+
+## Verdict
+
+GATE 2.2A NATIVE WRITE REMEDIATION PASS (both Node-ABI and Electron-ABI/packaged verification
+now complete — see remaining-risks.md for full criteria checklist).
+
+BATCH B1.1 CONDITIONAL PASS (unchanged verdict class — Gate 2.2's remaining lifecycle
+conditions and the pre-existing unrelated baselines remain open, not reversed).
+
+Gate 2.2's remaining packaged lifecycle scenarios (feature-disable mid-freeze, window-identity/
+navigation) may now resume, using the existing Gate 2.2 fixture and the now-fixed and
+packaged-verified native write path.
+
+## Correction (Gate 2.2A.2, 2026-07-29): binary-provenance clarification
+
+This report's hash comparisons above referenced two different vendor-tree snapshots of
+vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node under the same generic label without
+distinguishing them, which read as a contradiction when cross-referenced against
+native-binary-inventory.csv. Full reconciled timeline: the standalone Electron-ABI rebuild
+(node-gyp rebuild --target=42.4.1, run manually, SHA256 616f2e9c...) was superseded IN PLACE
+by electron-builder's own internal @electron/rebuild step during dist:dir (which re-prepared
+vendor/memoryjs-3.5.1-patched independently, producing SHA256 e286fd07...) before packaging
+copied anything out. The packaged binary is byte-identical to electron-builder's own rebuild
+(e286fd07...), not to the earlier standalone rebuild (616f2e9c...) — both facts are correct,
+they simply describe different points in the same file path's history. See
+Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_2A_2_Provenance/ for the full timeline,
+hash-comparison table, and behavioral-provenance table. Provenance verdict: PROVENANCE
+RECONCILED — FUNCTIONALLY EQUIVALENT, NOT BYTE IDENTICAL. This does not change any PASS
+verdict above — the packaged binary was independently, behaviorally verified to contain the
+fix regardless of which prior rebuild it hash-matches.

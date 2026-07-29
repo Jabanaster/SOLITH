@@ -1,0 +1,280 @@
+TAP version 13
+# Subtest: preview receipt binds owner, selection, source hash, expiry, and selected IDs
+ok 1 - preview receipt binds owner, selection, source hash, expiry, and selected IDs
+  ---
+  duration_ms: 1.0187
+  type: 'test'
+  ...
+# Subtest: preview receipt is single-use and permits a selective subset
+ok 2 - preview receipt is single-use and permits a selective subset
+  ---
+  duration_ms: 0.1413
+  type: 'test'
+  ...
+# Subtest: will-quit cleanup stops every session and records accurate sanitized results
+ok 3 - will-quit cleanup stops every session and records accurate sanitized results
+  ---
+  duration_ms: 7.3705
+  type: 'test'
+  ...
+# Subtest: cleanup failure containment
+    # Subtest: runs the required cleanup order and records success
+    ok 1 - runs the required cleanup order and records success
+      ---
+      duration_ms: 1.2398
+      type: 'test'
+      ...
+    # Subtest: contains multiple failures, continues every later step, and reports sanitized codes
+    ok 2 - contains multiple failures, continues every later step, and reports sanitized codes
+      ---
+      duration_ms: 0.4091
+      type: 'test'
+      ...
+    # Subtest: audit failure cannot prevent the revocation barrier or remaining cleanup
+    ok 3 - audit failure cannot prevent the revocation barrier or remaining cleanup
+      ---
+      duration_ms: 0.1587
+      type: 'test'
+      ...
+    1..3
+ok 4 - cleanup failure containment
+  ---
+  duration_ms: 2.6971
+  type: 'suite'
+  ...
+# Subtest: feature-disable cleanup
+    # Subtest: stops an active freeze, revokes pending authorization, and prevents later writes
+    ok 1 - stops an active freeze, revokes pending authorization, and prevents later writes
+      ---
+      duration_ms: 5.2063
+      type: 'test'
+      ...
+    1..1
+ok 5 - feature-disable cleanup
+  ---
+  duration_ms: 5.9738
+  type: 'suite'
+  ...
+# Subtest: real render-process-gone wiring performs owner-scoped idempotent cleanup
+ok 6 - real render-process-gone wiring performs owner-scoped idempotent cleanup
+  ---
+  duration_ms: 7.149
+  type: 'test'
+  ...
+# Subtest: Gate 2: raw-byte rollback equality
+    # Subtest: identical bytes: rollback succeeds when nothing else touched memory
+    ok 1 - identical bytes: rollback succeeds when nothing else touched memory
+      ---
+      duration_ms: 3.2501
+      type: 'test'
+      ...
+    # Subtest: one-bit mismatch in a non-NaN double is detected and rejected
+    ok 2 - one-bit mismatch in a non-NaN double is detected and rejected
+      ---
+      duration_ms: 0.4677
+      type: 'test'
+      ...
+    # Subtest: one-byte mismatch (uint32) is detected and rejected
+    ok 3 - one-byte mismatch (uint32) is detected and rejected
+      ---
+      duration_ms: 0.2705
+      type: 'test'
+      ...
+    # Subtest: NaN payload mismatch: numeric check alone would pass, byte check must reject (the documented gap this closes)
+    ok 4 - NaN payload mismatch: numeric check alone would pass, byte check must reject (the documented gap this closes)
+      ---
+      duration_ms: 0.478
+      type: 'test'
+      ...
+    # Subtest: positive zero vs negative zero: rollback rejects (both numeric Object.is and byte check concur)
+    ok 5 - positive zero vs negative zero: rollback rejects (both numeric Object.is and byte check concur)
+      ---
+      duration_ms: 0.4577
+      type: 'test'
+      ...
+    # Subtest: positive vs negative infinity: rollback rejects
+    ok 6 - positive vs negative infinity: rollback rejects
+      ---
+      duration_ms: 0.2417
+      type: 'test'
+      ...
+    # Subtest: float precision boundary: Math.fround-normalized rollback still succeeds and restores exact bytes
+    ok 7 - float precision boundary: Math.fround-normalized rollback still succeeds and restores exact bytes
+      ---
+      duration_ms: 0.1683
+      type: 'test'
+      ...
+    # Subtest: double precision boundary (Number.MAX_SAFE_INTEGER as a double) rolls back exactly
+    ok 8 - double precision boundary (Number.MAX_SAFE_INTEGER as a double) rolls back exactly
+      ---
+      duration_ms: 0.1769
+      type: 'test'
+      ...
+    # Subtest: large integer boundary: uint32 max (0xFFFFFFFF) rolls back exactly
+    ok 9 - large integer boundary: uint32 max (0xFFFFFFFF) rolls back exactly
+      ---
+      duration_ms: 0.3379
+      type: 'test'
+      ...
+    # Subtest: large integer boundary: int64 rejects unsafe precision even though raw bytes were captured
+    ok 10 - large integer boundary: int64 rejects unsafe precision even though raw bytes were captured
+      ---
+      duration_ms: 0.295
+      type: 'test'
+      ...
+    # Subtest: boolean is not a supported LiveValueType — no boolean rollback path exists to test (documented, not a regression)
+    ok 11 - boolean is not a supported LiveValueType — no boolean rollback path exists to test (documented, not a regression)
+      ---
+      duration_ms: 0.062
+      type: 'test'
+      ...
+    # Subtest: concurrent external mutation via raw writeBuffer (not just setValue) is detected
+    ok 12 - concurrent external mutation via raw writeBuffer (not just setValue) is detected
+      ---
+      duration_ms: 0.1506
+      type: 'test'
+      ...
+    # Subtest: expired record cannot be rolled back, and the session remains usable afterward (no stale-entry corruption)
+    ok 13 - expired record cannot be rolled back, and the session remains usable afterward (no stale-entry corruption)
+      ---
+      duration_ms: 0.2856
+      type: 'test'
+      ...
+    # Subtest: failed current-byte read during rollback fails closed without writing
+    ok 14 - failed current-byte read during rollback fails closed without writing
+      ---
+      duration_ms: 0.2458
+      type: 'test'
+      ...
+    # Subtest: failed rollback write leaves the ledger entry intact for a later retry
+    ok 15 - failed rollback write leaves the ledger entry intact for a later retry
+      ---
+      duration_ms: 0.3181
+      type: 'test'
+      ...
+    # Subtest: cleanup (detach) destroys retained rollback bytes — later rollback on the same proposalId fails
+    ok 16 - cleanup (detach) destroys retained rollback bytes — later rollback on the same proposalId fails
+      ---
+      duration_ms: 0.2566
+      type: 'test'
+      ...
+    # Subtest: cleanup (revokePendingAuthorizationsForCleanup) destroys a pending proposal's captured raw bytes before confirm
+    ok 17 - cleanup (revokePendingAuthorizationsForCleanup) destroys a pending proposal's captured raw bytes before confirm
+      ---
+      duration_ms: 0.1674
+      type: 'test'
+      ...
+    # Subtest: full ledger rejects the 51st confirm before mutation; a fresh address is unaffected afterward
+    ok 18 - full ledger rejects the 51st confirm before mutation; a fresh address is unaffected afterward
+      ---
+      duration_ms: 1.3713
+      type: 'test'
+      ...
+    # Subtest: failed initial write retains nothing — no ledger entry, no leaked pending raw bytes
+    ok 19 - failed initial write retains nothing — no ledger entry, no leaked pending raw bytes
+      ---
+      duration_ms: 0.2868
+      type: 'test'
+      ...
+    1..19
+ok 7 - Gate 2: raw-byte rollback equality
+  ---
+  duration_ms: 10.1367
+  type: 'suite'
+  ...
+# Subtest: rollback type integrity
+    # Subtest: supported integer types compare exactly
+    ok 1 - supported integer types compare exactly
+      ---
+      duration_ms: 0.7855
+      type: 'test'
+      ...
+    # Subtest: int64 rejects unsafe precision
+    ok 2 - int64 rejects unsafe precision
+      ---
+      duration_ms: 0.072
+      type: 'test'
+      ...
+    # Subtest: float compares exact float32 encodings
+    ok 3 - float compares exact float32 encodings
+      ---
+      duration_ms: 0.0885
+      type: 'test'
+      ...
+    # Subtest: NaN policy is Object.is equality for floats
+    ok 4 - NaN policy is Object.is equality for floats
+      ---
+      duration_ms: 0.0716
+      type: 'test'
+      ...
+    # Subtest: signed zero remains distinct
+    ok 5 - signed zero remains distinct
+      ---
+      duration_ms: 0.0484
+      type: 'test'
+      ...
+    # Subtest: infinities compare by exact sign
+    ok 6 - infinities compare by exact sign
+      ---
+      duration_ms: 0.0365
+      type: 'test'
+      ...
+    # Subtest: integer comparisons reject non-finite and fractional values
+    ok 7 - integer comparisons reject non-finite and fractional values
+      ---
+      duration_ms: 0.0754
+      type: 'test'
+      ...
+    # Subtest: unknown types fail closed
+    ok 8 - unknown types fail closed
+      ---
+      duration_ms: 0.0705
+      type: 'test'
+      ...
+    1..8
+ok 8 - rollback type integrity
+  ---
+  duration_ms: 1.7707
+  type: 'suite'
+  ...
+# Subtest: Wisp in-app preferences and positioning
+    # Subtest: recovers malformed preferences to visible safe defaults
+    ok 1 - recovers malformed preferences to visible safe defaults
+      ---
+      duration_ms: 0.8469
+      type: 'test'
+      ...
+    # Subtest: accepts every bounded user setting
+    ok 2 - accepts every bounded user setting
+      ---
+      duration_ms: 0.1029
+      type: 'test'
+      ...
+    # Subtest: clamps invalid and off-screen positions into the usable viewport
+    ok 3 - clamps invalid and off-screen positions into the usable viewport
+      ---
+      duration_ms: 0.0877
+      type: 'test'
+      ...
+    # Subtest: provides keyboard-accessible edge, corner, and center presets
+    ok 4 - provides keyboard-accessible edge, corner, and center presets
+      ---
+      duration_ms: 0.144
+      type: 'test'
+      ...
+    1..4
+ok 9 - Wisp in-app preferences and positioning
+  ---
+  duration_ms: 1.6853
+  type: 'suite'
+  ...
+1..9
+# tests 39
+# suites 5
+# pass 39
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 567.0414
+exit: 0

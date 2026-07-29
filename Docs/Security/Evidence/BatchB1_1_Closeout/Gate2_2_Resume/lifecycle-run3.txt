@@ -1,0 +1,38 @@
+
+Running 10 tests using 1 worker
+
+  ok  1 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:136:1 › Phase 3 — fixture and packaged native write/read/restore prerequisite (28.0s)
+  ok  2 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) (28.2s)
+  ok  3 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:242:1 › Phase 4.3 — shutdown with pending (unconfirmed) write consent: stale proposal/token rejected after restart (14.7s)
+  ok  4 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:278:1 › Phase 4.4 — shutdown with an active process selection (attach, no freeze): stale attach state rejected after restart (12.0s)
+  ok  5 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:307:1 › Phase 4.5 — shutdown with a confirmed rollback entry: old rollback ID rejected after restart, raw bytes released (21.2s)
+  ok  6 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:350:1 › Phase 4.6 — controlled forced termination: no further writes reach the fixture after the process is killed (18.3s)
+  x   7 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:380:1 › Phase 5 — real freeze stops when v2LiveModeEnabled is disabled via the real settings IPC (27.3s)
+  -   8 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:423:1 › Phase 6 — main-window reload: stale operation IDs and sender identity are rejected after reload
+  -   9 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:470:1 › Phase 9.1/9.6 — unauthorized navigation revokes authority; returning to trusted content does not restore it
+  -  10 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:521:1 › Phase 11 — normal packaged candidate exposes no Gate 2.1/2.2 test-only hooks
+
+
+  1) tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:380:1 › Phase 5 — real freeze stops when v2LiveModeEnabled is disabled via the real settings IPC 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: undefined
+
+      399 |     await sleep(5000);
+      400 |     const status = await ctx.win.evaluate(async () => (window as any).electronAPI.liveMemoryFreezeStatus());
+    > 401 |     expect(status?.active).toBe(false);
+          |                            ^
+      402 |     expect(status?.stopReason).toBe('feature_disabled');
+      403 |
+      404 |     fs.writeFileSync(f.mutatePath, '111999');
+        at G:\ACTIVE_PROJECTS\SOLITH\tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:401:28
+
+    Error Context: test-results\gate2-2-resume-packaged-li-be0d3-d-via-the-real-settings-IPC\error-context.md
+
+  1 failed
+    tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:380:1 › Phase 5 — real freeze stops when v2LiveModeEnabled is disabled via the real settings IPC 
+  3 did not run
+  6 passed (2.5m)
+exit:1

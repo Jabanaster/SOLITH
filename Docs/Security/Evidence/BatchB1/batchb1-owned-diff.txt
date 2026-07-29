@@ -1,0 +1,817 @@
+====================================================================
+BATCH B1 — OWNED DIFF (files/hunks authored by this Batch B1 session)
+====================================================================
+
+METHOD: For files untouched in the Batch B1 baseline (see baseline-files.txt),
+'git diff' below is 100% Batch B1 content by construction. For files that
+already had UNSTAGED changes in the baseline (electron/preload.ts,
+package.json, src/types/global.d.ts), 'git diff' (no ref) mixes pre-existing
+unstaged content with Batch B1's new unstaged edits on the SAME file, so
+each hunk below is individually annotated [BATCH B1] or [PRE-EXISTING —
+excluded, see preexisting-diff-preserved.txt] based on manual content
+verification against this session's actual Edit tool calls.
+
+==================== PART 1: FILES UNTOUCHED AT BASELINE ====================
+(electron/live-memory-ipc.ts, electron/registry-verification-ipc.ts,
+ src/core/live-memory/live-memory-session.ts, memory-manager.ts, types.ts,
+ tests/live-memory/live-memory-session.test.ts, memory-manager.test.ts)
+100% Batch B1 content — no baseline changes existed to mix with.
+
+diff --git a/electron/live-memory-ipc.ts b/electron/live-memory-ipc.ts
+index 8f2c3dd..6aa756c 100644
+--- a/electron/live-memory-ipc.ts
++++ b/electron/live-memory-ipc.ts
+@@ -48,6 +48,7 @@ import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
+ import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
+ import { setCrashReportContext } from '../src/core/crash/local-crash-reporter.js';
+ import { hashInstalledExecutableForCatalog } from '../src/core/live-memory/installed-exe-hash.js';
++import { wireSessionCleanupOnDestroy, type DestroyableEmitter } from '../src/core/live-memory/session-cleanup.js';
+ import {
+   onAvowedMemoryManagerSnapshotEvent,
+   onAvowedProcessAttached,
+@@ -169,7 +170,7 @@ export function registerLiveMemoryIpc(): void {
+       );
+ 
+       if (result.success) {
+-        const bundle = bindSessionBundle(event.sender.id, session, mod);
++        const bundle = bindSessionBundle(event.sender.id, session, mod, event.sender);
+         refreshCrashContext(bundle);
+         maybeStartAvowedWingdkBackups({
+           executableName: parsed.executableName,
+@@ -199,7 +200,7 @@ export function registerLiveMemoryIpc(): void {
+ 
+       disposeSession(event.sender.id);
+       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
+-      const bundle = bindSessionBundle(event.sender.id, session, mod);
++      const bundle = bindSessionBundle(event.sender.id, session, mod, event.sender);
+ 
+       const executableHashSHA256 =
+         parsed.executableHashSHA256 ??
+@@ -442,13 +443,9 @@ export function registerLiveMemoryIpc(): void {
+     try {
+       const bundle = requireBundle(event);
+       const parsed = LiveMemoryRollbackSchema.parse(payload);
+-      const manifest = {
+-        ...parsed.manifest,
+-        target: { ...parsed.manifest.target, address: BigInt(parsed.manifest.target.address) },
+-      };
+-      const result = await bundle.manager.rollback(manifest);
++      const result = await bundle.manager.rollback(parsed.proposalId);
+       refreshCrashContext(bundle);
+-      return { success: result.success, guard: result.guard, error: result.error };
++      return serializeWriteResult(result);
+     } catch (error) {
+       return { success: false, error: sanitize(error, 'rollback_failed') };
+     }
+@@ -1283,11 +1280,17 @@ function refreshCrashContext(bundle: SessionBundle | undefined): void {
+   });
+ }
+ 
+-function bindSessionBundle(senderId: number, session: LiveMemorySession, mod: any): SessionBundle {
++function bindSessionBundle(
++  senderId: number,
++  session: LiveMemorySession,
++  mod: any,
++  webContents: DestroyableEmitter,
++): SessionBundle {
+   const audit = new mod.MemoryAuditLog({ filePath: memoryAuditFilePath() });
+   const manager = new mod.MemoryManager(session, audit);
+   const bundle: SessionBundle = { session, audit, manager, correlationWatcher: null };
+   sessions.set(senderId, bundle);
++  wireSessionCleanupOnDestroy(webContents, () => disposeSession(senderId));
+   return bundle;
+ }
+ 
+diff --git a/electron/registry-verification-ipc.ts b/electron/registry-verification-ipc.ts
+index b3a702a..98533a6 100644
+--- a/electron/registry-verification-ipc.ts
++++ b/electron/registry-verification-ipc.ts
+@@ -13,18 +13,12 @@ import {
+ import { evaluateSessionStability } from '../src/core/runtime/delta-engine.js';
+ import { compareRestartSignatureArtifacts } from '../src/core/runtime/restart-validation.js';
+ import { validateLoadedRegistry } from '../src/core/registry/loaded-registry.js';
++import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
++import { RegistryRunVerificationSchema } from './ipc-validation.js';
+ 
+ const moduleFilename = fileURLToPath(import.meta.url);
+ const moduleDirectory = path.dirname(moduleFilename);
+ 
+-const RunVerificationSchema = z.object({
+-  registry: z.unknown(),
+-  pid: z.number().int().positive(),
+-  executableName: z.string().min(1).max(260),
+-  executablePath: z.string().min(1).max(2000).optional(),
+-  timeoutMs: z.number().int().min(1_000).max(120_000).optional().default(30_000),
+-}).strict();
+-
+ const CompareRestartSchema = z.object({
+   previous: z.unknown(),
+   current: z.unknown(),
+@@ -105,9 +99,18 @@ function isHeadlessArtifact(value: unknown): value is HeadlessVerificationArtifa
+ }
+ 
+ export function registerRegistryVerificationIpc(): void {
+-  ipcMain.handle('registry-run-readonly-verification', async (_event, payload: unknown) => {
++  ipcMain.handle('registry-run-readonly-verification', async (event, payload: unknown) => {
+     try {
+-      const parsed = RunVerificationSchema.parse(payload);
++      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
++      // This opens an arbitrary caller-supplied PID and reads its process memory —
++      // the same privileged category of operation live-memory-* gates behind
++      // v2LiveModeEnabled. It must not be reachable just because a renderer can
++      // reach IPC at all.
++      if (!isTrainerCapabilityEnabled('v2LiveModeEnabled')) {
++        return { success: false, error: 'feature_disabled' };
++      }
++
++      const parsed = RegistryRunVerificationSchema.parse(payload);
+       const registry = validateLoadedRegistry(parsed.registry);
+       const generatedAt = new Date().toISOString();
+       const requestId = crypto.randomUUID();
+@@ -123,7 +126,7 @@ export function registerRegistryVerificationIpc(): void {
+           pid: parsed.pid,
+           executableName: parsed.executableName,
+           executablePath: parsed.executablePath,
+-          selectedByUser: true,
++          selectedByUser: parsed.userSelectedProcess,
+           platform: process.platform,
+         },
+       }, parsed.timeoutMs);
+diff --git a/src/core/live-memory/live-memory-session.ts b/src/core/live-memory/live-memory-session.ts
+index 8360711..feeef7c 100644
+--- a/src/core/live-memory/live-memory-session.ts
++++ b/src/core/live-memory/live-memory-session.ts
+@@ -63,6 +63,18 @@ const DEFAULT_FREEZE_SCHEDULER: FreezeScheduler = {
+ };
+ 
+ const DEFAULT_FREEZE_INTERVAL_MS = 200;
++const MIN_FREEZE_INTERVAL_MS = 50;
++const MAX_FREEZE_INTERVAL_MS = 5000;
++/** Hard ceiling on how long a single freeze may run before it auto-stops (safety net against a forgotten/orphaned freeze). */
++const MAX_FREEZE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
++/**
++ * Bounds how many confirmed-write manifests a session retains for rollback.
++ * Each entry is only reachable by its own proposalId and is deleted the
++ * moment it is rolled back (single-use) — this cap is defense-in-depth
++ * against unbounded growth if a session confirms many writes without ever
++ * rolling any of them back.
++ */
++const MAX_CONFIRMED_WRITES = 50;
+ 
+ interface FreezeState {
+   target: FreezeTarget;
+@@ -71,6 +83,7 @@ interface FreezeState {
+   tickCount: number;
+   lastGuard: OnlineGuardResult | null;
+   stopReason?: FreezeStopReason;
++  intervalMs: number;
+ }
+ 
+ export interface StartFreezeResult {
+@@ -109,6 +122,7 @@ export interface RollbackResult {
+   success: boolean;
+   guard?: OnlineGuardResult;
+   error?: string;
++  manifest?: LiveWriteManifest;
+ }
+ 
+ /**
+@@ -130,10 +144,18 @@ export class LiveMemorySession {
+   private userConfirmedOffline = false;
+   private acceptedConnectionBaseline = 0;
+   private pendingProposals = new Map<string, LiveWriteProposal>();
++  /**
++   * Manifests of writes this session actually confirmed, keyed by proposalId.
++   * rollback() may ONLY restore a write recorded here — it never trusts a
++   * caller-supplied manifest. Each entry is consumed (deleted) the moment it
++   * is successfully rolled back, so a rollback authorization cannot be reused.
++   */
++  private confirmedWrites = new Map<string, LiveWriteManifest>();
+   private remoteConnectionObserver: RemoteConnectionObserverFn = observeRemoteConnections;
+   private freezeScheduler: FreezeScheduler = DEFAULT_FREEZE_SCHEDULER;
+   private freeze: FreezeState | null = null;
+   private freezeGeneration = 0;
++  private maxFreezeDurationMs = MAX_FREEZE_DURATION_MS;
+   private unknownSnapshots = new Map<string, UnknownScanSnapshot>();
+   private readonly addressCache = new SessionAddressCache();
+   private lastFingerprint: FingerprintVerifyResult | null = null;
+@@ -151,6 +173,11 @@ export class LiveMemorySession {
+     this.freezeScheduler = scheduler;
+   }
+ 
++  /** Testing seam — override the max-freeze-duration ceiling so tests don't need thousands of ticks. */
++  _setMaxFreezeDurationMsForTests(ms: number): void {
++    this.maxFreezeDurationMs = ms;
++  }
++
+   isAttached(): boolean {
+     return this.handle !== null;
+   }
+@@ -704,15 +731,37 @@ export class LiveMemorySession {
+       valueAfter: proposal.requestedValue,
+       appliedAt: new Date().toISOString(),
+     };
++    this.recordConfirmedWrite(manifest);
+     return { success: true, manifest, guard };
+   }
+ 
+-  /** Restores the value captured before a prior confirmed write. Re-checks write consent. */
+-  async rollback(manifest: LiveWriteManifest): Promise<RollbackResult> {
++  /** Records a confirmed write for later rollback, bounding retained history (FIFO eviction). */
++  private recordConfirmedWrite(manifest: LiveWriteManifest): void {
++    if (this.confirmedWrites.size >= MAX_CONFIRMED_WRITES) {
++      const oldestKey = this.confirmedWrites.keys().next().value;
++      if (oldestKey !== undefined) this.confirmedWrites.delete(oldestKey);
++    }
++    this.confirmedWrites.set(manifest.proposalId, manifest);
++  }
++
++  /**
++   * Restores the value captured before a write THIS SESSION actually confirmed.
++   * Takes only a proposalId — never a caller-supplied manifest — so a renderer
++   * cannot use "rollback" as a disguised arbitrary-address/arbitrary-value write
++   * primitive. The manifest is looked up from confirmedWrites (populated solely
++   * by confirmWrite) and consumed on success, so the same rollback cannot be
++   * replayed. Re-checks write consent and process identity exactly like confirmWrite.
++   */
++  async rollback(proposalId: string): Promise<RollbackResult> {
+     if (!this.handle || !this.target) {
+       return { success: false, error: 'No process attached.' };
+     }
+ 
++    const manifest = this.confirmedWrites.get(proposalId);
++    if (!manifest) {
++      return { success: false, error: 'Unknown or already rolled back write.' };
++    }
++
+     const evidence = await this.remoteConnectionObserver(this.target.pid);
+     const guard = evaluateWriteConsent({
+       userConfirmedOffline: this.userConfirmedOffline,
+@@ -734,7 +783,10 @@ export class LiveMemorySession {
+       return { success: false, guard, error: `Rollback write failed: ${String(err)}` };
+     }
+ 
+-    return { success: true, guard };
++    // Single-use: this exact confirmed write can only be rolled back once.
++    this.confirmedWrites.delete(proposalId);
++
++    return { success: true, guard, manifest };
+   }
+ 
+   /**
+@@ -751,6 +803,17 @@ export class LiveMemorySession {
+     if (this.freeze?.active) {
+       return { success: false, error: 'A freeze is already active on this session. Stop it first.' };
+     }
++    // Defense in depth: the IPC schema already bounds these, but the session API is
++    // also callable directly (library/tests) — never rely solely on renderer/IPC validation.
++    if (!Number.isFinite(value)) {
++      return { success: false, error: 'Freeze value must be a finite number.' };
++    }
++    if (!Number.isInteger(intervalMs) || intervalMs < MIN_FREEZE_INTERVAL_MS || intervalMs > MAX_FREEZE_INTERVAL_MS) {
++      return {
++        success: false,
++        error: `Freeze interval must be an integer between ${MIN_FREEZE_INTERVAL_MS} and ${MAX_FREEZE_INTERVAL_MS}ms.`,
++      };
++    }
+ 
+     this.freezeGeneration += 1;
+     const generation = this.freezeGeneration;
+@@ -761,6 +824,7 @@ export class LiveMemorySession {
+       timer: null,
+       tickCount: 0,
+       lastGuard: null,
++      intervalMs,
+     };
+ 
+     const tick = async (): Promise<void> => {
+@@ -797,6 +861,13 @@ export class LiveMemorySession {
+       }
+ 
+       if (generation === this.freezeGeneration && this.freeze?.active) {
++        // tickCount * intervalMs approximates elapsed run time under normal scheduling —
++        // deterministic and testable via the injectable FreezeScheduler, unlike wall-clock time.
++        const elapsedMs = this.freeze.tickCount * this.freeze.intervalMs;
++        if (elapsedMs >= this.maxFreezeDurationMs) {
++          this.stopFreezeInternal('max_duration_exceeded');
++          return;
++        }
+         this.freeze.timer = this.freezeScheduler.schedule(() => {
+           void tick();
+         }, intervalMs);
+@@ -844,6 +915,7 @@ export class LiveMemorySession {
+     this.handle = null;
+     this.target = null;
+     this.pendingProposals.clear();
++    this.confirmedWrites.clear();
+     this.unknownSnapshots.clear();
+     this.addressCache.clear();
+     this.lastFingerprint = null;
+diff --git a/src/core/live-memory/memory-manager.ts b/src/core/live-memory/memory-manager.ts
+index 63764d9..541a2b4 100644
+--- a/src/core/live-memory/memory-manager.ts
++++ b/src/core/live-memory/memory-manager.ts
+@@ -10,7 +10,7 @@ import type {
+   LiveMemorySession,
+   RollbackResult,
+ } from './live-memory-session.js';
+-import type { LiveMemoryAddress, LiveWriteManifest, LiveWriteProposal } from './types.js';
++import type { LiveMemoryAddress, LiveWriteProposal } from './types.js';
+ import {
+   WritePolicyGate,
+   defaultTrainerWritePolicyContext,
+@@ -344,15 +344,22 @@ export class MemoryManager {
+     };
+   }
+ 
+-  async rollback(manifest: LiveWriteManifest, featureId?: string): Promise<RollbackResult> {
+-    const result = await this.session.rollback(manifest);
++  /**
++   * Rolls back a write THIS SESSION actually confirmed, identified only by
++   * proposalId. The manifest (address/dataType/values) is looked up
++   * server-side inside LiveMemorySession — never accepted from the caller —
++   * so this cannot be used to write an arbitrary value to an arbitrary
++   * address under the guise of "undo".
++   */
++  async rollback(proposalId: string, featureId?: string): Promise<RollbackResult> {
++    const result = await this.session.rollback(proposalId);
+     this.audit.append({
+       op: 'rollback',
+       featureId,
+-      address: `0x${manifest.target.address.toString(16)}`,
+-      valueType: manifest.target.dataType,
+-      valueBefore: manifest.valueAfter,
+-      valueAfter: manifest.valueBefore,
++      address: result.manifest ? `0x${result.manifest.target.address.toString(16)}` : undefined,
++      valueType: result.manifest?.target.dataType,
++      valueBefore: result.manifest?.valueAfter,
++      valueAfter: result.manifest?.valueBefore,
+       reason: result.success ? 'rollback_ok' : (result.error ?? 'rollback_failed'),
+       waiverAssumed: this.waiverAssumedForAudit(result.success),
+     });
+diff --git a/src/core/live-memory/types.ts b/src/core/live-memory/types.ts
+index 3b73a0d..260ed62 100644
+--- a/src/core/live-memory/types.ts
++++ b/src/core/live-memory/types.ts
+@@ -214,7 +214,13 @@ export interface FreezeTarget {
+   value: number;
+ }
+ 
+-export type FreezeStopReason = 'user_stopped' | 'guard_blocked' | 'identity_mismatch' | 'write_failed' | 'detached';
++export type FreezeStopReason =
++  | 'user_stopped'
++  | 'guard_blocked'
++  | 'identity_mismatch'
++  | 'write_failed'
++  | 'detached'
++  | 'max_duration_exceeded';
+ 
+ export interface FreezeStatus {
+   active: boolean;
+diff --git a/tests/live-memory/live-memory-session.test.ts b/tests/live-memory/live-memory-session.test.ts
+index de6804e..a8162b9 100644
+--- a/tests/live-memory/live-memory-session.test.ts
++++ b/tests/live-memory/live-memory-session.test.ts
+@@ -163,11 +163,175 @@ describe('LiveMemorySession', () => {
+     const confirmed = await session.confirmWrite(proposal.proposalId);
+     assert.equal(confirmed.success, true);
+ 
+-    const rolledBack = await session.rollback(confirmed.manifest!);
++    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+     assert.equal(rolledBack.success, true);
+     assert.equal(driver.getValue(0x1000n), 100);
+   });
+ 
++  test('rollback rejects a caller-supplied manifest for a write that was never confirmed', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const forged = await session.rollback('forged-proposal-id-never-confirmed');
++
++    assert.equal(forged.success, false);
++    assert.match(forged.error ?? '', /unknown or already rolled back/i);
++    assert.equal(driver.getValue(0x1000n), 100, 'no memory should be written for an unknown proposal');
++  });
++
++  test('rollback cannot be replayed after it has already consumed the confirmed write', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
++    const confirmed = await session.confirmWrite(proposal.proposalId);
++    const first = await session.rollback(confirmed.manifest!.proposalId);
++    assert.equal(first.success, true);
++    assert.equal(driver.getValue(0x1000n), 100);
++
++    driver.setValue(0x1000n, 4242);
++    const replay = await session.rollback(confirmed.manifest!.proposalId);
++
++    assert.equal(replay.success, false);
++    assert.match(replay.error ?? '', /unknown or already rolled back/i);
++    assert.equal(driver.getValue(0x1000n), 4242, 'replayed rollback must not touch memory again');
++  });
++
++  test('rollback fails closed when the attached process identity no longer matches', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
++    const confirmed = await session.confirmWrite(proposal.proposalId);
++    assert.equal(confirmed.success, true);
++
++    driver.setProcessExecutableName(1234, 'different.exe');
++    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
++
++    assert.equal(rolledBack.success, false);
++    assert.match(rolledBack.error ?? '', /identity mismatch/i);
++    assert.equal(driver.getValue(0x1000n), 9999, 'rollback must not write when identity fails closed');
++  });
++
++  test('rollback ledger is cleared on detach — a re-attached session cannot roll back a prior session\'s write', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
++    const confirmed = await session.confirmWrite(proposal.proposalId);
++    assert.equal(confirmed.success, true);
++
++    session.detach();
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
++    assert.equal(rolledBack.success, false);
++    assert.match(rolledBack.error ?? '', /unknown or already rolled back/i);
++  });
++
++  test('rollback fails closed against a same-PID process restart (path + start time both changed, PID unchanged)', async () => {
++    // Distinct from the generic identity-mismatch test above: this specifically simulates
++    // the PID-reuse scenario (OS assigns the SAME numeric PID to a brand-new process after
++    // the original exits) rather than an executable-name-only discrepancy.
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    driver.setProcessExecutablePath(1234, 'C:\\Games\\demo\\demo.exe');
++    driver.setProcessStartTime(1234, '2026-07-01T00:00:00.000Z');
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    await session.attach(
++      { pid: 1234, executableName: 'demo.exe', executablePath: 'C:\\Games\\demo\\demo.exe', startTime: '2026-07-01T00:00:00.000Z' },
++      true,
++    );
++
++    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
++    const confirmed = await session.confirmWrite(proposal.proposalId);
++    assert.equal(confirmed.success, true);
++
++    // Simulate PID reuse: same numeric PID 1234, but the OS now reports a different
++    // executable path AND a different process creation time — the signature of a
++    // restarted (or entirely different) process reusing a recycled PID.
++    driver.setProcessExecutablePath(1234, 'C:\\Windows\\Temp\\unrelated.exe');
++    driver.setProcessStartTime(1234, '2026-07-01T00:05:00.000Z');
++
++    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
++
++    assert.equal(rolledBack.success, false);
++    assert.match(rolledBack.error ?? '', /mismatch/i);
++    assert.equal(driver.getValue(0x1000n), 9999, 'rollback must not write to a process that only shares a recycled PID');
++  });
++
++  test('rollback ledger evicts the oldest confirmed write once the 50-entry cap is exceeded (FIFO)', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const evidence = Array.from({ length: 120 }, () => CLEAN_EVIDENCE);
++    const session = makeSession(driver, evidence);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const manifests = [];
++    for (let i = 0; i < 51; i++) {
++      const proposal = session.proposeWrite(HEALTH_ADDR, 1000 + i);
++      const confirmed = await session.confirmWrite(proposal.proposalId);
++      assert.equal(confirmed.success, true);
++      manifests.push(confirmed.manifest!);
++    }
++
++    // The 1st confirmed write (index 0) should have been evicted once the 51st was recorded.
++    const evictedRollback = await session.rollback(manifests[0].proposalId);
++    assert.equal(evictedRollback.success, false);
++    assert.match(
++      evictedRollback.error ?? '',
++      /unknown or already rolled back/i,
++      'an evicted ledger entry must fail the same way as an unknown proposalId — rollback becomes silently unavailable for it, with no distinct "evicted" error surfaced to the caller today',
++    );
++
++    // The most recent (51st) confirmed write must still be rollback-able.
++    const recentRollback = await session.rollback(manifests[50].proposalId);
++    assert.equal(recentRollback.success, true);
++  });
++
++  test('KNOWN GAP: rollback does not verify the current memory value still matches the confirmed write before restoring — it will overwrite an intervening change', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
++    const confirmed = await session.confirmWrite(proposal.proposalId);
++    assert.equal(confirmed.success, true);
++    assert.equal(driver.getValue(0x1000n), 9999);
++
++    // Something else changes the same address after the confirmed write — e.g. the game's
++    // own logic, a concurrent freeze, or a second unrelated write to the same address.
++    driver.setValue(0x1000n, 42);
++
++    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
++
++    // Current behavior: rollback succeeds and blindly overwrites the intervening value with
++    // the ORIGINAL pre-write value, with no "expected current value" (compare-and-swap) check.
++    // This is not an authorization/identity bypass (the write is still bound to a real
++    // confirmed write on the correctly-identified attached process) but it IS a documented,
++    // untested-until-now gap: rollback cannot detect or refuse to clobber an intervening change.
++    assert.equal(rolledBack.success, true, 'documents current behavior: rollback does NOT check the current value first');
++    assert.equal(driver.getValue(0x1000n), 100, 'rollback silently overwrote the intervening value of 42 with the original 100');
++  });
++
++  test('KNOWN GAP: a confirmed write remains rollback-able indefinitely — there is no expiration/TTL, only the 50-entry FIFO cap', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
++    const confirmed = await session.confirmWrite(proposal.proposalId);
++
++    // No wall-clock or tick-based expiration exists on confirmedWrites entries — simulating
++    // "a long time later" is simply calling rollback normally; there is nothing that ages it out
++    // except the FIFO cap (covered by a separate test) or session detach.
++    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
++
++    assert.equal(rolledBack.success, true, 'documents current behavior: no TTL exists, so this always succeeds regardless of elapsed time');
++  });
++
+   test('detach closes the process handle and clears pending proposals', async () => {
+     const driver = new FakeMemoryDriver({ '4096': 100 });
+     const session = makeSession(driver, [CLEAN_EVIDENCE], 'game.exe');
+@@ -392,6 +556,81 @@ describe('LiveMemorySession freeze', () => {
+     assert.equal(driver.isOpen(), false);
+     assert.equal(pendingCount(), 0);
+   });
++
++  test('startFreeze rejects an interval below the minimum bound', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const result = session.startFreeze(HEALTH_ADDR, 9999, 1);
++
++    assert.equal(result.success, false);
++    assert.match(result.error ?? '', /interval/i);
++    assert.equal(session.getFreezeStatus().active, false);
++  });
++
++  test('startFreeze rejects an interval above the maximum bound', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const result = session.startFreeze(HEALTH_ADDR, 9999, 999_999);
++
++    assert.equal(result.success, false);
++    assert.match(result.error ?? '', /interval/i);
++  });
++
++  test('startFreeze rejects a non-finite freeze value even though the IPC schema would also catch it', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE]);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    const result = session.startFreeze(HEALTH_ADDR, Number.NaN, 100);
++
++    assert.equal(result.success, false);
++    assert.match(result.error ?? '', /finite/i);
++    assert.equal(driver.getValue(0x1000n), 100, 'no write should occur for a rejected freeze value');
++  });
++
++  test('freeze auto-stops once the maximum duration is exceeded', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE]);
++    const { scheduler, fireNext, pendingCount } = makeFakeFreezeScheduler();
++    session._injectFreezeScheduler(scheduler);
++    session._setMaxFreezeDurationMsForTests(300); // 3 ticks at 100ms
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    session.startFreeze(HEALTH_ADDR, 9999, 100);
++    await flushMicrotasks();
++    assert.equal(session.getFreezeStatus().tickCount, 1);
++
++    await fireNext(); // tick 2 — elapsed 200ms, still under the 300ms cap
++    assert.equal(session.getFreezeStatus().active, true);
++    assert.equal(session.getFreezeStatus().tickCount, 2);
++
++    await fireNext(); // tick 3 — elapsed 300ms, hits the cap: stop instead of scheduling tick 4
++    assert.equal(session.getFreezeStatus().active, false);
++    assert.equal(session.getFreezeStatus().stopReason, 'max_duration_exceeded');
++    assert.equal(pendingCount(), 0, 'no further tick should be scheduled once the duration cap is hit');
++  });
++
++  test('freeze auto-stops when the target process identity no longer matches (process exited or PID reused)', async () => {
++    const driver = new FakeMemoryDriver({ '4096': 100 });
++    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
++    const { scheduler, fireNext } = makeFakeFreezeScheduler();
++    session._injectFreezeScheduler(scheduler);
++    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
++
++    session.startFreeze(HEALTH_ADDR, 9999, 100);
++    await flushMicrotasks();
++    assert.equal(session.getFreezeStatus().active, true);
++
++    driver.setProcessExecutableName(1234, 'different.exe');
++    await fireNext();
++
++    assert.equal(session.getFreezeStatus().active, false);
++    assert.equal(session.getFreezeStatus().stopReason, 'identity_mismatch');
++  });
+ });
+ 
+ describe('LiveMemorySession catalog controls', () => {
+diff --git a/tests/live-memory/memory-manager.test.ts b/tests/live-memory/memory-manager.test.ts
+index 67499cf..cee3615 100644
+--- a/tests/live-memory/memory-manager.test.ts
++++ b/tests/live-memory/memory-manager.test.ts
+@@ -267,4 +267,44 @@ describe('memory-manager + audit-log', () => {
+     assert.equal(result.success, true);
+     assert.equal(result.verified, true);
+   });
++
++  test('MemoryManager.rollback accepts only a proposalId and restores the confirmed write', async () => {
++    const { manager, audit, address } = await attachedManager();
++    const result = await manager.safeWrite(address, 55, { reason: 'setup', userApproved: true });
++    assert.equal(result.success, true);
++    const proposalId = result.confirm!.manifest!.proposalId;
++
++    const rollback = await manager.rollback(proposalId);
++
++    assert.equal(rollback.success, true);
++    assert.equal(rollback.manifest?.valueBefore, 10, 'the confirmed write manifest recorded the original pre-write value');
++    const rollbackEntry = audit.recent(1)[0];
++    assert.equal(rollbackEntry.op, 'rollback');
++    assert.equal(rollbackEntry.reason, 'rollback_ok');
++  });
++
++  test('MemoryManager.rollback rejects an unconfirmed/forged proposalId without writing memory or crashing', async () => {
++    const { manager, audit } = await attachedManager();
++
++    const rollback = await manager.rollback('never-confirmed-proposal-id');
++
++    assert.equal(rollback.success, false);
++    assert.match(rollback.error ?? '', /unknown or already rolled back/i);
++    const rollbackEntry = audit.recent(1)[0];
++    assert.equal(rollbackEntry.op, 'rollback');
++    assert.equal(rollbackEntry.address, undefined, 'no address should be logged when the proposal was never confirmed');
++  });
++
++  test('MemoryManager.rollback cannot replay the same proposalId twice', async () => {
++    const { manager, address } = await attachedManager();
++    const result = await manager.safeWrite(address, 55, { reason: 'setup', userApproved: true });
++    const proposalId = result.confirm!.manifest!.proposalId;
++
++    const first = await manager.rollback(proposalId);
++    const second = await manager.rollback(proposalId);
++
++    assert.equal(first.success, true);
++    assert.equal(second.success, false);
++    assert.match(second.error ?? '', /unknown or already rolled back/i);
++  });
+ });
+
+==================== PART 2: NEW FILES CREATED THIS SESSION ====================
+
+--- src/core/live-memory/session-cleanup.ts (new file, full content) ---
+/**
+ * Renderer-window lifecycle cleanup for live-memory sessions.
+ *
+ * Kept dependency-free (no Electron import) so it can be unit tested without
+ * a real Electron runtime — electron/live-memory-ipc.ts wires this against
+ * the real WebContents 'destroyed' event.
+ */
+
+/** Minimal shape needed from Electron's WebContents — trivially fakeable in tests. */
+export interface DestroyableEmitter {
+  once(event: 'destroyed', listener: () => void): unknown;
+}
+
+/** WebContents we've already wired a cleanup listener on — avoids stacking duplicate listeners across repeated attach/detach cycles on the same window. */
+const destroyedListenerWired = new WeakSet<object>();
+
+/**
+ * Ensures `onDestroyed` runs exactly once when `emitter` fires 'destroyed',
+ * so an active session (and any freeze it's running) is torn down even if
+ * the owning renderer window closes without ever calling live-memory-detach.
+ * Safe to call repeatedly for the same emitter — only the first call wires a
+ * listener.
+ */
+export function wireSessionCleanupOnDestroy(emitter: DestroyableEmitter, onDestroyed: () => void): void {
+  if (destroyedListenerWired.has(emitter)) return;
+  destroyedListenerWired.add(emitter);
+  emitter.once('destroyed', onDestroyed);
+}
+
+--- tests/live-memory/session-cleanup-on-destroy.test.ts (new file) ---
+(56 lines — see file directly, full content omitted here for brevity; not mixed with any pre-existing content since the file did not exist before)
+
+--- tests/live-memory-rollback-freeze-ipc-validation.test.ts (new file) ---
+(122 lines — see file directly, full content omitted here for brevity; not mixed with any pre-existing content since the file did not exist before)
+
+==================== PART 3: MIXED FILES — ONLY THE BATCH B1 HUNKS ====================
+
+--- electron/ipc-validation.ts (baseline: "M " staged-only; git diff with no
+    ref shows working-tree vs INDEX, which cleanly isolates this session's
+    unstaged edits from the pre-existing staged ones — both hunks below are
+    100% Batch B1, confirmed by inspecting the full diff, no pre-existing
+    hunks were present in this file's unstaged diff) ---
+
+@@ -326,19 +326,15 @@ export const LiveMemoryConfirmWriteSchema = z.object({
+   consentToken: z.string().uuid(),
+ });
+ 
++// Rollback identifies the write to undo by proposalId ONLY. ...
+ export const LiveMemoryRollbackSchema = z.object({
+-  manifest: z.object({ ... }),
+-});
++  proposalId: z.string().min(1).max(128),
++}).strict();
+
+@@ -660,6 +656,28 @@ export const ImportCtSchema = z.object({
++export const RegistryRunVerificationSchema = z.object({
++  registry: z.unknown(),
++  pid: z.number().int().positive(),
++  executableName: z.string().min(1).max(260),
++  executablePath: z.string().min(1).max(2000).optional(),
++  timeoutMs: z.number().int().min(1_000).max(120_000).optional().default(30_000),
++  userSelectedProcess: z.literal(true),
++}).strict();
+
+(full hunk text already captured verbatim in this session's earlier turn;
+re-verified byte-for-byte against `git diff -- electron/ipc-validation.ts`
+immediately before writing this file — both hunks present, no others.)
+
+--- electron/preload.ts (baseline: "MM" — ALREADY had pre-existing unstaged
+    changes. git diff shows 3 hunks; only hunks 1 and 3 below are Batch B1.
+    Hunk 2 (wispOverlaySetExpanded/MoveBy/SetInteractive) is PRE-EXISTING,
+    NOT authored by this session — see preexisting-diff-preserved.txt) ---
+
+[BATCH B1] @@ -98,7 +98,7 @@
+-  liveMemoryRollback: (payload: { manifest: unknown }) =>
++  liveMemoryRollback: (payload: { proposalId: string }) =>
+     ipcRenderer.invoke('live-memory-rollback', payload),
+
+[BATCH B1] @@ -315,6 +321,7 @@ (inside registryRunReadOnlyVerification payload type)
+     executablePath?: string;
+     timeoutMs?: number;
++    userSelectedProcess: true;
+   }) => ipcRenderer.invoke('registry-run-readonly-verification', payload),
+
+--- package.json (baseline: "MM" — already had pre-existing unstaged changes.
+    git diff shows 3 hunks; only the specific substrings noted below within
+    hunk 1 are Batch B1. The surrounding long script-string content on those
+    same lines, and the entire test:install-discovery hunk, are PRE-EXISTING
+    — see preexisting-diff-preserved.txt. Because these are single-line JSON
+    string values, git's line-based diff cannot show a sub-line insertion in
+    isolation; the substring insertion is identified by exact string search.) ---
+
+[BATCH B1 substring, within an otherwise pre-existing line] "test:live-memory" script:
+  inserted "tests/live-memory/session-cleanup-on-destroy.test.ts " immediately
+  after "tests/live-memory/memory-manager.test.ts " (verified present via
+  `grep -c session-cleanup-on-destroy package.json` = 2 occurrences, matching
+  the two script strings it was inserted into)
+
+[BATCH B1 substring, within an otherwise pre-existing line] "test" script:
+  same insertion as above, plus inserted
+  "tests/live-memory-rollback-freeze-ipc-validation.test.ts " immediately
+  after "tests/trainer-catalog-ipc-validation.test.ts "
+
+[PRE-EXISTING, NOT Batch B1] "test:install-discovery" script: addition of
+  tests/installed-game-identity.test.ts and tests/trainer-library-preview-gates.test.ts
+  — this session never edited test:install-discovery.
+
+--- src/app/pages/RegistryExplorerPage.tsx (baseline: "M " staged-only — git
+    diff with no ref cleanly isolates this session's single unstaged edit) ---
+
+@@ -187,6 +187,7 @@ function GovernanceDashboard({
+         timeoutMs: 30_000,
++        userSelectedProcess: true,
+       });
+
+--- src/types/global.d.ts (baseline: "MM" — already had pre-existing unstaged
+    changes. git diff shows 7 hunks; only hunks 2 and 4 below are Batch B1.
+    Hunks 1, 3, 5, 6, 7 (liveMemoryListProcesses signature expansion,
+    wispOverlay*/trainerHotkeys*/trainerCatalog* additions, install-discovery
+    identity/classification field additions) are PRE-EXISTING, NOT authored
+    by this session — see preexisting-diff-preserved.txt) ---
+
+[BATCH B1] @@ -88,7 +88,7 @@
+-    liveMemoryRollback: (payload: { manifest: unknown }) => Promise<{ success: boolean; error?: string }>;
++    liveMemoryRollback: (payload: { proposalId: string }) => Promise<{ success: boolean; error?: string }>;
+
+[BATCH B1] @@ -553,616 @@ (inside registryRunReadOnlyVerification payload type)
+       executablePath?: string;
+       timeoutMs?: number;
++      userSelectedProcess: true;
+     }) => Promise<{

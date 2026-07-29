@@ -1,0 +1,11 @@
+1. Packaged build: npm run build:vite; npm run build:electron; npm run dist:dir — PASS. First wrapper attempt passed no npm args and never started a product build; preserved separately.
+2. Gate 2.5 exploratory run — exposed no child bridge and an overlay freeze-stop/status authorization defect.
+3. Gate 2.5 corrected focused run — 7/7 PASS including cross-origin local HTTP child.
+4. Final coherent full packaged regression — 49/49 PASS: Gate 2.2 Resume 10, native real-process proof 1, Gate 2.3 3, Gate 2.4 5, Gate 2.5 7, packaged smoke 23. An earlier 48/48 run before the HTTP child case is preserved.
+5. Node ABI restoration — node-gyp rebuild --target=22.23.1 PASS.
+6. npm test through bundled Node 22 — 1,040/1,040 PASS (1,030 main + 10 SQL). First wrapper attempt correctly failed before tests when npm child PATH resolved Node 24; preserved separately.
+7. npm run test:live-memory — 257/257 PASS.
+8. Main TypeScript — PASS, 0 diagnostics.
+9. Electron TypeScript — baseline reproduced, 31 diagnostics across 13 files, exit 2; no new Gate 2.5 diagnostic.
+10. git diff --check — baseline reproduced, GameLibrary.tsx lines 286 and 303 only, exit 2; no new Gate 2.5 whitespace issue.
+11. No manual UI certification was claimed; this gate uses live packaged automation authorized by the owner.

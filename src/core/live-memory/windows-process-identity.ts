@@ -41,12 +41,48 @@ function hashFileSha256(filePath: string): string | null {
   }
 }
 
+// Gate 2.1: narrow test-only seam so the packaged lifecycle harness can
+// certify PID-reuse/identity-mismatch rejection without needing to force
+// real OS PID recycling (which cannot be reproduced deterministically).
+// Unavailable unless SOLITH_TEST_BUILD=1 is set in the process env — normal
+// packaged launches never set this, so the setter throws and the map stays
+// undefined, meaning queryWindowsProcessIdentity always takes the real path.
+const IS_TEST_BUILD = process.env.SOLITH_TEST_BUILD === '1';
+const testIdentityOverrides = IS_TEST_BUILD
+  ? new Map<number, WindowsProcessIdentity | null>()
+  : undefined;
+
+export function __setTestProcessIdentityOverride(
+  pid: number,
+  identity: WindowsProcessIdentity | null,
+): void {
+  if (!testIdentityOverrides) {
+    throw new Error('__setTestProcessIdentityOverride is only available when SOLITH_TEST_BUILD=1.');
+  }
+  testIdentityOverrides.set(pid, identity);
+}
+
+export function __clearTestProcessIdentityOverrides(): void {
+  if (!testIdentityOverrides) {
+    throw new Error('__clearTestProcessIdentityOverrides is only available when SOLITH_TEST_BUILD=1.');
+  }
+  testIdentityOverrides.clear();
+}
+
+if (IS_TEST_BUILD) {
+  (globalThis as Record<string, unknown>).__solithSetTestProcessIdentityOverride =
+    __setTestProcessIdentityOverride;
+  (globalThis as Record<string, unknown>).__solithClearTestProcessIdentityOverrides =
+    __clearTestProcessIdentityOverrides;
+}
+
 /**
  * Query live OS identity. Returns null only when the PID does not exist.
  * Missing path/creation time yields an incomplete identity object that
  * callers must reject for destructive operations.
  */
 export function queryWindowsProcessIdentity(pid: number): WindowsProcessIdentity | null {
+  if (testIdentityOverrides?.has(pid)) return testIdentityOverrides.get(pid) ?? null;
   if (!Number.isInteger(pid) || pid <= 0) return null;
   if (process.platform !== 'win32') return null;
 
@@ -198,4 +234,14 @@ export function compareProcessIdentity(
 export function pathsEqual(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
   return normalizePath(a) === normalizePath(b);
+}
+
+// Gate 2.1: expose the two read-only identity functions on globalThis too
+// (in addition to the module export) so the packaged lifecycle harness can
+// reach them via electronApp.evaluate — Electron's utility-script evaluation
+// context does not support dynamic import(). Read-only, no new behavior;
+// still gated behind SOLITH_TEST_BUILD=1 and unreachable from any renderer.
+if (IS_TEST_BUILD) {
+  (globalThis as Record<string, unknown>).__solithQueryWindowsProcessIdentity = queryWindowsProcessIdentity;
+  (globalThis as Record<string, unknown>).__solithCompareProcessIdentity = compareProcessIdentity;
 }

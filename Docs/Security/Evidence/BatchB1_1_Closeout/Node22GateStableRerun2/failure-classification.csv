@@ -1,0 +1,7 @@
+Finding,ExpectedBaseline,ActualResult,ExactMatch,Classification
+"Electron TypeScript diagnostics","31 diagnostics across 13 files (Node22Gate baseline)","31 diagnostics across 13 files, line-for-line identical to prior recorded baseline (zero diff)","Yes","Unrelated source-state difference — NONE (pre-existing, unrelated to B1.1, unchanged)"
+"git diff --check","GameLibrary.tsx lines 286 and 303 trailing whitespace","GameLibrary.tsx lines 286 and 303 trailing whitespace, identical","Yes","Unrelated source-state difference — NONE (pre-existing, unrelated to B1.1, unchanged)"
+"npm test","1034/1034 pass","1034/1034 pass, exit 0","Yes","No regression"
+"npm run test:live-memory","221/221 pass","221/221 pass, exit 0","Yes","No regression"
+"Main TypeScript","PASS, 0 diagnostics","PASS, 0 diagnostics, exit 0","Yes","No regression"
+"Test-fixture mtime touches (20 files under tests/fixtures/parsers/*)","Not previously documented as expected, but zero hash change","mtime updated, SHA256 identical, git status unchanged","N/A","Test-harness generated — non-contaminating (content-identical)"

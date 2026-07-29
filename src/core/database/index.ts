@@ -3,6 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { getAppPaths } from '../../shared/app-paths.js';
+import {
+  createInstallIdentity,
+  createLegacyInstallIdentity,
+  INSTALL_IDENTITY_VERSION,
+} from '../install-discovery/identity.js';
+import type { InstallPlatform, RawInstalledGame } from '../install-discovery/types.js';
 
 let dbPath = '';
 
@@ -14,6 +20,157 @@ let pendingPersistPromise: Promise<void> | null = null;
 let resolvePendingPersist: (() => void) | null = null;
 let rejectPendingPersist: ((err: Error) => void) | null = null;
 let inTransaction = false;
+
+export interface InstalledGameIdentityMigrationReport {
+  verified: number;
+  backfilled: number;
+  ambiguous: number;
+  collisions: number;
+  unchanged: number;
+}
+
+let installedGameIdentityMigrationReport: InstalledGameIdentityMigrationReport = {
+  verified: 0,
+  backfilled: 0,
+  ambiguous: 0,
+  collisions: 0,
+  unchanged: 0,
+};
+
+export function getInstalledGameIdentityMigrationReport(): InstalledGameIdentityMigrationReport {
+  return { ...installedGameIdentityMigrationReport };
+}
+
+function migrateInstalledGameIdentity(): void {
+  const tableInfo = rawDb!.exec('PRAGMA table_info(installed_games)')[0];
+  const columnNames = new Set((tableInfo?.values ?? []).map((row: unknown[]) => String(row[1])));
+  if (columnNames.has('install_identity')) {
+    installedGameIdentityMigrationReport = {
+      verified: 0,
+      backfilled: 0,
+      ambiguous: 0,
+      collisions: 0,
+      unchanged: Number(rawDb!.exec('SELECT COUNT(*) FROM installed_games')[0]?.values?.[0]?.[0] ?? 0),
+    };
+    rawDb!.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_installed_games_identity ON installed_games(install_identity)');
+    return;
+  }
+
+  const legacyRows = (rawDb!.exec(`
+    SELECT id, catalog_game_id, platform, install_path, executable_path,
+           display_name, steam_app_id, detected_at, last_seen_at
+    FROM installed_games
+    ORDER BY id
+  `)[0]?.values ?? []) as unknown[][];
+
+  const planned = legacyRows.map((row) => {
+    const legacyId = String(row[0]);
+    const game: RawInstalledGame = {
+      platform: String(row[2]) as InstallPlatform,
+      installPath: String(row[3] ?? ''),
+      executablePath: row[4] ? String(row[4]) : undefined,
+      displayName: row[5] ? String(row[5]) : undefined,
+      steamAppId: row[6] != null ? Number(row[6]) : undefined,
+    };
+    const identity = createInstallIdentity(game);
+    const collisionKey = identity.canonicalExecutablePath
+      ? `exe:${identity.canonicalExecutablePath}`
+      : identity.launcherAppId
+        ? `launcher:${identity.launcherAppId}:${identity.canonicalInstallPath}`
+        : `path:${game.platform}:${identity.canonicalInstallPath}`;
+    return { row, legacyId, game, identity, collisionKey };
+  });
+
+  const collisionCounts = new Map<string, number>();
+  for (const item of planned) {
+    collisionCounts.set(item.collisionKey, (collisionCounts.get(item.collisionKey) ?? 0) + 1);
+  }
+
+  installedGameIdentityMigrationReport = {
+    verified: 0,
+    backfilled: 0,
+    ambiguous: 0,
+    collisions: [...collisionCounts.values()].filter((count) => count > 1).length,
+    unchanged: 0,
+  };
+
+  rawDb!.run('BEGIN IMMEDIATE TRANSACTION');
+  try {
+    rawDb!.run(`
+      CREATE TABLE installed_games_identity_v2 (
+        id TEXT PRIMARY KEY,
+        install_identity TEXT NOT NULL,
+        canonical_install_path TEXT NOT NULL,
+        canonical_executable_path TEXT,
+        launcher_app_id TEXT,
+        identity_version INTEGER NOT NULL,
+        identity_status TEXT NOT NULL,
+        needs_reverification INTEGER NOT NULL DEFAULT 0,
+        catalog_game_id TEXT,
+        platform TEXT NOT NULL,
+        install_path TEXT NOT NULL,
+        executable_path TEXT,
+        display_name TEXT,
+        steam_app_id INTEGER,
+        detected_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      )
+    `);
+
+    const insert = rawDb!.prepare(`
+      INSERT INTO installed_games_identity_v2 (
+        id, install_identity, canonical_install_path, canonical_executable_path,
+        launcher_app_id, identity_version, identity_status, needs_reverification,
+        catalog_game_id, platform, install_path, executable_path, display_name,
+        steam_app_id, detected_at, last_seen_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const item of planned) {
+      const collided = (collisionCounts.get(item.collisionKey) ?? 0) > 1;
+      const lacksConcreteIdentity = !item.identity.canonicalExecutablePath && !item.identity.launcherAppId;
+      const identity = collided || lacksConcreteIdentity
+        ? createLegacyInstallIdentity(item.game.platform, item.game.installPath, item.legacyId)
+        : item.identity;
+      const status = collided || lacksConcreteIdentity ? 'ambiguous' : 'backfilled';
+      if (status === 'backfilled') installedGameIdentityMigrationReport.backfilled += 1;
+      else installedGameIdentityMigrationReport.ambiguous += 1;
+
+      insert.run([
+        item.legacyId,
+        identity.installIdentity,
+        identity.canonicalInstallPath,
+        identity.canonicalExecutablePath ?? null,
+        identity.launcherAppId ?? null,
+        INSTALL_IDENTITY_VERSION,
+        status,
+        collided || lacksConcreteIdentity || identity.needsReverification ? 1 : 0,
+        item.row[1] ?? null,
+        item.game.platform,
+        item.game.installPath,
+        item.game.executablePath ?? null,
+        item.game.displayName ?? null,
+        item.game.steamAppId ?? null,
+        String(item.row[7]),
+        String(item.row[8]),
+      ]);
+    }
+    insert.free();
+
+    rawDb!.run('ALTER TABLE installed_games RENAME TO installed_games_identity_v1');
+    rawDb!.run('ALTER TABLE installed_games_identity_v2 RENAME TO installed_games');
+    rawDb!.run('DROP TABLE installed_games_identity_v1');
+    rawDb!.run('CREATE UNIQUE INDEX idx_installed_games_identity ON installed_games(install_identity)');
+    rawDb!.run('CREATE INDEX idx_installed_games_catalog ON installed_games(catalog_game_id)');
+    rawDb!.run('COMMIT');
+  } catch (error) {
+    rawDb!.run('ROLLBACK');
+    throw error;
+  }
+
+  const boundedReport = JSON.stringify(installedGameIdentityMigrationReport);
+  console.info(`[database] installed-game identity migration ${boundedReport.slice(0, 512)}`);
+}
 
 function checkTransaction(sql: string) {
   const upper = sql.trim().toUpperCase();
@@ -311,7 +468,10 @@ class Database {
  * This must be called in `before()` hooks so every test suite starts from
  * a clean, isolated state without touching production data.
  */
-export async function resetForTesting(tempDbPath?: string): Promise<void> {
+export async function resetForTesting(
+  tempDbPath?: string,
+  options: { preserveExisting?: boolean } = {},
+): Promise<void> {
   // Flush and close the current instance
   if (rawDb) {
     try {
@@ -338,7 +498,7 @@ export async function resetForTesting(tempDbPath?: string): Promise<void> {
   } else {
     dbPath = ':memory:';
   }
-  await initDatabaseAtPath(tempDbPath ?? ':memory:');
+  await initDatabaseAtPath(tempDbPath ?? ':memory:', options);
 }
 
 /** Apply all DDL and seed defaults to the already-open rawDb. */
@@ -357,12 +517,37 @@ function applySchema(): void {
       dateAdded TEXT DEFAULT (datetime('now')),
       lastScan TEXT,
       engine TEXT,
+      executablePath TEXT,
+      coverPath TEXT,
+      iconPath TEXT,
+      saveLocations TEXT,
+      notes TEXT,
+      metadataId TEXT,
       fingerprint TEXT,
       needsRescan INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
+
+  const gamesColumns = rawDb!.exec('PRAGMA table_info(games)')[0];
+  const gamesColumnNames = new Set(
+    (gamesColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  const optionalGameColumns = [
+    'executablePath TEXT',
+    'coverPath TEXT',
+    'iconPath TEXT',
+    'saveLocations TEXT',
+    'notes TEXT',
+    'metadataId TEXT',
+  ];
+  for (const column of optionalGameColumns) {
+    const columnName = column.split(' ')[0];
+    if (!gamesColumnNames.has(columnName)) {
+      rawDb!.run(`ALTER TABLE games ADD COLUMN ${column}`);
+    }
+  }
 
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS scans (
@@ -815,6 +1000,7 @@ function applySchema(): void {
       UNIQUE(platform, install_path)
     )
   `);
+  migrateInstalledGameIdentity();
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_installed_games_catalog ON installed_games(catalog_game_id)');
 
   rawDb!.run(`
@@ -900,10 +1086,11 @@ function applySchema(): void {
   });
 }
 
-async function initDatabaseAtPath(targetPath: string): Promise<void> {
+async function initDatabaseAtPath(
+  targetPath: string,
+  options: { preserveExisting?: boolean } = {},
+): Promise<void> {
   const SQL = await initSqlJs();
-
-  rawDb = new SQL.Database();
 
   if (targetPath !== ':memory:' && targetPath !== '') {
     dbPath = targetPath;
@@ -911,10 +1098,16 @@ async function initDatabaseAtPath(targetPath: string): Promise<void> {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    // Tests always start with a fresh file
-    if (fs.existsSync(targetPath)) {
+    if (fs.existsSync(targetPath) && !options.preserveExisting) {
       fs.unlinkSync(targetPath);
     }
+  }
+
+  if (targetPath !== ':memory:' && targetPath !== '' && fs.existsSync(targetPath)) {
+    const fileBuffer = fs.readFileSync(targetPath);
+    rawDb = new SQL.Database(fileBuffer);
+  } else {
+    rawDb = new SQL.Database();
   }
 
   // Apply schema to the fresh database

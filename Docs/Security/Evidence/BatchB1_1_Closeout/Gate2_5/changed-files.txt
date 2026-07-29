@@ -1,0 +1,9 @@
+Gate 2.5 owned changes:
+- electron/live-memory-ipc.ts — added existing trusted-sender/window-type guard to live-memory-freeze-stop and live-memory-freeze-status only. File had extensive pre-existing modifications; all other hunks are preserved baseline work.
+- tests/gate2-5-frame-overlay-closeout.e2e.test.ts — new Gate 2.5 packaged harness.
+- Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/* — new evidence only; earlier evidence not overwritten.
+- SOLITH_SECURITY_ROADMAP.md — Gate 2.4 wording correction and append-only Gate 2.5 phase, session-log, status-table, and final-verdict update.
+Generated/ignored outputs:
+- dist/win-unpacked packaged candidate rebuilt.
+- vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node restored to Node 22 ABI.
+No dependency, package-lock, CI, release workflow, GameLibrary whitespace, or Electron TypeScript baseline change was made.

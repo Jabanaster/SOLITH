@@ -1,0 +1,1 @@
+BLOCKED — Node22GateStableRerun halted at Phase 6 (Node version stop condition: active node is v24.15.0, not v22.x). This phase requires the Node 22 verification commands, which were not run. See node-environment.txt and verification-final.txt for the full determination.

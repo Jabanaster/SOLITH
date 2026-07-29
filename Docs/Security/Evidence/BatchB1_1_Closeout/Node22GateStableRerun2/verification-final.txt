@@ -1,0 +1,98 @@
+# Node22Gate Stable Rerun 2 — Recovered Node 22 Runtime
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+
+## Phase 1 — Grounding
+
+git rev-parse --show-toplevel -> G:/ACTIVE_PROJECTS/SOLITH (matches)
+git branch --show-current -> master
+
+## Phase 2 — Prior Node 22 environment recovered
+
+Exact node.exe: G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64\node.exe
+Exact npm-cli.js: G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64\node_modules\npm\bin\npm-cli.js
+Recovered from: Node22Gate/node-paths.txt (`where.exe node; where.exe npm` raw output),
+cross-checked against Node22Gate/node-version.txt (v22.23.1) and
+Node22Gate/npm-version.txt (10.9.8). See prior-node22-environment.md.
+
+## Phase 3 — Candidate verification
+
+Single candidate identified (exact path match to prior evidence). Verified via:
+- Test-Path / Get-Item: exists, 86,989,128 bytes, LastWriteTimeUtc 2026-06-23T22:15:44Z
+- Windows file version metadata: ProductName=Node.js, FileVersion=22.23.1 (matches)
+- SHA256 recorded in node22-candidates.csv
+TrustedForExecution: Yes (exact recovered path, normal official Node.js distribution
+layout, located in repository-local gitignored .tools/ directory, source zip present
+alongside it).
+
+## Phase 5 — Direct invocation
+
+"$Node22" --version -> v22.23.1 (exit 0)
+"$Node22" "$NpmCli" --version -> 10.9.8 (exit 0)
+"$Node22" -e "console.log(process.version); console.log(process.execPath)" ->
+  v22.23.1 / G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64\node.exe
+
+## Phase 6 — Child-process inheritance proof
+
+Positive control: PATH scoped (prepended, non-persistent, single command only) to
+the recovered distribution directory -> `node scripts/check-node.mjs` (the project's
+own pretest guard) passes silently, exit 0.
+Negative control: unmodified system PATH -> same command fails loudly:
+"[solith] Unsupported Node.js v24.15.0. Required: Node.js 22.x", exit 1.
+This proves PATH-scoping is both necessary and sufficient for child-process
+inheritance, and that the guard correctly discriminates.
+
+## Phase 7 — Fresh pretest stability checkpoint
+
+T0 (2026-07-28T09:49:36Z) -> T60 (2026-07-28T09:50:41Z): 1,089 monitored files,
+0 hash changes, 0 status changes. STABLE.
+
+## Phase 8 — Verification results (all via direct Node 22 invocation, PATH scoped per-command)
+
+- npm test: PASS, exit 0, 1,034/1,034 (1,024 + 10 across the two tsx --test invocations)
+- npm run test:live-memory: PASS, exit 0, 221/221
+- tsc --noEmit (main): PASS, exit 0, 0 diagnostics
+- tsc -p tsconfig.electron.json --noEmit: FAIL, exit 2, 31 diagnostics / 13 files —
+  line-for-line identical (zero diff) to the previously recorded baseline
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286 and :303 trailing whitespace —
+  identical to the previously recorded baseline
+
+## Phase 9 — Post-command state
+
+20 files under tests/fixtures/parsers/* had mtime updated by the parser test suite
+after npm test; SHA256/size/status identical before and after (test-harness
+generated, non-contaminating). Zero further drift after test:live-memory, main tsc,
+electron tsc, or git diff --check (each snapshot byte-identical to the previous).
+
+## Phase 10 — Final quiet window
+
+60-second wait after the last verification command. Final state matches the
+after-npm-test state exactly (same 20 mtime-only touches, zero hash/status change,
+zero additional drift). See final-stability-comparison.csv.
+
+## Phase 12 — B1.1 source-state integrity
+
+All 23 monitored B1.1 production and test paths (see b1_1-source-integrity.csv):
+ChangedDuringGate = No for every path, including src/app/pages/RegistryExplorerPage.tsx.
+
+## Scope integrity
+
+Diffing git-status-pretest.txt against git-status-final.txt: only new entries are
+this task's own files under Node22GateStableRerun2. No production, test, package,
+lockfile, tsconfig, Vite config, or CI file was created, edited, staged, unstaged,
+reverted, or cleaned. No software was installed. No PATH or Windows environment
+variable was permanently modified (PATH was only ever set for the environment of
+individual child-process invocations, never exported to the parent shell). No
+process was terminated. No Gate 2, Batch B2, or B2A work began.
+
+## Verdict
+
+NODE22GATE STABLE RERUN PASS
+
+BATCH B1.1 CONDITIONAL PASS (unchanged — no regression proven or disproven this
+cycle; functional results independently reproduce the established expected baseline
+exactly).
+
+Gate 2 may not resume (explicit task scope; this task did not authorize or attempt
+Gate 2 regardless of the passing verdict).

@@ -115,4 +115,19 @@ describe('Solith Wisp companion safety model', () => {
     assert.equal(closed.interactionOpen, false);
     assert.equal(closed.visible, true);
   });
+
+  test('temporary status forms return to the selected persistent form', () => {
+    const selected = wispReducer(DEFAULT_WISP_STATE, { type: 'selectForm', form: 'phoenix' });
+    const message = createWispMessage({
+      title: 'Scan started',
+      body: 'Read-only scan is active.',
+      source: 'ocr-fallback',
+    });
+    const scanning = wispReducer(selected, { type: 'message', message });
+    assert.equal(scanning.form, 'scan');
+    assert.equal(scanning.preferredForm, 'phoenix');
+
+    const closed = wispReducer(scanning, { type: 'closeBubble', id: message.id });
+    assert.equal(closed.form, 'phoenix');
+  });
 });

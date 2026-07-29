@@ -1,0 +1,107 @@
+BATCH A EVIDENCE SUMMARY
+Generated: 2026-07-26
+Status: PARTIAL VERIFICATION
+
+=== VERIFIED FACTS ===
+
+Repository: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+IPC Handlers (ipcMain.handle): 149
+IPC On (ipcMain.on): 0
+Unique Registered Channels: 149
+Duplicate Channels: 0
+Files with Registrations: 12
+
+Preload Wrapper Methods: 154
+Channels in Preload Wrappers: 149
+Window.electronAPI Calls: 160
+
+=== UNRESOLVED CONTRADICTION ===
+
+Claim 1: "Orphan wrappers: 5"
+Claim 2: "No orphaned wrappers"
+
+RESOLUTION REQUIRED:
+Identify the 5 preload methods that do NOT correspond to registered channels:
+- Method names
+- File and line numbers
+- Classification (callback, event listener, no IPC, etc.)
+
+=== VALIDATION AUDIT STATUS ===
+
+Handlers with Schema Validation (Zod): 10
+Handlers with Manual Validation: Unknown
+Handlers with No Validation: Unknown
+Handlers Not Inspected: 139
+
+Discovery Coverage: 10/149 (6.7%) complete
+
+=== AUTHORIZATION AUDIT STATUS ===
+
+Handlers with Sender Validation: Unknown
+Handlers with Authorization: Unknown
+Handlers with Consent Gates: 6 (CRITICAL only)
+Remaining Handlers Not Assessed: 143
+
+Discovery Coverage: 6/149 (4.0%) complete
+
+=== CONSENT STATE MACHINE ===
+
+Status: NOT INSPECTED
+Required for: in-process-* handlers (7 registrations)
+Missing Analysis:
+- Token lifecycle
+- Expiration behavior
+- Replay resistance
+- Concurrency handling
+- Sender identity binding
+
+=== CREDENTIAL SCAN ===
+
+Status: NOT PERFORMED
+Required directories/patterns defined but scan not executed
+Cannot claim "no credentials" without reproducible evidence
+
+=== HANDLER-BY-HANDLER CLASSIFICATION ===
+
+Status: INCOMPLETE
+Only 10 handlers audited for validation
+139 handlers remain unclassified
+
+Required classifications per handler:
+- Validation type (schema/manual/none)
+- Sender validation (present/absent/uncertain)
+- Authorization (present/absent/uncertain)
+- Consent requirement (yes/no/uncertain)
+- Privileged effect classification
+
+=== INCOMPLETE DISCOVERY AREAS ===
+
+Not inspected (per original scope):
+1. Registry operations
+2. Process execution (4 of 6 locations)
+3. Consent-state machine edge cases
+4. Remaining 139 handler validation
+
+Partially inspected:
+1. ZIP import (size limits only)
+2. YAML parsing (default mode only)
+3. File path containment (lexical only)
+4. Process execution (2 of 6 locations)
+
+=== VERDICT ===
+
+BATCH A PARTIALLY VERIFIED
+
+Complete evidence:
+- Repository state: YES
+- IPC extraction: YES
+- Preload surface: PARTIAL (contradiction unresolved)
+- Renderer callers: PARTIAL (160 calls, coverage TBD)
+- Handler audit: NO (10/149 = 6.7%)
+- Authorization audit: NO (6/149 = 4.0%)
+- Validation audit: NO (10/149 = 6.7%)
+- Credential scan: NO
+
+Conclusion: Batch A discovery is 15-20% complete at best.
+Batch B cannot proceed without completing handler validation, authorization, and consent audits.

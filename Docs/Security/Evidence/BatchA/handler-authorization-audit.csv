@@ -1,0 +1,150 @@
+Handler #,Channel name,Sender validation?,Authorization check?,Consent gate?,Confidence,Notes
+1,cheat-toggle-get-all,yes,no,no,certain,Checks event.sender.isDestroyed() before proceeding; CheatToggleGetAllSchema.parse validates gameId; dynamically imports cheat-toggle-store to read persisted per-game cheat states.
+2,cheat-toggle-set,yes,no,no,certain,"Checks event.sender.isDestroyed(); CheatToggleSetSchema.parse validates gameId/cheatId/enabled/confirmedAddress/dataType. Persists an armed cheat toggle (including confirmed address) across restarts with no separate consent-token requirement, unlike the live-memory write-consent flow."
+3,cheat-toggle-clear,yes,no,no,certain,Checks event.sender.isDestroyed(); CheatToggleClearSchema.parse validates gameId/cheatId before clearing persisted state.
+4,ct-library-pick-zip,no,no,no,certain,Opens a native openFile dialog and manually rejects non-.zip extensions before returning the chosen absolute path.
+5,ct-library-summary,no,no,no,certain,No input payload; reads local CT library summary file only.
+6,ct-library-search,no,no,no,certain,SearchSchema.parse (.strict()) bounds query/gameId/kind/limit/offset before searching the local CT library.
+7,ct-library-game-detail,no,no,no,certain,GameDetailSchema.parse validates gameId before returning table detail.
+8,ct-library-import-zip-preview,no,no,no,certain,ImportPreviewSchema.safeParse plus manual isZipPath check; extracts/compiles an arbitrary user/renderer-supplied archivePath (no root confinement) and streams progress via event.sender.send without checking isDestroyed().
+9,ct-library-import-zip-start,no,no,no,certain,"ImportStartSchema.safeParse; performs the 'confirmed' zip import and writes compiled library/index artifacts to disk under data/registry, but there is no explicit approval flag/token distinguishing it from preview besides the channel name."
+10,ct-library-import-zip-cancel,no,no,no,certain,ImportCancelSchema.parse; aborts an in-flight import AbortController by jobId.
+11,install-discovery-pick-folder,no,no,no,certain,Opens a native openDirectory dialog anchored to the sender's BrowserWindow; returns the chosen folder path unfiltered.
+12,install-discovery-preview,no,no,no,certain,DiscoveryOptionsSchema.parse bounds path strings/lengths; read-only preview scan of local install roots (Steam/Epic/GOG paths).
+13,install-discovery-commit,no,no,no,certain,CommitRecordsSchema.parse (array of up to 500 install records) then persists them via commitInstallDiscoveryRecords; trusts renderer-supplied installPath/executablePath without independent re-verification.
+14,install-discovery-scan,no,no,no,certain,DiscoveryOptionsSchema.parse validated; runs the full install discovery scan across local library roots.
+15,install-discovery-list,no,no,no,certain,No payload; lists already-installed/catalog-matched games.
+16,live-memory-list-processes,yes,no,no,certain,"Checks event.sender.isDestroyed(); gated only by feature flag, lists running processes (no memory access)."
+17,live-memory-attach,yes,yes,no,certain,Requires parsed.userConfirmedOffline waiver and feature flag; disposes/binds new session keyed by event.sender.id.
+18,live-memory-zero-input-prepare,yes,yes,no,certain,"Requires userConfirmedOffline/driftAcknowledged flags and feature flag; auto-attaches and binds session to event.sender.id, broadcasts zero-input-ready to all windows."
+19,live-memory-detach,yes,no,no,certain,"No isDestroyed check, but uses event.sender.id as session key to dispose; safe no-op if nothing attached, no prior-attach requirement enforced."
+20,live-memory-read,yes,yes,no,certain,requireBundle() enforces sender not destroyed and an attached session bound to event.sender.id; reads raw process memory at arbitrary address.
+21,live-memory-propose-write,yes,yes,yes,certain,"Staging-only step of propose/issue-consent/confirm-write flow; requires attached session, does not write memory itself (userApproved:false)."
+22,live-memory-issue-write-consent,yes,yes,yes,certain,"Requires attached session, matching pending proposalId, verified process identity, and native requestPrivilegedWriteConsent dialog approval before issuing a consent token."
+23,live-memory-confirm-write,yes,yes,yes,certain,Writes to target process memory — high risk; requires consentToken matching consentBinding plus identity re-verification against the pending proposal.
+24,live-memory-rollback,yes,yes,no,certain,"Writes to target process memory to restore a prior value; gated only by requireBundle (attached session), no fresh consentToken required unlike confirm-write."
+25,live-memory-scan-first,yes,yes,no,certain,Read-only memory scan; requires prior attach via requireSession.
+26,live-memory-scan-first-auto-matrix,yes,yes,no,certain,Read-only multi-mode/multi-type scan fan-out; requires prior attach via requireSession.
+27,live-memory-scan-next,yes,yes,no,certain,Read-only narrowing scan over previous match list; requires prior attach via requireSession.
+28,live-memory-scan-first-unknown,yes,yes,no,certain,Read-only unknown-initial-value baseline scan; requires prior attach via requireSession.
+29,live-memory-scan-next-from-unknown,yes,yes,no,certain,Read-only multi-datatype filter against unknown-value baseline snapshot; requires prior attach via requireSession.
+30,live-memory-read-many,yes,yes,no,certain,Bulk read-only polling of candidate addresses for Watch Live Values panel; requires prior attach via requireSession.
+31,live-memory-correlation-start,yes,yes,no,certain,Starts a background poller pushing periodic 'live-memory-correlation-report' events; requires attached session and separately checks event.sender.isDestroyed() before each push.
+32,live-memory-correlation-poll,yes,yes,no,certain,Requires attached session and a previously started correlation watcher (per-sender bundle state).
+33,live-memory-correlation-event,yes,yes,no,certain,Records a correlation event; requires attached session and an active correlation watcher.
+34,live-memory-correlation-stop,yes,yes,no,certain,Stops the correlation watcher for the sender's bundle; requires attached session.
+35,live-memory-freeze-start,yes,yes,no,certain,"Writes a value repeatedly to target process memory on an interval (value freeze/cheat) — high risk; only gated by attach state, no consentToken required unlike write-consent flow."
+36,live-memory-freeze-stop,yes,yes,no,certain,Stops an active freeze; requires attached session.
+37,live-memory-freeze-status,yes,yes,no,certain,Read-only freeze status check; requires attached session.
+38,live-memory-list-controls,yes,yes,no,certain,Read-only listing of schema.v1 controls for the attached executable; requires attached session.
+39,live-memory-resolve-control,yes,yes,no,certain,Resolves a control address and reads its current value (read-only); requires attached session; actual writes still route through propose/confirm.
+40,live-memory-resolve-definition-feature,yes,yes,no,certain,Resolves a catalog definition memory feature and reads current value (read-only); requires attached session.
+41,live-memory-pointer-scan,yes,yes,no,certain,Read-only pointer chain scan; requires attached session plus feature flag.
+42,live-memory-scan-aob,yes,yes,no,certain,Read-only array-of-bytes signature scan; requires attached session plus feature flag.
+43,research:view,yes,yes,no,certain,"Reads raw typed values from process memory (read-only); requires attached session and feature flag, appends audit log entry."
+44,research:hex,yes,yes,no,certain,"Reads a raw hex memory window (read-only); requires attached session and feature flag, appends audit log entry."
+45,research:pointer-analyze,yes,yes,no,certain,"Read-only pointer scan plus candidate analysis; requires attached session and feature flag, appends audit log entry."
+46,research:resolve-path,yes,yes,no,certain,"Resolves module+offset[+chain] to an address on the attached session only (read-only); requires attached session and feature flag, appends audit log entry noting offline-waiver status."
+47,research:snapshot-diff,yes,no,no,certain,"Only checks event.sender.isDestroyed() and feature flag — no requireBundle/requireSession, so it does not require an attached session; pure diff of two supplied snapshot objects, no live memory access."
+48,research:snapshot-save,yes,no,no,certain,Only checks event.sender.isDestroyed() and feature flag; writes a snapshot JSON file under userData/research-sessions with no attach requirement (optionally logs to audit if a session happens to be attached for this sender).
+49,in-process-propose-hook,yes,yes,yes,certain,"Propose step of hook-install flow; requires attached session, in-process feature enabled, and evaluateInProcessGate (offline confirmation + userApprovedAction) before generating a hook proposal (not yet installed)."
+50,in-process-confirm-hook,yes,yes,yes,certain,"Installs an in-process code hook into the target process — high risk; confirm step keyed by sessionKey=String(event.sender.id)+proposalId (single-use pattern without a cryptographic consentToken), gated by in-process flag, offline/approval gate, and a re-checked online guard."
+51,in-process-rollback-hook,yes,yes,no,certain,Takes no payload (no schema needed); rolls back a previously installed hook keyed by sessionKey=String(event.sender.id); requires attached session with active memory access and in-process feature enabled.
+52,in-process-propose-injector-launch,yes,yes,yes,certain,"Propose step of injector-launch flow; requires attached session, verified process identity, in-process flag, and evaluateInProcessGate requiring both userConfirmedOffline and userApprovedAction true before staging a launch proposal."
+53,in-process-issue-injector-consent,yes,yes,yes,certain,"Issue-consent step for injector launch; requires attached session, verified identity, a valid pending injector proposalId, and native requestPrivilegedWriteConsent dialog approval before minting a consent token."
+54,in-process-register-injector-helper,no,yes,yes,certain,"Unlike its sibling handlers, does NOT call requireSession/requireBundle and never checks event.sender.isDestroyed() or an attach state — gated instead by in-process flag, path constraints (must exist, be .exe, under injector-helpers root, not a Windows system exe) plus a native requestPrivilegedApproval dialog before whitelisting the helper's SHA-256; no session-binding check at all."
+55,in-process-confirm-injector-launch,yes,yes,yes,certain,"Launches an injector helper process into the attached target — high risk; confirm step consumes parsed.consentToken bound to consentBinding/proposalId/identity, plus in-process flag, offline/approval gate, and a fresh remote-connections observation."
+56,local-ocr-list-window-sources,no,no,no,certain,"LocalOcrListSourcesSchema.parse validates optional targetName; enumerates all open window capture sources (desktopCapturer) with thumbnails/icons — privacy-relevant window enumeration, filtered but not restricted to a specific target process."
+57,local-ocr-read-window-region,no,no,no,certain,"LocalOcrCaptureSchema.parse validates sourceId/roi, plus manual clampRoi() bounds-checks the ROI against actual thumbnail size before cropping; captures a screen region and runs local tesseract.js OCR on it."
+58,get-games,no,no,no,certain,no input at all; reads all games from db
+59,pick-game-folder,no,no,no,certain,"opens native OS folder picker dialog scoped to sender's window, no other input"
+60,pick-game-executable,no,no,no,certain,"opens native OS file picker filtered to .exe, no other input"
+61,add-game,no,no,no,certain,AddGameSchema.parse plus separate validatePathSafety check on parsed.path before insert
+62,update-game,no,no,no,certain,UpdateGameSchema.parse plus validatePathSafety on parsed.path; gameId must be uuid or demo literal
+63,scan-game,no,no,no,certain,"ScanGameSchema.parse on gameId only, then filesystem scan of game.path"
+64,delete-game,no,no,no,certain,"DeleteGameSchema.parse on gameId; deletes db row, irreversible"
+65,get-recipes,no,no,no,certain,"read-only, GetRecipesSchema.parse on gameId"
+66,create-recipe,no,no,no,certain,"CreateRecipeSchema.parse (with superRefine) plus validateIpcPathSafety(target, gameId) confinement check"
+67,get-journal,no,no,no,certain,"read-only, GetJournalSchema.parse, gameId optional/nullable"
+68,log-event,no,no,no,certain,"LogEventSchema.parse, writes a journal row only, low risk"
+69,get-settings,no,no,no,certain,no input at all; reads settings
+70,set-setting,no,no,no,certain,SetSettingSchema.parse on key/value union; any renderer can flip any setting key including v2SessionMonitorEnabled/communitySyncEnabled with side effects
+71,delete-recipe,no,no,no,certain,"DeleteRecipeSchema.parse (uuid), deletes db row"
+72,get-backups,no,no,no,certain,"read-only, GetBackupsSchema.parse on gameId"
+73,restore-backup,no,no,no,certain,"RestoreBackupSchema.parse (uuid backupId); restores a file from backup and writes journal entry, no path safety re-check on restored file itself"
+74,detect-save-files,no,no,no,certain,"DetectSaveFilesSchema.parse on gameId; scans filesystem under game path and approved save locations, read-only"
+75,pick-save-file,no,no,no,certain,"validates gameId via DetectSaveFilesSchema; opens native file dialog and then auto-approves the parent folder as a save location for that gameId via addUserSelectedLocation (user picks the file, so implicit consent via OS dialog)"
+76,parse-save,no,yes - validateSaveDataFileAccess requires filePath be within an approved save location or registered game root for that gameId,no,certain,ParseSaveSchema.parse then validateSaveDataFileAccess path/ownership gate before reading file
+77,compare-saves,no,yes - validateSaveDataFileAccess on both savePathA and savePathB against gameId,no,certain,CompareSavesSchema.parse plus dual file-access checks before reading two files
+78,compare-saves-report,no,yes - validateSaveDataFileAccess on both file paths against gameId,no,certain,same pattern as compare-saves but returns a richer report object
+79,create-proposal-for-edit,no,"yes - validateIpcPathSafety(filePath, gameId) confines target file to game's approved root before creating proposal",no,certain,"CreateProposalSchema.parse; this only creates a pending proposal object, does not write to disk itself"
+80,apply-proposal,no,"yes - validateIpcPathSafety(targetFile, gameId) then a dry-run (dryRunProposal) must succeed before the real write executes",no,certain,"ApplyProposalSchema.parse; mutates a save/data file on disk after path-safety + dry-run gate; no explicit consent token but caller must submit a full pre-built proposal object (id, risk, dryRunPassed fields) rather than a two-phase server-side token"
+81,suggest-data-edits,no,"yes - validateSaveDataFileAccess(gameId, filePath) gate before reading file",no,certain,SuggestDataEditsSchema.parse; read-only analysis of a save/data file
+82,discover-save-locations,no,no,no,certain,DiscoverSaveLocationsSchema.parse on gameId; read-only filesystem discovery scan
+83,get-save-locations,no,no,no,certain,"read-only, GetSaveLocationsSchema.parse on gameId"
+84,approve-save-location,no,no,no,certain,ApproveSaveLocationSchema.parse(locationId uuid) only; any renderer can approve any locationId by id with no ownership/game binding check shown in this handler beyond schema shape
+85,revoke-save-location,no,no,no,certain,"RevokeSaveLocationSchema.parse(locationId uuid) only, same pattern as approve"
+86,add-user-selected-location,no,no,no,certain,"AddUserSelectedLocationSchema.parse(gameId, path); registers an arbitrary renderer-supplied path as an approved save location for a game with no path-safety/confinement check visible in this handler"
+87,check-game-running,no,no,no,certain,CheckGameRunningSchema.parse(gameId); read-only process-list check against configured executable names
+88,get-compatibility-profile,no,no,no,certain,"read-only, GetCompatibilityProfileSchema.parse on gameId"
+89,get-all-profiles,no,no,no,certain,"no input; runs raw SQL SELECT * with no params (no injection risk since no interpolation), read-only"
+90,v2-monitor-start,yes - explicit event.sender.isDestroyed() check before parsing payload,yes - gated on module-level lifecycleWiring being initialised and on v2SessionMonitorEnabled feature flag read server-side; ownership keyed to event.sender.id (never payload-supplied) per code comment,no,certain,V2MonitorStartSchema.parse; comment explicitly states senderId is derived from IPC event never payload to prevent renderer impersonation
+91,v2-monitor-stop,yes - event.sender.isDestroyed() check,yes - stop is scoped to event.sender.id via lifecycleWiring.handleStop,no,certain,no payload at all besides event; ownership enforced downstream by sender.id
+92,v2-monitor-get-state,no,no,no,certain,"no input, read-only status snapshot"
+93,v2-monitor-clear-timeline,no,no,no,certain,"no input; clears in-memory timeline for the single global session monitor, not scoped per-sender"
+94,v2-monitor-export-diagnostics,no,no,no,certain,"no input; exports diagnostics object, read-only"
+95,trainer-host-start,yes - event.sender.isDestroyed() check,no - first caller becomes owner (trainerHostOwner = event.sender.id) but starting itself is not gated by any prior session/consent check,no,certain,TrainerHostStartSchema is an empty object schema (z.object({})); lazily constructs a process supervisor singleton
+96,trainer-host-stop,yes - event.sender.isDestroyed() check,yes - trainerHostOwner must be null or equal event.sender.id ('not_owner' rejection),no,certain,no payload; ownership check prevents a different renderer from stopping another's session
+97,trainer-host-get-status,no,no,no,certain,"no input, read-only status, not owner-gated (any sender can query status)"
+98,trainer-host-read-field,yes - event.sender.isDestroyed() check,"yes - trainerHostOwner must match event.sender.id, plus downstream isPathApproved() enforced inside supervisor.readField() per inline comment",no,certain,"TrainerHostReadFieldSchema.parse; reads memory-mapped/file field from a running trainer host process, gated by ownership + path approval"
+99,trainer-host-propose-write,yes - event.sender.isDestroyed() check,yes - trainerHostOwner must match event.sender.id before a write can even be proposed,"yes - this is phase 1 of a two-phase propose/confirm flow; only creates a pending proposal, does not write",certain,TrainerHostProposeWriteSchema.parse; comment says proposal must be explicitly approved via trainer-host-approve-and-write
+100,trainer-host-approve-and-write,yes - event.sender.isDestroyed() check,yes - trainerHostOwner must match event.sender.id; additionally the proposalId must exist in supervisor's pending-proposal map per inline comment ('consuming it is the approval gate'),"yes - executes a previously proposed write identified only by proposalId, consuming it as the approval token",certain,TrainerHostApproveAndWriteSchema.parse(proposalId); actually performs the memory/file write
+101,trainer-host-rollback,yes - event.sender.isDestroyed() check,yes - trainerHostOwner must match event.sender.id,"no - rollback restores from an already-created backup, not gated by a fresh consent token itself",certain,"TrainerHostRollbackSchema.parse(filePath, backupPath, field, gameId); restores prior value from backup file"
+102,registry-run-readonly-verification,no,no,no,certain,Not Windows registry access (no HKLM/HKCU/WMI touched anywhere in this file) — 'registry' means a compiled CT/cheat-table artifact (pointers/scripts/AOB signatures). RunVerificationSchema.parse (registry field is z.unknown()) is followed by manual deep validation via validateLoadedRegistry(); spawns a worker_threads.Worker against a caller-supplied pid/executableName for 'read-only' memory verification and writes a JSON artifact to userData/runtime-verification. The process metadata sent to the worker hardcodes selectedByUser: true regardless of any real user confirmation.
+103,registry-compare-restart-artifacts,no,no,no,certain,"CompareRestartSchema.parse (previous/current as z.unknown()) plus a manual isHeadlessArtifact() shape guard; pure in-memory comparison of two prior verification artifacts, no filesystem or registry access."
+104,trainer-catalog-search,no,no,no,certain,Read-only search; SearchSchema.parse validates query/limit/offset/categories/verificationStatus.
+105,trainer-catalog-stats,no,no,no,certain,No input payload; read-only stats/sync-log listing.
+106,trainer-catalog-get,no,no,no,certain,CatalogGameIdSchema.parse; read-only single entry lookup.
+107,trainer-catalog-seed,no,no,no,certain,No user input; reads bundled seed file and writes seeded rows/definitions to local catalog store.
+108,trainer-catalog-sync-remote,no,"yes - gated by v2RemoteCatalogSyncEnabled setting flag (feature toggle, not identity/role based)",no,certain,Triggers outbound network sync of trainer sources when not disabled by setting.
+109,trainer-catalog-sync-hub,no,no,yes - overwriteUserDefinitions must be explicit true to overwrite locally-authored definitions,certain,Syncs community hub definitions; overwrite of user data requires explicit boolean flag.
+110,trainer-catalog-get-definition,no,no,no,certain,Validates stored definition against SolithDefinitionV1Schema before returning; read-only.
+111,publishToCommunity,no,no,no,certain,Publishes a full definition + executableHash to the community hub over the network with no session/consent gate beyond schema shape.
+112,trainer-catalog-load-game,no,no,no,certain,Registers game config into cheat-system game-registry (in-memory state mutation) and enables save access.
+113,trainer-catalog-get-trainer-controls,no,no,no,certain,Read-only dual-read of save-edit controls for a catalog game.
+114,trainer-catalog-approve-save-path,no,no,yes - this handler itself is the user's explicit approval action granting a save file/location access,certain,Grants a save-file directory as an approved location; saveFilePath dirname is trusted directly from renderer input.
+115,trainer-catalog-pick-ct,yes - uses event.sender via BrowserWindow.fromWebContents to anchor the dialog,no,no,certain,"Opens native file picker, enforces extension regex and 1B-8MB size bounds, reads file and hashes it (sha256) before returning contents to renderer."
+116,trainer-catalog-preview-ct,no,no,no,certain,PickedCtSchema.parse plus manual sha256 re-verification to guard against TOCTOU tampering of picked file content before preview parse.
+117,trainer-catalog-import-ct,no,no,no,certain,Imports and writes a new catalog definition parsed from an externally supplied Cheat Engine table XML.
+118,trainer-catalog-feedback-record,no,no,no,certain,Writes definition feedback record; low-risk local write.
+119,trainer-catalog-feedback-summary,no,no,no,certain,Read-only feedback/quarantine summary lookup.
+120,trainer-catalog-evaluate-promotion,no,no,no,certain,Read-only eligibility computation for promotion to verified status.
+121,trainer-catalog-promote-verified,no,no,no,certain,Escalates a definition's verificationStatus to verified with no session/role/consent gate beyond a valid catalogGameId - notable trust-elevation action with weak gating.
+122,trainer-catalog-export-definition,no,no,no,certain,Exports a stored definition to YAML text returned to renderer; no direct filesystem write here.
+123,trainer-catalog-pending-quarantine,no,no,no,certain,No input; read-only listing of quarantined/pending definition updates.
+124,trainer-catalog-import-yaml,no,no,no,certain,Parses and imports an arbitrary YAML definition blob (up to 2MB) into the catalog store.
+125,trainer-deck-get,no,no,no,likely,"catalogGameId pulled via manual 'in' check and String() coercion, no length/format limits; aggregates entry/definition/health/install/demand data (read-only)."
+126,trainer-health-check,no,no,no,likely,"Optional catalogGameId manually type-guarded, no schema; runs health check computation."
+127,trainer-health-list,no,no,no,certain,No input; read-only listing of all trainer health records.
+128,trainer-catalog-certify-l1,no,no,no,likely,Manual non-empty check on catalogGameId only; runs offline L1 certification writing certification results.
+129,catalog-demand-notify,no,no,no,likely,"catalogGameId required manually; kind validated only via inline ternary fallback ('notify' default), no schema; writes demand record."
+130,catalog-demand-list,no,no,no,certain,No input; read-only demand list.
+131,install-discovery-open-path,no,no,no,certain,"Manually resolves target path and enforces isPathUnderApprovedInstall containment check before calling shell.openPath - opens a file/folder via OS default handler, path traversal is explicitly guarded but no zod schema used."
+132,catalog-process-watch-active,no,no,no,likely,"Manual boolean coercion of 'active'; toggles background process-watch polling interval, no destructive effect."
+133,trainer-hotkeys-get-defaults,no,no,no,certain,No payload; returns default trainer hotkey bindings.
+134,trainer-hotkeys-get-bindings,no,no,no,certain,No payload; returns current bindings plus conflict/OS-warning detection.
+135,trainer-hotkeys-set-bindings,no,no,no,uncertain,"Only checks payload is an object containing a 'hotkeys' key, then blind-casts it to Record<string,string> and merges into bindings and re-registers global OS shortcuts — value types/contents are never actually validated."
+136,trainer-overlay-toggle,no,yes,no,certain,Gated by isTrainerCapabilityEnabled('v2OverlayEnabled') feature flag before toggling the trainer overlay window; not a user/session auth check.
+137,trainer-overlay-hide,no,no,no,certain,"Unlike trainer-overlay-toggle, this hide handler does not check the v2OverlayEnabled capability flag before acting — inconsistent gating."
+138,trainer-research-pick-exe,yes - checks event.sender.isDestroyed(),no,no,certain,"Opens native .exe file picker labeled 'analysis only — never run from Solith'; returns raw resolved path with no further validation, no execution performed here."
+139,trainer-research-analyze-exe,yes - checks event.sender.isDestroyed(),no,no,certain,"TrainerResearchAnalyzeExeSchema.parse validates filePath; performs static PE analysis of an arbitrary user-selected executable (read-only parsing, no spawn)."
+140,trainer-research-pick-dumpspace-folder,yes - checks event.sender.isDestroyed(),no,no,likely,Opens directory picker then manually verifies presence of expected Dumpspace JSON files before accepting the folder.
+141,trainer-research-import-dumpspace,yes - checks event.sender.isDestroyed(),no,no,certain,Schema-validated payload plus manual fs.existsSync/isDirectory check; reads user-supplied directory path and imports a new definition from its JSON contents.
+142,trainer-research-pick-ct,yes - checks event.sender.isDestroyed(),no,no,certain,"Picks a .ct/.xml file and reads it synchronously with fs.readFileSync with NO size cap or extension re-check (unlike trainer-catalog-pick-ct's 8MB limit/regex check) - inconsistent hardening, potential large-file/DoS read."
+143,trainer-research-analyze-ct-scripts,yes - checks event.sender.isDestroyed(),no,no,certain,"Schema-validated payload; parses/analyzes embedded Cheat Engine Lua/AutoAssembler scripts from untrusted XML for research purposes (script content is analyzed, not executed)."
+144,trainer-research-merge-ue-scripts,yes - checks event.sender.isDestroyed(),no,no,certain,"Only a manual truthy check on dumpspaceDir/xmlText via an unchecked type cast - no zod schema despite sibling handlers (analyze-ct-scripts, import-dumpspace) using one for near-identical inputs; reads arbitrary JSON files from a user-resolved directory path with no length/type bounds on xmlText/title/executable."
+145,wisp-overlay-toggle,no,no,no,certain,No payload; shows/hides the always-on-top transparent overlay BrowserWindow.
+146,wisp-overlay-hide,no,no,no,certain,No payload; hides the overlay window.
+147,wisp-overlay-set-expanded,no,no,no,certain,Payload only coerced via Boolean(payload?.expanded) — any value type is accepted; resizes/repositions the overlay window bounds.
+148,wisp-overlay-move-by,no,no,no,certain,"Manually coerces deltaX/deltaY with Number() and rejects non-finite values, then clamps the resulting overlay window position on-screen."
+149,wisp-overlay-set-interactive,no,no,no,certain,Payload only coerced via Boolean(payload?.interactive); toggles click-through/mouse-forwarding on the overlay window.

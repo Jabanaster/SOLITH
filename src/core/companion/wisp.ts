@@ -67,6 +67,7 @@ export type WispState = {
   visible: boolean;
   interactionOpen: boolean;
   form: WispForm;
+  preferredForm: WispForm;
   mood: WispMood;
   quietMode: boolean;
   message: WispMessage | null;
@@ -86,7 +87,8 @@ export type WispEvent =
   | { type: 'toggleInteraction' }
   | { type: 'setQuietMode'; quietMode: boolean }
   | { type: 'setMood'; mood: WispMood }
-  | { type: 'setForm'; form: WispForm };
+  | { type: 'setForm'; form: WispForm }
+  | { type: 'selectForm'; form: WispForm };
 
 export const SAFE_WISP_ACTIONS: ReadonlySet<WispActionKind> = new Set<WispActionKind>([
   'begin_scan',
@@ -117,6 +119,7 @@ export const DEFAULT_WISP_STATE: WispState = {
   visible: true,
   interactionOpen: false,
   form: 'base',
+  preferredForm: 'base',
   mood: 'curious',
   quietMode: false,
   message: null,
@@ -200,7 +203,7 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
         ...state,
         message: state.message?.id === event.id ? bubbles[0] ?? null : state.message,
         bubbles,
-        form: bubbles[0] ? getWispFormForMessage(bubbles[0]) : 'base',
+        form: bubbles[0] ? getWispFormForMessage(bubbles[0]) : state.preferredForm,
         mood: bubbles[0] ? getWispMoodForMessage(bubbles[0]) : state.quietMode ? 'sleepy' : 'curious',
       };
     }
@@ -209,7 +212,7 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
         ...state,
         message: null,
         bubbles: [],
-        form: 'base',
+        form: state.preferredForm,
         mood: state.quietMode ? 'sleepy' : 'curious',
       };
     case 'dismiss':
@@ -218,7 +221,7 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
         message: null,
         bubbles: [],
         interactionOpen: false,
-        form: 'base',
+        form: state.preferredForm,
         mood: state.quietMode ? 'sleepy' : 'curious',
       };
     case 'hide':
@@ -233,7 +236,7 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
       return {
         ...state,
         visible: true,
-        form: state.message ? getWispFormForMessage(state.message) : 'base',
+        form: state.message ? getWispFormForMessage(state.message) : state.preferredForm,
         mood: state.message ? getWispMoodForMessage(state.message) : 'curious',
       };
     case 'openInteraction':
@@ -241,14 +244,14 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
         ...state,
         visible: true,
         interactionOpen: true,
-        form: state.message ? getWispFormForMessage(state.message) : 'controller',
+        form: state.message ? getWispFormForMessage(state.message) : state.preferredForm,
         mood: 'curious',
       };
     case 'closeInteraction':
       return {
         ...state,
         interactionOpen: false,
-        form: state.message ? getWispFormForMessage(state.message) : 'base',
+        form: state.message ? getWispFormForMessage(state.message) : state.preferredForm,
         mood: state.message ? getWispMoodForMessage(state.message) : 'curious',
       };
     case 'toggleInteraction':
@@ -263,6 +266,8 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
       return { ...state, mood: event.mood };
     case 'setForm':
       return { ...state, form: event.form };
+    case 'selectForm':
+      return { ...state, form: event.form, preferredForm: event.form };
     default:
       return state;
   }

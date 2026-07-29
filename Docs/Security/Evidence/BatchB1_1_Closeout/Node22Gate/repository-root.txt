@@ -1,0 +1,6 @@
+Command: git rev-parse --show-toplevel
+StartTime: 2026-07-28T01:42:48.5269704-07:00
+EndTime: 2026-07-28T01:42:48.5269704-07:00
+ExitCode: 0
+--- RAW OUTPUT ---
+G:/ACTIVE_PROJECTS/SOLITH

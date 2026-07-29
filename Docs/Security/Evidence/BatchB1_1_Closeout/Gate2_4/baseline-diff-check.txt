@@ -1,0 +1,4 @@
+src/app/routes/GameLibrary.tsx:286: trailing whitespace.
++                <div 
+src/app/routes/GameLibrary.tsx:303: trailing whitespace.
++                    

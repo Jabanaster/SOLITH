@@ -1,0 +1,13 @@
+PASS: invalid PID is rejected
+PASS: write after process exit is rejected
+PASS: write via read-only handle fails closed (no silent success) — threw=true, valueUnchanged=true (before=424242, after=424242)
+PASS: write to unmapped address is rejected
+PASS: real direct write lands via nativeMemoryDriver — readBack=424242, before=424242, after=555222
+PASS: restore-to-original write lands — restored=424242, expected=424242
+PASS: freeze starts — {"success":true}
+FAIL: freeze applies frozen value — value=424242
+PASS: freeze restores value after external mutation — value=111222
+PASS: freeze no longer writes after stop — value=777333
+FATAL: TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at main (G:\ACTIVE_PROJECTS\SOLITH\Docs\Security\Evidence\BatchB1_1_Closeout\Gate2_2A_NativeWrite\verify-write-freeze-rollback.mts:228:93)

@@ -1,0 +1,84 @@
+# Gate 2.4A — Deleted-File Recovery and Scope-Integrity Reconciliation
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Model: Claude Sonnet
+
+## Scope
+
+Read-only investigation cycle. No production code, test code, package.json,
+package-lock.json, or CI/release-workflow file was modified. No file was
+deleted, restored, checked out, reset, cleaned, stashed, committed, pushed,
+merged, or tagged this cycle.
+
+## Findings
+
+1. **Original test_output.txt status**: Untracked, present since at least
+   Gate 2's baseline (the earliest evidence-capturing gate in this
+   engagement) — its creation predates this engagement's own evidence trail.
+2. **Likely origin**: Unknown with certainty; most plausibly an ad-hoc manual
+   shell-redirection artifact from before Gate 2 began. No script, test, or
+   config file in the current source tree references this filename.
+3. **Exact recovery**: Not available. Recursive filesystem search across
+   G:\ACTIVE_PROJECTS, G:\Downloads, %TEMP%, %LOCALAPPDATA%\Temp found zero
+   copies. PowerShell history, Git Bash history, VS Code local history, and
+   the Windows Recycle Bin were all searched with zero matches.
+4. **Reconstruction**: Not possible — no generating command or script was
+   ever identified. No reconstructed file was created; no guessed content
+   was written anywhere.
+5. **Other unauthorized deletions**: None found. Diffing Gate 2.4's own
+   baseline status snapshot against the current status snapshot shows exactly
+   one removed line (`test_output.txt`); every other difference is an
+   authorized addition (Gate 2.4's own new test file and evidence files, and
+   this cycle's own new evidence files).
+6. **Other unauthorized modifications**: None found. `git diff --stat`,
+   `--name-status`, and `--check` this cycle match Gate 2.4's own final
+   snapshot with no new drift.
+7. **Gate 2.4 source-state reproducibility**: Confirmed stable and
+   reproducible — no source file that produced Gate 2.4's test results has
+   changed since Gate 2.4's own final verification.
+8. **Effect on test results**: None. `test_output.txt` has zero references in
+   any package.json script, test file, or config file; it could not have
+   altered any test's execution, assertions, or output.
+9. **Effect on security conclusions**: None. Gate 2.4's security conclusions
+   (R-2.3-001/002 resolution, overlay/window/frame/navigation boundary
+   results) rest entirely on the unchanged main/renderer/electron source and
+   the packaged candidate built from it — none of which reference or depend
+   on the deleted file.
+10. **Evidence files corrected**: Gate2_4/verification-final.txt (scope-
+    integrity verdict formalized as FAIL), Gate2_4/changed-files.txt
+    (deletion note added), Gate2_4/remaining-risks.md (recovery/impact
+    findings layered onto existing R-2.4-007). See evidence-corrections.md
+    for the full before/after/reason table. No raw evidence was rewritten.
+11. **Files created**: 16 files under
+    Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/ — see
+    changed-files.txt for the complete list.
+12. **Remaining risks**: See remaining-risks.md — R-2.4-007 closed out as
+    NOT RECOVERABLE with proven zero functional/security impact; one new
+    documentation-only risk (R-2.4A-001, the file's original purpose remains
+    permanently unknown) disclosed; all Gate 2.4 risks R-2.4-001 through
+    R-2.4-006 carried forward unchanged.
+13. **Roadmap update**: SOLITH_SECURITY_ROADMAP.md updated with a Gate 2.4A
+    follow-up entry; the prior Gate 2.4 entry is preserved, not erased.
+
+## Verdict
+
+GATE 2.4A SCOPE INTEGRITY RECONCILED does not apply (test_output.txt could
+not be exactly recovered or faithfully reconstructed).
+
+**GATE 2.4A CONDITIONAL RECONCILIATION** — test_output.txt is not recoverable;
+its deletion is proven not to affect test execution or security conclusions;
+no additional unexplained path changes remain; evidence and roadmap fully
+disclose the loss.
+
+Gate 2.4 functional status: **REPORTED COMPLETE — VERIFIED** (functional
+results independently confirmed reproducible and unaffected by the deletion).
+
+Gate 2.4 scope integrity: **FAIL** (one unauthorized deletion of a
+pre-existing untracked file; no other integrity violation found).
+
+BATCH B1.1: **CONDITIONAL PASS** (unchanged — no exploitable functional or
+security regression was found or introduced in this cycle or any prior
+cycle).
+
+Release: **DENIED** (unchanged).

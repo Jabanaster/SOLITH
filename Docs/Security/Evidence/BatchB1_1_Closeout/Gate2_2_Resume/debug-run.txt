@@ -1,0 +1,28 @@
+
+Running 1 test using 1 worker
+
+  x  1 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) (15.5s)
+
+
+  1) tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) 
+
+    Error: freeze status: {"success":true,"status":{"active":true,"target":{"address":{"address":"1955640418600","dataType":"int32"},"value":111000},"lastGuard":{"allowed":true,"reason":"Single-player waiver accepted (advisory: 0 remote connection(s) observed; not blocking)."},"tickCount":1}}
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 111000
+    Received: 424242
+
+      199 |     await sleep(2500);
+      200 |     const debugStatus = await ctx.win.evaluate(async () => (window as any).electronAPI.liveMemoryFreezeStatus());
+    > 201 |     expect(readStatus(f.statusPath).value, `freeze status: ${JSON.stringify(debugStatus)}`).toBe(111000);
+          |                                                                                             ^
+      202 |     // Prove at least two real ticks by mutating externally and confirming restore.
+      203 |     fs.writeFileSync(f.mutatePath, '999000');
+      204 |     await sleep(500);
+        at G:\ACTIVE_PROJECTS\SOLITH\tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:201:93
+
+    Error Context: test-results\gate2-2-resume-packaged-li-62b79-tate-same-event-on-Windows-\error-context.md
+
+  1 failed
+    tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) 

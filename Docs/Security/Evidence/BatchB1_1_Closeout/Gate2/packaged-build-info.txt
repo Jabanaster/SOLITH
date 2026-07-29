@@ -1,0 +1,8 @@
+Command sequence: npm run build:vite && npm run build:electron && npm run dist:dir
+NodeVersion: v22.23.1
+NpmVersion: 10.9.8
+ElectronVersion (package.json devDependencies):     "electron": "^42.4.1",
+BuildConfig: package.json "build" field (electron-builder), win.target=nsis, dist:dir uses --dir (unpacked, no installer)
+OutputPath: dist/win-unpacked/Solith.exe
+StartTimeUtc/EndTimeUtc: see packaged-build-output.txt
+ExitCodes: build:vite=0, build:electron=0, dist:dir=0

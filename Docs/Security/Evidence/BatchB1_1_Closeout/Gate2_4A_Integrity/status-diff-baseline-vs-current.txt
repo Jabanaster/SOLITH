@@ -1,0 +1,44 @@
+302a303,307
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/baseline-diff-check.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/baseline-diff-name-status.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/baseline-diff-stat.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/baseline-file-manifest.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/baseline-staged-name-status.txt
+303a309,341
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/canonical-url-boundary-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/changed-files.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/control-provenance.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/failure-classification.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/gate24-diff-check.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/gate24-status-final.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/gate2_3-independent-verification-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/normal-build-test-hook-final-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/npm-test-live-memory-output.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/npm-test-output.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-audit-review.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-build-info.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-devtools-boundary-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-environment.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-final-regression-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-frame-boundary-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-navigation-boundary-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-overlay-permission-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-owner-isolation-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-real-flow-renderer-crash-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/packaged-window-recreation-matrix.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/remaining-risks.md
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/test-hook-inventory.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/tests-run.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/tests-summary.csv
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/tsc-electron-check.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/tsc-main-check.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4/verification-final.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/current-diff-check.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/current-diff-name-status.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/current-diff-stat.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/current-staged-name-status.txt
+> ?? Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/current-status.txt
+485d522
+< ?? test_output.txt
+516a554
+> ?? tests/gate2-4-final-certification.e2e.test.ts

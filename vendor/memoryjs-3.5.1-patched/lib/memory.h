@@ -63,20 +63,33 @@ public:
     return FALSE;
   }
 
+  // Every writeMemory overload below returns whether WriteProcessMemory both
+  // succeeded AND wrote the full requested byte count (a short write is
+  // treated as failure, not partial success), and reports the Win32 error
+  // code via lastError when it did not. Callers must check the return value
+  // — a discarded result here is exactly the defect this rework closes.
   template <class dataType>
-  void writeMemory(HANDLE hProcess, DWORD64 address, dataType value) {
-    WriteProcessMemory(hProcess, (LPVOID)address, &value, sizeof(dataType), NULL);
+  bool writeMemory(HANDLE hProcess, DWORD64 address, dataType value, DWORD* lastError = nullptr) {
+    SIZE_T bytesWritten = 0;
+    BOOL ok = WriteProcessMemory(hProcess, (LPVOID)address, &value, sizeof(dataType), &bytesWritten);
+    bool success = ok && bytesWritten == sizeof(dataType);
+    if (lastError) *lastError = success ? 0 : GetLastError();
+    return success;
   }
 
   template <class dataType>
-  void writeMemory(HANDLE hProcess, DWORD64 address, dataType value, SIZE_T size) {
+  bool writeMemory(HANDLE hProcess, DWORD64 address, dataType value, SIZE_T size, DWORD* lastError = nullptr) {
 	  LPVOID buffer = value;
 
 	  if (typeid(dataType) != typeid(char*)) {
 		  buffer = &value;
 	  }
 
-	  WriteProcessMemory(hProcess, (LPVOID)address, buffer, size, NULL);
+	  SIZE_T bytesWritten = 0;
+	  BOOL ok = WriteProcessMemory(hProcess, (LPVOID)address, buffer, size, &bytesWritten);
+	  bool success = ok && bytesWritten == size;
+	  if (lastError) *lastError = success ? 0 : GetLastError();
+	  return success;
   }
 
   // Write String, Method 1: Utf8Value is converted to string, get pointer and length from string
@@ -86,8 +99,12 @@ public:
   // }
 
   // Write String, Method 2: get pointer and length from Utf8Value directly
-  void writeMemory(HANDLE hProcess, DWORD64 address, char* value, SIZE_T size) {
-    WriteProcessMemory(hProcess, (LPVOID)address, value, size, NULL);
+  bool writeMemory(HANDLE hProcess, DWORD64 address, char* value, SIZE_T size, DWORD* lastError = nullptr) {
+    SIZE_T bytesWritten = 0;
+    BOOL ok = WriteProcessMemory(hProcess, (LPVOID)address, value, size, &bytesWritten);
+    bool success = ok && bytesWritten == size;
+    if (lastError) *lastError = success ? 0 : GetLastError();
+    return success;
   }
 };
 #endif

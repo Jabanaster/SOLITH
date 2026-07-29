@@ -31,8 +31,8 @@ struct Vector4 {
 Napi::Value openProcess(const Napi::CallbackInfo& args) {
   Napi::Env env = args.Env();
 
-  if (args.Length() != 1 && args.Length() != 2) {
-    Napi::Error::New(env, "requires 1 argument, or 2 arguments if a callback is being used").ThrowAsJavaScriptException();
+  if (args.Length() < 1 || args.Length() > 2) {
+    Napi::Error::New(env, "requires 1 argument, or 2 arguments if a callback or a writable flag is being used").ThrowAsJavaScriptException();
     return env.Null();
   }
 
@@ -41,8 +41,15 @@ Napi::Value openProcess(const Napi::CallbackInfo& args) {
     return env.Null();
   }
 
-  if (args.Length() == 2 && !args[1].IsFunction()) {
-    Napi::Error::New(env, "second argument must be a function").ThrowAsJavaScriptException();
+  bool hasCallback = args.Length() == 2 && args[1].IsFunction();
+  // Gate 2.2A: a second, non-function boolean argument opts into a
+  // write-capable handle (PROCESS_VM_WRITE | PROCESS_VM_OPERATION in addition
+  // to the original read-only rights) — never PROCESS_ALL_ACCESS, and never
+  // granted unless explicitly requested by the caller.
+  bool requestWriteAccess = args.Length() == 2 && args[1].IsBoolean() && args[1].As<Napi::Boolean>().Value();
+
+  if (args.Length() == 2 && !args[1].IsFunction() && !args[1].IsBoolean()) {
+    Napi::Error::New(env, "second argument must be a function or a boolean").ThrowAsJavaScriptException();
     return env.Null();
   }
 
@@ -53,7 +60,7 @@ Napi::Value openProcess(const Napi::CallbackInfo& args) {
 
   if (args[0].IsString()) {
     std::string processName(args[0].As<Napi::String>().Utf8Value());
-    pair = Process.openProcess(processName.c_str(), &errorMessage);
+    pair = Process.openProcess(processName.c_str(), &errorMessage, requestWriteAccess);
 
     // In case it failed to open, let's keep retrying
     // while(!strcmp(process.szExeFile, "")) {
@@ -62,7 +69,7 @@ Napi::Value openProcess(const Napi::CallbackInfo& args) {
   }
 
   if (args[0].IsNumber()) {
-    pair = Process.openProcess(args[0].As<Napi::Number>().Uint32Value(), &errorMessage);
+    pair = Process.openProcess(args[0].As<Napi::Number>().Uint32Value(), &errorMessage, requestWriteAccess);
 
     // In case it failed to open, let's keep retrying
     // while(!strcmp(process.szExeFile, "")) {
@@ -72,7 +79,7 @@ Napi::Value openProcess(const Napi::CallbackInfo& args) {
 
   // If an error message was returned from the function that opens the process, throw the error.
   // Only throw an error if there is no callback (if there's a callback, the error is passed there).
-  if (strcmp(errorMessage, "") && args.Length() != 2) {
+  if (strcmp(errorMessage, "") && !hasCallback) {
     Napi::Error::New(env, errorMessage).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -91,9 +98,10 @@ Napi::Value openProcess(const Napi::CallbackInfo& args) {
   DWORD64 base = module::getBaseAddress(pair.process.szExeFile, pair.process.th32ProcessID);
   processInfo.Set(Napi::String::New(env, "modBaseAddr"), Napi::Value::From(env, (uintptr_t)base));
 
-  // openProcess can either take one argument or can take
-  // two arguments for asychronous use (second argument is the callback)
-  if (args.Length() == 2) {
+  // openProcess can either take one argument, or two arguments for
+  // asynchronous use (second argument is a callback), or two arguments to
+  // request a write-capable handle (second argument is a boolean).
+  if (hasCallback) {
     // Callback to let the user handle with the information
     Napi::Function callback = args[1].As<Napi::Function>();
     callback.Call(env.Global(), { Napi::String::New(env, errorMessage), processInfo });
@@ -513,49 +521,56 @@ Napi::Value writeMemory(const Napi::CallbackInfo& args) {
   HANDLE handle = (HANDLE)args[0].As<Napi::Number>().Int64Value();
   DWORD64 address = args[1].As<Napi::Number>().Int64Value();
 
+  // Gate 2.2A: every branch below now captures whether the write actually
+  // landed (full byte count written) and the Win32 error code when it did
+  // not, instead of discarding WriteProcessMemory's result. A failed or
+  // short write must never be reported to JS as success.
+  bool writeSucceeded = false;
+  DWORD writeLastError = 0;
+
   if (!strcmp(dataType, "int8") || !strcmp(dataType, "byte") || !strcmp(dataType, "char")) {
 
-    Memory.writeMemory<int8_t>(handle, address, args[2].As<Napi::Number>().Int32Value());
+    writeSucceeded = Memory.writeMemory<int8_t>(handle, address, args[2].As<Napi::Number>().Int32Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "uint8") || !strcmp(dataType, "ubyte") || !strcmp(dataType, "uchar")) {
 
-    Memory.writeMemory<uint8_t>(handle, address, args[2].As<Napi::Number>().Uint32Value());
+    writeSucceeded = Memory.writeMemory<uint8_t>(handle, address, args[2].As<Napi::Number>().Uint32Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "int16") || !strcmp(dataType, "short")) {
 
-    Memory.writeMemory<int16_t>(handle, address, args[2].As<Napi::Number>().Int32Value());
+    writeSucceeded = Memory.writeMemory<int16_t>(handle, address, args[2].As<Napi::Number>().Int32Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "uint16") || !strcmp(dataType, "ushort") || !strcmp(dataType, "word")) {
 
-    Memory.writeMemory<uint16_t>(handle, address, args[2].As<Napi::Number>().Uint32Value());
+    writeSucceeded = Memory.writeMemory<uint16_t>(handle, address, args[2].As<Napi::Number>().Uint32Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "int32") || !strcmp(dataType, "int") || !strcmp(dataType, "long")) {
 
-    Memory.writeMemory<int32_t>(handle, address, args[2].As<Napi::Number>().Int32Value());
+    writeSucceeded = Memory.writeMemory<int32_t>(handle, address, args[2].As<Napi::Number>().Int32Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "uint32") || !strcmp(dataType, "uint") || !strcmp(dataType, "ulong") || !strcmp(dataType, "dword")) {
 
-    Memory.writeMemory<uint32_t>(handle, address, args[2].As<Napi::Number>().Uint32Value());
+    writeSucceeded = Memory.writeMemory<uint32_t>(handle, address, args[2].As<Napi::Number>().Uint32Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "int64")) {
 
     Napi::BigInt bigInt = args[2].As<Napi::BigInt>();
     bool lossless;
-    Memory.writeMemory<int64_t>(handle, address, bigInt.Int64Value(&lossless));
+    writeSucceeded = Memory.writeMemory<int64_t>(handle, address, bigInt.Int64Value(&lossless), &writeLastError);
 
   } else if (!strcmp(dataType, "uint64")) {
 
     Napi::BigInt bigInt = args[2].As<Napi::BigInt>();
     bool lossless;
-    Memory.writeMemory<uint64_t>(handle, address, bigInt.Uint64Value(&lossless));
+    writeSucceeded = Memory.writeMemory<uint64_t>(handle, address, bigInt.Uint64Value(&lossless), &writeLastError);
 
   } else if (!strcmp(dataType, "float")) {
 
-    Memory.writeMemory<float>(handle, address, args[2].As<Napi::Number>().FloatValue());
+    writeSucceeded = Memory.writeMemory<float>(handle, address, args[2].As<Napi::Number>().FloatValue(), &writeLastError);
 
   } else if (!strcmp(dataType, "double")) {
 
-    Memory.writeMemory<double>(handle, address, args[2].As<Napi::Number>().DoubleValue());
+    writeSucceeded = Memory.writeMemory<double>(handle, address, args[2].As<Napi::Number>().DoubleValue(), &writeLastError);
 
   } else if (!strcmp(dataType, "ptr") || !strcmp(dataType, "pointer")) {
 
@@ -570,9 +585,9 @@ Napi::Value writeMemory(const Napi::CallbackInfo& args) {
 
     if (bigInt.IsBigInt()) {
       bool lossless;
-      Memory.writeMemory<intptr_t>(handle, address, bigInt.Int64Value(&lossless));
+      writeSucceeded = Memory.writeMemory<intptr_t>(handle, address, bigInt.Int64Value(&lossless), &writeLastError);
     } else {
-      Memory.writeMemory<intptr_t>(handle, address, args[2].As<Napi::Number>().Int32Value());
+      writeSucceeded = Memory.writeMemory<intptr_t>(handle, address, args[2].As<Napi::Number>().Int32Value(), &writeLastError);
     }
 
   } else if (!strcmp(dataType, "uptr") || !strcmp(dataType, "upointer")) {
@@ -588,14 +603,14 @@ Napi::Value writeMemory(const Napi::CallbackInfo& args) {
 
     if (bigInt.IsBigInt()) {
       bool lossless;
-      Memory.writeMemory<uintptr_t>(handle, address, bigInt.Uint64Value(&lossless));
+      writeSucceeded = Memory.writeMemory<uintptr_t>(handle, address, bigInt.Uint64Value(&lossless), &writeLastError);
     } else {
-      Memory.writeMemory<uintptr_t>(handle, address, args[2].As<Napi::Number>().Uint32Value());
+      writeSucceeded = Memory.writeMemory<uintptr_t>(handle, address, args[2].As<Napi::Number>().Uint32Value(), &writeLastError);
     }
 
   } else if (!strcmp(dataType, "bool") || !strcmp(dataType, "boolean")) {
 
-    Memory.writeMemory<bool>(handle, address, args[2].As<Napi::Boolean>().Value());
+    writeSucceeded = Memory.writeMemory<bool>(handle, address, args[2].As<Napi::Boolean>().Value(), &writeLastError);
 
   } else if (!strcmp(dataType, "string") || !strcmp(dataType, "str")) {
 
@@ -606,7 +621,7 @@ Napi::Value writeMemory(const Napi::CallbackInfo& args) {
     //Memory.writeMemory<std::string>(handle, address, std::string(*valueParam));
 
     // Write String, Method 2
-    Memory.writeMemory(handle, address, (char*) valueParam.data(), valueParam.size());
+    writeSucceeded = Memory.writeMemory(handle, address, (char*) valueParam.data(), valueParam.size(), &writeLastError);
 
   } else if (!strcmp(dataType, "vector3") || !strcmp(dataType, "vec3")) {
 
@@ -616,7 +631,7 @@ Napi::Value writeMemory(const Napi::CallbackInfo& args) {
       value.Get(Napi::String::New(env, "y")).As<Napi::Number>().FloatValue(),
       value.Get(Napi::String::New(env, "z")).As<Napi::Number>().FloatValue()
     };
-    Memory.writeMemory<Vector3>(handle, address, vector);
+    writeSucceeded = Memory.writeMemory<Vector3>(handle, address, vector, &writeLastError);
 
   } else if (!strcmp(dataType, "vector4") || !strcmp(dataType, "vec4")) {
 
@@ -627,10 +642,19 @@ Napi::Value writeMemory(const Napi::CallbackInfo& args) {
       value.Get(Napi::String::New(env, "y")).As<Napi::Number>().FloatValue(),
       value.Get(Napi::String::New(env, "z")).As<Napi::Number>().FloatValue()
     };
-    Memory.writeMemory<Vector4>(handle, address, vector);
+    writeSucceeded = Memory.writeMemory<Vector4>(handle, address, vector, &writeLastError);
 
   } else {
     Napi::Error::New(env, "unexpected data type").ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (!writeSucceeded) {
+    // Sanitized: stable code + native Win32 error number only. No memory
+    // values, addresses, consent tokens, or paths are included here.
+    std::string error = "write_failed:" + std::to_string(writeLastError);
+    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   return env.Null();
@@ -653,7 +677,14 @@ Napi::Value writeBuffer(const Napi::CallbackInfo& args) {
   DWORD64 address = args[1].As<Napi::Number>().Int64Value();
   SIZE_T length = args[2].As<Napi::Buffer<char>>().Length();
   char* data = args[2].As<Napi::Buffer<char>>().Data();
-  Memory.writeMemory<char*>(handle, address, data, length);
+
+  DWORD writeLastError = 0;
+  bool writeSucceeded = Memory.writeMemory<char*>(handle, address, data, length, &writeLastError);
+  if (!writeSucceeded) {
+    std::string error = "write_failed:" + std::to_string(writeLastError);
+    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    return env.Null();
+  }
 
   return env.Null();
 }

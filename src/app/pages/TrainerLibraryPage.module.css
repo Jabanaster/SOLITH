@@ -122,6 +122,121 @@
   justify-content: flex-end;
 }
 
+.scanPreviewPanel {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(80, 220, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(10, 18, 32, 0.94);
+}
+
+.scanPreviewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.scanPreviewHeader h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+  color: #e8f0ff;
+}
+
+.scanPreviewHeader p,
+.scanRoot {
+  margin: 0;
+  color: #9eb6dc;
+  font-size: 0.82rem;
+}
+
+.scanRoot {
+  margin-top: 0.6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanPreviewActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.scanPreviewActions .secondaryBtn {
+  width: auto;
+  padding: 0.5rem 0.8rem;
+}
+
+.scanSummary {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+}
+
+.scanSummary span {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgba(120, 180, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(18, 30, 50, 0.85);
+  color: #cde0ff;
+  font-size: 0.75rem;
+}
+
+.scanRecordList {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  min-height: 12rem;
+  max-height: min(70vh, 56rem);
+  margin-top: 0.7rem;
+  overflow: auto;
+  padding-right: 0.25rem;
+  resize: vertical;
+}
+
+.scanRecordListExpanded {
+  height: min(70vh, 56rem);
+  resize: none;
+}
+
+.scanRecord {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid rgba(120, 180, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(13, 24, 42, 0.86);
+  color: #e8f0ff;
+}
+
+.scanRecord small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #8fa3c7;
+  font-size: 0.72rem;
+}
+
+.scanRecordMuted {
+  opacity: 0.65;
+}
+
+.scanDiagnostics {
+  margin-top: 0.75rem;
+  color: #9eb6dc;
+  font-size: 0.78rem;
+}
+
+.scanDiagnostics summary {
+  cursor: pointer;
+  color: #cde0ff;
+}
+
 .cancelImportBtn {
   padding: 0.55rem 0.9rem;
   border-radius: 8px;

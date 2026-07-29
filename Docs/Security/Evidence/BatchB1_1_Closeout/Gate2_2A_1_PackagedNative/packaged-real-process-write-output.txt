@@ -1,0 +1,7 @@
+
+Running 1 test using 1 worker
+
+  ok 1 tests\gate2-2a1-packaged-real-process-write-proof.e2e.test.ts:40:1 › packaged real-process write/read/restore/failure proof against the Gate 2.2 fixture (27.9s)
+
+  1 passed (29.0s)
+exit:0

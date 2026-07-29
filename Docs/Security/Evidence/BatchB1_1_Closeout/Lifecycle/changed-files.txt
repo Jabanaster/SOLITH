@@ -1,0 +1,19 @@
+electron/live-memory-ipc.ts
+electron/main.ts
+electron/registry-verification-ipc.ts
+electron/sender-validation.ts
+src/core/consent/write-consent.ts
+src/core/live-memory/cleanup-coordinator.ts
+src/core/live-memory/live-memory-session.ts
+src/core/security/process-selection-registry.ts
+src/core/security/trusted-sender-registry.ts
+tests/live-memory/app-shutdown-cleanup.test.ts
+tests/live-memory/cleanup-failure-handling.test.ts
+tests/live-memory/feature-disable-cleanup.test.ts
+tests/live-memory/renderer-crash-cleanup.test.ts
+tests/live-memory/rollback-float-integrity.test.ts
+tests/process-selection-registry.test.ts
+tests/trusted-sender-registry.test.ts
+Docs/Security/Evidence/BatchB1_1_Closeout/Lifecycle/*
+
+Some listed files already contained uncommitted B1.1 work before this phase. See control-provenance.csv; this file does not claim all file content was newly implemented.

@@ -1,0 +1,6 @@
+Node,npm,Electron,Arch,Compiler
+v24.15.0
+v22.23.1
+    "electron": "^42.4.1",
+x64
+VS2022 17.14.37516.0 (MSBuild)

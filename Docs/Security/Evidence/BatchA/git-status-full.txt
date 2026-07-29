@@ -1,0 +1,74 @@
+M  .gitignore
+ M ROADMAP.md
+M  electron/ct-library-ipc.ts
+MM electron/install-discovery-ipc.ts
+M  electron/ipc-validation.ts
+M  electron/main.ts
+MM electron/preload.ts
+M  electron/trainer-catalog-ipc.ts
+ M electron/wisp-overlay.ts
+M  package.json
+M  src/app/App.tsx
+ M src/app/assets/wisp/index.ts
+M  src/app/components/PageModuleHeader.tsx
+A  src/app/components/PageWalkthrough.tsx
+ M src/app/components/SolithWispCompanion.tsx
+A  src/app/help/walkthroughs.ts
+AM src/app/live-memory/process-picker.ts
+M  src/app/pages/Backups.tsx
+M  src/app/pages/CompatibilityDashboard.tsx
+M  src/app/pages/CtLibraryExplorerPage.tsx
+M  src/app/pages/DiscoveryLab.tsx
+M  src/app/pages/ExternalTrainerResearchLab.tsx
+MM src/app/pages/LiveMemoryTrainerPage.tsx
+M  src/app/pages/Recipes.tsx
+M  src/app/pages/RegistryExplorerPage.tsx
+M  src/app/pages/SaveEditor.tsx
+M  src/app/pages/SaveLocations.tsx
+M  src/app/pages/SessionMonitorPage.tsx
+M  src/app/pages/TrainerControlPanel.tsx
+M  src/app/pages/TrainerLibraryPage.module.css
+MM src/app/pages/TrainerLibraryPage.tsx
+M  src/app/routes/GameLibrary.tsx
+MM src/app/styles/index.css
+M  src/core/ct-library/import-state.ts
+M  src/core/database/index.ts
+M  src/core/definitions/import-definition-ct.ts
+M  src/core/games/index.ts
+MM src/core/install-discovery/index.ts
+MM src/core/install-discovery/types.ts
+ M src/core/live-memory/native-memory-driver.ts
+ M src/index.tsx
+M  src/shared/types/index.ts
+MM src/types/global.d.ts
+A  tests/game-metadata-persistence.test.ts
+A  tests/page-walkthrough.test.tsx
+AM tests/process-picker.test.ts
+AM tests/trainer-library-preview-gates.test.ts
+?? Docs/Reports/Evidence/Phase-1/2026-07-26/00-windows-ui-unavailable.md
+?? Docs/Reports/PHASE_1_MANUAL_CERTIFICATION_2026-07-26.md
+?? Docs/Reports/STRICT_EXECUTIVE_PROJECT_REVIEW_2026-07-26.md
+?? Docs/Security/BATCH_A_COMPLETION_MATRIX.md
+?? Docs/Security/BATCH_A_FINAL_REPORT.md
+?? Docs/Security/Evidence/BatchA/branch.txt
+?? Docs/Security/Evidence/BatchA/git-status-full.txt
+?? Docs/Security/Evidence/BatchA/repository-root.txt
+?? Docs/Security/SOLITH_ATTACK_SURFACE.md
+?? Docs/Security/SOLITH_BATCH_A_COMPLETE_AUDIT.md
+?? Docs/Security/SOLITH_DEPENDENCY_INVENTORY.md
+?? Docs/Security/SOLITH_IPC_INVENTORY_BATCH_A.md
+?? Docs/Security/SOLITH_SECURITY_ARCHITECTURE.md
+?? Docs/Security/SOLITH_SECURITY_FINDINGS_BATCH_A_REVISED.md
+?? Docs/Security/SOLITH_SECURITY_FINDINGS_INITIAL.md
+?? Docs/Security/Tools/Extract-SolithIpcSurface.ps1
+?? Docs/V1_STABILIZATION_MANIFEST.md
+?? src/app/assets/wisp/solith-wisp-base-float.png
+?? src/app/assets/wisp/solith-wisp-controller-float.png
+?? src/app/assets/wisp/solith-wisp-crystal-float.png
+?? src/app/assets/wisp/solith-wisp-dragon-float.png
+?? src/app/assets/wisp/solith-wisp-error-float.png
+?? src/app/assets/wisp/solith-wisp-phoenix-float.png
+?? src/app/assets/wisp/solith-wisp-scan-float.png
+?? src/app/assets/wisp/solith-wisp-shield-float.png
+?? src/app/assets/wisp/solith-wisp-success-float.png
+?? src/app/assets/wisp/solith-wisp-warning-float.png

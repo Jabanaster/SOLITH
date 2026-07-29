@@ -1,0 +1,134 @@
+M  .gitignore
+ M ROADMAP.md
+M  electron/ct-library-ipc.ts
+MM electron/install-discovery-ipc.ts
+MM electron/ipc-validation.ts
+ M electron/live-memory-ipc.ts
+MM electron/main.ts
+MM electron/preload.ts
+ M electron/privileged-consent-dialog.ts
+ M electron/registry-verification-ipc.ts
+M  electron/trainer-catalog-ipc.ts
+ M electron/trainer-overlay.ts
+ M electron/wisp-overlay.ts
+MM package.json
+M  src/app/App.tsx
+ M src/app/assets/wisp/index.ts
+M  src/app/components/PageModuleHeader.tsx
+A  src/app/components/PageWalkthrough.tsx
+ M src/app/components/SolithWispCompanion.tsx
+A  src/app/help/walkthroughs.ts
+AM src/app/live-memory/process-picker.ts
+M  src/app/pages/Backups.tsx
+M  src/app/pages/CompatibilityDashboard.tsx
+M  src/app/pages/CtLibraryExplorerPage.tsx
+M  src/app/pages/DiscoveryLab.tsx
+M  src/app/pages/ExternalTrainerResearchLab.tsx
+MM src/app/pages/LiveMemoryTrainerPage.tsx
+M  src/app/pages/Recipes.tsx
+MM src/app/pages/RegistryExplorerPage.tsx
+M  src/app/pages/SaveEditor.tsx
+M  src/app/pages/SaveLocations.tsx
+M  src/app/pages/SessionMonitorPage.tsx
+M  src/app/pages/TrainerControlPanel.tsx
+MM src/app/pages/TrainerLibraryPage.module.css
+MM src/app/pages/TrainerLibraryPage.tsx
+M  src/app/routes/GameLibrary.tsx
+MM src/app/styles/index.css
+ M src/core/consent/write-consent.ts
+M  src/core/ct-library/import-state.ts
+MM src/core/database/index.ts
+M  src/core/definitions/import-definition-ct.ts
+M  src/core/games/index.ts
+ M src/core/install-discovery/epic.ts
+ M src/core/install-discovery/gog.ts
+MM src/core/install-discovery/index.ts
+ M src/core/install-discovery/match.ts
+ M src/core/install-discovery/store.ts
+MM src/core/install-discovery/types.ts
+ M src/core/live-memory/live-memory-session.ts
+ M src/core/live-memory/memory-manager.ts
+ M src/core/live-memory/native-memory-driver.ts
+ M src/core/live-memory/types.ts
+ M src/index.tsx
+M  src/shared/types/index.ts
+MM src/types/global.d.ts
+ M tests/csp-static.test.ts
+A  tests/game-metadata-persistence.test.ts
+ M tests/live-memory/live-memory-session.test.ts
+ M tests/live-memory/memory-manager.test.ts
+ M tests/packaged-smoke.test.ts
+AM tests/page-walkthrough.test.tsx
+AM tests/process-picker.test.ts
+AM tests/trainer-library-preview-gates.test.ts
+ M vite.config.ts
+?? Docs/Reports/Evidence/Phase-1/2026-07-26/00-windows-ui-unavailable.md
+?? Docs/Reports/PHASE_1_MANUAL_CERTIFICATION_2026-07-26.md
+?? Docs/Reports/STRICT_EXECUTIVE_PROJECT_REVIEW_2026-07-26.md
+?? Docs/Security/B2A/freeze-consent-lifecycle-discovery.md
+?? Docs/Security/BATCH_A_COMPLETION_MATRIX.md
+?? Docs/Security/BATCH_A_FINAL_REPORT.md
+?? Docs/Security/Evidence/BatchA/HANDOVER_EXECUTION_PLAN.txt
+?? Docs/Security/Evidence/BatchA/branch.txt
+?? Docs/Security/Evidence/BatchA/consent-state-machine-audit.txt
+?? Docs/Security/Evidence/BatchA/git-diff-check.txt
+?? Docs/Security/Evidence/BatchA/git-diff-stat.txt
+?? Docs/Security/Evidence/BatchA/git-status-full.txt
+?? Docs/Security/Evidence/BatchA/handler-authorization-audit.csv
+?? Docs/Security/Evidence/BatchA/handler-validation-audit.csv
+?? Docs/Security/Evidence/BatchA/ipc-channel-reconciliation.csv
+?? Docs/Security/Evidence/BatchA/ipc-preload-orphans.csv
+?? Docs/Security/Evidence/BatchA/ipc-renderer-callers.csv
+?? Docs/Security/Evidence/BatchA/ipc-summary.txt
+?? Docs/Security/Evidence/BatchA/process-execution-audit.csv
+?? Docs/Security/Evidence/BatchA/registry-operations-audit.txt
+?? Docs/Security/Evidence/BatchA/repository-root.txt
+?? Docs/Security/Evidence/BatchA/secret-scan-summary.txt
+?? Docs/Security/Evidence/BatchA/verification-final.txt
+?? Docs/Security/Evidence/BatchB1/baseline-files.txt
+?? Docs/Security/Evidence/BatchB1/batcha-disposition-updates.csv
+?? Docs/Security/Evidence/BatchB1/batchb1-owned-diff.txt
+?? Docs/Security/Evidence/BatchB1/changed-files.txt
+?? Docs/Security/Evidence/BatchB1/finding-revalidation-v2.md
+?? Docs/Security/Evidence/BatchB1/finding-revalidation.md
+?? Docs/Security/Evidence/BatchB1/preexisting-diff-preserved.txt
+?? Docs/Security/Evidence/BatchB1/tests-run.txt
+?? Docs/Security/Evidence/BatchB1/verification-final.txt
+?? Docs/Security/Evidence/BatchB1_1/changed-files.txt
+?? Docs/Security/Evidence/BatchB1_1/design.md
+?? Docs/Security/Evidence/BatchB1_1/remaining-risks.md
+?? Docs/Security/Evidence/BatchB1_1/tests-run.txt
+?? Docs/Security/Evidence/BatchB1_1/verification-final.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/branch.txt
+?? Docs/Security/Evidence/BatchB1_1_Closeout/repository-root.txt
+?? Docs/Security/SOLITH_ATTACK_SURFACE.md
+?? Docs/Security/SOLITH_BATCH_A_COMPLETE_AUDIT.md
+?? Docs/Security/SOLITH_DEPENDENCY_INVENTORY.md
+?? Docs/Security/SOLITH_IPC_INVENTORY_BATCH_A.md
+?? Docs/Security/SOLITH_SECURITY_ARCHITECTURE.md
+?? Docs/Security/SOLITH_SECURITY_FINDINGS_BATCH_A_REVISED.md
+?? Docs/Security/SOLITH_SECURITY_FINDINGS_INITIAL.md
+?? Docs/Security/Tools/Extract-SolithIpcSurface.ps1
+?? Docs/V1_STABILIZATION_MANIFEST.md
+?? electron/sender-validation.ts
+?? src/app/assets/wisp/solith-wisp-base-float.png
+?? src/app/assets/wisp/solith-wisp-controller-float.png
+?? src/app/assets/wisp/solith-wisp-crystal-float.png
+?? src/app/assets/wisp/solith-wisp-dragon-float.png
+?? src/app/assets/wisp/solith-wisp-error-float.png
+?? src/app/assets/wisp/solith-wisp-phoenix-float.png
+?? src/app/assets/wisp/solith-wisp-scan-float.png
+?? src/app/assets/wisp/solith-wisp-shield-float.png
+?? src/app/assets/wisp/solith-wisp-success-float.png
+?? src/app/assets/wisp/solith-wisp-warning-float.png
+?? src/configure-zod-csp.ts
+?? src/core/install-discovery/identity.ts
+?? src/core/live-memory/freeze-concurrency-registry.ts
+?? src/core/live-memory/session-cleanup.ts
+?? src/core/security/process-selection-registry.ts
+?? src/core/security/trusted-sender-registry.ts
+?? tests/installed-game-identity.test.ts
+?? tests/live-memory-rollback-freeze-ipc-validation.test.ts
+?? tests/live-memory/session-cleanup-on-destroy.test.ts
+?? tests/process-selection-registry.test.ts
+?? tests/trusted-sender-registry.test.ts

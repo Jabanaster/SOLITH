@@ -1,0 +1,2 @@
+--- audit review (not separately re-inspected beyond source review this cycle) ---
+Freeze-start audit.append (src/core/live-memory/memory-manager.ts freezeStart) records op/featureId/reason/waiverAssumed only — no raw memory values, addresses, or consent tokens. Unchanged from prior gates; not re-inspected via a fresh log capture this cycle (see packaged-feature-disable-final-matrix.csv, 'Audit output sanitized' row, marked PARTIAL).

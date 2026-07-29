@@ -1,0 +1,12 @@
+Suite,Command,Tests,Passed,Failed,ExitCode,Status
+Gate2.5 focused packaged,"playwright gate2-5-frame-overlay-closeout",7,7,0,0,"VERIFIED COMPLETE"
+Full packaged regression,"playwright Gate2.2 Resume + Gate2.2A1 + Gate2.3 + Gate2.4 + Gate2.5 + packaged smoke",49,49,0,0,"VERIFIED COMPLETE"
+Packaged smoke subset,"tests/packaged-smoke.test.ts",23,23,0,0,"VERIFIED COMPLETE"
+npm test main,"npm test main TAP group",1030,1030,0,0,"VERIFIED COMPLETE"
+npm test SQL,"npm test SQL TAP group",10,10,0,0,"VERIFIED COMPLETE"
+npm test combined,"npm test",1040,1040,0,0,"VERIFIED COMPLETE"
+Live memory,"npm run test:live-memory",257,257,0,0,"VERIFIED COMPLETE"
+Main TypeScript,"tsc --noEmit",0,0,0,0,"VERIFIED COMPLETE"
+Electron TypeScript,"tsc -p tsconfig.electron.json --noEmit",31,0,31,2,"REPORTED COMPLETE — VERIFY"
+Git diff check,"git diff --check",2,0,2,2,"REPORTED COMPLETE — VERIFY"
+Electron output verifier,"npm run build:electron",29,29,0,0,"VERIFIED COMPLETE"

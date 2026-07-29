@@ -1,0 +1,2 @@
+ExePath,Total,Passed,Failed,ExitCode,DurationSec,Evidence
+dist/win-unpacked/Solith.exe,23,23,0,0,9.9,packaged-smoke-output.txt

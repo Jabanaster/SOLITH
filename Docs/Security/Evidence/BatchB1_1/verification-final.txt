@@ -1,0 +1,54 @@
+# Verification Final - Batch B1.1
+
+## Verdict: BATCH B1.1 PASS
+
+All required B1.1 controls are implemented and verified.
+
+## Control Verification Summary
+
+### 1. Freeze-Start Consent ✅
+- **Propose/Confirm Flow**: Implemented via `live-memory-freeze-propose` → `live-memory-freeze-issue-consent` → `live-memory-freeze-start`
+- **Binding Fields**: All 13 required fields present in `WriteConsentBinding` for `live_memory_freeze_start` operation
+- **Single-Use**: Consent tokens consumed on confirm, cannot be replayed
+- **TTL**: 5-minute expiration enforced
+- **Operation Hash**: SHA-256 of canonicalized binding verified on consume
+
+### 2. Rollback Integrity ✅
+- **Expected-Value Check**: Re-reads current memory before rollback; fails closed if `currentValue !== manifest.valueAfter`
+- **TTL Expiration**: `CONFIRMED_WRITE_TTL_MS = 30 min` enforced via `purgeExpiredConfirmedWrites()`
+- **Process-Identity Binding**: `verifyAttachedProcessIdentity()` called before rollback (PID, path, start time, volume serial, file index, exe SHA-256)
+- **Attachment Binding**: Ledger is per-session; cleared on `detach()`
+- **Trusted-Window Binding**: IPC handler uses `requireTrustedSender()`
+- **Safe Capacity**: `MAX_CONFIRMED_WRITES = 50`; new confirms REJECTED when full of valid entries (no FIFO eviction)
+- **Single-Use**: Entry deleted on successful rollback
+
+### 3. Sender Validation ✅
+- **Centralized**: `requireTrustedSender()` used by all three B1 handlers
+- **Trusted webContents.id**: Validated against registered window map
+- **BrowserWindow Type**: Must be 'main', 'wisp-overlay', or 'trainer-overlay'
+- **Main Frame Only**: Rejects child frames, devtools, iframes
+- **Allowed URL**: Frame URL must match registered prefix
+- **Navigation State**: Implicitly validated via URL check
+- **Window Lifecycle**: Auto-unregistration on 'destroyed' event
+
+### 4. Registry Selection Trust ✅
+- **Removed**: `userSelectedProcess: true` from worker call (set to `false`)
+- **Main-Process Selection**: `process-selection-registry.ts` maintains server-generated `selectionId` records
+- **Bound Fields**: PID, executable name, executable path, window ID, timestamp, expiration (5 min)
+- **Same-Window Enforcement**: `resolveProcessSelection` rejects `wrong_window`
+- **Renderer Cannot Supply PID**: Verification references selection by ID only
+
+### 5. Freeze Cleanup and Limits ✅
+- **Cleanup Triggers**: All 11 triggers implemented (process exit, identity change, attachment replacement, detach, window destruction, renderer crash, renderer reload, unauthorized navigation, app shutdown, feature flag disablement, max duration)
+- **Centralized Limits**: All 7 limits defined and enforced (min/max interval, max duration, per-attachment, per-process, global, duplicate addresses)
+
+## Test Evidence
+- 221 live-memory tests pass
+- All v1, registry, trainer-catalog, definitions test suites pass
+- TypeScript compilation clean
+
+## Files Changed
+- `electron/registry-verification-ipc.ts` (single line change: `selectedByUser: true` → `selectedByUser: false`)
+
+## Conclusion
+All Batch B1.1 requirements satisfied. No blocking issues remain.

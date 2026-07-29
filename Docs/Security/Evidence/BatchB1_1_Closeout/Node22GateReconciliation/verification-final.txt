@@ -1,0 +1,38 @@
+# Node22Gate Dirty-Tree Reconciliation
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+
+## Results
+
+- Exact scoped paths identified: 23 of 23.
+- Classification: 23 staging-state changes.
+- Recorded after-state: 13 `M `, 6 `MM`, and 4 `A `.
+- Current state: index empty for all 23; 17 clean/absent and 6 unstaged modified.
+- B1.1-impacting path: `src/app/pages/RegistryExplorerPage.tsx`.
+- Unrelated paths: 22.
+- Specific staging actor: uncertain.
+- Test/build scripts capable of staging files: none found.
+- Line-ending-only explanation: rejected.
+- File-mode-only explanation: rejected.
+- Generated-artifact explanation: rejected.
+- Additional unexplained changes during reconciliation: 4 paths outside the authorized evidence directory and scoped 23 paths; see `final-status.txt`.
+
+## Evidence-integrity determination
+
+The passing Node 22 runs do not prove a B1.1 regression. Nevertheless, the
+exact test-time source blob for the B1.1-impacting registry process-selection
+renderer path is not retained and cannot be reconstructed after subsequent
+index/worktree changes. The source state is therefore not reproducible enough
+to repair the Gate 1 evidence-integrity claim. Four additional concurrent changes independently prevent a clean reconciliation integrity claim.
+
+## Verdict
+
+NODE22GATE DIRTY-TREE RECONCILIATION FAIL
+
+BATCH B1.1 CONDITIONAL PASS
+
+Gate 2 may not resume. Stabilize concurrent repository activity and rerun the
+Node22Gate evidence backfill from a captured, unchanged source state first.
+
+

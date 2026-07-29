@@ -1,0 +1,71 @@
+COMMAND=final Playwright packaged Gate 2.2 Resume through Gate 2.5 plus packaged smoke
+EXIT_CODE=0
+
+Running 49 tests using 1 worker
+
+  ok  1 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:154:1 › Phase 3 — fixture and packaged native write/read/restore prerequisite (29.2s)
+  ok  2 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:207:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) (29.4s)
+  ok  3 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:260:1 › Phase 4.3 — shutdown with pending (unconfirmed) write consent: stale proposal/token rejected after restart (15.4s)
+  ok  4 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:296:1 › Phase 4.4 — shutdown with an active process selection (attach, no freeze): stale attach state rejected after restart (12.6s)
+  ok  5 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:325:1 › Phase 4.5 — shutdown with a confirmed rollback entry: old rollback ID rejected after restart, raw bytes released (23.2s)
+  ok  6 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:368:1 › Phase 4.6 — controlled forced termination: no further writes reach the fixture after the process is killed (21.1s)
+  ok  7 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:398:1 › Phase 5 — real freeze stops when v2LiveModeEnabled is disabled via the real settings IPC (31.4s)
+  ok  8 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:441:1 › Phase 6 — main-window reload: stale operation IDs and sender identity are rejected after reload (11.4s)
+  ok  9 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:488:1 › Phase 9.1/9.6 — unauthorized navigation revokes authority; returning to trusted content does not restore it (9.2s)
+  ok 10 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:539:1 › Phase 11 — normal packaged candidate exposes no Gate 2.1/2.2 test-only hooks (3.6s)
+  ok 11 tests\gate2-2a1-packaged-real-process-write-proof.e2e.test.ts:40:1 › packaged real-process write/read/restore/failure proof against the Gate 2.2 fixture (28.9s)
+  ok 12 tests\gate2-3-freeze-authorization-security.e2e.test.ts:98:1 › retired legacy freeze-start payload ({address,dataType,value,intervalMs}) is rejected by the real IPC handler (9.4s)
+  ok 13 tests\gate2-3-freeze-authorization-security.e2e.test.ts:139:1 › proposal and consent token cannot be replayed after a successful confirmed start (24.4s)
+  ok 14 tests\gate2-3-freeze-authorization-security.e2e.test.ts:191:1 › an unknown/fabricated proposal ID and an unknown consent token are both rejected (14.2s)
+  ok 15 tests\gate2-4-final-certification.e2e.test.ts:151:1 › Phase 3 — independent reverification: full real propose->consent->start->restore->stop->replay-reject cycle (27.7s)
+  ok 16 tests\gate2-4-final-certification.e2e.test.ts:184:1 › Phase 4 — renderer crash while a real-flow freeze is active stops writes and revokes state (20.2s)
+  ok 17 tests\gate2-4-final-certification.e2e.test.ts:228:1 › Phase 5 — a second real trusted window (overlay) cannot use or interfere with the main window's freeze (46.4s)
+  ok 18 tests\gate2-4-final-certification.e2e.test.ts:304:1 › Phase 9.2/9.4 — same-prefix sibling and encoded-path local navigation do not retain authority (9.5s)
+  ok 19 tests\gate2-4-final-certification.e2e.test.ts:361:1 › Phase 9.5 — unapproved local HTTP origin does not retain privileged access (9.8s)
+  ok 20 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:146:1 › live packaged same-origin, trusted-looking, and nested child frames reject privileged calls (3.7s)
+  ok 21 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:164:1 › live packaged untrusted local child frame rejects privileged calls (3.6s)
+  ok 22 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:179:1 › live packaged cross-origin local HTTP child frame has no privileged bridge (3.9s)
+  ok 23 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:197:1 › destroyed and navigated child frames cannot invoke through retained frame references (3.5s)
+  ok 24 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:222:1 › packaged DevTools context has no preload bridge, renderer Node access, or trusted-window registration (3.7s)
+  ok 25 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:257:1 › real Wisp overlay destruction and recreation yields a new identity and preserves main-only channel boundaries (3.9s)
+  ok 26 tests\gate2-5-frame-overlay-closeout.e2e.test.ts:297:1 › SOLITH_TEST_BUILD enables main-process hooks only for the exact value 1 (36.9s)
+  ok 27 tests\packaged-smoke.test.ts:40:1 › point 01 — packaged exe exists at dist/win-unpacked (1ms)
+  ok 28 tests\packaged-smoke.test.ts:122:1 › point 02 — app launches and first window appears (1ms)
+  ok 29 tests\packaged-smoke.test.ts:128:1 › point 03 — window title contains Solith (9ms)
+  ok 30 tests\packaged-smoke.test.ts:134:1 › point 04 — window reaches domcontentloaded state (2ms)
+  ok 31 tests\packaged-smoke.test.ts:140:1 › point 05 — React root mounts (#root > * present) (3ms)
+  ok 32 tests\packaged-smoke.test.ts:146:1 › point 06 — contextIsolation active: require is not available in renderer (2ms)
+  ok 33 tests\packaged-smoke.test.ts:152:1 › point 07 — window.electronAPI is exposed by contextBridge (2ms)
+  ok 34 tests\packaged-smoke.test.ts:158:1 › point 08 — window.electronAPI.getGames is a function (2ms)
+  ok 35 tests\packaged-smoke.test.ts:164:1 › point 09 — window.electronAPI.applyProposal is a function (full preload API) (1ms)
+  ok 36 tests\packaged-smoke.test.ts:170:1 › point 10 — IPC getGames() returns an array (database initialized) (3ms)
+  ok 37 tests\packaged-smoke.test.ts:176:1 › point 11 — IPC getSettings() returns an object with known keys (3ms)
+  ok 38 tests\packaged-smoke.test.ts:186:1 › point 12 — IPC addGame() creates a game record successfully (5ms)
+  ok 39 tests\packaged-smoke.test.ts:199:1 › point 13 — IPC parseSave() parses the JSON fixture correctly (14ms)
+  ok 40 tests\packaged-smoke.test.ts:236:1 › point 14 — zero uncaught renderer errors during startup and interaction (0ms)
+  ok 41 tests\packaged-smoke.test.ts:243:1 › point 14b — packaged renderer has no eval CSP violation (1ms)
+  ok 42 tests\packaged-smoke.test.ts:251:1 › point 15 — app exits cleanly (close() resolves without timeout) (9ms)
+  ok 43 tests\packaged-smoke.test.ts:261:1 › point 16 — unified sidebar navigation renders in packaged app (9ms)
+  ok 44 tests\packaged-smoke.test.ts:269:1 › point 17 — sidebar collapse toggles in packaged app (754ms)
+  ok 45 tests\packaged-smoke.test.ts:280:1 › point 18 — new Trainer IPC methods exposed in packaged preload (2ms)
+  ok 46 tests\packaged-smoke.test.ts:294:1 › point 19 — compatibility IPC succeeds in packaged app (empty → BLOCKED_PENDING_USER_DATA) (2ms)
+  ok 47 tests\packaged-smoke.test.ts:301:1 › point 20 — getRecipes IPC succeeds in packaged app (6ms)
+  ok 48 tests\packaged-smoke.test.ts:322:1 › point 21 — checkGameRunning is actually invoked in packaged app (not just presence) (3ms)
+
+══════════ GATE 18 PACKAGED RUNTIME REPORT ══════════
+exe_path            = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\Solith.exe
+isolated_user_data  = %TEMP%\solith-pkg-smoke-1785363437983-qoef068c0n\userData
+app_get_app_path    = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar
+resources_path      = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources
+preload_path        = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar\dist-electron\preload.cjs
+db_path             = %USERPROFILE%\AppData\Local\Temp\solith-pkg-smoke-1785363437983-qoef068c0n\solith.db
+ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave, getAllProfiles, getRecipes, checkGameRunning(invoked), getCompatibilityProfile(invoked)
+exit_code           = 0
+renderer_errors     = 0
+main_errors         = 0
+cleanup_success     = true
+══════════════════════════════════════════════════════
+
+  ok 49 tests\packaged-smoke.test.ts:335:1 › point 22 — getCompatibilityProfile is actually invoked in packaged app (2ms)
+
+  49 passed (7.4m)

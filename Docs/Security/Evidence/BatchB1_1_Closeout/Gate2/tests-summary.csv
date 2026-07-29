@@ -1,0 +1,11 @@
+Command,NodeVersion,ExitCode,Tests,Passed,Failed,Result
+"npm test","v22.23.1","0","1034","1034","0","PASS"
+"npm run test:live-memory","v22.23.1","0","221","221","0","PASS"
+"tsc --noEmit (main)","v22.23.1","0","0 diagnostics","-","-","PASS"
+"tsc -p tsconfig.electron.json --noEmit","v22.23.1","2","31 diagnostics / 13 files","-","-","FAIL (matches established unrelated baseline exactly, zero diff)"
+"git diff --check","N/A","2","2 findings / 1 file (GameLibrary.tsx:286,303)","-","-","FAIL (matches established unrelated baseline exactly)"
+"tests/live-memory/rollback-byte-integrity.test.ts (new, direct run — not wired into any npm script)","v22.23.1","0","19","19","0","PASS"
+"7 pre-existing orphaned test files (direct run — never wired into any npm script)","v22.23.1","0","20","20","0","PASS (app-shutdown-cleanup, cleanup-failure-handling, feature-disable-cleanup, renderer-crash-cleanup, rollback-float-integrity, ct-preview-receipt, wisp-preferences)"
+"64 fake-driven lifecycle/security tests (direct re-run for Phase 5 cross-check)","v22.23.1","0","64","64","0","PASS"
+"packaged build: build:vite && build:electron && dist:dir","v22.23.1","0/0/0","-","-","-","PASS — dist/win-unpacked/Solith.exe produced, native memoryjs rebuilt"
+"packaged-smoke.test.ts (Playwright, real Solith.exe)","v22.23.1","0","23","23","0","PASS"

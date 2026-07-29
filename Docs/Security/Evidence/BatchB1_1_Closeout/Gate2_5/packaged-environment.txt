@@ -1,0 +1,12 @@
+RepositoryRoot=G:\ACTIVE_PROJECTS\SOLITH
+Branch=master
+OS=Windows x64
+Node=v22.23.1
+npm=10.9.8
+Electron=42.4.1
+ElectronABI=146
+PackagedCandidate=dist/win-unpacked/Solith.exe
+TestIsolation=unique per-run temporary userData and APPDATA directories
+ConsentHarness=existing SOLITH_PRIVILEGED_CONSENT=auto-approve only where real consent flow required
+Gate25TestBuild=exact SOLITH_TEST_BUILD=1 only for DevTools test and positive hook-control case
+SensitiveRuntimeValuesRecorded=false

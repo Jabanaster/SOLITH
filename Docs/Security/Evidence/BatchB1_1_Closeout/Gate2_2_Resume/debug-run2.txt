@@ -1,0 +1,26 @@
+
+Running 1 test using 1 worker
+
+  x  1 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) (20.5s)
+
+
+  1) tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 111000
+    Received: 999000
+
+      203 |     fs.writeFileSync(f.mutatePath, '999000');
+      204 |     await sleep(500);
+    > 205 |     expect(readStatus(f.statusPath).value).toBe(111000);
+          |                                            ^
+      206 |
+      207 |     const webContentsId = await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.id);
+      208 |     const hasSessionBefore = await ctx.app.evaluate(
+        at G:\ACTIVE_PROJECTS\SOLITH\tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:205:44
+
+    Error Context: test-results\gate2-2-resume-packaged-li-62b79-tate-same-event-on-Windows-\error-context.md
+
+  1 failed
+    tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) 

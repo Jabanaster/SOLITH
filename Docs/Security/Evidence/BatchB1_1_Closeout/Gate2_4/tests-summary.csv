@@ -1,0 +1,8 @@
+Suite,Total,Pass,Fail,Notes
+packaged-smoke.test.ts,23,23,0,Rerun against fresh Gate 2.4 packaged build
+gate2-3-freeze-authorization-security.e2e.test.ts,3,3,0,Independent rerun for Gate 2.4 Phase 3 reverification
+gate2-4-final-certification.e2e.test.ts,5,5,0,New this cycle
+gate2-2-resume-packaged-lifecycle.e2e.test.ts,10,10,0,Rerun against fresh Gate 2.4 packaged build
+gate2-2a1-packaged-real-process-write-proof.e2e.test.ts,1,1,0,Rerun against fresh Gate 2.4 packaged build
+npm test (Node),1040,1040,0,Unchanged total vs Gate 2.3
+npm run test:live-memory (Node),257,257,0,Unchanged total vs Gate 2.3

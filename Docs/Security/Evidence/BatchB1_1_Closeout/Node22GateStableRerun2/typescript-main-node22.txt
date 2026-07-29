@@ -1,0 +1,8 @@
+Executable: /g/ACTIVE_PROJECTS/SOLITH/.tools/node-v22.23.1-win-x64/node.exe
+TscScript: node_modules/typescript/bin/tsc
+Command: "$Node22" "$Tsc" --noEmit
+StartTimeUtc: 2026-07-28T09:52:18Z
+--- RAW OUTPUT ---
+--- END RAW OUTPUT ---
+ExitCode: 0
+EndTimeUtc: 2026-07-28T09:52:21Z

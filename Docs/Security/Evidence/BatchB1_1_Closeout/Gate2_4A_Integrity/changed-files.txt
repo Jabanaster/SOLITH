@@ -1,0 +1,33 @@
+Gate 2.4A changed-files manifest
+=================================
+
+No production code, test code, package.json, package-lock.json, CI/release
+workflow, or any tracked source file was modified this cycle. This cycle is
+read-only investigation plus new evidence files.
+
+New files created this cycle (all under Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/):
+- baseline-status.txt
+- current-diff-stat.txt
+- current-diff-name-status.txt
+- current-staged-name-status.txt
+- current-diff-check.txt
+- current-status.txt
+- status-diff-baseline-vs-current.txt
+- recovery-candidates.csv
+- file-origin-analysis.md
+- recovery-decision.md
+- gate2_4-scope-integrity-matrix.csv
+- gate2_4-verification-impact.md
+- evidence-corrections.md
+- changed-files.txt (this file)
+- remaining-risks.md
+- verification-final.txt
+
+No file was deleted, restored, reconstructed, overwritten, or created outside
+this evidence directory. test_output.txt was NOT recreated (classified NOT
+RECOVERABLE; no guessed content was written).
+
+SOLITH_SECURITY_ROADMAP.md was updated with a Gate 2.4A follow-up entry (see
+verification-final.txt for confirmation) — this is the only file outside the
+Gate2_4A_Integrity evidence directory touched this cycle, and it is an
+explicitly authorized roadmap update, not a deletion or content-code change.

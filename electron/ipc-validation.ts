@@ -13,7 +13,26 @@ import { isPathApproved } from '../src/core/saves/locations.js';
 export const AddGameSchema = z.object({
   name: z.string().min(1).max(100),
   path: z.string().min(1),
-  engine: z.string().optional()
+  engine: z.string().max(100).optional(),
+  executablePath: z.string().max(1024).optional(),
+  coverPath: z.string().max(1024).optional(),
+  iconPath: z.string().max(1024).optional(),
+  saveLocations: z.array(z.string().max(1024)).max(20).optional(),
+  notes: z.string().max(2000).optional(),
+  metadataId: z.string().max(200).optional()
+});
+
+export const UpdateGameSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+  name: z.string().min(1).max(100),
+  path: z.string().min(1),
+  engine: z.string().max(100).optional(),
+  executablePath: z.string().max(1024).optional(),
+  coverPath: z.string().max(1024).optional(),
+  iconPath: z.string().max(1024).optional(),
+  saveLocations: z.array(z.string().max(1024)).max(20).optional(),
+  notes: z.string().max(2000).optional(),
+  metadataId: z.string().max(200).optional()
 });
 
 export const ScanGameSchema = z.object({
@@ -307,19 +326,15 @@ export const LiveMemoryConfirmWriteSchema = z.object({
   consentToken: z.string().uuid(),
 });
 
+// Rollback identifies the write to undo by proposalId ONLY. The address, data
+// type, and prior value are looked up server-side from the session's own
+// record of writes it actually confirmed (see LiveMemorySession.rollback) —
+// never accepted from the renderer. Accepting a full caller-supplied manifest
+// here would let "rollback" be used as an arbitrary-address/arbitrary-value
+// write primitive with none of the propose/confirm write-policy checks.
 export const LiveMemoryRollbackSchema = z.object({
-  manifest: z.object({
-    proposalId: z.string().min(1).max(128),
-    target: z.object({
-      address: LIVE_ADDRESS_STRING,
-      moduleName: z.string().max(260).optional(),
-      dataType: LIVE_VALUE_TYPE,
-    }),
-    valueBefore: z.number().finite(),
-    valueAfter: z.number().finite(),
-    appliedAt: z.string(),
-  }),
-});
+  proposalId: z.string().min(1).max(128),
+}).strict();
 
 // Bounds are client-overridable but capped tightly server-side — a renderer
 // (even a trusted-by-default one) should not be able to request a scan large
@@ -468,13 +483,26 @@ export const LocalOcrCaptureSchema = z.object({
   }),
 });
 
-export const LiveMemoryFreezeStartSchema = z.object({
+// Freeze propose/issue-consent/confirm — mirrors the write propose/consent/confirm
+// flow above (Batch B1.1). A freeze can no longer be started via a single
+// privileged call; a native-dialog-backed consent token is required, bound to
+// the exact address/dataType/value/interval approved at propose time.
+export const LiveMemoryFreezeProposeSchema = z.object({
   address: LIVE_ADDRESS_STRING,
   dataType: LIVE_VALUE_TYPE,
   value: z.number().finite(),
   // Floor prevents a runaway tight loop from hammering the target process/CPU.
   intervalMs: z.number().int().min(50).max(5000).optional(),
-});
+}).strict();
+
+export const LiveMemoryFreezeIssueConsentSchema = z.object({
+  proposalId: z.string().min(1).max(128),
+}).strict();
+
+export const LiveMemoryFreezeConfirmSchema = z.object({
+  proposalId: z.string().min(1).max(128),
+  consentToken: z.string().uuid(),
+}).strict();
 
 export const LiveMemoryFreezeStopSchema = z.object({});
 
@@ -640,6 +668,30 @@ export const ImportCtSchema = z.object({
   xmlText: z.string().min(1).max(8_000_000),
   title: z.string().max(200).optional(),
 });
+
+// ── Registry read-only verification (electron/registry-verification-ipc.ts) ──
+// Note: "registry" here means a compiled CT/cheat-table artifact (pointers,
+// scripts, AOB signatures), NOT the Windows Registry — see
+// Docs/Security/Evidence/BatchA/registry-operations-audit.txt.
+//
+// Batch B1.1: replaced the renderer-supplied `userSelectedProcess: true`
+// self-attestation (Batch B1's fix, which only proved the renderer SENT
+// true, not that a human selected that process) with a main-process-
+// maintained selection record. The renderer requests a selection via
+// registry-select-process (which independently re-verifies the pid really
+// is the claimed executable against the live OS); verification then
+// references that selection by its server-generated id and can no longer
+// supply pid/executableName/executablePath directly.
+export const RegistrySelectProcessSchema = z.object({
+  pid: z.number().int().positive(),
+  executableName: z.string().min(1).max(260),
+}).strict();
+
+export const RegistryRunVerificationSchema = z.object({
+  registry: z.unknown(),
+  selectionId: z.string().uuid(),
+  timeoutMs: z.number().int().min(1_000).max(120_000).optional().default(30_000),
+}).strict();
 
 // Persisted cheat toggle state
 // (e.g. 'undisputed'), not a UUID like the games-library gameId schemas above.

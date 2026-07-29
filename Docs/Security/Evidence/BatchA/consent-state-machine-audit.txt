@@ -1,0 +1,161 @@
+CONSENT STATE MACHINE AUDIT
+Scope: electron/live-memory-ipc.ts, electron/privileged-consent-dialog.ts,
+       src/core/consent/write-consent.ts, electron/trainer-catalog-ipc.ts (approve-save-path),
+       electron/main.ts (trainer-host propose/approve-and-write)
+Date: 2026-07-26
+
+SCOPE CORRECTION: The handover plan assumed the consent-gated surface lives in
+files named "in-process-*.ts" with "7 handlers." No files matching that glob
+exist. The in-process-* CHANNELS (propose-hook, confirm-hook, propose-injector-launch,
+issue-injector-consent, confirm-injector-launch, register-injector-helper,
+rollback-hook) are registered inside electron/live-memory-ipc.ts, not a
+separate file. A full cross-audit-file scan found 13 consent-gated handlers
+total (see handler-authorization-audit.csv, consent_gate=yes rows), broader
+than the 7 the handover anticipated:
+  live-memory-propose-write, live-memory-issue-write-consent,
+  live-memory-confirm-write, in-process-propose-hook, in-process-confirm-hook,
+  in-process-propose-injector-launch, in-process-issue-injector-consent,
+  in-process-register-injector-helper, in-process-confirm-injector-launch,
+  trainer-host-propose-write, trainer-host-approve-and-write,
+  trainer-catalog-sync-hub, trainer-catalog-approve-save-path.
+The cryptographic-token flow (below) covers 6 of these
+(live-memory-propose/issue/confirm-write, in-process-propose/issue/confirm-injector-launch);
+in-process-propose/confirm-hook and trainer-host propose/approve use a
+non-cryptographic proposalId-consumption pattern instead (documented separately below).
+
+===== 1. TOKEN LIFECYCLE (live-memory-* and in-process-injector-* flows) =====
+
+Implementation: src/core/consent/write-consent.ts
+
+CREATION (issueWriteConsent, line 81-115):
+  - tokenId = crypto.randomUUID() (cryptographically random, not guessable)
+  - bindingHash = SHA-256 over a canonical JSON payload containing: operation,
+    sessionKey (= event.sender.id, server-derived), proposalId, attachedPid,
+    attachedExecutableName (lowercased), executablePath (lowercased),
+    processStartTime, volumeSerialNumber, fileIndex, attachedExeSha256,
+    plus operation-specific fields (address/dataType/currentValue/requestedValue
+    for memory writes, or exePath/exeSha256 for injector launches).
+  - Fail-closed preconditions enforced before a token is ever minted: valid
+    positive-integer PID, non-empty sessionKey/proposalId/executableName,
+    non-empty executablePath AND processStartTime (throws otherwise) --
+    confirmed at src/core/consent/write-consent.ts:85-93.
+  - TTL: 5 minutes default (WRITE_CONSENT_TTL_MS = 300_000ms), overridable via
+    SOLITH_CONSENT_TTL_MS env var with no upper bound check and no
+    production/packaged-build guard (see FINDING C below).
+  - Tokens are only minted after a native OS confirmation dialog returns
+    'approve' (electron/privileged-consent-dialog.ts:113-128,
+    requestPrivilegedWriteConsent) -- the renderer cannot manufacture a token
+    by asserting a boolean flag; the dialog call is a real Electron
+    dialog.showMessageBox invocation in the main process.
+
+BINDING (re-verification at confirm time):
+  - electron/live-memory-ipc.ts:397-439 (live-memory-confirm-write) and
+    electron/live-memory-ipc.ts:1195+ (in-process-confirm-injector-launch)
+    both REBUILD the consentBinding object from the session's CURRENT
+    server-side attached-process identity (bundle.session.getAttachedIdentity())
+    at confirm time -- they do not trust any binding fields the renderer might
+    try to pass in the confirm payload (schema only accepts proposalId +
+    consentToken, see ipc-validation.ts LiveMemoryConfirmWriteSchema /
+    InProcessConfirmInjectorSchema). The freshly rebuilt hash is compared
+    against the hash stored at issuance time (consumeWriteConsent, line
+    124-151) -- if the attached process's identity has changed in ANY way
+    (different PID, different exe path/hash, different start time) between
+    issue and confirm, the bindingHash mismatches and confirmation is
+    rejected with "Consent token binding mismatch."
+
+REPLAY RESISTANCE (single-use enforcement):
+  - consumeWriteConsent (write-consent.ts:124-151) checks entry.consumed
+    BEFORE use, sets entry.consumed=true, then IMMEDIATELY store.delete(tokenId)
+    in the same synchronous function call -- no await between the consumed
+    check and the delete, so no race window exists within Node's single-threaded
+    event loop. A second confirm attempt with the same tokenId returns
+    "Unknown or already-used consent token" (entry no longer in the Map).
+  - Verified: no code path re-inserts a consumed/deleted token back into the
+    store.
+
+EXPIRATION:
+  - Checked before binding-hash comparison (write-consent.ts:136-139); an
+    expired token is deleted and rejected with "Consent token expired,"
+    independent of whether the binding would otherwise have matched.
+
+SENDER IDENTITY BINDING:
+  - sessionKey = String(event.sender.id) is captured SERVER-SIDE from the IPC
+    event at proposal-creation time and again at issue-consent/confirm-write
+    time -- never accepted as a renderer-supplied payload field (confirmed by
+    reading LiveMemoryIssueWriteConsentSchema / LiveMemoryConfirmWriteSchema /
+    InProcessConfirmInjectorSchema in electron/ipc-validation.ts: none of them
+    declare a sessionKey/senderId field). A different renderer webContents
+    (different event.sender.id) issuing a confirm for another sender's
+    proposalId would compute a different bindingHash and fail the match.
+
+CONCURRENCY HANDLING:
+  - The consent store is a single in-process Map with fully synchronous
+    get/set/delete inside consumeWriteConsent -- Node's single-threaded event
+    loop guarantees consumeWriteConsent cannot be re-entered mid-execution by
+    a second concurrent IPC call, so two simultaneous confirm-write invocations
+    for the same tokenId cannot both observe consumed=false. One will win the
+    Map.delete; the other will find no entry.
+  - The store itself has NO periodic eviction / max-size bound -- expired-but-
+    never-confirmed tokens remain in the Map until either a matching confirm
+    attempt (which deletes on expiry-check) or process exit. For a
+    single-user desktop trainer app tied to short debugging sessions this is
+    low-impact (unbounded growth would require an attacker to mint very many
+    proposals without ever confirming, and the store resets on app restart),
+    but it is a latent minor memory-growth issue worth a Batch B note.
+
+===== 2. NON-CRYPTOGRAPHIC PROPOSAL-CONSUMPTION FLOWS =====
+
+in-process-propose-hook / in-process-confirm-hook (electron/live-memory-ipc.ts:968-1013):
+  - Uses sessionKey = String(event.sender.id) + proposalId as the lookup key
+    for a pending-proposal map, WITHOUT a separate cryptographic consentToken.
+    "Consuming" the proposal (removing it from the map on confirm) is itself
+    the single-use enforcement. This is weaker than the write-consent.ts
+    design (no expiry TTL field observed on this specific map in the excerpt
+    reviewed, no SHA-256 binding hash) but is still gated by
+    evaluateInProcessGate (requires userConfirmedOffline + userApprovedAction)
+    and sessionKey-scoping prevents cross-sender confirmation.
+
+trainer-host-propose-write / trainer-host-approve-and-write (electron/main.ts:1146-1181):
+  - Ownership-gated (trainerHostOwner must equal event.sender.id) rather than
+    token-gated. "Consuming" the pending-proposal map entry on
+    approve-and-write is the approval mechanism, per inline code comment.
+    No TTL/expiry was found for this map in the reviewed excerpt -- a
+    proposal could in principle remain approvable indefinitely as long as the
+    owning sender's session persists. Lower severity than a memory-write
+    primitive would suggest because trainer-host operations are file-based
+    reads/writes gated by isPathApproved(), not raw process-memory writes.
+
+===== 3. FINDINGS FOR BATCH B =====
+
+FINDING A (defense-in-depth gap, low real-world severity):
+  SOLITH_PRIVILEGED_CONSENT=auto-approve|auto-deny (electron/privileged-consent-dialog.ts:47-53)
+  and SOLITH_CONSENT_TTL_MS (line 122-125) are read from process.env with NO
+  app.isPackaged / NODE_ENV==='production' guard. They exist to support
+  tests/electron-consent-boundary.e2e.test.ts. If SOLITH_PRIVILEGED_CONSENT=
+  auto-approve is set in a packaged build's environment (malicious launcher
+  script, shared/inherited env var, or an actor who already has local
+  environment-variable-setting capability), every native consent dialog in
+  the app is bypassed and all privileged writes/injector-launches
+  auto-approve without any user interaction. Exploiting this requires
+  local code-execution-equivalent capability (setting a process's own
+  environment before launch), so it does not cross a privilege boundary an
+  attacker doesn't already have, but it removes the app's own safety net
+  entirely under that precondition. Recommend gating this override behind
+  an explicit non-production build flag for Batch B.
+
+FINDING B (unbounded store growth, low severity):
+  The write-consent.ts in-memory Map has no eviction sweep for
+  expired-but-unconfirmed tokens; they linger until a confirm attempt
+  touches them or the process exits. Low impact for a single-user desktop
+  app; note for Batch B as a hardening item, not a vulnerability.
+
+FINDING C (inconsistent hardening across consent flows):
+  Only the live-memory-write and injector-launch flows use the cryptographic
+  SHA-256-bound, single-use, TTL-expiring token design. The hook-install
+  (in-process-propose/confirm-hook) and trainer-host write flows use a
+  weaker sessionKey+proposalId consumption pattern with no observed TTL or
+  cryptographic binding hash. Both are still gated by sender/ownership
+  scoping and explicit approval flags, so no live exploitation path was
+  found, but the inconsistency itself is worth flagging for Batch B: the
+  strongest pattern (write-consent.ts) should arguably be the standard for
+  all "propose then irreversibly act" flows, not just process-memory writes.

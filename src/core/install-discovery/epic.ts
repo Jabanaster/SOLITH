@@ -42,6 +42,7 @@ export function scanEpicInstalls(options: InstallDiscoveryOptions = {}): RawInst
         installPath: path.resolve(installPath),
         executablePath: executablePath ? path.resolve(executablePath) : undefined,
         displayName: raw.DisplayName ?? raw.AppName ?? raw.MainGameAppName ?? path.basename(installPath),
+        launcherAppId: raw.AppName ?? raw.MainGameAppName,
       });
     } catch {
       // Skip malformed manifest

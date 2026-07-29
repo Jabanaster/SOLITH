@@ -1,0 +1,7 @@
+# Changed Files - Batch B1.1
+
+## Modified Files
+electron/registry-verification-ipc.ts
+
+## Notes
+All other B1.1 controls (freeze-start consent, rollback integrity, sender validation, freeze cleanup/limits) were already implemented in prior work (Batch B1 and earlier). The only code change required for Batch B1.1 was removing the `selectedByUser: true` flag from the worker call in registry-verification-ipc.ts, as the selection is now backed by a main-process-verified selection record.

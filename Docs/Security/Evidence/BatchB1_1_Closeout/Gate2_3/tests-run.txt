@@ -1,0 +1,12 @@
+Gate 2.3 test runs (in order):
+
+1. npm-test-output.txt / npm-test-final.txt — npm test (Node 22), 1040/1040 pass, exit 0 (both pre- and post-ABI-restore runs)
+2. npm-test-live-memory-output.txt / npm-test-live-memory-final.txt — npm run test:live-memory (Node 22), 257/257 pass, exit 0 (both runs)
+3. tsc-main-check.txt — tsc --noEmit (main tsconfig), 0 diagnostics, exit 0
+4. tsc-electron-check.txt — tsc -p tsconfig.electron.json --noEmit, 31 diagnostics/13 files, exit 2 (unchanged baseline)
+5. gate23-diff-check.txt — git diff --check, GameLibrary.tsx:286/303 only, exit 2 (unchanged baseline)
+6. packaged-build-output.txt — build:vite, build:electron (29/29 checks), dist:dir (electron-builder --dir), all exit 0
+7. packaged-smoke-output.txt — tests/packaged-smoke.test.ts against rebuilt candidate, 23/23 pass
+8. packaged-real-flow-run.txt — tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts (rewired to real freeze flow, no test hook), 10/10 pass
+9. packaged-security-matrix-run.txt — tests/gate2-3-freeze-authorization-security.e2e.test.ts (new), 3/3 pass
+10. node22-abi-restore.txt — node-gyp rebuild --target=22.23.1 for vendor/memoryjs-3.5.1-patched, exit 0, confirmed loadable under Node 22

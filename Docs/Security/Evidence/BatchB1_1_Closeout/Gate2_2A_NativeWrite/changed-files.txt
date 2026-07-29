@@ -1,0 +1,6 @@
+ M src/core/live-memory/native-memory-driver.ts
+ M vendor/memoryjs-3.5.1-patched/lib/memory.h
+ M vendor/memoryjs-3.5.1-patched/lib/memoryjs.cc
+ M vendor/memoryjs-3.5.1-patched/lib/process.cc
+ M vendor/memoryjs-3.5.1-patched/lib/process.h
+?? tests/fixtures/gate2-2-memory-fixture/
