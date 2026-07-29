@@ -1,0 +1,5 @@
+Condition,Classification,Notes
+Electron TypeScript 31 diagnostics/13 files,Pre-existing baseline — out of Gate 2.2A scope,Identical to Gate 2/2.1 baseline (final-typescript-electron.txt); zero diff
+GameLibrary.tsx trailing whitespace (lines 286/303),Pre-existing baseline — out of Gate 2.2A scope,Identical to Gate 2/2.1 baseline; file not touched this cycle
+Read-only vs write-capable handle separation not applied to every driver call site,Residual design note, not a defect,Single-handle-per-session architecture means the same handle always needs both rights; documented in native-access-rights-model.md
+Packaged (Electron ABI) rebuild not performed this cycle,Deferred — explicitly out of scope for Gate 2.2A,Authorization scoped this remediation to the native write path and Node-ABI verification; packaging is part of paused Gate 2.2 lifecycle certification

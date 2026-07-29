@@ -1,0 +1,68 @@
+REGISTRY / WMI OPERATIONS AUDIT
+Scope: G:\ACTIVE_PROJECTS\SOLITH electron/ and src/, all *.ts files
+Search: grep -rniE "HKEY_|HKLM|HKCU|winreg|regedit|reg\.exe|Registry\.(GetValue|SetValue|OpenSubKey)|win32ole|wmic|SELECT \* FROM Win32_" electron/ src/
+Date: 2026-07-26
+
+FINDING 1 — CORRECTION OF HANDOVER ASSUMPTION:
+The handover plan assumed "registry-verification-ipc.ts" performs Windows
+registry/WMI operations based on its filename. This is FALSE. Read in full,
+electron/registry-verification-ipc.ts (channels: registry-run-readonly-verification,
+registry-compare-restart-artifacts) never touches HKLM/HKCU/WMI/reg.exe anywhere.
+"Registry" in that file's naming refers to a compiled Cheat Engine table artifact
+(pointers/scripts/AOB signatures) — an in-app data structure, NOT the Windows
+Registry. This is a naming-collision false lead, now resolved with evidence.
+
+FINDING 2 — ACTUAL WINDOWS REGISTRY ACCESS LOCATION:
+File: src/core/install-discovery/registry-win.ts
+Two functions perform real `reg query` shell calls via child_process.execSync:
+
+  readRegistryString(hiveKey, valueName)   [line 7-25]
+    execSync(`reg query "${hiveKey}" /v ${valueName}`, ...)
+
+  listRegistrySubkeys(hiveKey)             [line 27-45]
+    execSync(`reg query "${hiveKey}"`, ...)
+
+Classification:
+  - Read vs write:      READ ONLY. No `reg add`/`reg delete`/`reg import` calls
+                         exist anywhere in the codebase.
+  - Scope:               HKLM (Steam, GOG install paths) and HKCU (Epic Games
+                         launcher AppDataPath) — both hives are used.
+  - Input validation:    hiveKey and valueName are interpolated directly into
+                         a shell command string (execSync always invokes a
+                         shell). NO escaping/sanitization is applied to either
+                         argument inside registry-win.ts itself.
+  - Injection risk:      LOW IN PRACTICE, NOT ZERO IN PATTERN.
+                         Traced every call site (grep -rn for the four exported
+                         functions across src/ and electron/):
+                           - defaultSteamInstallPath() and
+                             defaultEpicManifestsPath() call with 100%
+                             hardcoded literal hiveKey/valueName strings.
+                           - gog.ts calls listRegistrySubkeys(GOG_GAMES_KEY)
+                             with a hardcoded constant, then feeds the
+                             *subkey names returned by the registry itself*
+                             (not renderer input) into readRegistryString()
+                             as keyPath; valueName arguments there are also
+                             all hardcoded literals ('path','exe','gameName',
+                             etc).
+                         No IPC handler (install-discovery-scan/preview, which
+                         accept renderer-supplied steamInstallPath /
+                         epicManifestsPath strings validated by
+                         DiscoveryOptionsSchema) ever routes that renderer
+                         input into hiveKey/valueName — renderer-supplied
+                         path overrides bypass the registry read path
+                         entirely (used only as filesystem paths instead).
+                         CONCLUSION: no currently-reachable IPC path lets a
+                         renderer-controlled string reach the shell-interpolated
+                         reg query. The pattern itself (string-built shell
+                         command instead of execFileSync with an argument
+                         array) is not defense-in-depth and should be flagged
+                         for Batch B hardening, but is not an active
+                         vulnerability under the current call graph.
+
+No other registry or WMI access exists anywhere in electron/ or src/. The
+three PowerShell/WMI-adjacent calls found elsewhere (native-memory-driver.ts,
+windows-process-identity.ts x2) use Get-CimInstance Win32_Process via
+execFileSync with an argument array (not shell string concatenation for the
+process invocation itself) — see process-execution-audit.csv for those,
+they are process/memory identity queries, not registry operations, and are
+listed there instead of here.

@@ -1,0 +1,13 @@
+Product=Solith
+Version=2.4.0-alpha.2
+Platform=Windows x64
+NodeBuildToolchain=v22.23.1
+npm=10.9.8
+Electron=42.4.1
+ElectronABI=146
+ExecutableSHA256=0aec0dc0f5cdefc8d2c01dd4873b5722d4516fc068df8b37687586bd3ad2c602
+AppAsarSHA256=6c4b1f9ed17d937992048957f8bf06f1434e54ed1ff5bd3382b7b98aa16e590a
+BuildSteps=npm run build:vite; npm run build:electron; npm run dist:dir
+BuildResult=PASS
+ElectronOutputVerifier=29/29 PASS
+NativeAddonFinalWorkspaceABI=Node 22.23.1 (restored after packaged regression)

@@ -1,0 +1,11 @@
+
+Running 5 tests using 1 worker
+
+  ok 1 tests\packaged-lifecycle-gate2-1.e2e.test.ts:98:1 › point 00 — packaged exe exists and test-build seams are active (4ms)
+  ok 2 tests\packaged-lifecycle-gate2-1.e2e.test.ts:103:1 › scenario 1 — a forced cleanup-step failure still tears down the session and blocks future writes (4.9s)
+  ok 3 tests\packaged-lifecycle-gate2-1.e2e.test.ts:148:1 › scenario 2 — renderer crash disposes the live-memory session for that owner (5.5s)
+  ok 4 tests\packaged-lifecycle-gate2-1.e2e.test.ts:185:1 › scenario 3 — identity mismatch (simulated PID reuse) is rejected against a real spawned process (654ms)
+  ok 5 tests\packaged-lifecycle-gate2-1.e2e.test.ts:250:1 › scenario 4 — app close (will-quit) resolves cleanly with no hang after a full session lifecycle (120ms)
+
+  5 passed (15.1s)
+exit:0

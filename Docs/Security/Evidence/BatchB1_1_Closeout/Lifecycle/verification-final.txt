@@ -1,0 +1,33 @@
+# Verification Final
+
+Verdict: BATCH B1.1 CONDITIONAL PASS
+
+Scoped lifecycle/security suite: PASS, 40/40.
+Renderer crash: PASS — real `render-process-gone` wiring, owner-scoped cleanup, other owner remains active, authorization/selection/trust cleared, idempotent sanitized audit.
+Application shutdown: PASS — real `will-quit` wiring, all fake sessions stopped/detached, global registries cleared, sanitized results.
+Feature disable: PASS — stop reason `feature_disabled`, pending authorization and owner tokens revoked, no later write, no restart on re-enable.
+Cleanup failure: PASS — 3/3; required order, multiple failures continued, sanitized codes, audit failure contained.
+Process selection: PASS — 12/12; main-owned reusable five-minute window-scoped selection, complete identity snapshot, revalidation before worker. `selectedByUser: false` is retained only as a non-authoritative legacy protocol field.
+Trusted sender: PASS — 14/14; main-frame identity, per-channel main-window authorization, canonical parsed URL/file-entry boundaries and malicious variation rejection.
+Rollback integrity: PASS with residual risk — 8/8 type-policy tests; all supported source types covered (`byte`, `int32`, `uint32`, `int64`, `float`, `double`). Unsafe int64 and unsupported types fail closed. Raw-byte comparison is unavailable.
+
+Exact verification:
+- `npm run test:live-memory`: exit 0; 221 passed, 0 failed, 0 skipped, 0 cancelled.
+- `npm test`: exit 1 in pretest; no tests discovered because Node 24.15.0 is unsupported and Node 22.x is required.
+- `.\node_modules\.bin\tsc.cmd --noEmit`: exit 0.
+- `.\node_modules\.bin\tsc.cmd -p .\tsconfig.electron.json --noEmit`: exit 2; 31 diagnostics in 13 files. No diagnostic remains in lifecycle coordinator, session cleanup, sender registry/wrapper, process registry/IPC, main lifecycle, consent store, or live-memory session. The one `memory-manager.ts` diagnostic is the previously reported unrelated baseline issue.
+- `git status --short --untracked-files=all`: exit 0.
+- `git diff --stat`: exit 0.
+- `git diff --check`: exit 2 due unrelated pre-existing trailing whitespace in `src/app/routes/GameLibrary.tsx` lines 286 and 303.
+- `git diff --name-only`: exit 0.
+
+Final scope review:
+- No Batch A, Batch B1, or original Batch B1.1 evidence was modified.
+- No B2/B2A production implementation was begun.
+- No CI workflow was changed.
+- No package was installed or upgraded. Existing package.json changes predated this phase; this phase did not modify package or lock files.
+- No `.only`, `.skip`, todo, broad ignore, new exclusion, or weakened scoped assertion was added.
+- No commits, pushes, merges, resets, cleans, stashes, tags, releases, or file deletions were performed.
+- Unrelated modified/untracked files were preserved.
+
+Conditional reasons: exact full `npm test` did not run under required Node 22; 31 unrelated Electron diagnostics remain; raw-byte rollback comparison is unavailable; packaged Windows crash/shutdown certification remains outstanding.

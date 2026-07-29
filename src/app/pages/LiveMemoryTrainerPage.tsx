@@ -577,11 +577,26 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
       const baseInterval = freezeIntervalMs.trim() ? Number(freezeIntervalMs) : 200;
       const multiplier = Math.max(1, Math.min(8, Number(speedhackMultiplier) || 1));
       const intervalMs = Math.max(50, Math.floor(baseInterval / multiplier));
-      const result = await api.liveMemoryFreezeStart({
+      const proposeResult = await api.liveMemoryFreezePropose({
         address: address.trim(),
         dataType,
         value: Number(freezeValue),
         intervalMs,
+      });
+      if (!proposeResult?.success || !proposeResult.proposal?.proposalId) {
+        setMessage(`Freeze proposal failed: ${proposeResult?.error ?? 'unknown error'}`);
+        return;
+      }
+      const consentResult = await api.liveMemoryFreezeRequestConsent({
+        proposalId: proposeResult.proposal.proposalId,
+      });
+      if (!consentResult?.success || !consentResult.consent?.tokenId) {
+        setMessage(`Freeze consent failed: ${consentResult?.error ?? 'unknown error'}`);
+        return;
+      }
+      const result = await api.liveMemoryFreezeStart({
+        proposalId: proposeResult.proposal.proposalId,
+        consentToken: consentResult.consent.tokenId,
       });
       if (result?.success) {
         setMessage(`Freeze started on ${address.trim()}.`);
@@ -1173,11 +1188,26 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
               return result.address;
             }}
             onFreeze={async (addr, value, type) => {
-              const result = await api.liveMemoryFreezeStart({
+              const proposeResult = await api.liveMemoryFreezePropose({
                 address: addr,
                 dataType: type,
                 value,
                 intervalMs: Number(freezeIntervalMs) || 200,
+              });
+              if (!proposeResult?.success || !proposeResult.proposal?.proposalId) {
+                setMessage(proposeResult?.error ?? 'freeze proposal failed');
+                return;
+              }
+              const consentResult = await api.liveMemoryFreezeRequestConsent({
+                proposalId: proposeResult.proposal.proposalId,
+              });
+              if (!consentResult?.success || !consentResult.consent?.tokenId) {
+                setMessage(consentResult?.error ?? 'freeze consent failed');
+                return;
+              }
+              const result = await api.liveMemoryFreezeStart({
+                proposalId: proposeResult.proposal.proposalId,
+                consentToken: consentResult.consent.tokenId,
               });
               if (!result?.success) setMessage(result?.error ?? 'freeze failed');
               else {

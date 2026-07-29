@@ -1,0 +1,44 @@
+Command: node --version
+StartTimeUtc: 2026-07-28T09:35:26Z
+Output: v24.15.0
+ExitCode: 0
+
+Command: npm --version
+Output: 11.12.1
+ExitCode: 0
+
+Command: where.exe node
+Output:
+C:\Program Files\nodejs\node.exe
+ExitCode: 0
+
+Command: where.exe npm
+Output:
+C:\Program Files\nodejs\npm
+C:\Program Files\nodejs\npm.cmd
+ExitCode: 0
+
+EndTimeUtc: 2026-07-28T09:35:27Z
+
+## Verdict
+
+STOP CONDITION TRIGGERED: Active Node version is v24.15.0, not v22.x.
+
+Expected (per prior Node22Gate evidence and repository pinning):
+- .nvmrc: 22
+- package.json engines.node: ">=22 <23"
+- Prior Node22Gate/node-version.txt: v22.23.1
+
+Actual:
+- node --version: v24.15.0
+- where.exe node: C:\Program Files\nodejs\node.exe (only Node install found)
+- No nvm, volta, or fnm present on this machine.
+- No alternate Node 22 binary found on this system.
+
+Per task instruction Phase 6 ("If Node 22 is not active, stop"), this task
+halts before Phase 7 (pretest checkpoint) and Phase 8 (verification commands).
+No test, build, or TypeScript command was executed as part of this task.
+This is classified as an ENVIRONMENT FAILURE, not a source-state instability
+and not a functional regression. The system-wide Node toolchain changed
+(v22.23.1 -> v24.15.0) between the prior Node22Gate capture and this task;
+that change is outside repository scope and was not made by this task.

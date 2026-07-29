@@ -12,6 +12,54 @@ import { getScanSizeLimitMB } from '../settings';
 const DEMO_GAME_ID = 'demo-game-quest-id-000000000000';
 const cancelledScans = new Set<string>();
 
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeSaveLocations(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function serializeSaveLocations(value: unknown): string | null {
+  const normalized = normalizeSaveLocations(value);
+  return normalized.length > 0 ? JSON.stringify(normalized) : null;
+}
+
+function parseSaveLocations(value: unknown): string[] | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    const normalized = normalizeSaveLocations(parsed);
+    return normalized.length > 0 ? normalized : undefined;
+  } catch (error) {
+    console.error('Failed to parse persisted game save locations:', error);
+    return undefined;
+  }
+}
+
+function rowToGame(row: any): Game {
+  return {
+    ...row,
+    engine: row.engine ?? 'Generic',
+    dateAdded: row.dateAdded.toISOString(),
+    lastScan: row.lastScan ? row.lastScan.toISOString() : undefined,
+    executablePath: normalizeOptionalText(row.executablePath),
+    coverPath: normalizeOptionalText(row.coverPath),
+    iconPath: normalizeOptionalText(row.iconPath),
+    saveLocations: parseSaveLocations(row.saveLocations),
+    notes: normalizeOptionalText(row.notes),
+    metadataId: normalizeOptionalText(row.metadataId),
+    fingerprint: row.fingerprint ? JSON.parse(row.fingerprint) : undefined,
+    needsRescan: row.needsRescan === 1
+  };
+}
+
 export function cancelScan(scanId: string): void {
   cancelledScans.add(scanId);
 }
@@ -64,25 +112,19 @@ export function getGames(): Game[] {
   const stmt = db.prepare(`
     SELECT g.*, json_extract(g.fingerprint, '$.fileCount') as fileCount,
            json_extract(g.fingerprint, '$.totalSize') as totalSize,
-           json_extract(g.fingerprint, '$.engine') as engine
+           COALESCE(json_extract(g.fingerprint, '$.engine'), g.engine) as engine
     FROM games g
     ORDER BY g.dateAdded DESC
   `);
   
-  return stmt.all().map(row => ({
-    ...row,
-    dateAdded: row.dateAdded.toISOString(),
-    lastScan: row.lastScan ? row.lastScan.toISOString() : undefined,
-    fingerprint: row.fingerprint ? JSON.parse(row.fingerprint) : undefined,
-    needsRescan: row.needsRescan === 1
-  }));
+  return stmt.all().map(rowToGame);
 }
 
 export function getGameById(gameId: string): Game | null {
   const stmt = db.prepare(`
     SELECT g.*, json_extract(g.fingerprint, '$.fileCount') as fileCount,
            json_extract(g.fingerprint, '$.totalSize') as totalSize,
-           json_extract(g.fingerprint, '$.engine') as engine
+           COALESCE(json_extract(g.fingerprint, '$.engine'), g.engine) as engine
     FROM games g
     WHERE g.id = ?
   `);
@@ -90,13 +132,7 @@ export function getGameById(gameId: string): Game | null {
   const row = stmt.get(gameId);
   if (!row) return null;
   
-  return {
-    ...row,
-    dateAdded: row.dateAdded.toISOString(),
-    lastScan: row.lastScan ? row.lastScan.toISOString() : undefined,
-    fingerprint: row.fingerprint ? JSON.parse(row.fingerprint) : undefined,
-    needsRescan: row.needsRescan === 1
-  };
+  return rowToGame(row);
 }
 
 export function addGame(game: Omit<Game, 'id' | 'dateAdded'>): Game {
@@ -108,17 +144,32 @@ export function addGame(game: Omit<Game, 'id' | 'dateAdded'>): Game {
   
   const gameId = generateId();
   const stmt = db.prepare(`
-    INSERT INTO games (id, name, path, engine, fingerprint)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO games (
+      id, name, path, engine, executablePath, coverPath, iconPath,
+      saveLocations, notes, metadataId, fingerprint
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
-  stmt.run(gameId, game.name, game.path, game.engine || 'Generic', JSON.stringify({
-    fileCount: 0,
-    totalSize: 0,
-    keyHashes: [],
-    mainExecutable: undefined,
-    lastScan: new Date().toISOString()
-  }));
+  stmt.run(
+    gameId,
+    game.name,
+    game.path,
+    game.engine || 'Generic',
+    normalizeOptionalText(game.executablePath) ?? null,
+    normalizeOptionalText(game.coverPath) ?? null,
+    normalizeOptionalText(game.iconPath) ?? null,
+    serializeSaveLocations(game.saveLocations),
+    normalizeOptionalText(game.notes) ?? null,
+    normalizeOptionalText(game.metadataId) ?? null,
+    JSON.stringify({
+      fileCount: 0,
+      totalSize: 0,
+      keyHashes: [],
+      mainExecutable: undefined,
+      lastScan: new Date().toISOString()
+    })
+  );
   
   return {
     ...game,
@@ -134,13 +185,22 @@ export function updateGame(gameId: string, updates: Partial<Omit<Game, 'id' | 'd
   const name = updates.name !== undefined ? updates.name : current.name;
   const pathVal = updates.path !== undefined ? updates.path : current.path;
   const engine = updates.engine !== undefined ? updates.engine : current.engine;
+  const executablePath = updates.executablePath !== undefined ? updates.executablePath : current.executablePath;
+  const coverPath = updates.coverPath !== undefined ? updates.coverPath : current.coverPath;
+  const iconPath = updates.iconPath !== undefined ? updates.iconPath : current.iconPath;
+  const saveLocations = updates.saveLocations !== undefined ? updates.saveLocations : current.saveLocations;
+  const notes = updates.notes !== undefined ? updates.notes : current.notes;
+  const metadataId = updates.metadataId !== undefined ? updates.metadataId : current.metadataId;
   const fingerprint = updates.fingerprint !== undefined ? updates.fingerprint : current.fingerprint;
   const lastScan = updates.lastScan !== undefined ? updates.lastScan : current.lastScan;
   const needsRescan = updates.needsRescan !== undefined ? updates.needsRescan : current.needsRescan;
 
   const stmt = db.prepare(`
     UPDATE games SET
-      name = ?, path = ?, engine = ?, fingerprint = ?,
+      name = ?, path = ?, engine = ?,
+      executablePath = ?, coverPath = ?, iconPath = ?,
+      saveLocations = ?, notes = ?, metadataId = ?,
+      fingerprint = ?,
       lastScan = ?, needsRescan = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
@@ -150,6 +210,12 @@ export function updateGame(gameId: string, updates: Partial<Omit<Game, 'id' | 'd
     name,
     pathVal,
     engine,
+    normalizeOptionalText(executablePath) ?? null,
+    normalizeOptionalText(coverPath) ?? null,
+    normalizeOptionalText(iconPath) ?? null,
+    serializeSaveLocations(saveLocations),
+    normalizeOptionalText(notes) ?? null,
+    normalizeOptionalText(metadataId) ?? null,
     fingerprint ? JSON.stringify(fingerprint) : null,
     lastScan,
     needsRescan ? 1 : 0,

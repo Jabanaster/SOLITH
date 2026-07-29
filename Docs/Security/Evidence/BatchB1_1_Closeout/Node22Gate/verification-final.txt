@@ -1,0 +1,40 @@
+# Gate 1 Node 22 Evidence Backfill
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+NodeVersion: v22.23.1
+NpmVersion: 10.9.8
+
+## Exact command results
+
+- `npm test`: exit 0; 1,034 tests passed, 0 failed, 0 skipped, 0 cancelled. This is the authoritative completed run.
+- `npm run test:live-memory`: exit 0; 221 tests passed, 0 failed, 0 skipped, 0 cancelled.
+- `.\node_modules\.bin\tsc.cmd --noEmit`: exit 0; no diagnostics.
+- `.\node_modules\.bin\tsc.cmd -p .\tsconfig.electron.json --noEmit`: exit 2; 31 diagnostics across 13 files.
+- `git diff --check`: exit 2; trailing whitespace at `src/app/routes/GameLibrary.tsx` lines 286 and 303.
+
+## Failure classification
+
+- The earlier short-timeout `npm test` attempt was an invalid environment or harness failure. It is not a product failure. The authoritative rerun passed.
+- The Electron TypeScript diagnostic set exactly matches the prior raw 31-diagnostic baseline: 31 current, 31 prior, zero diagnostic-line differences, and 13 files.
+- No diagnostic appears in the B1.1 lifecycle coordinator, cleanup coordinator, session cleanup, trusted-sender registry or validation wrapper, sender frame or URL validation, process-selection registry or IPC, main lifecycle wiring, consent store, rollback session control, or freeze-concurrency registry.
+- The single `src/core/live-memory/memory-manager.ts` diagnostic is the exact previously documented unrelated baseline diagnostic.
+- The two `GameLibrary.tsx` whitespace findings exactly reproduce the prior evidence and were not repaired.
+
+## Dirty-tree integrity
+
+FAIL. The pre-evidence dirty tree was captured before creating this directory. The final comparison found 23 production/test paths whose status modes changed outside `Docs\Security\Evidence\BatchB1_1_Closeout\Node22Gate`. The cause is uncertain. No path was reverted automatically. See `changed-files.txt` and the before/after raw Git evidence.
+
+## Residual risks
+
+- Raw-byte rollback equality remains unavailable and proposed for acceptance.
+- Packaged Windows lifecycle certification remains outstanding.
+- The unrelated Electron TypeScript baseline remains.
+- The unrelated `GameLibrary.tsx` whitespace release-gate failure remains.
+
+## Verdict
+
+GATE 1 EVIDENCE BACKFILL FAIL
+
+BATCH B1.1 CONDITIONAL PASS
+

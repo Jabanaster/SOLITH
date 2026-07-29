@@ -1,0 +1,96 @@
+# Node22Gate Stable Rerun
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+
+## Mandatory grounding
+
+git rev-parse --show-toplevel -> G:/ACTIVE_PROJECTS/SOLITH (matches required root)
+git branch --show-current -> master
+
+## Phase 1 — Prior evidence read
+
+Confirmed against Node22Gate and Node22GateReconciliation evidence:
+- 23 exact changed-status paths extracted (see monitored-paths.txt).
+- 4 additional unauthorized-change paths extracted.
+- 1 B1.1-impacting path: src/app/pages/RegistryExplorerPage.tsx.
+- 6 paths with unrecoverable MM test-time content (App.tsx,
+  RegistryExplorerPage.tsx, TrainerLibraryPage.module.css,
+  TrainerLibraryPage.tsx, GameLibrary.tsx, index.css).
+Current repository state independently corroborates these prior findings:
+the 22 unrelated paths from the 23-path set are now clean/absent except
+the same 6 that remain unstaged-modified, and all 4 unauthorized-change
+paths are still present in the working tree in modified/untracked form.
+
+## Phase 2-5 — Evidence directory, monitored set, before-manifest, stability window
+
+- Evidence directory created: Docs\Security\Evidence\BatchB1_1_Closeout\Node22GateStableRerun
+  (Node22Gate and Node22GateReconciliation left untouched).
+- Monitored set: 1,051 files (876 tracked + 175 untracked at time of listing,
+  minus one dedupe), documented in monitored-paths.txt.
+- source-state-before.csv: full manifest (path, tracked/index/worktree status,
+  size, mtime, SHA256, HEAD blob hash, index blob hash, EOL state) for all
+  1,051 monitored paths.
+- Stability window: T0 (2026-07-28T09:32:57Z) -> T60 (09:33:59Z) ->
+  T120 (09:35:01Z). stability-snapshot-t0.csv, -t60.csv, -t120.csv are
+  byte-identical in content (0 hash changes, 0 status changes, 0 paths
+  appeared/disappeared among monitored files). The only git-status delta
+  across the window was the appearance of this task's own evidence files.
+  RESULT: SOURCE STATE STABLE for the observed 120-second window.
+
+## Phase 6 — Node environment (STOP CONDITION)
+
+node --version -> v24.15.0 (expected v22.x; prior evidence recorded v22.23.1)
+npm --version -> 11.12.1
+where.exe node -> C:\Program Files\nodejs\node.exe (only Node install found)
+No nvm/volta/fnm present. .nvmrc pins "22"; package.json engines.node is
+">=22 <23". No Node 22 runtime is available on this machine.
+
+Per task instruction, this task STOPS here. Phases 7-10 (pretest checkpoint,
+npm test, npm run test:live-memory, tsc main, tsc electron, git diff --check,
+post-command snapshots, final quiet window) were NOT executed. All
+corresponding evidence files were created with an explicit BLOCKED marker
+rather than left absent, per the "no silent gaps" evidence-completeness
+requirement.
+
+## Phase 11 — Concurrent process observation
+
+33 node.exe processes, 5 electron.exe processes (including a running
+"Solith" Electron app window), multiple powershell.exe/cmd.exe/bash.exe
+shells were observed. See concurrent-process-observation.txt. No process
+was terminated or inspected beyond read-only tasklist output. No causal
+link is claimed between this process activity and any file change, because
+no monitored file changed during the observed 120-second window despite
+this activity being present throughout.
+
+## Phase 12-13 — B1.1 integrity / expected-result verification
+
+BLOCKED — no pretest/posttest test run occurred, so no fresh comparison of
+npm test / live-memory / tsc-main / tsc-electron / git diff --check results
+against the Phase 13 expected baseline could be performed this cycle.
+
+## Phase 15 — Scope integrity
+
+Confirmed by diffing git-status-before.txt (captured at the start of this
+task's Phase 4) against a fresh git status capture at completion: the only
+new entries are files created by this task under
+Docs\Security\Evidence\BatchB1_1_Closeout\Node22GateStableRerun. No
+production file, test file, package/lockfile, tsconfig, Vite config, or CI
+file was created, edited, staged, unstaged, reverted, or cleaned by this
+task. No process was terminated. No Gate 2, Batch B2, or B2A work began.
+
+## Verdict
+
+NODE22GATE STABLE RERUN FAIL — ENVIRONMENT FAILURE (Node 22 unavailable)
+
+This is distinct from both defined FAIL categories in the task
+specification (SOURCE STATE UNSTABLE and FUNCTIONAL REGRESSION): the
+source state was in fact proven stable for the full observation window,
+and no functional test ran to regress. The blocking condition is that no
+Node 22.x runtime exists on this machine to execute the gate.
+
+BATCH B1.1 CONDITIONAL PASS (unchanged — no regression proven or
+disproven this cycle; the prior conditional pass stands on its existing
+evidence basis).
+
+Gate 2 may not resume.

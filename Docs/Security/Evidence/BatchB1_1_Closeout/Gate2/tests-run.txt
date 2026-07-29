@@ -1,0 +1,7 @@
+Command: npm test
+StartTimeUtc: 2026-07-28T21:51:38Z
+npm test exit: 0, EndTimeUtc: 2026-07-28T21:52:03Z
+test:live-memory exit: 0
+tsc main exit: 0
+tsc electron exit: 2
+git diff --check exit: 2

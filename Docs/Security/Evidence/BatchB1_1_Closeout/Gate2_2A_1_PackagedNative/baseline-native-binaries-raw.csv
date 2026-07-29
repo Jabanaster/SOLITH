@@ -1,0 +1,3 @@
+Path,Exists,Size,LastWriteTimeUtc,SHA256
+vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node,true,238080,2026-07-29T15:03:11.116Z,72847fc0510fa53e506cef17eddb8c6587b6823244713a4ac3adc0b227518902
+dist/win-unpacked/resources/app.asar.unpacked/node_modules/memoryjs/build/Release/memoryjs.node,true,235008,2026-07-28T23:48:00.764Z,c89a33ed80bff92d06c29543dd8a4d0453ec9e0448a72e78e64dc92a66c75a98

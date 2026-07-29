@@ -1,0 +1,125 @@
+BATCH B1 — TEST EXECUTION RECORD
+Date: 2026-07-26
+Working directory: G:\ACTIVE_PROJECTS\SOLITH
+
+ENVIRONMENT NOTE: The repository pins Node 22.x (.nvmrc, package.json
+engines: ">=22 <23"). This session's runtime is Node v24.15.0. The
+package.json "pretest" hook (scripts/check-node.mjs) therefore blocks `npm
+test` outright with "Unsupported Node.js v24.15.0". This is a pre-existing
+environment constraint, unrelated to Batch B1 — it blocks `npm test` on ANY
+change, including no change at all. All commands below invoke the underlying
+`tsx --test ...` / `tsc` commands directly (bypassing only the Node-version
+lifecycle gate, not any test logic) to get an accurate regression signal.
+
+===== 1. TypeScript compile check (whole repository) =====
+Command: npx tsc --noEmit -p tsconfig.json
+Exit code: 0
+Output: (empty — zero errors)
+
+===== 2. Targeted new/modified test files (Batch B1 changes only) =====
+Command: npx tsx --test tests/live-memory-rollback-freeze-ipc-validation.test.ts tests/live-memory/session-cleanup-on-destroy.test.ts tests/live-memory/live-memory-session.test.ts tests/live-memory/memory-manager.test.ts
+Exit code: 0
+Result: tests 69 | suites 8 | pass 69 | fail 0 | cancelled 0 | skipped 0 | todo 0
+
+Breakdown of NEW tests added this session (all passing):
+  tests/live-memory-rollback-freeze-ipc-validation.test.ts       — 19 tests (new file)
+  tests/live-memory/session-cleanup-on-destroy.test.ts           — 3 tests (new file)
+  tests/live-memory/live-memory-session.test.ts (new cases only) — 9 new tests added to existing file
+    (rollback rejects forged manifest, rollback replay rejected, rollback fails
+     closed on identity mismatch, rollback ledger cleared on detach,
+     freeze interval min/max rejection, freeze non-finite value rejection,
+     freeze max-duration auto-stop, freeze auto-stop on identity mismatch)
+  tests/live-memory/memory-manager.test.ts (new cases only)      — 3 new tests added to existing file
+    (MemoryManager.rollback via proposalId, rejects forged proposalId, replay rejected)
+
+===== 3. Full live-memory test suite (regression check) =====
+Command: npx tsx --test tests/live-memory/online-guard.test.ts tests/live-memory/live-memory-session.test.ts tests/live-memory/remote-connection-observer.test.ts tests/live-memory/memory-scanner.test.ts tests/live-memory/real-time-scanner.test.ts tests/live-memory/game-connection-baselines.test.ts tests/live-memory/pointer-scanner.test.ts tests/live-memory/aob-resolver.test.ts tests/live-memory/feature-resolver.test.ts tests/live-memory/signature-engine.test.ts tests/live-memory/process-watcher.test.ts tests/live-memory/memory-manager.test.ts tests/live-memory/session-cleanup-on-destroy.test.ts tests/live-memory/local-crash-reporter.test.ts tests/live-memory/zero-input-prepare.test.ts tests/live-memory/installed-exe-hash.test.ts tests/live-memory/local-sandbox.test.ts tests/live-memory/research-tools.test.ts tests/live-memory/write-policy-gate.test.ts tests/live-memory/write-policy.test.ts tests/live-memory/write-consent.test.ts tests/live-memory/ct-promote-pack.test.ts tests/live-memory/live-correlation-watcher.test.ts tests/backups/avowed-wingdk.test.ts
+Exit code: 0
+Result: tests 202 | suites 19 | pass 202 | fail 0 | cancelled 0 | skipped 0 | todo 0
+
+===== 4. Full registry/headless-verification test suite (Target 3 regression check) =====
+Command: npx tsx --test tests/registry-query.test.ts tests/registry-schema.test.ts tests/registry-cli.test.ts tests/registry-explorer-page.test.tsx tests/ct-registry.test.ts tests/ce-enrichment.test.ts tests/feature-candidates.test.ts tests/runtime-readonly.test.ts tests/runtime-signature-validation.test.ts tests/headless-verification.test.ts tests/delta-engine.test.ts tests/l4-governance.test.ts
+Exit code: 0
+Result: tests 36 | suites 12 | pass 36 | fail 0 | cancelled 0 | skipped 0 | todo 0
+Note: tests/registry-explorer-page.test.tsx (RegistryExplorerPage.tsx component
+tests) passed unchanged — the userSelectedProcess: true addition to that
+page's call site did not break its existing render/detail tests.
+
+===== 5. Full repository unit test suite (package.json "test" script contents, run directly) =====
+Command (part 1 — main tsx --test invocation, ~150 files):
+  npx tsx --test tests/core.test.ts tests/parsers.test.ts [...all files listed in package.json "test" script up to...] tests/injector-process-integration.test.ts
+Exit code: 0
+Result: tests 966 | suites (multiple) | pass 966 | fail 0 | cancelled 0 | skipped 0 | todo 0
+
+Command (part 2 — chained via && in the original script):
+  npx tsx --test tests/sql-parameter-binding.test.ts
+Exit code: 0
+Result: tests 10 | suites 1 | pass 10 | fail 0 | cancelled 0 | skipped 0 | todo 0
+
+COMBINED FULL-SUITE TOTAL: 976 tests, 976 pass, 0 fail, 0 cancelled, 0 skipped.
+This is the SINGLE authoritative full-suite number. An earlier narrated
+estimate of "986" made mid-session (before this file existed) was never
+based on an actual captured command output and is WRONG — see
+finding-revalidation-v2.md section 0 for the correction record. This file
+has never itself stated 986; the contradiction existed only in this
+session's spoken narration, not in written evidence, but is documented here
+for completeness since the user flagged it.
+
+===== 6. VERIFICATION-PASS ADDENDUM (2026-07-27) — 4 new tests added =====
+A subsequent verification-only correction pass added 4 new tests to
+tests/live-memory/live-memory-session.test.ts to directly answer specific
+binding/eviction questions raised in review (see
+Docs/Security/Evidence/BatchB1/finding-revalidation-v2.md section 2 for
+full detail and rationale). Re-run totals after these additions:
+
+Command: npx tsx --test tests/live-memory-rollback-freeze-ipc-validation.test.ts tests/live-memory/session-cleanup-on-destroy.test.ts tests/live-memory/live-memory-session.test.ts tests/live-memory/memory-manager.test.ts
+Exit code: 0
+Result: tests 73 | suites 8 | pass 73 | fail 0 | cancelled 0 | skipped 0 | todo 0
+(was 69/69 before this addendum; +4 new tests, 0 regressions)
+
+Command (full live-memory suite, 24 files):
+Exit code: 0
+Result: tests 206 | suites 19 | pass 206 | fail 0 | cancelled 0 | skipped 0 | todo 0
+(was 202/202 before this addendum; +4 new tests, 0 regressions)
+
+The 4 new tests (2 of which are explicitly named "KNOWN GAP" and pass BY
+DESIGN to document current — imperfect — behavior, not to assert the system
+is fully secure):
+  1. rollback fails closed against a same-PID process restart (path + start
+     time both changed, PID unchanged) — PASS (protects correctly)
+  2. rollback ledger evicts the oldest confirmed write once the 50-entry cap
+     is exceeded (FIFO) — PASS (documents silent eviction behavior)
+  3. KNOWN GAP: rollback does not verify the current memory value still
+     matches the confirmed write before restoring — PASS (documents the gap
+     exists; this is NOT a security fix, it is a behavior-documenting test)
+  4. KNOWN GAP: a confirmed write remains rollback-able indefinitely, no
+     expiration/TTL exists — PASS (documents the gap exists)
+
+Full repository suite was NOT re-run after this addendum (only the directly
+affected files were), since the addendum added zero production-code changes
+— only tests. TypeScript compile was re-verified clean (exit 0) after the
+addendum.
+
+===== 7. Warnings observed =====
+- Git LF/CRLF warnings on several pre-existing files during `git status`/`git diff`
+  (line-ending normalization notices, not errors — pre-existing repo config,
+  unrelated to Batch B1).
+- No TypeScript warnings.
+- No test-runner warnings, deprecation notices, or unhandled rejections observed
+  in any of the above runs.
+
+===== 8. Tests intentionally NOT run =====
+- Playwright e2e suites (tests/electron-consent-boundary.e2e.test.ts,
+  tests/ipc-channels.e2e.test.ts, tests/trainer.e2e.test.ts, etc.) were not
+  run. These require a full `dist-electron` production build and, per the
+  Batch B1 instructions ("Do not attach to unrelated live processes... during
+  automated tests"), several of them compile and launch real Windows
+  executables and attach live-memory sessions to them
+  (electron-consent-boundary.e2e.test.ts explicitly builds a C# fixture EXE
+  and attaches to it). Exercising Batch B1's logic changes was done instead
+  at the unit level (LiveMemorySession/MemoryManager with FakeMemoryDriver,
+  and Zod schema tests), which is the established fast-test pattern this
+  codebase already uses for this exact logic (tests/live-memory/*.test.ts).
+- npm run build / npm run dist were not run (would install/build a full
+  Electron package — outside the "no deploying packages" instruction and
+  unnecessary to verify these source-level changes).

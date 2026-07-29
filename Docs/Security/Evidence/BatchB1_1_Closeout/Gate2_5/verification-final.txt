@@ -1,0 +1,45 @@
+# SOLITH Gate 2.5 — Verification Final
+
+Repository root: G:\ACTIVE_PROJECTS\SOLITH  
+Branch: master  
+Model: Codex (Claude Sonnet requirement explicitly waived by owner)  
+Build identity: Solith 2.4.0-alpha.2; Electron 42.4.1 ABI 146; win32 x64; exeSHA256=0aec0dc0f5cdefc8d2c01dd4873b5722d4516fc068df8b37687586bd3ad2c602
+
+## Result
+
+Gate 2.4 functional status: **REPORTED COMPLETE — VERIFY**.  
+Gate 2.4 scope integrity: **CONDITIONALLY RECONCILED**.  
+Gate 2.5: **REPORTED COMPLETE — VERIFY**.  
+Batch B1.1: **CONDITIONAL PASS**.  
+Release: **DENIED**.
+
+## Gate 2.5 findings
+
+The initial live Wisp test found a real security defect: live-memory-freeze-stop and live-memory-freeze-status did not enforce the main-window trusted-sender/window-type guard used by freeze proposal, consent, start, and rollback. A trusted overlay could reach those handlers and receive session-level results. Gate 2.5 added the existing requireTrustedSender(event) guard to exactly those two handlers. No validator, allow-list, consent, process-selection, URL, identity, rollback, or cleanup control was weakened.
+
+Final live packaged results:
+
+- Child frames: complete for same-origin, trusted-looking, untrusted local file, cross-origin local HTTP, and nested frames. No child had an own or parent-accessible preload bridge; the existing not_main_frame guard remains defense in depth.
+- Stale/destroyed frames: complete for removal, navigation, parent reload, null/disposed source path, and stale authority revocation.
+- DevTools: complete for the strongest genuine supported boundary. A detached real DevTools context had no preload bridge, Node access, or trusted Solith identity. No fabricated sender was used.
+- Wisp recreation: complete. The actual overlay was created, destroyed, and recreated through the production toggle. The new webContents identity differed; the old page was unusable; all seven main-only privileged operations rejected before and after recreation.
+- Test hooks: 8 inventory rows (7 retained global functions plus the removed freeze-start hook). Absent and nine non-1 variants expose zero hooks; exact 1 exposes seven main-process-only functions; renderer mutation cannot activate the guard.
+
+## Verification totals
+
+- Final packaged regression: **49/49 PASS**.
+- Packaged smoke subset: **23/23 PASS**.
+- Gate 2.5 focused suite: **7/7 PASS**.
+- npm test: **1,040/1,040 PASS** (1,030 main + 10 SQL).
+- npm run test:live-memory: **257/257 PASS**.
+- Main TypeScript: **PASS**, 0 diagnostics.
+- Electron TypeScript: unchanged excluded baseline, **31 diagnostics across 13 files**.
+- git diff --check: unchanged excluded baseline, **GameLibrary.tsx lines 286 and 303 only**.
+- Electron output verifier: **29/29 PASS**.
+- Packaged build: **PASS**.
+
+## Verdict basis
+
+No unresolved exploitable Gate 2.5 defect remains in the tested Windows x64 candidate. B1.1 is not promoted to unconditional PASS because the verdict rules require explicit owner disposition of the remaining documented conditions, including the Electron TypeScript and GameLibrary diff-check baselines. Gate 2.4's aggregate status is not rewritten as VERIFIED; only individually reproduced claims use VERIFIED COMPLETE in the evidence matrices.
+
+No commit, push, merge, reset, clean, stash, restore, checkout, tag, upload, publication, or release occurred.

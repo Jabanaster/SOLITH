@@ -9,7 +9,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
   getGames: () => ipcRenderer.invoke('get-games'),
   addGame: (gameData: any) => ipcRenderer.invoke('add-game', gameData),
+  updateGame: (gameData: any) => ipcRenderer.invoke('update-game', gameData),
   deleteGame: (gameId: string) => ipcRenderer.invoke('delete-game', gameId),
+  pickGameFolder: () => ipcRenderer.invoke('pick-game-folder'),
+  pickGameExecutable: () => ipcRenderer.invoke('pick-game-executable'),
   scanGame: (gameId: string) => ipcRenderer.invoke('scan-game', gameId),
   getRecipes: (gameId: string) => ipcRenderer.invoke('get-recipes', gameId),
   createRecipe: (recipeData: any) => ipcRenderer.invoke('create-recipe', recipeData),
@@ -95,7 +98,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-issue-write-consent', payload),
   liveMemoryConfirmWrite: (payload: { proposalId: string; consentToken: string }) =>
     ipcRenderer.invoke('live-memory-confirm-write', payload),
-  liveMemoryRollback: (payload: { manifest: unknown }) =>
+  liveMemoryRollback: (payload: { proposalId: string }) =>
     ipcRenderer.invoke('live-memory-rollback', payload),
   liveMemoryScanFirst: (payload: {
     dataType: string;
@@ -180,7 +183,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     sourceId: string;
     roi: { x: number; y: number; width: number; height: number };
   }) => ipcRenderer.invoke('local-ocr-read-window-region', payload),
-  liveMemoryFreezeStart: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
+  liveMemoryFreezePropose: (payload: { address: string; dataType: string; value: number; intervalMs?: number }) =>
+    ipcRenderer.invoke('live-memory-freeze-propose', payload),
+  liveMemoryFreezeRequestConsent: (payload: { proposalId: string }) =>
+    ipcRenderer.invoke('live-memory-freeze-issue-consent', payload),
+  liveMemoryFreezeStart: (payload: { proposalId: string; consentToken: string }) =>
     ipcRenderer.invoke('live-memory-freeze-start', payload),
   liveMemoryFreezeStop: () => ipcRenderer.invoke('live-memory-freeze-stop'),
   liveMemoryFreezeStatus: () => ipcRenderer.invoke('live-memory-freeze-status'),
@@ -207,6 +214,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerOverlayHide: () => ipcRenderer.invoke('trainer-overlay-hide'),
   wispOverlayToggle: () => ipcRenderer.invoke('wisp-overlay-toggle'),
   wispOverlayHide: () => ipcRenderer.invoke('wisp-overlay-hide'),
+  wispOverlaySetExpanded: (payload: { expanded: boolean }) =>
+    ipcRenderer.invoke('wisp-overlay-set-expanded', payload),
+  wispOverlayMoveBy: (payload: { deltaX: number; deltaY: number }) =>
+    ipcRenderer.invoke('wisp-overlay-move-by', payload),
+  wispOverlaySetInteractive: (payload: { interactive: boolean }) =>
+    ipcRenderer.invoke('wisp-overlay-set-interactive', payload),
   trainerHotkeysGetDefaults: () => ipcRenderer.invoke('trainer-hotkeys-get-defaults'),
   trainerHotkeysGetBindings: () => ipcRenderer.invoke('trainer-hotkeys-get-bindings'),
   trainerHotkeysSetBindings: (payload: { hotkeys: Record<string, string> }) =>
@@ -244,6 +257,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-catalog-approve-save-path', payload),
   trainerCatalogImportYaml: (payload: { yamlText: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
+  trainerCatalogPickCt: () => ipcRenderer.invoke('trainer-catalog-pick-ct'),
+  trainerCatalogPreviewCt: (payload: { filePath: string; xmlText: string; title: string; sha256: string }) =>
+    ipcRenderer.invoke('trainer-catalog-preview-ct', payload),
   trainerCatalogImportCt: (payload: { xmlText: string; title?: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-ct', payload),
   trainerCatalogFeedbackRecord: (payload: {
@@ -303,11 +319,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ct-library-import-progress', listener);
     return () => ipcRenderer.removeListener('ct-library-import-progress', listener);
   },
+  registrySelectProcess: (payload: { pid: number; executableName: string }) =>
+    ipcRenderer.invoke('registry-select-process', payload),
   registryRunReadOnlyVerification: (payload: {
     registry: unknown;
-    pid: number;
-    executableName: string;
-    executablePath?: string;
+    selectionId: string;
     timeoutMs?: number;
   }) => ipcRenderer.invoke('registry-run-readonly-verification', payload),
   registryCompareRestartArtifacts: (payload: { previous: unknown; current: unknown }) =>
@@ -417,8 +433,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installDiscoveryScan: (payload?: {
     steamInstallPath?: string;
     epicManifestsPath?: string;
+    gogFixturePath?: string;
     offlineRootsOnly?: boolean;
+    userSelectedRoots?: string[];
+    includeCommonRoots?: boolean;
   }) => ipcRenderer.invoke('install-discovery-scan', payload ?? {}),
+  installDiscoveryPickFolder: () => ipcRenderer.invoke('install-discovery-pick-folder'),
+  installDiscoveryPreview: (payload?: {
+    steamInstallPath?: string;
+    epicManifestsPath?: string;
+    gogFixturePath?: string;
+    offlineRootsOnly?: boolean;
+    userSelectedRoots?: string[];
+    includeCommonRoots?: boolean;
+  }) => ipcRenderer.invoke('install-discovery-preview', payload ?? {}),
+  installDiscoveryCommit: (payload: { records: unknown[] }) =>
+    ipcRenderer.invoke('install-discovery-commit', payload),
   installDiscoveryList: () => ipcRenderer.invoke('install-discovery-list'),
 
   trainerDeckGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-deck-get', payload),

@@ -1,0 +1,10 @@
+Suite,Total,Pass,Fail,ExitCode,Evidence
+Gate 2.2 Resume packaged lifecycle harness (Phases 3-6/9/11),10,10,0,0,lifecycle-final.txt
+Gate 2.1 packaged regression (crash/cleanup-failure/identity/shutdown),5,5,0,0,packaged-regression-gate2-1.txt
+Packaged smoke,23,23,0,0,packaged-smoke-output.txt
+Gate 2.2A.1 packaged real-process write proof (regression),1,1,0,0,packaged-regression-write-proof.txt
+npm test,1040,1040,0,0,tests-run.txt
+npm run test:live-memory,257,257,0,0,tests-run.txt
+Main TypeScript (tsc --noEmit),0 diagnostics,-,-,0,tests-run.txt
+Electron TypeScript (tsconfig.electron.json),31 diagnostics/13 files (unchanged baseline),-,-,2,tests-run.txt
+git diff --check,GameLibrary.tsx only (unchanged baseline),-,-,2,tests-run.txt

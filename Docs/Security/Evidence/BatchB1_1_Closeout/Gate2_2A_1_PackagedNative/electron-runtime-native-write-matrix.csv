@@ -1,0 +1,10 @@
+Requirement,Scenario,ExpectedResult,ActualResult,Status,Evidence
+Addon loads without ABI errors,Require nativeMemoryDriver + LiveMemorySession under ELECTRON_RUN_AS_NODE=1 electron.exe (real Electron 42.4.1 runtime, ABI 146),No ABI mismatch error on require,Loaded cleanly; all 18 checks ran,PASS,electron-runtime-native-write-run.txt
+Read operation works against fixture,nativeMemoryDriver.readMemory against real fixture process under Electron,Reads current sentinel value (424242),readBack=424242,PASS,electron-runtime-native-write-run.txt
+Write operation changes fixture value,nativeMemoryDriver.writeMemory 555222 under Electron,Fixture's independent status read shows 555222,after.value=555222,PASS,electron-runtime-native-write-run.txt
+Readback returns new value,Re-read after write,readMemory reflects 555222 (validated via fixture status),Confirmed via fixture status file,PASS,electron-runtime-native-write-run.txt
+Restore returns original value,Write original value back,Fixture status reflects 424242,restored=424242,PASS,electron-runtime-native-write-run.txt
+Invalid write returns structured failure,Write to unmapped address 0x1; write via read-only handle,Both throw write_failed,Both threw as expected,PASS,electron-runtime-native-write-run.txt
+No failed write reports success,Same as above,No silent-success case observed,Confirmed - all failure scenarios threw,PASS,electron-runtime-native-write-run.txt
+Fixture exits cleanly / no process remains,killAndCleanup() after each scenario block,No leftover Gate2_2Fixture.exe process,All scenarios completed cleanup without error,PASS,electron-runtime-native-write-run.txt
+Freeze/rollback also verified under real Electron (beyond Phase 5's minimum list),Full 18-check suite re-run verbatim under Electron ABI,Same 18/18 as Node-ABI run,18/18 passed,PASS,electron-runtime-native-write-run.txt

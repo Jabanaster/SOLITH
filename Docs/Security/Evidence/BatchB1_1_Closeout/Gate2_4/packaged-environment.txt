@@ -1,0 +1,4 @@
+v22.23.1
+npm: 10.9.8
+platform: win32 x64
+Electron: 42.4.1 (ABI 146)

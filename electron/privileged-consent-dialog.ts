@@ -150,6 +150,31 @@ export function formatMemoryWriteConsentLines(input: {
   ];
 }
 
+export function formatFreezeConsentLines(input: {
+  attachedExecutableName: string;
+  attachedPid: number;
+  executablePath?: string | null;
+  address: string;
+  dataType: string;
+  value: number;
+  intervalMs: number;
+  maxDurationMs: number;
+  proposalId: string;
+}): string[] {
+  return [
+    'Operation: live memory freeze (repeated write)',
+    `Process: ${input.attachedExecutableName} (PID ${input.attachedPid})`,
+    `Executable path: ${input.executablePath?.trim() || '(unknown)'}`,
+    `Proposal: ${input.proposalId}`,
+    `Address: ${input.address}`,
+    `Type: ${input.dataType}`,
+    `Frozen value: ${input.value}`,
+    `Re-write interval: ${input.intervalMs}ms`,
+    `Auto-stops after: ${Math.round(input.maxDurationMs / 60000)} minutes`,
+    'Consequence: process memory will be repeatedly overwritten until stopped or auto-expired. Offline / solo-play only.',
+  ];
+}
+
 export function formatInjectorConsentLines(input: {
   attachedExecutableName: string;
   attachedPid: number;

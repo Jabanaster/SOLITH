@@ -1,0 +1,7 @@
+Command: .\node_modules\.bin\tsc.cmd --noEmit
+Start time: 2026-07-27T23:22:53.6879393-07:00
+End time: 2026-07-27T23:22:56.1738952-07:00
+Exit code: 0
+Duration: 2485.956 ms
+
+

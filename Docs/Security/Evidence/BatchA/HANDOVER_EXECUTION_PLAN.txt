@@ -1,0 +1,309 @@
+BATCH A COMPLETION HANDOVER
+Date: 2026-07-26
+Status: INCOMPLETE (15-20% done, 80-85% remaining)
+Target: Fresh Claude context with full token budget
+
+===== COMPLETED WORK =====
+
+✓ Required documents (4 files verified on disk):
+  - SOLITH_SECURITY_ARCHITECTURE.md (229 lines, SHA256: 5C9BC8AD...)
+  - SOLITH_ATTACK_SURFACE.md (230 lines, SHA256: B1259AC2...)
+  - SOLITH_SECURITY_FINDINGS_INITIAL.md (282 lines, SHA256: 9CB1E7B0...)
+  - SOLITH_DEPENDENCY_INVENTORY.md (112 lines, SHA256: 4CEF2820...)
+
+✓ IPC surface extracted:
+  - 149 ipcMain.handle() registrations identified
+  - 0 ipcMain.on() registrations
+  - 12 files with registrations catalogued
+  - No duplicate channels
+
+✓ Repository evidence saved:
+  - repository-root.txt
+  - branch.txt
+  - git-status-full.txt
+  - git-diff-stat.txt
+  - git-diff-check.txt
+  - ipc-summary.txt
+  - verification-final.txt
+
+===== INCOMPLETE WORK (PRIORITY ORDER) =====
+
+1. HANDLER VALIDATION AUDIT
+   Status: 10/149 (6.7%) complete
+   Remaining: 139 handlers require validation classification
+
+   Output needed: handler-validation-audit.csv
+   Columns:
+   - Handler #
+   - Channel name
+   - File location
+   - Zod schema present? (yes/no/partial)
+   - Validation type (schema/manual/none)
+   - Validation confidence (certain/likely/uncertain)
+   - Notes
+
+   Search pattern: grep -n "ipcMain.handle" electron/*.ts | parse each handler
+   For each: check for .parse(), .safeParse(), manual validation, or no validation
+
+2. HANDLER AUTHORIZATION AUDIT
+   Status: 6/149 (4.0%) complete
+   Remaining: 143 handlers require authorization classification
+
+   Output needed: handler-authorization-audit.csv
+   Columns:
+   - Handler #
+   - Channel name
+   - Sender validation? (event.sender check)
+   - Authorization check? (session/role/consent)
+   - Consent gate? (yes/no)
+   - Confidence (certain/likely/uncertain)
+   - Notes
+
+   Search: grep -n "event.sender" electron/*.ts
+   Cross-reference: check which handlers use sender validation
+
+3. PRELOAD WRAPPER CONTRADICTION RESOLUTION
+   Status: Unresolved
+   Issue: 154 preload methods claimed vs 149 handlers used = 5 orphan methods
+
+   Output needed: ipc-preload-orphans.csv
+   Columns:
+   - Method name
+   - File location
+   - Line number
+   - Purpose (callback/event/other)
+   - Related handler (if any)
+   - Classification
+
+   Search: grep -n "exposeInMainWorld" electron/preload.ts
+   Count all wrapper methods (154 claimed)
+   Cross-reference with 149 handlers
+   Identify and classify 5 orphans
+
+4. CREDENTIAL SCAN
+   Status: Not performed
+
+   Output needed: secret-scan-summary.txt
+   Script location: Docs/Security/Tools/Scan-SolithSecrets.ps1
+   Execute on G:\ACTIVE_PROJECTS\SOLITH
+   Report: found/not-found
+   Candidates (if any): secret-scan-candidates.csv
+
+   Patterns to scan:
+   - API keys (OPENAI_KEY, API_KEY, etc.)
+   - JWT tokens
+   - Passwords in code
+   - Private keys
+   - Hardcoded URLs/endpoints (staging vs prod)
+
+5. CHANNEL-TO-RENDERER MAPPING
+   Status: 0% (160 calls found, no mapping)
+
+   Output needed: ipc-renderer-callers.csv
+   Columns:
+   - Handler channel name
+   - Called from renderer (yes/no/uncertain)
+   - Window name (main/overlay/wisp)
+   - File location
+   - Line number
+   - Call context
+
+   Search: grep -rn "window.electronAPI\." src/
+   Cross-reference each call with registered handlers
+   Verify coverage (all 149 handlers called?)
+
+6. CONSENT STATE MACHINE VERIFICATION
+   Status: Partial only
+
+   Output needed: consent-state-machine-audit.txt
+   Test: in-process-* handlers (7 handlers with consent gates)
+   Verify:
+   - Token lifecycle (creation, binding, expiration)
+   - Replay resistance (single-use enforcement)
+   - Sender identity binding (who requested consent?)
+   - Concurrency handling (parallel requests)
+   - Authorization state (scope/permissions)
+
+7. REGISTRY OPERATIONS SECURITY
+   Status: Not inspected
+
+   Output needed: registry-operations-audit.txt
+   Search: grep -rn "WMI\|Registry\|win32" electron/
+   Find all registry operations
+   Classify by:
+   - Read vs write
+   - Scope (HKEY_LOCAL_MACHINE vs HKEY_CURRENT_USER)
+   - Input validation (if any)
+   - Injection risk (if any)
+
+8. PROCESS EXECUTION INVENTORY
+   Status: 2/6 locations analyzed
+
+   Output needed: process-execution-audit.csv
+   Find all spawn(), execFileSync(), exec() calls
+   Columns:
+   - Location (file, line)
+   - Command executed
+   - Arguments (array vs string)
+   - Shell option (true/false/none)
+   - Input validation (yes/no)
+   - Injection risk (low/medium/high)
+   - Quoting pattern (if applicable)
+
+===== RECONCILIATION NEEDED =====
+
+After completing all audits above, create:
+
+ipc-channel-reconciliation.csv (19 columns, 149 rows)
+- Handler #
+- Channel name
+- File location
+- Line number
+- Validation type
+- Sender validation
+- Authorization type
+- Consent gate?
+- Renderer callers
+- Risk level
+- Operation impact
+- Finding severity
+- Verified safe?
+- Test coverage
+- Notes
+- Known issues
+- Batch B priority
+- Fix type
+- Status
+
+===== EXECUTION ROADMAP (FRESH SESSION) =====
+
+Phase 1: Auditing (Token budget ~100k)
+  1a. Complete handler validation audit (139 pending)
+      - grep -rn "ipcMain.handle" electron/
+      - For each handler: identify validation mechanism
+      - Output: handler-validation-audit.csv (149 rows × 7 columns)
+
+  1b. Complete handler authorization audit (143 pending)
+      - grep -rn "event.sender\|session\|role" electron/
+      - Cross-reference with handlers
+      - Output: handler-authorization-audit.csv (149 rows × 6 columns)
+
+  1c. Resolve preload wrapper contradiction
+      - grep -c "exposeInMainWorld" electron/preload.ts
+      - Count all wrapper methods
+      - Identify 5 orphan methods
+      - Output: ipc-preload-orphans.csv (5 rows)
+
+Phase 2: Scanning & Evidence (Token budget ~50k)
+  2a. Run credential scan
+      - Execute: Docs/Security/Tools/Scan-SolithSecrets.ps1
+      - Output: secret-scan-summary.txt
+      - Output: secret-scan-candidates.csv (if found)
+
+  2b. Complete renderer mapping
+      - grep -rn "window.electronAPI" src/
+      - Match against 149 channels
+      - Output: ipc-renderer-callers.csv (160 rows)
+
+Phase 3: Deep Inspection (Token budget ~50k)
+  3a. Consent state machine verification
+      - Inspect: electron/in-process-*.ts handlers
+      - Verify: token lifecycle, replay protection, sender binding
+      - Output: consent-state-machine-audit.txt
+
+  3b. Registry operations audit
+      - grep -rn "WMI\|Registry\|win32" electron/
+      - Classify all registry access
+      - Output: registry-operations-audit.txt
+
+  3c. Process execution audit
+      - grep -rn "spawn\|execFileSync\|exec" electron/
+      - Analyze all 6 locations
+      - Output: process-execution-audit.csv
+
+Phase 4: Reconciliation & Finalization (Token budget ~30k)
+  4a. Create ipc-channel-reconciliation.csv
+      - 149 rows (all handlers)
+      - 19 columns (comprehensive audit)
+      - Merge all audit data
+
+  4b. Update verification-final.txt
+      - Mark all discovery areas complete/partial/incomplete
+      - Provide final verdict
+
+  4c. Update all authoritative documents
+      - SOLITH_SECURITY_ARCHITECTURE.md
+      - SOLITH_ATTACK_SURFACE.md
+      - SOLITH_SECURITY_FINDINGS_INITIAL.md
+      - SOLITH_DEPENDENCY_INVENTORY.md
+      - BATCH_A_COMPLETION_MATRIX.md
+
+===== TOOLS & SCRIPTS AVAILABLE =====
+
+Docs/Security/Tools/
+  - Extract-SolithIpcSurface.ps1 (already executed)
+  - Scan-SolithSecrets.ps1 (not yet executed)
+  - *.md templates (if any)
+
+Docs/Security/Evidence/BatchA/
+  - All completed evidence files
+  - This handover document
+
+===== SUCCESS CRITERIA =====
+
+Batch A is COMPLETE when:
+  □ All 149 handlers audited for validation (csv exists)
+  □ All 149 handlers audited for authorization (csv exists)
+  □ Preload wrapper orphans identified and classified (csv exists)
+  □ Credential scan executed and results documented (txt exists)
+  □ All 160 renderer calls mapped to handlers (csv exists)
+  □ Consent state machine verified (txt exists)
+  □ Registry operations audited (txt exists)
+  □ All 6 process execution locations analyzed (csv exists)
+  □ ipc-channel-reconciliation.csv complete (149 rows × 19 columns)
+  □ verification-final.txt updated (all 17 areas marked complete/partial)
+  □ All authoritative documents updated based on evidence
+  □ No contradictions remain unresolved
+  □ Every claim backed by machine-readable evidence on disk
+
+Batch A is VERIFIED when:
+  □ All audits complete
+  □ All CSV/txt evidence files exist and are complete
+  □ Verification-final.txt reports 17/17 areas complete or explicitly deferred
+  □ Handler audit: 149/149 (100%)
+  □ Authorization audit: 149/149 (100%)
+  □ Preload contradiction: 0 remaining
+  □ Credential scan: executed with results
+
+===== DO NOT =====
+
+X Do not modify production code
+X Do not commit, push, reset, clean, stash
+X Do not delete existing evidence files
+X Do not stop because of token limits (save to disk)
+X Do not claim completion until all 17 areas verified
+X Do not begin Batch B
+X Do not make approximations (use exact counts)
+X Do not provide narrative summaries (use raw evidence)
+
+===== CRITICAL NOTES =====
+
+1. Previous session claimed completion multiple times with incomplete evidence
+2. User rejected all summary-based verdicts; requires actual machine-readable CSVs
+3. Every number must be verified against command output on disk
+4. Contradictions are unresolved; fresh session must identify the 5 orphan methods
+5. Credential scan has never been executed; results unknown
+6. This is NOT Batch B; do not fix issues, only discover/verify them
+7. Batch B cannot proceed until Batch A discovery is 100% complete
+
+===== OUTPUT FORMAT =====
+
+When fresh session completes, it must provide:
+- Concise text summary (50-100 words max)
+- All CSV files saved to Docs/Security/Evidence/BatchA/
+- All txt files saved to Docs/Security/Evidence/BatchA/
+- No tool output in response; only summary + file paths
+- Exact counts (not "approximately" or "around")
+- SHA-256 hashes of final authoritative documents
+
+===== END HANDOVER =====

@@ -1,0 +1,8 @@
+Repository root: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node (dev/test ABI): v22.23.1 (.tools/node-v22.23.1-win-x64/node.exe)
+npm: 10.9.8
+Electron (packaged): 42.4.1, ABI (NODE_MODULE_VERSION) 146, arch x64, platform win32
+electron-builder: 26.15.3
+Packaged executable: dist/win-unpacked/Solith.exe
+Fixture: tests/fixtures/gate2-2-memory-fixture/bin/Release/net9.0/Gate2_2Fixture.exe (.NET 9)

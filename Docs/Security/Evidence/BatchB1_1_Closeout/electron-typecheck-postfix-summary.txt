@@ -1,0 +1,18 @@
+Exit code: 2
+Exact errors: 31
+Exact files: 13
+
+Files:
+electron/local-ocr-ipc.ts
+electron/run-compat-test.ts
+electron/trainer-catalog-ipc.ts
+electron/trainer-research-ipc.ts
+src/core/adapters/drill-core-settings.ts
+src/core/definitions/catalog-definition-capabilities.ts
+src/core/definitions/import-definition.ts
+src/core/definitions/schema.v1.ts
+src/core/in-process-script/injector-launcher.ts
+src/core/live-memory/memory-manager.ts
+src/core/runtime/headless-verification.ts
+src/core/trainer-catalog/sync/hub-client.ts
+src/core/trainer-health/index.ts

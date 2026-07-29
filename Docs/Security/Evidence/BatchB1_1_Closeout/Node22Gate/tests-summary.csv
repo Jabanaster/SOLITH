@@ -1,0 +1,6 @@
+Command,NodeVersion,ExitCode,TestFiles,Tests,Passed,Failed,Skipped,Cancelled,Duration,Status
+"npm test","v22.23.1",0,"authoritative package.json test list plus SQL parameter-binding suite",1034,1034,0,0,0,"25856.5768 ms combined TAP durations","PASS"
+"npm run test:live-memory","v22.23.1",0,24,221,221,0,0,0,"1562.1136 ms","PASS"
+".\node_modules\.bin\tsc.cmd --noEmit","v22.23.1",0,"tsconfig.json","N/A","N/A",0,"N/A","N/A","N/A","PASS"
+".\node_modules\.bin\tsc.cmd -p .\tsconfig.electron.json --noEmit","v22.23.1",2,"tsconfig.electron.json","31 diagnostics","N/A",31,"N/A","N/A","N/A","FAIL - documented unrelated baseline"
+"git diff --check","v22.23.1",2,"working tree","2 whitespace diagnostics","N/A",2,"N/A","N/A","N/A","FAIL - documented unrelated baseline"

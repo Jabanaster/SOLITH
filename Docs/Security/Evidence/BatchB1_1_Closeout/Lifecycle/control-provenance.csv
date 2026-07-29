@@ -1,0 +1,14 @@
+Control,Implementation,Provenance,Status,Evidence
+Renderer destroyed/navigation cleanup,src/core/live-memory/session-cleanup.ts,already implemented before this phase,verified,verification-scoped-security-tests.txt
+Real render-process-gone owner cleanup,electron/main.ts; electron/live-memory-ipc.ts,changed during this phase,verified,renderer-crash-test-matrix.csv
+Application will-quit session disposal,electron/main.ts; electron/live-memory-ipc.ts,already implemented before this phase and strengthened during this phase,verified,shutdown-test-matrix.csv
+Ordered failure-tolerant cleanup,src/core/live-memory/cleanup-coordinator.ts,changed during this phase,verified,cleanup-failure-test-matrix.csv
+Feature-disable tick check,src/core/live-memory/live-memory-session.ts,already implemented before this phase and strengthened during this phase,verified,feature-disable-test-matrix.csv
+Process-selection registry,src/core/security/process-selection-registry.ts,already implemented before this phase and strengthened during this phase,verified,process-selection-test-matrix.csv
+Pre-worker identity revalidation,electron/registry-verification-ipc.ts,changed during this phase,verified,process-selection-test-matrix.csv
+Trusted sender registry,src/core/security/trusted-sender-registry.ts,already implemented before this phase and strengthened during this phase,verified,trusted-sender-boundary-test-matrix.csv
+Per-channel main-window authorization,electron/live-memory-ipc.ts; electron/registry-verification-ipc.ts,changed during this phase,verified,trusted-sender-boundary-test-matrix.csv
+Rollback ledger capacity/expiry,src/core/live-memory/live-memory-session.ts,already implemented before this phase,verified only during this phase,verification-live-memory-tests.txt
+Type-aware rollback comparison,src/core/live-memory/live-memory-session.ts,changed during this phase,verified,rollback-float-integrity-test-matrix.csv
+Raw-byte rollback equality,MemoryDriver interface,still incomplete,conditional,remaining-risks.md
+Real full npm test,package runtime guard,still incomplete,blocked by Node 24 vs required Node 22,verification-npm-test.txt

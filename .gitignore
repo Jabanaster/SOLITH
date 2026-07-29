@@ -123,3 +123,5 @@ electron/test-compat.db
 # Local research session dumps (machine-specific)
 artifacts/
 
+
+.tools/

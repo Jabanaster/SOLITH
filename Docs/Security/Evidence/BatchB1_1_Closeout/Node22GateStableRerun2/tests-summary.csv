@@ -1,0 +1,6 @@
+Command,NodeVersion,NpmVersion,ExitCode,TestFiles,Tests,Passed,Failed,Skipped,Cancelled,DurationMs,Result
+"npm test","v22.23.1","10.9.8","0","2 (tsx --test invocations)","1034","1034","0","0","0","25347.59","PASS"
+"npm run test:live-memory","v22.23.1","10.9.8","0","1 (tsx --test invocation)","221","221","0","0","0","N/A (see live-memory-test-node22.txt)","PASS"
+"tsc --noEmit (main)","v22.23.1","N/A","0","N/A","N/A","N/A","0 diagnostics","N/A","N/A","N/A","PASS"
+"tsc -p tsconfig.electron.json --noEmit","v22.23.1","N/A","2","N/A","N/A","N/A","31 diagnostics / 13 files","N/A","N/A","N/A","FAIL (matches unrelated baseline exactly)"
+"git diff --check","N/A","N/A","2","N/A","N/A","N/A","2 findings / 1 file","N/A","N/A","N/A","FAIL (matches unrelated baseline exactly: GameLibrary.tsx:286,303)"

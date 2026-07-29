@@ -1,0 +1,15 @@
+fixture status before write: {
+  pid: 17332,
+  addressHex: '0x2643140a048',
+  value: 424242,
+  updatedAtIso: '2026-07-29T15:03:25.9030194Z'
+}
+driver.readMemory -> 424242 (expected 424242)
+driver.writeMemory -> wrote 777001
+fixture status after write: {
+  pid: 17332,
+  addressHex: '0x2643140a048',
+  value: 777001,
+  updatedAtIso: '2026-07-29T15:03:26.3407421Z'
+}
+PASS: real nativeMemoryDriver read + write verified against the Gate 2.2 fixture process.

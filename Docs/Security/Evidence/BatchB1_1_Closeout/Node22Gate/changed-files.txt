@@ -1,0 +1,33 @@
+# Changed Files
+
+This evidence-only backfill created 22 files exclusively under:
+
+`Docs\Security\Evidence\BatchB1_1_Closeout\Node22Gate`
+
+The before/after integrity comparison also detected status changes outside the authorized evidence directory. Their cause is uncertain; the verification commands do not intentionally modify or stage these paths, but the evidence cannot prove that no concurrent process changed them:
+
+- `src/app/App.tsx`
+- `src/app/components/PageModuleHeader.tsx`
+- `src/app/components/PageWalkthrough.tsx`
+- `src/app/help/walkthroughs.ts`
+- `src/app/pages/Backups.tsx`
+- `src/app/pages/CompatibilityDashboard.tsx`
+- `src/app/pages/CtLibraryExplorerPage.module.css`
+- `src/app/pages/DiscoveryLab.tsx`
+- `src/app/pages/ExternalTrainerResearchLab.tsx`
+- `src/app/pages/Journal.tsx`
+- `src/app/pages/Recipes.tsx`
+- `src/app/pages/RegistryExplorerPage.tsx`
+- `src/app/pages/SaveEditor.tsx`
+- `src/app/pages/SaveLocations.tsx`
+- `src/app/pages/SessionMonitorPage.tsx`
+- `src/app/pages/TrainerControlPanel.tsx`
+- `src/app/pages/TrainerLibraryPage.module.css`
+- `src/app/pages/TrainerLibraryPage.tsx`
+- `src/app/routes/GameLibrary.tsx`
+- `src/app/styles/index.css`
+- `src/app/styles/trainer-control-panel.css`
+- `tests/page-walkthrough.test.tsx`
+- `tests/walkthrough-navigation.e2e.test.ts`
+
+No path was reverted, cleaned, reset, or otherwise repaired.

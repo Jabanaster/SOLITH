@@ -1,0 +1,8 @@
+Gate 2.4 packaged candidate
+============================
+electron-builder version: 26.15.3
+Electron version: 42.4.1 (ABI 146)
+arch: x64
+appOutDir: dist/win-unpacked
+Build command: npm run build:vite && npm run build:electron && npm run dist:dir
+Native addon: vendor/memoryjs-3.5.1-patched rebuilt by @electron/rebuild during dist:dir for Electron 42.4.1 ABI; restored to Node 22.23.1 ABI via node-gyp rebuild --target=22.23.1 after packaged verification completed (same pattern as every prior gate).

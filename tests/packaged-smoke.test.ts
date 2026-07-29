@@ -34,6 +34,7 @@ let electronApp: ElectronApplication;
 let win: Page;
 const mainErrors: string[] = [];
 const rendererErrors: string[] = [];
+const rendererConsoleMessages: string[] = [];
 
 // ── Point 1: packaged exe exists ──────────────────────────────────────────────
 test('point 01 — packaged exe exists at dist/win-unpacked', () => {
@@ -68,6 +69,7 @@ test.beforeAll(async () => {
   win = await electronApp.firstWindow();
 
   win.on('pageerror', err => rendererErrors.push(err.message));
+  win.on('console', msg => rendererConsoleMessages.push(msg.text()));
 
   await win.waitForLoadState('domcontentloaded');
   await win.waitForSelector('#root > *', { timeout: 20_000 });
@@ -236,6 +238,13 @@ test('point 14 — zero uncaught renderer errors during startup and interaction'
     rendererErrors,
     `Renderer errors: ${rendererErrors.join(', ')}`
   ).toHaveLength(0);
+});
+
+test('point 14b — packaged renderer has no eval CSP violation', () => {
+  const violations = rendererConsoleMessages.filter((message) =>
+    /content security policy/i.test(message) && /\beval\b/i.test(message),
+  );
+  expect(violations, `Packaged CSP eval violations: ${violations.join(', ')}`).toEqual([]);
 });
 
 // ── Point 15: clean exit ─────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { createRequire as nodeCreateRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import type { LiveProcessHandle, LiveValueType, MemoryDriver, MemoryModule, MemoryRegion } from './types.js';
 import { queryWindowsProcessIdentity } from './windows-process-identity.js';
 
@@ -67,7 +68,13 @@ interface MemoryjsModuleEntry {
 }
 
 interface MemoryjsModule {
-  openProcess(pid: number): { handle: unknown; th32ProcessID: number };
+  // Gate 2.2A: second argument opts into a write-capable handle
+  // (PROCESS_VM_WRITE | PROCESS_VM_OPERATION in addition to the original
+  // read-only rights) — see vendor/memoryjs-3.5.1-patched/lib/process.cc.
+  // This driver's single handle serves the whole live-memory session (read,
+  // scan, propose-write, freeze), so it always requests write access; never
+  // PROCESS_ALL_ACCESS.
+  openProcess(pid: number, requestWriteAccess?: boolean): { handle: unknown; th32ProcessID: number };
   readMemory(handle: unknown, address: number | bigint, dataType: string): number;
   // Separate overload-ish signature acknowledged via a distinct call site (readPointer below) —
   // memoryjs's native binding actually returns a JS bigint for 'uint64'/'int64', not a number.
@@ -76,6 +83,7 @@ interface MemoryjsModule {
   getProcesses(): MemoryjsProcessEntry[];
   getRegions(handle: unknown): MemoryjsRegion[];
   readBuffer(handle: unknown, address: number | bigint, size: number): Buffer;
+  writeBuffer(handle: unknown, address: number | bigint, buffer: Buffer): void;
   getModules(pid: number): MemoryjsModuleEntry[];
 }
 
@@ -184,7 +192,7 @@ export const nativeMemoryDriver: MemoryDriver = {
       }
 
       const mem = loadMemoryjs();
-      const opened = mem.openProcess(pid);
+      const opened = mem.openProcess(pid, true);
 
       if (!opened || !opened.th32ProcessID) {
         throw new Error(`Failed to open process ${pid}: native call returned invalid handle`);
@@ -370,6 +378,25 @@ export const nativeMemoryDriver: MemoryDriver = {
     }
   },
 
+  writeBuffer(handle: LiveProcessHandle, address: bigint, buffer: Buffer): void {
+    try {
+      validateHandle(handle, 'writeBuffer');
+      validateAddress(address, 'writeBuffer');
+
+      if (!Buffer.isBuffer(buffer) || buffer.length <= 0 || buffer.length > 1048576) {
+        throw new Error(`Invalid buffer for writeBuffer (must be a non-empty Buffer <= 1MB)`);
+      }
+
+      const mem = loadMemoryjs();
+      const nativeAddr = toNativeAddress(address);
+      mem.writeBuffer((handle.opaque as { handle: unknown }).handle, nativeAddr, buffer);
+    } catch (err) {
+      throw new Error(
+        `writeBuffer(${address.toString(16)}, ${buffer.length} bytes) failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  },
+
   getModules(handle: LiveProcessHandle): MemoryModule[] {
     try {
       validateHandle(handle, 'getModules');
@@ -418,10 +445,33 @@ export const nativeMemoryDriver: MemoryDriver = {
 export interface LiveProcessListEntry {
   pid: number;
   name: string;
+  executablePath?: string;
+  parentPid?: number;
+  parentProcessName?: string;
+  startTime?: string;
+}
+
+interface WindowsProcessMetadata { ProcessId: number; ParentProcessId?: number; Name?: string; ExecutablePath?: string; StartTime?: string }
+
+function queryWindowsProcessMetadata(): Map<number, WindowsProcessMetadata> {
+  if (process.platform !== 'win32') return new Map();
+  const script = "$ErrorActionPreference='SilentlyContinue'; Get-CimInstance Win32_Process | ForEach-Object { $start = if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') } else { $null }; [pscustomobject]@{ ProcessId=$_.ProcessId; ParentProcessId=$_.ParentProcessId; Name=$_.Name; ExecutablePath=$_.ExecutablePath; StartTime=$start } } | ConvertTo-Json -Compress";
+  try {
+    const raw = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 5_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true }).trim();
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as WindowsProcessMetadata | WindowsProcessMetadata[];
+    return new Map((Array.isArray(parsed) ? parsed : [parsed]).map((item) => [Number(item.ProcessId), item]));
+  } catch { return new Map(); }
 }
 
 /** Read-only process enumeration for the process picker (no attach, no memory access). */
 export function listLiveMemoryProcesses(): LiveProcessListEntry[] {
   const mem = loadMemoryjs();
-  return mem.getProcesses().map((p) => ({ pid: p.th32ProcessID, name: p.szExeFile }));
+  const metadata = queryWindowsProcessMetadata();
+  return mem.getProcesses().map((entry) => {
+    const pid = entry.th32ProcessID;
+    const details = metadata.get(pid);
+    const parentPid = details?.ParentProcessId ? Number(details.ParentProcessId) : undefined;
+    return { pid, name: entry.szExeFile, executablePath: details?.ExecutablePath || undefined, parentPid, parentProcessName: parentPid ? metadata.get(parentPid)?.Name || undefined : undefined, startTime: details?.StartTime || undefined };
+  });
 }

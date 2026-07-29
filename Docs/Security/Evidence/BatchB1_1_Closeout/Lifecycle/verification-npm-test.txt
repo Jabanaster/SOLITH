@@ -1,0 +1,12 @@
+Command: npm test
+Start time: 2026-07-27T23:18:04.7946196-07:00
+End time: 2026-07-27T23:18:05.2655393-07:00
+Exit code: 1
+Duration: 470.92 ms
+
+
+> solith@2.4.0-alpha.2 pretest
+> node scripts/check-node.mjs && node scripts/ensure-electron-host-entry.mjs
+
+[solith] Unsupported Node.js v24.15.0. Required: Node.js 22.x (see .nvmrc and package.json engines).
+

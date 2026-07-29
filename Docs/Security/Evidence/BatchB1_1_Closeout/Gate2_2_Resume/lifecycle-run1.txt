@@ -1,0 +1,38 @@
+
+Running 10 tests using 1 worker
+
+  ok  1 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:136:1 › Phase 3 — fixture and packaged native write/read/restore prerequisite (31.0s)
+  x   2 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) (12.4s)
+  -   3 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:238:1 › Phase 4.3 — shutdown with pending (unconfirmed) write consent: stale proposal/token rejected after restart
+  -   4 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:274:1 › Phase 4.4 — shutdown with an active process selection (attach, no freeze): stale attach state rejected after restart
+  -   5 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:303:1 › Phase 4.5 — shutdown with a confirmed rollback entry: old rollback ID rejected after restart, raw bytes released
+  -   6 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:346:1 › Phase 4.6 — controlled forced termination: no further writes reach the fixture after the process is killed
+  -   7 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:376:1 › Phase 5 — real freeze stops when v2LiveModeEnabled is disabled via the real settings IPC
+  -   8 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:417:1 › Phase 6 — main-window reload: stale operation IDs and sender identity are rejected after reload
+  -   9 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:464:1 › Phase 9.1/9.6 — unauthorized navigation revokes authority; returning to trusted content does not restore it
+  -  10 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:515:1 › Phase 11 — normal packaged candidate exposes no Gate 2.1/2.2 test-only hooks
+
+
+  1) tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 111000
+    Received: 424242
+
+      195 |     const { proposalId } = await attachAndFreeze(ctx.app, ctx.win, before, 111000);
+      196 |     await sleep(800);
+    > 197 |     expect(readStatus(f.statusPath).value).toBe(111000);
+          |                                            ^
+      198 |     // Prove at least two real ticks by mutating externally and confirming restore.
+      199 |     fs.writeFileSync(f.mutatePath, '999000');
+      200 |     await sleep(500);
+        at G:\ACTIVE_PROJECTS\SOLITH\tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:197:44
+
+    Error Context: test-results\gate2-2-resume-packaged-li-62b79-tate-same-event-on-Windows-\error-context.md
+
+  1 failed
+    tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:189:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) 
+  8 did not run
+  1 passed (44.0s)
+exit:1

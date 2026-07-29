@@ -13,17 +13,19 @@ import {
 import { evaluateSessionStability } from '../src/core/runtime/delta-engine.js';
 import { compareRestartSignatureArtifacts } from '../src/core/runtime/restart-validation.js';
 import { validateLoadedRegistry } from '../src/core/registry/loaded-registry.js';
+import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
+import { RegistryRunVerificationSchema, RegistrySelectProcessSchema } from './ipc-validation.js';
+import { compareProcessIdentity, isCompleteProcessIdentity, queryWindowsProcessIdentity } from '../src/core/live-memory/windows-process-identity.js';
+import {
+  createProcessSelection,
+  resolveProcessSelection,
+  clearSelectionsForWindow,
+} from '../src/core/security/process-selection-registry.js';
+import { validateIpcSender } from './sender-validation.js';
+import { wireSessionCleanupOnDestroy } from '../src/core/live-memory/session-cleanup.js';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = path.dirname(moduleFilename);
-
-const RunVerificationSchema = z.object({
-  registry: z.unknown(),
-  pid: z.number().int().positive(),
-  executableName: z.string().min(1).max(260),
-  executablePath: z.string().min(1).max(2000).optional(),
-  timeoutMs: z.number().int().min(1_000).max(120_000).optional().default(30_000),
-}).strict();
 
 const CompareRestartSchema = z.object({
   previous: z.unknown(),
@@ -64,7 +66,7 @@ async function writeVerificationArtifact(artifact: HeadlessVerificationArtifact)
 
 function runWorker(message: unknown, timeoutMs: number): Promise<HeadlessVerificationResponse> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(workerPath(), { type: 'module' });
+    const worker = new Worker(workerPath(), { type: 'module' } as unknown as import('node:worker_threads').WorkerOptions);
     const timer = setTimeout(() => {
       void worker.terminate();
       reject(new Error(`Registry verification worker timed out after ${timeoutMs}ms.`));
@@ -105,9 +107,84 @@ function isHeadlessArtifact(value: unknown): value is HeadlessVerificationArtifa
 }
 
 export function registerRegistryVerificationIpc(): void {
-  ipcMain.handle('registry-run-readonly-verification', async (_event, payload: unknown) => {
+  // Batch B1.1: the renderer requests a selection here; the main process
+  // independently re-verifies the claimed pid really IS the claimed
+  // executable against the live OS (queryWindowsProcessIdentity) before
+  // ever creating a selection record. registry-run-readonly-verification
+  // below then references the selection by id — it can no longer accept a
+  // renderer-supplied pid/executableName directly.
+  ipcMain.handle('registry-select-process', async (event, payload: unknown) => {
     try {
-      const parsed = RunVerificationSchema.parse(payload);
+      const senderCheck = validateIpcSender(event, ['main']);
+      if (!senderCheck.ok) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      if (!isTrainerCapabilityEnabled('v2LiveModeEnabled')) {
+        return { success: false, error: 'feature_disabled' };
+      }
+      const parsed = RegistrySelectProcessSchema.parse(payload);
+
+      const liveIdentity = queryWindowsProcessIdentity(parsed.pid);
+      if (!liveIdentity || !isCompleteProcessIdentity(liveIdentity)) {
+        return { success: false, error: 'Process not found or identity incomplete — cannot select.' };
+      }
+      if (liveIdentity.executableName.toLowerCase() !== parsed.executableName.toLowerCase()) {
+        return {
+          success: false,
+          error: `Selected PID ${parsed.pid} is ${liveIdentity.executableName}, not ${parsed.executableName} — refusing to select.`,
+        };
+      }
+
+      const selection = createProcessSelection({
+        pid: parsed.pid,
+        executableName: liveIdentity.executableName,
+        executablePath: liveIdentity.executablePath,
+        processStartTime: liveIdentity.startTimeIso,
+        volumeSerialNumber: liveIdentity.volumeSerialNumber ?? undefined,
+        fileIndex: liveIdentity.fileIndex ?? undefined,
+        exeSha256: liveIdentity.exeSha256 ?? undefined,
+        windowId: event.sender.id,
+      });
+      wireSessionCleanupOnDestroy(event.sender, () => clearSelectionsForWindow(event.sender.id));
+
+      return {
+        success: true,
+        selectionId: selection.selectionId,
+        expiresAt: new Date(selection.expiresAtMs).toISOString(),
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('registry-run-readonly-verification', async (event, payload: unknown) => {
+    try {
+      const senderCheck = validateIpcSender(event, ['main']);
+      if (!senderCheck.ok) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      // This opens the selected PID and reads its process memory — the same
+      // privileged category of operation live-memory-* gates behind
+      // v2LiveModeEnabled. It must not be reachable just because a renderer can
+      // reach IPC at all.
+      if (!isTrainerCapabilityEnabled('v2LiveModeEnabled')) {
+        return { success: false, error: 'feature_disabled' };
+      }
+
+      const parsed = RegistryRunVerificationSchema.parse(payload);
+
+      const resolved = resolveProcessSelection(parsed.selectionId, event.sender.id);
+      if (resolved.ok === false) {
+        return { success: false, error: `selection_rejected:${resolved.reason}` };
+      }
+      const { pid, executableName, executablePath } = resolved.selection;
+      const identityError = compareProcessIdentity({
+        pid,
+        executableName,
+        executablePath,
+        startTime: resolved.selection.processStartTime ?? '',
+        volumeSerialNumber: resolved.selection.volumeSerialNumber,
+        fileIndex: resolved.selection.fileIndex,
+        exeSha256: resolved.selection.exeSha256,
+      }, queryWindowsProcessIdentity(pid));
+      if (identityError) return { success: false, error: 'selection_rejected:identity_mismatch' };
+
       const registry = validateLoadedRegistry(parsed.registry);
       const generatedAt = new Date().toISOString();
       const requestId = crypto.randomUUID();
@@ -120,15 +197,18 @@ export function registerRegistryVerificationIpc(): void {
         generatedAt,
         timeoutMs: parsed.timeoutMs,
         process: {
-          pid: parsed.pid,
-          executableName: parsed.executableName,
-          executablePath: parsed.executablePath,
-          selectedByUser: true,
+          pid,
+          executableName,
+          executablePath,
+          // selectedByUser is now backed by a main-process-verified selection record,
+          // not a renderer-supplied boolean — see process-selection-registry.ts.
+          // The worker no longer relies on this flag for authorization.
+          selectedByUser: false,
           platform: process.platform,
         },
       }, parsed.timeoutMs);
 
-      if (!response.ok) {
+      if (response.ok === false) {
         return { success: false, error: response.error.message };
       }
 

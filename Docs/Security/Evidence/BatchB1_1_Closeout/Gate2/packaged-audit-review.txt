@@ -1,0 +1,47 @@
+Command: node_modules/@playwright/test/cli.js test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts
+StartTimeUtc: 2026-07-28T21:50:13Z
+
+Running 23 tests using 1 worker
+
+  ok  1 tests\packaged-smoke.test.ts:40:1 › point 01 — packaged exe exists at dist/win-unpacked (4ms)
+  ok  2 tests\packaged-smoke.test.ts:122:1 › point 02 — app launches and first window appears (1ms)
+  ok  3 tests\packaged-smoke.test.ts:128:1 › point 03 — window title contains Solith (11ms)
+  ok  4 tests\packaged-smoke.test.ts:134:1 › point 04 — window reaches domcontentloaded state (5ms)
+  ok  5 tests\packaged-smoke.test.ts:140:1 › point 05 — React root mounts (#root > * present) (4ms)
+  ok  6 tests\packaged-smoke.test.ts:146:1 › point 06 — contextIsolation active: require is not available in renderer (2ms)
+  ok  7 tests\packaged-smoke.test.ts:152:1 › point 07 — window.electronAPI is exposed by contextBridge (2ms)
+  ok  8 tests\packaged-smoke.test.ts:158:1 › point 08 — window.electronAPI.getGames is a function (2ms)
+  ok  9 tests\packaged-smoke.test.ts:164:1 › point 09 — window.electronAPI.applyProposal is a function (full preload API) (2ms)
+  ok 10 tests\packaged-smoke.test.ts:170:1 › point 10 — IPC getGames() returns an array (database initialized) (5ms)
+  ok 11 tests\packaged-smoke.test.ts:176:1 › point 11 — IPC getSettings() returns an object with known keys (5ms)
+  ok 12 tests\packaged-smoke.test.ts:186:1 › point 12 — IPC addGame() creates a game record successfully (5ms)
+  ok 13 tests\packaged-smoke.test.ts:199:1 › point 13 — IPC parseSave() parses the JSON fixture correctly (18ms)
+  ok 14 tests\packaged-smoke.test.ts:236:1 › point 14 — zero uncaught renderer errors during startup and interaction (1ms)
+  ok 15 tests\packaged-smoke.test.ts:243:1 › point 14b — packaged renderer has no eval CSP violation (1ms)
+  ok 16 tests\packaged-smoke.test.ts:251:1 › point 15 — app exits cleanly (close() resolves without timeout) (12ms)
+  ok 17 tests\packaged-smoke.test.ts:261:1 › point 16 — unified sidebar navigation renders in packaged app (10ms)
+  ok 18 tests\packaged-smoke.test.ts:269:1 › point 17 — sidebar collapse toggles in packaged app (716ms)
+  ok 19 tests\packaged-smoke.test.ts:280:1 › point 18 — new Trainer IPC methods exposed in packaged preload (2ms)
+  ok 20 tests\packaged-smoke.test.ts:294:1 › point 19 — compatibility IPC succeeds in packaged app (empty → BLOCKED_PENDING_USER_DATA) (2ms)
+  ok 21 tests\packaged-smoke.test.ts:301:1 › point 20 — getRecipes IPC succeeds in packaged app (6ms)
+  ok 22 tests\packaged-smoke.test.ts:322:1 › point 21 — checkGameRunning is actually invoked in packaged app (not just presence) (15ms)
+
+══════════ GATE 18 PACKAGED RUNTIME REPORT ══════════
+exe_path            = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\Solith.exe
+isolated_user_data  = %TEMP%\solith-pkg-smoke-1785275414432-ulsjswo01un\userData
+app_get_app_path    = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar
+resources_path      = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources
+preload_path        = G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked\resources\app.asar\dist-electron\preload.cjs
+db_path             = C:\Users\chase\AppData\Local\Temp\solith-pkg-smoke-1785275414432-ulsjswo01un\solith.db
+ipc_channels_tested = getGames, getSettings, addGame, addUserSelectedLocation, parseSave, getAllProfiles, getRecipes, checkGameRunning(invoked), getCompatibilityProfile(invoked)
+exit_code           = 0
+renderer_errors     = 0
+main_errors         = 0
+cleanup_success     = true
+══════════════════════════════════════════════════════
+
+  ok 23 tests\packaged-smoke.test.ts:335:1 › point 22 — getCompatibilityProfile is actually invoked in packaged app (2ms)
+
+  23 passed (8.9s)
+ExitCode: 0
+EndTimeUtc: 2026-07-28T21:50:23Z

@@ -1,0 +1,24 @@
+Commands (in order), all via trusted Node 22.23.1 runtime + bundled npm:
+1. npm run build:vite — exit 0
+2. npm run build:electron — exit 0, 29/29 electron-output sanity checks passed
+3. npm run dist:dir (electron-builder --dir) — exit 0
+
+electron-builder: version 26.15.3
+Electron packaged: 42.4.1, arch=x64, platform=win32
+@electron/rebuild invoked automatically by electron-builder during dist:dir
+  (log: "executing @electron/rebuild electronVersion=42.4.1 arch=x64 buildFromSource=false
+   workspaceRoot=G:\ACTIVE_PROJECTS\SOLITH projectDir=./ appDir=./" — then
+   "preparing moduleName=vendor/memoryjs-3.5.1-patched arch=x64" / "finished ...")
+Output: dist\win-unpacked\Solith.exe (unpacked build, not signed/published/released)
+signtool.exe ran against Solith.exe and the bundled readonly-scanner helper (existing
+project-standard local dev-cert signing step, unchanged from prior gates — not a release
+signing/publish action).
+
+Packaged native memoryjs.node path:
+  dist/win-unpacked/resources/app.asar.unpacked/node_modules/memoryjs/build/Release/memoryjs.node
+SHA256: e286fd07a8ce8a6f90d5814a53a37c73b4b36a2bb0b618a9848758eba96412cf (238080 bytes)
+
+See packaged-native-binary-verification.csv for why this does not byte-match the
+standalone Electron-ABI rebuild (electron-native-binary-hashes.csv) yet is confirmed to
+contain the same fix via direct behavioral verification
+(packaged-native-binary-behavioral-verification.txt).

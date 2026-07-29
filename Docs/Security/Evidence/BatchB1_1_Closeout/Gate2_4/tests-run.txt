@@ -1,0 +1,12 @@
+Gate 2.4 test runs (this session, fresh packaged rebuild)
+===========================================================
+tests/packaged-smoke.test.ts .......................... 23/23 pass
+tests/gate2-3-freeze-authorization-security.e2e.test.ts .. 3/3 pass (independent rerun)
+tests/gate2-4-final-certification.e2e.test.ts ............ 5/5 pass (new)
+tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts ...... 10/10 pass (rerun)
+tests/gate2-2a1-packaged-real-process-write-proof.e2e.test.ts . 1/1 pass (rerun)
+npm test (Node) ........................................... 1040/1040 pass
+npm run test:live-memory (Node) ........................... 257/257 pass
+Main TypeScript (tsc --noEmit) ............................ 0 diagnostics
+Electron TypeScript (tsc -p tsconfig.electron.json) ........ 31 diagnostics / 13 files (unchanged baseline)
+git diff --check ........................................... GameLibrary.tsx:286,303 only (unchanged baseline)

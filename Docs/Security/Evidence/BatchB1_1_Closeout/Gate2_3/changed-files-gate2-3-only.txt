@@ -1,0 +1,26 @@
+Files touched BY GATE 2.3 THIS CYCLE (all other entries in changed-files.txt
+are pre-existing modifications/untracked files from earlier gates and
+unrelated work, confirmed already present in the working tree before this
+cycle started — see baseline-status.txt captured at the start of this cycle,
+which is byte-identical in scope to this same list minus the Gate 2.3 edits
+below):
+
+MODIFIED:
+  electron/preload.ts                          — freeze API repair (Phase 4)
+  electron/live-memory-ipc.ts                  — removed __testStartFreezeForOwner test hook (Phase 8)
+  src/types/global.d.ts                        — freeze API type repair (Phase 4)
+  src/app/pages/LiveMemoryTrainerPage.tsx       — renderer workflow repair, 2 call sites (Phase 5)
+  src/app/hooks/useGameCheatSession.ts          — renderer workflow repair, 1 call site (Phase 5)
+  tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts — attachAndFreeze rewired to real flow (Phase 8/10)
+
+NEW (untracked):
+  tests/gate2-3-freeze-authorization-security.e2e.test.ts — new security proof suite (Phase 7/9)
+  Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_3/*     — this evidence directory
+  SOLITH_SECURITY_ROADMAP.md updated in place (tracked file, modified)
+
+REBUILT (not source, build output only):
+  dist-electron/*, dist/win-unpacked/* — packaged rebuild (Phase 9)
+  vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node — Electron-ABI rebuild during packaging, then restored to Node-22 ABI at the end of this cycle (same housekeeping pattern as every prior gate)
+
+No other file in electron/, src/, or tests/ was modified by Gate 2.3. All
+other entries visible in changed-files.txt predate this cycle.

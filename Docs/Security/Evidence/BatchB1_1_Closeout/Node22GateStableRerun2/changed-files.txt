@@ -1,0 +1,24 @@
+# Changed Files
+
+This task created files exclusively under:
+
+Docs\Security\Evidence\BatchB1_1_Closeout\Node22GateStableRerun2
+
+Confirmed by diffing git-status-pretest.txt (captured before Phase 8) against
+git-status-final.txt (captured after the 60-second post-verification quiet
+window): the only new entries are this task's own evidence files.
+
+Within the monitored source tree, exactly 20 files under
+tests/fixtures/parsers/* had their mtime updated by the parser test suite
+(read/round-trip access during `npm test`). Their SHA256 content hash, size,
+Git tracked/index/worktree status are byte-for-byte identical before and
+after. This is test-harness-generated and non-contaminating; see
+final-stability-comparison.csv.
+
+No production file, test file, package.json, package-lock.json, .nvmrc,
+tsconfig, Vite config, or CI file was created, edited, staged, unstaged,
+reverted, or removed by this task. No PATH or Windows environment variable
+was permanently modified — the recovered Node 22 distribution directory was
+only prepended to PATH within the scope of individual child-process
+invocations (documented in node22-direct-invocation.txt), never exported to
+the parent shell or persisted anywhere.

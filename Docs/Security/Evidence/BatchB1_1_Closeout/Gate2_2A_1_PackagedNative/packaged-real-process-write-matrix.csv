@@ -1,0 +1,10 @@
+Requirement,Scenario,ExpectedResult,ActualResult,Status,Evidence
+Launch fixture,Spawn Gate2_2Fixture.exe,Real pid/address/value reported via status file,Reported normally,PASS,packaged-real-process-write-output.txt
+Launch packaged SOLITH candidate,electron.launch(dist/win-unpacked/Solith.exe) with isolated userData/appData,App launches and renders,Window loaded successfully,PASS,packaged-real-process-write-output.txt
+Real attach via packaged IPC,liveMemoryAttach against fixture pid,attach succeeds (no error),attachResult.error undefined,PASS,packaged-real-process-write-output.txt
+Read original value through SOLITH,liveMemoryRead,Returns fixture's current value (424242),readResult.value===before.value,PASS,packaged-real-process-write-output.txt
+Write new harmless value (real propose/consent/confirm flow),liveMemoryProposeWrite -> liveMemoryIssueWriteConsent (auto-approved via pre-existing SOLITH_PRIVILEGED_CONSENT seam) -> liveMemoryConfirmWrite 555222,confirm succeeds; fixture independently observes 555222,confirmResult.error undefined; afterWrite.value===555222,PASS,packaged-real-process-write-output.txt
+Read new value through SOLITH,liveMemoryRead after write,Returns 555222,readBackResult.value===555222,PASS,packaged-real-process-write-output.txt
+Restore original value,Same propose/consent/confirm flow with original value,Fixture observes restored original value,afterRestore.value===before.value,PASS,packaged-real-process-write-output.txt
+Controlled invalid-address failure surfaces (not success),liveMemoryProposeWrite to address 0x1,Fails closed (surfaced at propose time, since proposeWrite reads current value first),badPropose.error defined,PASS,packaged-real-process-write-output.txt
+Shut down all harness-created processes,Detach + electronApp.close() + kill fixture,No leftover processes,Confirmed via afterAll cleanup + no leftover Gate2_2Fixture.exe process (see below),PASS,packaged-real-process-write-output.txt

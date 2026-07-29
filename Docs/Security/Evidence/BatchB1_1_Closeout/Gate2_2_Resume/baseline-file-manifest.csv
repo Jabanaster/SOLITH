@@ -1,0 +1,3 @@
+Path,GitStatus,Size,LastWriteTimeUtc,SHA256
+electron/live-memory-ipc.ts,modified/new,76937,2026-07-29T16:02:20.138Z,c21d94c918c94855daf236bcaed5f852d0f3e8e42f965ea768e9a64e3b22a851
+tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts,modified/new,27792,2026-07-29T16:12:30.545Z,0fcad25b27bf2f974baa26f0337a6488336c4fcbfb695dbb46d3802f8c4fb0e6

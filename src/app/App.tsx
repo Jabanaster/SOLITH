@@ -284,10 +284,30 @@ const App: React.FC = () => {
     setCurrentView('library');
   };
 
-  const handleAddGame = async (gameData: { name: string; path: string; engine?: string }) => {
-    if (!(window as any).electronAPI) return;
-    const result = await (window as any).electronAPI.addGame(gameData);
-    if (result?.success) await loadGames();
+  const handleAddGame = async (gameData: {
+    name: string;
+    path: string;
+    engine?: string;
+    executablePath?: string;
+    coverPath?: string;
+    iconPath?: string;
+    saveLocations?: string[];
+    notes?: string;
+    metadataId?: string;
+  }) => {
+    if (!(window as any).electronAPI) return { success: false, error: 'Electron API unavailable' };
+    try {
+      const result = await (window as any).electronAPI.addGame(gameData);
+      if (result?.success) {
+        await loadGames();
+        return { success: true };
+      }
+      console.error('addGame IPC failed:', result?.error);
+      return { success: false, error: result?.error ?? 'Failed to add game' };
+    } catch (error) {
+      console.error('addGame IPC exception:', error);
+      return { success: false, error: String(error) };
+    }
   };
 
   const isNavActive = (view: View) => currentView === view;
@@ -532,7 +552,10 @@ const App: React.FC = () => {
       )}
 
       {!navigator.webdriver && !showOpeningCinematic && (
-        <SolithWispCompanion />
+        <SolithWispCompanion
+          currentPage={NAV_SECTIONS.flatMap((section) => section.items).find((item) => item.id === currentView)?.label ?? currentView}
+          onNavigate={(target) => setCurrentView(target)}
+        />
       )}
     </div>
   );

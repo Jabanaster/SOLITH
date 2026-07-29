@@ -1,0 +1,5 @@
+Snapshot,ComparedTo,MonitoredFilesTotal,HashDiffCount,StatusDiffCount,NonEvidencePathsAppeared,NonEvidencePathsDisappeared,Result
+T0,baseline,1051,0,0,0,0,"Baseline capture"
+T60,T0,1051,0,0,0,0,"No non-evidence change; identical CSV content"
+T120,T60,1051,0,0,0,0,"No non-evidence change; identical CSV content"
+T120,T0,1051,0,0,0,0,"No non-evidence change across full 120s window; only new Node22GateStableRerun evidence files appeared in git status (expected/authorized)"

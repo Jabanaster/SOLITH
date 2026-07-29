@@ -9,8 +9,9 @@ import type {
   ConfirmWriteResult,
   LiveMemorySession,
   RollbackResult,
+  StartFreezeResult,
 } from './live-memory-session.js';
-import type { LiveMemoryAddress, LiveWriteManifest, LiveWriteProposal } from './types.js';
+import type { LiveMemoryAddress, LiveWriteProposal } from './types.js';
 import {
   WritePolicyGate,
   defaultTrainerWritePolicyContext,
@@ -114,13 +115,15 @@ export class MemoryManager {
     const decision = this.writeGate.evaluate(
       this.getWritePolicyContext(userApprovedForCall, writeIntent),
     );
-    if (decision.allow) return { ok: true };
+    if (decision.allow === true) return { ok: true };
+    // decision.allow is false here, so decision.code is available
+    const code = decision.code;
     this.audit.append({
       op: 'abort',
-      reason: `write_policy:${decision.code}:${reason}:${decision.reasons.join(';')}`,
+      reason: `write_policy:${code}:${reason}:${decision.reasons.join(';')}`,
       waiverAssumed: this.waiverAssumedForAudit(userApprovedForCall),
     });
-    return { ok: false, error: `write_policy_denied:${decision.code}`, code: decision.code };
+    return { ok: false, error: `write_policy_denied:${code}`, code };
   }
 
   getAuditLog(): MemoryAuditLog {
@@ -176,7 +179,7 @@ export class MemoryManager {
     const intent = options.writeIntent ?? 'stage';
     const userApproved = options.userApproved === true;
     const gate = this.enforceWritePolicy(options.reason ?? 'propose', userApproved, intent);
-    if (!gate.ok) {
+    if (gate.ok === false) {
       throw new Error(gate.error);
     }
     const proposal = this.session.proposeWrite(address, requestedValue);
@@ -203,7 +206,7 @@ export class MemoryManager {
         return { success: false, error: 'consent_binding_required' };
       }
       const consumed = consumeWriteConsent(options.consentToken, options.consentBinding);
-      if (!consumed.ok) {
+      if (consumed.ok === false) {
         this.audit.append({
           op: 'abort',
           featureId: options.featureId,
@@ -215,7 +218,7 @@ export class MemoryManager {
       userApproved = true;
     }
     const gate = this.enforceWritePolicy(options.reason ?? 'confirm', userApproved, 'commit');
-    if (!gate.ok) {
+    if (gate.ok === false) {
       return { success: false, error: gate.error };
     }
     const confirm = await this.session.confirmWrite(proposalId);
@@ -344,16 +347,54 @@ export class MemoryManager {
     };
   }
 
-  async rollback(manifest: LiveWriteManifest, featureId?: string): Promise<RollbackResult> {
-    const result = await this.session.rollback(manifest);
+  /**
+   * Rolls back a write THIS SESSION actually confirmed, identified only by
+   * proposalId. The manifest (address/dataType/values) is looked up
+   * server-side inside LiveMemorySession — never accepted from the caller —
+   * so this cannot be used to write an arbitrary value to an arbitrary
+   * address under the guise of "undo".
+   */
+  async rollback(proposalId: string, featureId?: string): Promise<RollbackResult> {
+    const result = await this.session.rollback(proposalId);
     this.audit.append({
       op: 'rollback',
       featureId,
-      address: `0x${manifest.target.address.toString(16)}`,
-      valueType: manifest.target.dataType,
-      valueBefore: manifest.valueAfter,
-      valueAfter: manifest.valueBefore,
+      address: result.manifest ? `0x${result.manifest.target.address.toString(16)}` : undefined,
+      valueType: result.manifest?.target.dataType,
+      valueBefore: result.manifest?.valueAfter,
+      valueAfter: result.manifest?.valueBefore,
       reason: result.success ? 'rollback_ok' : (result.error ?? 'rollback_failed'),
+      waiverAssumed: this.waiverAssumedForAudit(result.success),
+    });
+    return result;
+  }
+
+  /**
+   * Starts a previously-proposed freeze, identified only by proposalId.
+   * Unlike confirmWrite, there is NO userApproved legacy bypass here — a
+   * consentToken + consentBinding are always required, so an IPC caller (or
+   * any other caller) can never start a freeze without going through the
+   * native-dialog-backed propose/issue-consent flow.
+   */
+  async freezeStart(
+    proposalId: string,
+    options: { consentToken: string; consentBinding: WriteConsentBinding; featureId?: string },
+  ): Promise<StartFreezeResult> {
+    const consumed = consumeWriteConsent(options.consentToken, options.consentBinding);
+    if (consumed.ok === false) {
+      this.audit.append({
+        op: 'abort',
+        featureId: options.featureId,
+        reason: `consent_denied:${consumed.reason}`,
+        waiverAssumed: this.waiverAssumedForAudit(false),
+      });
+      return { success: false, error: `consent_denied:${consumed.reason}` };
+    }
+    const result = this.session.startFreezeConfirmed(proposalId);
+    this.audit.append({
+      op: 'write',
+      featureId: options.featureId,
+      reason: result.success ? 'freeze_start_confirmed' : (result.error ?? 'freeze_start_failed'),
       waiverAssumed: this.waiverAssumedForAudit(result.success),
     });
     return result;

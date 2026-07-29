@@ -1,0 +1,142 @@
+# Gate 2.3 — Restore the Real Packaged Freeze Authorization Flow
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node: v22.23.1, npm: 10.9.8, Electron: 42.4.1 (ABI 146), arch x64, platform win32
+
+## Baseline
+
+Confirmed clean starting point matching the established chain (GameLibrary.tsx-only
+whitespace). See baseline-status.txt / baseline-diff-*.txt / gate23-diff-check.txt.
+
+## Root-cause finding (Phase 1-2)
+
+The main-process IPC handlers for freeze propose/issue-consent/confirm
+(`live-memory-freeze-propose`, `live-memory-freeze-issue-consent`,
+`live-memory-freeze-start`) were ALREADY fully implemented and correct in
+`electron/live-memory-ipc.ts` before this cycle began — they already enforced
+trusted-sender validation, session ownership, feature-flag re-checks,
+identity re-verification, and a real privileged consent dialog, and already
+required `{proposalId, consentToken}` for confirmed start. The entire defect
+was in the preload/renderer layer: `electron/preload.ts`'s
+`liveMemoryFreezeStart` sent the legacy `{address, dataType, value,
+intervalMs}` payload directly to the confirm-start channel (guaranteed schema
+rejection), and no `liveMemoryFreezePropose`/`liveMemoryFreezeRequestConsent`
+preload methods existed at all. See current-freeze-flow.md and
+freeze-flow-gap-matrix.csv.
+
+## Repair (Phases 4-6)
+
+- `electron/preload.ts`: added `liveMemoryFreezePropose`,
+  `liveMemoryFreezeRequestConsent`; fixed `liveMemoryFreezeStart` to
+  `{proposalId, consentToken}`.
+- `src/types/global.d.ts`: matching type repair.
+- `src/app/pages/LiveMemoryTrainerPage.tsx` (2 call sites) and
+  `src/app/hooks/useGameCheatSession.ts` (1 call site): rewired to the real
+  propose -> requestConsent -> start sequence, preserving the existing
+  single-click "Start Freeze" / toggle-freeze UX.
+- Legacy signature: REMOVED outright (never had a working call path to
+  preserve). See freeze-api-compatibility.md.
+
+## Test-hook disposition (Phase 8)
+
+The Gate 2.2 Resume `__testStartFreezeForOwner` test-only hook is no longer
+needed and has been REMOVED from source entirely (function and its
+`globalThis` registration both deleted, not merely env-gated). See
+test-hook-disposition.md.
+
+## Packaged real production-flow certification (Phase 9)
+
+Fresh packaged rebuild (`build:vite` -> `build:electron`, 29/29 sanity checks
+-> `dist:dir`, exit 0). Against the real Gate 2.2 fixture and the real
+packaged `Solith.exe`, using ONLY the renderer-facing `electronAPI` surface
+(no test hook): propose -> real privileged consent (auto-approved via the
+pre-existing `SOLITH_PRIVILEGED_CONSENT` test/headless seam, not a new
+bypass) -> confirmed start -> real freeze ticks -> external mutation ->
+restore confirmed -> stop -> no further writes -> proposal/token replay
+rejected -> fabricated proposal/token rejected -> legacy payload rejected.
+See packaged-real-freeze-authorization-matrix.csv,
+packaged-real-flow-run.txt, packaged-security-matrix-run.txt.
+
+## Affected lifecycle re-certification (Phase 10)
+
+`tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts` re-run in full (10/10
+pass) with `attachAndFreeze` rewired to the real flow. Active-session
+shutdown/quit, mid-freeze feature-disable, and controlled forced termination
+now all use the real production authorization sequence — the latter two
+launched WITHOUT `SOLITH_TEST_BUILD` to prove the real flow needs no test
+assistance whatsoever. See packaged-production-flow-lifecycle-matrix.csv.
+
+## Normal-build security check (Phase 11)
+
+New `tests/gate2-3-freeze-authorization-security.e2e.test.ts` (3/3 pass):
+legacy payload rejected, proposal/token replay rejected, fabricated
+proposal/token rejected. Combined with the pre-existing Phase 11 hook-absence
+re-confirmation (still passing — now trivially true since the removed hook
+no longer exists in source). See normal-build-freeze-api-security-matrix.csv.
+
+## Full regression gate (Phase 12)
+
+- npm test: PASS, exit 0, 1040/1040 (unchanged total)
+- npm run test:live-memory: PASS, exit 0, 257/257 (unchanged total)
+- Main TypeScript: PASS, exit 0, 0 diagnostics
+- Electron TypeScript: FAIL, exit 2, 31 diagnostics/13 files — unchanged
+  established baseline (live-memory-ipc.ts's edits introduced zero new
+  diagnostics)
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286/303 only — unchanged
+  established baseline
+- Packaged build: PASS, exit 0
+- Packaged smoke: PASS, 23/23
+
+Node-22 ABI native addon was restored (via `node-gyp rebuild
+--target=22.23.1`) after packaged verification completed, and the full
+regression gate was re-confirmed a second time post-restoration
+(npm-test-final.txt, npm-test-live-memory-final.txt) — both clean.
+
+## Scope integrity (Phase 15)
+
+- No Batch B2/B2A work began.
+- No renderer-accessible arbitrary write/freeze interface was added — the
+  renderer can still only propose a normalized freeze target and must obtain
+  a real, server-generated, single-use, operation-bound consent token before
+  a freeze starts.
+- Proposal IDs and consent tokens are both generated exclusively by the main
+  process; unchanged this cycle (this was already true — the gap was purely
+  that the renderer couldn't reach the already-correct main-process layer).
+- Consent could not be bypassed; the legacy payload cannot start a freeze
+  (schema-rejected); proposal and token replay both reject
+  (packaged-security-matrix-run.txt).
+- Process identity is revalidated before consent-issue and before start
+  (unchanged, pre-existing).
+- No test-only direct-start hook remains usable in ANY build — it was
+  deleted from source, not merely gated.
+- No dependency added; package-lock.json unchanged; no CI/release-workflow
+  changes.
+- No unrelated production behavior changed — only
+  `electron/preload.ts`, `electron/live-memory-ipc.ts` (hook removal only),
+  `src/types/global.d.ts`, `src/app/pages/LiveMemoryTrainerPage.tsx`,
+  `src/app/hooks/useGameCheatSession.ts` were touched in source, plus
+  `tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts` (helper rewrite) and
+  new `tests/gate2-3-freeze-authorization-security.e2e.test.ts` — see
+  changed-files-gate2-3-only.txt.
+- No git mutation command was run this cycle.
+- Only harness-created SOLITH and Gate 2.2 fixture processes were terminated
+  this cycle; confirmed no leftover processes.
+- No raw target values, addresses, tokens, or rollback bytes appear in any
+  evidence file produced this cycle.
+- SOLITH_SECURITY_ROADMAP.md updated (see roadmap Phase 3.14 entry).
+
+## Verdict
+
+GATE 2.3 (real packaged freeze authorization flow restoration): VERIFIED
+COMPLETE for all explicitly authorized, attempted scope. R-2.2-RESUME-001 is
+RESOLVED. Two narrower residual items (R-2.3-001, R-2.3-002) disclosed rather
+than fabricated as independently proven; four items carried forward
+unchanged from Gate 2.2 Resume, out of Gate 2.3's scope.
+
+BATCH B1.1 CONDITIONAL PASS (the specific defect blocking further progress —
+the broken real renderer/preload/IPC freeze flow — is now resolved; remaining
+conditions are the same class of pre-existing, disclosed, non-regression
+items as every prior gate).
+
+Release: DENIED (unchanged).

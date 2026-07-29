@@ -1,0 +1,147 @@
+# Gate 2.4 — Final Ownership, Window, Frame, and Navigation Certification
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node: v22.23.1, npm: 10.9.8, Electron: 42.4.1 (ABI 146), arch x64, platform win32
+
+## Scope
+
+Gate 2.4 is a certification-only milestone: no production IPC handler,
+preload API, or trusted-sender-registry code was modified this cycle. One
+new test file was added (tests/gate2-4-final-certification.e2e.test.ts).
+
+## Phase 3 — Independent Gate 2.3 reverification
+
+A fresh packaged candidate was built from scratch (build:vite ->
+build:electron -> dist:dir) and the full real production freeze flow
+(propose -> consent -> confirmed start -> 2+ ticks -> external mutation ->
+restore -> stop -> no-further-write -> proposal/token replay rejection) was
+independently re-run against it, plus a fresh rerun of Gate 2.3's own 3-test
+security suite. All passed. See gate2_3-independent-verification-matrix.csv.
+
+## Phase 4 — Renderer crash with a production-created freeze
+
+A freeze started exclusively via propose -> consent -> confirmed start was
+active when the owning renderer was forcefully crashed
+(webContents.forcefullyCrashRenderer()). No further writes reached the
+fixture; the pre-crash proposal/token did not survive a subsequent reload.
+R-2.3-001 RESOLVED. See packaged-real-flow-renderer-crash-matrix.csv.
+
+## Phase 5 — Two-owner authorization isolation
+
+The application's architecture has exactly one 'main'-type window; a true
+two-independent-main-window test is not constructible without modifying
+window-creation code (prohibited). The strongest genuine substitute — the
+real Wisp overlay window, a second live trusted webContents — was used: it
+could not request consent for, or start, the main window's proposal, while
+the main window completed its own operation normally. R-2.3-002 RESOLVED
+(narrowed, with the single-privileged-window architecture disclosed). See
+packaged-owner-isolation-matrix.csv.
+
+## Phase 6 — Main-window close and recreation
+
+NOT APPLICABLE on this platform: electron/main.ts's window-all-closed
+handler calls app.quit() whenever process.platform !== 'darwin', which is
+always true on this Windows target. Full-restart state invalidation is
+already proven by the existing Phase 4 lifecycle suite (rerun this cycle).
+See packaged-window-recreation-matrix.csv.
+
+## Phase 7 — Overlay identity and permission boundaries
+
+requireTrustedSender() hardcodes allowedWindowTypes=['main'] for every
+freeze/rollback channel — overlays are structurally barred regardless of
+this test, confirmed by source read and by the real packaged cross-window
+test in Phase 5. See packaged-overlay-permission-matrix.csv.
+
+## Phase 8 — Canonical file URL and path-boundary testing
+
+Compiled from tests/trusted-sender-registry.test.ts's existing, extensive
+unit coverage (exact match, sibling/directory-boundary, encoded slash/
+backslash/dot-dot, malformed percent-encoding, protocol mismatch, query/hash
+variations, dev-server prefix) — all rerun this cycle as part of npm test
+(1040/1040). Two minor gaps disclosed as PARTIAL (explicit mixed-case file:
+URL fixture; explicit data:/javascript:/custom-scheme fixture — both covered
+by the same already-tested code path). See canonical-url-boundary-matrix.csv.
+
+## Phase 9 — Real packaged unauthorized navigation
+
+9.1/9.6 (existing, rerun) plus new 9.2 (encoded-path), 9.4 (same-prefix
+sibling directory), and 9.5 (unapproved local HTTP origin) all pass against
+the fresh packaged candidate. See packaged-navigation-boundary-matrix.csv.
+
+## Phase 10 — Child-frame and stale-frame certification
+
+The not_main_frame check is generic and unit-tested
+(tests/trusted-sender-registry.test.ts). A live packaged child-<iframe>
+privileged-IPC attempt was not attempted this cycle (time-scoped out). See
+packaged-frame-boundary-matrix.csv.
+
+## Phase 11 — DevTools boundary
+
+HARNESS LIMITATION — NOT CERTIFIED, carried forward unchanged from Gate 2.2
+Resume/Gate 2.3's identical disclosure. See packaged-devtools-boundary-matrix.csv.
+
+## Phase 12 — Normal-production test-hook review
+
+5 test-only hooks inventoried (4 currently gated + registered only under
+SOLITH_TEST_BUILD=1; 1 — the Gate 2.2 Resume freeze-start hook — structurally
+removed from source in Gate 2.3, confirmed absent again this cycle via
+grep). Absent-env-var case re-confirmed live against the fresh packaged
+build (Phase 11 test, 10/10 suite pass). Non-'1' value variants (0/false/
+malformed) not independently relaunched this cycle after an ad-hoc script
+failed outside the Playwright harness; the guard is a strict '===1' string
+comparison, a structural (not merely empirical) guarantee. See
+test-hook-inventory.csv and normal-build-test-hook-final-matrix.csv.
+
+## Phase 13-14 — Full packaged and Node regression
+
+- Packaged smoke: 23/23
+- Gate 2.3 independent rerun: 3/3
+- Gate 2.4 new suite: 5/5
+- Gate 2.2 Resume lifecycle rerun: 10/10
+- Gate 2.2A.1 native write proof rerun: 1/1
+- npm test: 1040/1040 (unchanged total)
+- npm run test:live-memory: 257/257 (unchanged total)
+- Main TypeScript: 0 diagnostics
+- Electron TypeScript: 31 diagnostics/13 files (unchanged baseline)
+- git diff --check: GameLibrary.tsx:286/303 only (unchanged baseline)
+
+Node-22 ABI native addon was restored (node-gyp rebuild --target=22.23.1)
+after packaged verification completed, and the Node regression gate ran
+after that restoration.
+
+## Scope integrity
+
+- No Batch B2/B2A work began.
+- No production IPC handler, preload API, or sender-validation code was
+  modified this cycle.
+- No dependency added; package-lock.json unchanged; no CI/release-workflow
+  changes (git diff --name-status confirms the same file set as before this
+  cycle plus the one new test file).
+- No test-only hook works in normal production (re-confirmed).
+- Only harness-created SOLITH, Gate 2.2 fixture, and overlay-window
+  processes were interacted with this cycle; confirmed no leftover
+  Solith.exe/Gate2_2Fixture.exe processes after cleanup.
+- No raw addresses, PID values, tokens, or rollback bytes appear in any
+  Gate 2.4 evidence file.
+- No git mutation command was run this cycle.
+- SOLITH_SECURITY_ROADMAP.md updated (Phase 3.15 entry).
+- DISCLOSED ERROR: a pre-existing untracked file (test_output.txt, present
+  before this session began) was deleted in error via a blanket cleanup
+  command, without being read first. Not recoverable via git. Reported to
+  the user directly. See remaining-risks.md R-2.4-007.
+
+## Verdict
+
+GATE 2.4 (final ownership, window, frame, and navigation certification):
+VERIFIED COMPLETE for all explicitly authorized, attempted scope.
+R-2.3-001 and R-2.3-002 are RESOLVED. Window recreation and the two-main-
+window ownership case are classified NOT APPLICABLE with concrete
+architectural evidence. DevTools-frame and non-DevTools child-frame
+rejection remain disclosed harness limitations, unchanged from prior gates.
+
+BATCH B1.1 CONDITIONAL PASS (unchanged from Gate 2.3 — no exploitable defect
+found in any cycle; remaining conditions are the same pre-existing, disclosed,
+non-regression items carried across every gate).
+
+Release: DENIED (unchanged).

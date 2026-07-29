@@ -1,0 +1,16 @@
+fixture status before write: {
+  pid: 5776,
+  addressHex: '0x1da9880a050',
+  value: 424242,
+  updatedAtIso: '2026-07-29T03:20:21.8699558Z'
+}
+driver.readMemory -> 424242 (expected 424242)
+driver.writeMemory -> wrote 777001
+fixture status after write: {
+  pid: 5776,
+  addressHex: '0x1da9880a050',
+  value: 424242,
+  updatedAtIso: '2026-07-29T03:20:22.3076801Z'
+}
+FAIL: Error: fixture did not observe the driver's write: expected 777001, saw 424242
+    at main (G:\ACTIVE_PROJECTS\SOLITH\Docs\Security\Evidence\BatchB1_1_Closeout\Gate2_2\verify-fixture-real-memory-driver.mts:67:13)

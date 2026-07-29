@@ -1,0 +1,9 @@
+Suite,Total,Pass,Fail,ExitCode,Evidence
+npm test,1040,1040,0,0,tests-run.txt
+npm run test:live-memory,257,257,0,0,tests-run.txt
+Main TypeScript (tsc --noEmit),0 diagnostics,-,-,0,tests-run.txt
+Electron TypeScript (tsconfig.electron.json),31 diagnostics/13 files (unchanged baseline),-,-,2,tests-run.txt
+git diff --check,GameLibrary.tsx only (unchanged baseline),-,-,2,tests-run.txt
+Electron-runtime real-process write/failure/freeze/rollback (Phase 5),18,18,0,0,electron-runtime-native-write-run.txt
+Packaged smoke,23,23,0,0,packaged-smoke-output.txt
+Packaged real-process write/read/restore/failure proof (Phase 8),1,1,0,0,packaged-real-process-write-output.txt

@@ -12,6 +12,7 @@ export const WRITE_CONSENT_TTL_MS = 5 * 60 * 1000;
 
 export type ConsentOperation =
   | 'live_memory_confirm_write'
+  | 'live_memory_freeze_start'
   | 'injector_confirm_launch';
 
 export interface WriteConsentBinding {
@@ -35,6 +36,20 @@ export interface WriteConsentBinding {
   /** Injector helper absolute path. */
   exePath?: string;
   exeSha256?: string;
+  /** Freeze value (live_memory_freeze_start only). */
+  freezeValue?: number;
+  /** Freeze re-write interval in ms (live_memory_freeze_start only). */
+  freezeIntervalMs?: number;
+  /** Freeze hard duration ceiling in ms (live_memory_freeze_start only). */
+  freezeMaxDurationMs?: number;
+  /**
+   * Requesting WebContents id — binds the consent to the exact renderer
+   * window/frame that proposed the operation. Optional so existing
+   * operations (live_memory_confirm_write, injector_confirm_launch) that
+   * predate this field keep hashing identically (both issuance and
+   * consumption omit it for those operations, so their hash is unaffected).
+   */
+  windowId?: number;
 }
 
 export interface WriteConsentArtifact {
@@ -47,6 +62,7 @@ export interface WriteConsentArtifact {
 }
 
 interface StoredConsent {
+  sessionKey: string;
   bindingHash: string;
   operation: ConsentOperation;
   proposalId: string;
@@ -74,6 +90,10 @@ export function hashConsentBinding(binding: WriteConsentBinding): string {
     requestedValue: binding.requestedValue ?? null,
     exePath: binding.exePath ? binding.exePath.toLowerCase() : null,
     exeSha256: binding.exeSha256 ? binding.exeSha256.toLowerCase() : null,
+    freezeValue: binding.freezeValue ?? null,
+    freezeIntervalMs: binding.freezeIntervalMs ?? null,
+    freezeMaxDurationMs: binding.freezeMaxDurationMs ?? null,
+    windowId: binding.windowId ?? null,
   });
   return createHash('sha256').update(payload).digest('hex');
 }
@@ -98,6 +118,7 @@ export function issueWriteConsent(
   const createdAt = new Date(nowMs).toISOString();
   const expiresAtMs = nowMs + ttlMs;
   store.set(tokenId, {
+    sessionKey: binding.sessionKey,
     bindingHash,
     operation: binding.operation,
     proposalId: binding.proposalId,
@@ -157,4 +178,16 @@ export function peekWriteConsent(tokenId: string): StoredConsent | undefined {
 
 export function clearWriteConsentStore(): void {
   store.clear();
+}
+
+/** Revokes unconsumed consent artifacts owned by one renderer/session. */
+export function revokeWriteConsentsForSession(sessionKey: string): number {
+  let revoked = 0;
+  for (const [tokenId, entry] of store) {
+    if (entry.sessionKey === sessionKey) {
+      store.delete(tokenId);
+      revoked += 1;
+    }
+  }
+  return revoked;
 }

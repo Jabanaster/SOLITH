@@ -1,0 +1,20 @@
+PASS: invalid PID is rejected
+PASS: write after process exit is rejected
+PASS: write via read-only handle fails closed (no silent success) — threw=true, valueUnchanged=true (before=424242, after=424242)
+PASS: write to unmapped address is rejected
+PASS: real direct write lands via nativeMemoryDriver — readBack=424242, before=424242, after=555222
+PASS: restore-to-original write lands — restored=424242, expected=424242
+PASS: freeze starts — {"success":true}
+FAIL: freeze applies frozen value — value=424242
+PASS: freeze restores value after external mutation — value=111222
+PASS: freeze no longer writes after stop — value=777333
+PASS: rollback scenario: confirmWrite succeeds — {"success":true,"manifest":{"proposalId":"d637aba1-bfb6-4525-9590-924a9066ce9f","target":{"address":"1663939158264","dataType":"int32"},"valueBefore":424242,"valueAfter":333444,"appliedAt":"2026-07-29T15:06:58.825Z"},"guard":{"allowed":true,"reason":"Single-player waiver accepted (advisory: 0 remote connection(s) observed; not blocking)."}}
+PASS: rollback scenario: write landed — value=333444
+PASS: rollback succeeds — {"success":true,"guard":{"allowed":true,"reason":"Single-player waiver accepted (advisory: 0 remote connection(s) observed; not blocking)."},"manifest":{"proposalId":"d637aba1-bfb6-4525-9590-924a9066ce9f","target":{"address":"1663939158264","dataType":"int32"},"valueBefore":424242,"valueAfter":333444,"appliedAt":"2026-07-29T15:06:58.825Z"}}
+PASS: rollback restores original value — value=424242, expected=424242
+PASS: rollback is single-use (no replay) — {"success":false,"error":"Unknown, expired, or already rolled back write."}
+PASS: rollback-rejection scenario: confirmWrite succeeds — {"success":true,"manifest":{"proposalId":"8e3a18af-a651-4c84-a41a-320a71e4642c","target":{"address":"1838254432504","dataType":"int32"},"valueBefore":424242,"valueAfter":222111,"appliedAt":"2026-07-29T15:07:03.026Z"},"guard":{"allowed":true,"reason":"Single-player waiver accepted (advisory: 0 remote connection(s) observed; not blocking)."}}
+PASS: rollback refuses to clobber an intervening external change — {"success":false,"guard":{"allowed":true,"reason":"Single-player waiver accepted (advisory: 0 remote connection(s) observed; not blocking)."},"error":"expected_value_mismatch: current memory no longer matches the value this write applied; refusing to overwrite an independent change."}
+PASS: value after refused rollback remains the external mutation (not silently overwritten) — value=444555
+
+17/18 passed

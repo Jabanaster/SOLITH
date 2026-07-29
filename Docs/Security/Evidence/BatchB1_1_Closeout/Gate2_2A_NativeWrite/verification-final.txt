@@ -1,0 +1,87 @@
+# Gate 2.2A — Native Memory Write-Path Remediation
+
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+Node (test ABI): v22.23.1 (.tools/node-v22.23.1-win-x64/node.exe)
+Electron (declared, ABI not yet rebuilt this cycle): ^42.4.1
+
+## Root cause
+
+Two defects in vendored memoryjs (vendor/memoryjs-3.5.1-patched):
+1. process::openProcess always opened handles with PROCESS_QUERY_INFORMATION|PROCESS_VM_READ
+   only — no PROCESS_VM_WRITE/PROCESS_VM_OPERATION — so every write was structurally impossible.
+2. writeMemory (memory.h) discarded WriteProcessMemory's return value; the JS binding
+   (memoryjs.cc) never checked or propagated failure. Writes silently no-op'd and reported success.
+See native-write-root-cause.md for full detail.
+
+## Fix
+
+- process.h/process.cc: openProcess(pid, errorMessage, requestWriteAccess=false) — write rights
+  granted only when explicitly requested; default unchanged; never PROCESS_ALL_ACCESS.
+- memoryjs.cc: openProcess() binding accepts an optional boolean 2nd argument (backward
+  compatible) to request a write-capable handle.
+- memory.h: all writeMemory overloads now return bool (success + full byte count written) and an
+  out-param Win32 error code.
+- memoryjs.cc: writeMemory()/writeBuffer() bindings check the result and throw
+  `write_failed:<code>` on any failure or short write — no memory values/addresses/tokens/paths
+  in the error.
+- native-memory-driver.ts: openProcess(pid) now requests write access (mem.openProcess(pid, true)).
+See native-access-rights-model.md and native-error-propagation.md for full detail.
+
+## Native rebuild
+
+node-gyp rebuild via node_modules/node-gyp/bin/node-gyp.js, --target=22.23.1 --arch=x64, using
+the trusted Node 22 runtime. Build succeeded (`gyp info ok`), pre-existing unrelated pointer-
+truncation warnings only (functions.h, not touched this cycle). See native-build-output.txt.
+Rebuilt binary: vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node
+SHA256: 72847fc0510fa53e506cef17eddb8c6587b6823244713a4ac3adc0b227518902 (238080 bytes)
+See native-binary-hashes.csv and native-build-info.txt.
+Electron-ABI rebuild: NOT performed this cycle — see remaining-risks.md R-2.2A-001.
+
+## Real-process verification (against the Gate 2.2 fixture, tests/fixtures/gate2-2-memory-fixture)
+
+18/18 checks pass via src/core/live-memory/native-memory-driver.ts and
+src/core/live-memory/live-memory-session.ts (real LiveMemorySession, not FakeMemoryDriver):
+- Failure modes: invalid PID, process-exited, read-only handle, unmapped address — all 4 reject
+  correctly (see real-process-failure-matrix.csv).
+- Direct write: writes land and are observed independently via the fixture's own status file
+  (see real-process-write-matrix.csv).
+- Freeze: starts, applies, restores after an external mutation, stops cleanly
+  (see real-process-freeze-matrix.csv).
+- Rollback: restores original value, is single-use, refuses to clobber an intervening external
+  change (see real-process-rollback-matrix.csv).
+Full run: real-process-full-verification-final.txt (18/18 passed).
+
+## Regression gate
+
+- npm test: PASS, exit 0, 1040/1040 (unchanged total from Gate 2.1)
+- npm run test:live-memory: PASS, exit 0, 257/257 (unchanged total from Gate 2.1)
+- Main TypeScript: PASS, exit 0, 0 diagnostics
+- Electron TypeScript: FAIL, exit 2, 31 diagnostics/13 files — identical to Gate 2/2.1 baseline
+- git diff --check: FAIL, exit 2, GameLibrary.tsx:286/303 only — identical to established baseline
+- Packaged smoke: NOT RUN this cycle (no packaged/Electron-ABI rebuild performed — see
+  remaining-risks.md R-2.2A-001)
+
+## Scope integrity
+
+- No Batch B2/B2A work began.
+- No unrelated source or test edits (changed-files.txt: native-memory-driver.ts + 4 vendor
+  memoryjs files + new fixture directory only).
+- No dependency installs/upgrades; package-lock.json unchanged.
+- No CI/release-workflow changes.
+- No git mutation commands run (no add/commit/push/reset/clean/stash/restore/checkout/tag).
+- No kernel drivers, packet capture, PROCESS_ALL_ACCESS, or arbitrary renderer-controlled
+  PID/address/value/command inputs added.
+- Only the dedicated fixture process and non-existent test PIDs were targeted; no unrelated
+  process was opened, read, or written.
+
+## Verdict
+
+GATE 2.2A NATIVE WRITE REMEDIATION PASS — see remaining-risks.md for full justification.
+
+BATCH B1.1 CONDITIONAL PASS (narrowed by R-2.2A-001, not reversed).
+
+Gate 2.2 may resume for its two remaining packaged-lifecycle scenarios (feature-disable
+mid-freeze, window-identity/navigation) once the packaged/Electron-ABI addon rebuild and a
+packaged-smoke re-verification are done against this fix. That rebuild-and-smoke step is the
+exact next milestone.

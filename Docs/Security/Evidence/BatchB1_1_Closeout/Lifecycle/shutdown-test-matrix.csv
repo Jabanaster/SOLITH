@@ -1,0 +1,2 @@
+"Requirement","ImplementationFile","Function","TestName","ExpectedResult","ActualResult","Status","Evidence","ResidualRisk"
+"Application shutdown stops all sessions and globally revokes privileged state","electron/main.ts; electron/live-memory-ipc.ts","will-quit; disposeAllLiveMemorySessions","will-quit cleanup stops every session and records accurate sanitized results","All schedulers stopped, sessions detached, global stores cleared, sanitized result","Passed","PASS","verification-scoped-security-tests.txt","Isolated fakes; no live game process by design"

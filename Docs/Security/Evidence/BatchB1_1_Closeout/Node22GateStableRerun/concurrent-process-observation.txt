@@ -1,0 +1,106 @@
+# Concurrent Process Observation
+CapturedUtc: 2026-07-28T09:36:21Z
+
+## Node processes
+
+Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                                              CPU Time Window Title                                                            
+========================= ======== ================ =========== ============ =============== ================================================== ============ ========================================================================
+node.exe                     35964 Console                    1      2,152 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     34964 Console                    1      6,640 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:02 N/A                                                                     
+node.exe                     21216 Console                    1     47,012 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:03 N/A                                                                     
+node.exe                     26752 Console                    1     45,260 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:04 N/A                                                                     
+node.exe                     34404 Console                    1     53,420 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     12896 Console                    1     50,724 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     28484 Console                    1     70,744 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     11272 Console                    1     70,140 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     39252 Console                    1    192,052 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:27 N/A                                                                     
+node.exe                     15632 Console                    1    395,440 K Unknown         DIS-IS-THE-WAE\chase                                    2:00:16 N/A                                                                     
+node.exe                     36704 Console                    1     53,064 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     24880 Console                    1     56,688 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     18100 Console                    1     82,464 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     33300 Console                    1    118,288 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     33360 Console                    1     57,772 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     40600 Console                    1     56,656 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     40720 Console                    1     84,476 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     24580 Console                    1    119,740 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     27928 Console                    1     45,156 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     41512 Console                    1     41,920 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     37548 Console                    1     61,784 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     21784 Console                    1     61,228 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     40456 Console                    1    115,860 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:30 N/A                                                                     
+node.exe                     24280 Console                    1     41,612 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     31112 Console                    1     57,040 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     15848 Console                    1     60,684 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                     41840 Console                    1     84,268 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     40900 Console                    1    120,888 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     26056 Console                    1     93,288 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:02 N/A                                                                     
+node.exe                     31948 Console                    1     91,728 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     13384 Console                    1     92,160 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:01 N/A                                                                     
+node.exe                     39008 Console                    1    114,624 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+node.exe                      5988 Console                    1    116,904 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:02 N/A                                                                     
+node.exe                     30864 Console                    1    122,532 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:02 N/A                                                                     
+
+## Electron processes
+
+Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                                              CPU Time Window Title                                                            
+========================= ======== ================ =========== ============ =============== ================================================== ============ ========================================================================
+electron.exe                 15476 Console                    1    181,384 K Running         DIS-IS-THE-WAE\chase                                    0:00:28 Solith                                                                  
+electron.exe                  3176 Console                    1    270,712 K Running         DIS-IS-THE-WAE\chase                                    0:00:17 N/A                                                                     
+electron.exe                 18468 Console                    1     57,728 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 OleMainThreadWndName                                                    
+electron.exe                  7828 Console                    1    176,584 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:10 N/A                                                                     
+electron.exe                  5156 Console                    1     98,984 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+
+## Editor / IDE candidates
+INFO: No tasks are running which match the specified criteria.
+INFO: No tasks are running which match the specified criteria.
+INFO: No tasks are running which match the specified criteria.
+
+## Shells
+
+Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                                              CPU Time Window Title                                                            
+========================= ======== ================ =========== ============ =============== ================================================== ============ ========================================================================
+powershell.exe               20112 Console                    1      3,076 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 npm start                                                               
+powershell.exe               40072 Console                    1    107,236 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 Select C:\WINDOWS\system32\cmd.exe                                      
+powershell.exe               27916 Console                    1     93,448 K Running         DIS-IS-THE-WAE\chase                                    0:00:01 Windows PowerShell                                                      
+powershell.exe               18512 Console                    1     74,884 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 Select C:\WINDOWS\system32\cmd.exe                                      
+powershell.exe               33520 Console                    1     80,600 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+
+Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                                              CPU Time Window Title                                                            
+========================= ======== ================ =========== ============ =============== ================================================== ============ ========================================================================
+pwsh.exe                      3620 Console                    1     96,732 K Not Responding  DIS-IS-THE-WAE\chase                                    0:00:03 OleMainThreadWndName                                                    
+
+Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                                              CPU Time Window Title                                                            
+========================= ======== ================ =========== ============ =============== ================================================== ============ ========================================================================
+bash.exe                     31216 Console                    1      9,072 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+bash.exe                     31300 Console                    1     13,764 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+bash.exe                     30860 Console                    1     11,072 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+
+Image Name                     PID Session Name        Session#    Mem Usage Status          User Name                                              CPU Time Window Title                                                            
+========================= ======== ================ =========== ============ =============== ================================================== ============ ========================================================================
+cmd.exe                      25760 Console                    1      1,072 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 C:\WINDOWS\system32\cmd.exe                                             
+cmd.exe                      18332 Console                    1      1,104 K Running         DIS-IS-THE-WAE\chase                                    0:00:00 C:\WINDOWS\system32\cmd.exe                                             
+cmd.exe                      31916 Console                    1        988 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      29924 Console                    1      1,132 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                       6500 Console                    1     10,296 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      19748 Console                    1     11,160 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      36148 Console                    1     11,368 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      12820 Console                    1     11,372 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      39688 Console                    1     11,316 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      10628 Console                    1     11,320 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      35008 Console                    1     11,084 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      15404 Console                    1     11,320 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      32192 Console                    1     11,080 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      39016 Console                    1     11,264 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      32504 Console                    1     10,252 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      34788 Console                    1     11,052 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      28096 Console                    1     11,052 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                       4240 Console                    1     11,024 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      19536 Console                    1     11,176 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      39264 Console                    1     11,320 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      41004 Console                    1     11,076 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                       3348 Console                    1     11,316 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      13508 Console                    1     11,112 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      39792 Console                    1     11,184 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                       6516 Console                    1     11,328 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                       8376 Console                    1     11,324 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     
+cmd.exe                      14084 Console                    1     11,324 K Unknown         DIS-IS-THE-WAE\chase                                    0:00:00 N/A                                                                     

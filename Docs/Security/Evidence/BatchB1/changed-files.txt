@@ -1,0 +1,55 @@
+CORRECTED (2026-07-27): this note originally mischaracterized which files
+had pre-existing mixed content. The precise, hunk-level, baseline-verified
+classification supersedes the paragraph that used to be here — see:
+  Docs/Security/Evidence/BatchB1/baseline-files.txt          (pre-Batch-B1 git status)
+  Docs/Security/Evidence/BatchB1/batchb1-owned-diff.txt       (exactly what Batch B1 authored)
+  Docs/Security/Evidence/BatchB1/preexisting-diff-preserved.txt (exactly what was NOT touched)
+  Docs/Security/Evidence/BatchB1/verification-final.txt       ("GIT VERIFICATION (CORRECTED)" section)
+
+Summary of the corrected classification: electron/ipc-validation.ts and
+src/app/pages/RegistryExplorerPage.tsx were baseline "M " (staged-only) —
+git diff with no ref isolates Batch B1's unstaged edits cleanly, 100% Batch
+B1. electron/preload.ts, package.json, and src/types/global.d.ts were
+baseline "MM" (already had unstaged pre-existing changes) — these required
+manual hunk-level attribution, performed and recorded in the two files
+above. The raw git diff --stat numbers below remain accurate as raw
+numbers; they are NOT a claim about how much of each diff is Batch B1's own
+work for the 3 "MM"-at-baseline files.
+
+=== git status --short --untracked-files=all (Batch B1 relevant files only) ===
+MM electron/ipc-validation.ts
+ M electron/live-memory-ipc.ts
+MM electron/preload.ts
+ M electron/registry-verification-ipc.ts
+MM package.json
+MM src/app/pages/RegistryExplorerPage.tsx
+ M src/core/live-memory/live-memory-session.ts
+ M src/core/live-memory/memory-manager.ts
+ M src/core/live-memory/types.ts
+MM src/types/global.d.ts
+ M tests/live-memory/live-memory-session.test.ts
+ M tests/live-memory/memory-manager.test.ts
+?? src/core/live-memory/session-cleanup.ts
+?? tests/live-memory-rollback-freeze-ipc-validation.test.ts
+?? tests/live-memory/session-cleanup-on-destroy.test.ts
+
+=== git diff --stat (Batch B1 relevant files) ===
+ electron/ipc-validation.ts                    |  42 +++++---
+ electron/live-memory-ipc.ts                   |  21 ++--
+ electron/preload.ts                           |   9 +-
+ electron/registry-verification-ipc.ts         |  25 +++--
+ package.json                                  |   6 +-
+ src/app/pages/RegistryExplorerPage.tsx        |   1 +
+ src/core/live-memory/live-memory-session.ts   |  78 +++++++++++++-
+ src/core/live-memory/memory-manager.ts        |  21 ++--
+ src/core/live-memory/types.ts                 |   8 +-
+ src/types/global.d.ts                         |  94 ++++++++++++++++-
+ tests/live-memory/live-memory-session.test.ts | 142 +++++++++++++++++++++++++-
+ tests/live-memory/memory-manager.test.ts      |  40 ++++++++
+ 12 files changed, 434 insertions(+), 53 deletions(-)
+
+=== new files created this session ===
+src/core/live-memory/session-cleanup.ts
+tests/live-memory/session-cleanup-on-destroy.test.ts
+tests/live-memory-rollback-freeze-ipc-validation.test.ts
+Docs/Security/Evidence/BatchB1/finding-revalidation.md

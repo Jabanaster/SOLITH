@@ -1,0 +1,7 @@
+Suite,Total,Pass,Fail,ExitCode,Evidence
+npm test,1040,1040,0,0,tests-run-npm-test.txt
+npm run test:live-memory,257,257,0,0,tests-run-npm-test-live-memory.txt
+Main TypeScript (tsc --noEmit),0 diagnostics,-,-,0,tests-run-tsc-main.txt
+Electron TypeScript (tsconfig.electron.json),31 diagnostics/13 files (unchanged baseline),-,-,2,tests-run-tsc-electron.txt
+git diff --check,GameLibrary.tsx only (unchanged baseline),-,-,2,tests-run-git-diff-check.txt
+Real-process write/failure/freeze/rollback verification,18,18,0,0,real-process-full-verification-final.txt

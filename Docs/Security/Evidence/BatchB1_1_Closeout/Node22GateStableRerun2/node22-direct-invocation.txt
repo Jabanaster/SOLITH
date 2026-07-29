@@ -1,0 +1,43 @@
+Node22Path: G:/ACTIVE_PROJECTS/SOLITH/.tools/node-v22.23.1-win-x64/node.exe
+NpmCliPath: G:/ACTIVE_PROJECTS/SOLITH/.tools/node-v22.23.1-win-x64/node_modules/npm/bin/npm-cli.js
+
+Command: "$Node22" --version
+StartTimeUtc: 2026-07-28T09:48:27Z
+Output: v22.23.1
+ExitCode: 0
+EndTimeUtc: 2026-07-28T09:48:27Z
+
+Command: "$Node22" "$NpmCli" --version
+StartTimeUtc: 2026-07-28T09:48:27Z
+Output: 10.9.8
+ExitCode: 0
+EndTimeUtc: 2026-07-28T09:48:27Z
+
+Command: "$Node22" -e "console.log(process.version); console.log(process.execPath)"
+StartTimeUtc: 2026-07-28T09:48:28Z
+Output:
+v22.23.1
+G:\ACTIVE_PROJECTS\SOLITH\.tools\node-v22.23.1-win-x64\node.exe
+ExitCode: 0
+EndTimeUtc: 2026-07-28T09:48:28Z
+
+## Phase 6 — Child-process runtime inheritance proof
+Method: temporarily prepend the recovered Node 22 distribution directory to PATH
+for a single child-process invocation only (not exported/persisted to this shell
+or any other process). This mirrors exactly how npm resolves the bare 'node' token
+inside the project's own 'pretest' script ("node scripts/check-node.mjs"), which
+is npm's own built-in Node-major guard (fails hard if process.versions.node major != 22).
+
+Command: PATH="$Node22Dir:$PATH" which node
+Resolved: /g/ACTIVE_PROJECTS/SOLITH/.tools/node-v22.23.1-win-x64/node
+
+Command: PATH="$Node22Dir:$PATH" node scripts/check-node.mjs  (this is the exact pretest script command)
+StartTimeUtc: 2026-07-28T09:49:10Z
+Output: <no output = pass>
+ExitCode: 0
+EndTimeUtc: 2026-07-28T09:49:10Z
+
+Control (unmodified PATH, proves the guard actually discriminates):
+Command: node scripts/check-node.mjs  (system PATH, v24 active)
+Output: [solith] Unsupported Node.js v24.15.0. Required: Node.js 22.x (see .nvmrc and package.json engines).
+ExitCode: 1

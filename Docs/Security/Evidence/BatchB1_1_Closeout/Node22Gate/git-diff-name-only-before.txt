@@ -1,0 +1,108 @@
+Command: git diff --name-only
+StartTime: 2026-07-28T01:42:48.6425606-07:00
+EndTime: 2026-07-28T01:42:48.7124131-07:00
+ExitCode: 0
+--- RAW OUTPUT ---
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Docs/Architecture/SOLITH_WISP_COMPANION.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/install-discovery-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/live-memory-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/main.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/privileged-consent-dialog.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/registry-verification-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/trainer-catalog-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/components/PageModuleHeader.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/components/SolithWispCompanion.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/Backups.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/CompatibilityDashboard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/CtLibraryExplorerPage.module.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/DiscoveryLab.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/ExternalTrainerResearchLab.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/Recipes.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/RegistryExplorerPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/SaveEditor.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/SaveLocations.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/SessionMonitorPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/TrainerControlPanel.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/TrainerLibraryPage.module.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/TrainerLibraryPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/routes/GameLibrary.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/styles/index.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/styles/trainer-control-panel.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/consent/write-consent.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/ct-library/import-state.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/database/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/definitions/import-definition-ct.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/games/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/epic.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/gog.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/match.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/store.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/types.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/live-memory/live-memory-session.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/index.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/shared/types/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/csp-static.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/live-memory/memory-manager.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/packaged-smoke.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vite.config.ts', LF will be replaced by CRLF the next time Git touches it
+.gitignore
+Docs/Architecture/SOLITH_WISP_COMPANION.md
+electron/install-discovery-ipc.ts
+electron/ipc-validation.ts
+electron/live-memory-ipc.ts
+electron/main.ts
+electron/preload.ts
+electron/privileged-consent-dialog.ts
+electron/registry-verification-ipc.ts
+electron/trainer-catalog-ipc.ts
+electron/trainer-overlay.ts
+electron/wisp-overlay.ts
+package.json
+src/app/App.tsx
+src/app/assets/wisp/index.ts
+src/app/components/PageModuleHeader.tsx
+src/app/components/SolithWispCompanion.tsx
+src/app/pages/Backups.tsx
+src/app/pages/CompatibilityDashboard.tsx
+src/app/pages/CtLibraryExplorerPage.module.css
+src/app/pages/DiscoveryLab.tsx
+src/app/pages/ExternalTrainerResearchLab.tsx
+src/app/pages/Journal.tsx
+src/app/pages/Recipes.tsx
+src/app/pages/RegistryExplorerPage.tsx
+src/app/pages/SaveEditor.tsx
+src/app/pages/SaveLocations.tsx
+src/app/pages/SessionMonitorPage.tsx
+src/app/pages/TrainerControlPanel.tsx
+src/app/pages/TrainerLibraryPage.module.css
+src/app/pages/TrainerLibraryPage.tsx
+src/app/routes/GameLibrary.tsx
+src/app/styles/index.css
+src/app/styles/trainer-control-panel.css
+src/core/consent/write-consent.ts
+src/core/ct-library/import-state.ts
+src/core/database/index.ts
+src/core/definitions/import-definition-ct.ts
+src/core/games/index.ts
+src/core/install-discovery/epic.ts
+src/core/install-discovery/gog.ts
+src/core/install-discovery/index.ts
+src/core/install-discovery/match.ts
+src/core/install-discovery/store.ts
+src/core/install-discovery/types.ts
+src/core/live-memory/live-memory-session.ts
+src/core/live-memory/memory-manager.ts
+src/core/live-memory/native-memory-driver.ts
+src/core/live-memory/types.ts
+src/index.tsx
+src/shared/types/index.ts
+src/types/global.d.ts
+tests/csp-static.test.ts
+tests/live-memory/live-memory-session.test.ts
+tests/live-memory/memory-manager.test.ts
+tests/packaged-smoke.test.ts
+vite.config.ts

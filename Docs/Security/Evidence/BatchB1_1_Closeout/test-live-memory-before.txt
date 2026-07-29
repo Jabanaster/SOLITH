@@ -1,0 +1,9 @@
+npm run test:live-memory
+Exit code: 0
+Test files: 22
+Tests: 221
+Passed: 221
+Failed: 0
+Skipped: 0
+Cancelled: 0
+Duration: ~631ms

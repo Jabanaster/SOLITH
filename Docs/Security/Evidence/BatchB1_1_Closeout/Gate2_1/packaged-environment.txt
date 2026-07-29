@@ -1,0 +1,6 @@
+RepositoryRoot: G:\ACTIVE_PROJECTS\SOLITH
+Branch: master
+HEAD: 406253d73042c5acb07fd5da134d6c68a98d4b2d
+Date: 2026-07-28
+-rwxr-xr-x 1 chase 197609 86989128 Jun 23 15:15 .tools/node-v22.23.1-win-x64/node.exe
+v22.23.1

@@ -1,0 +1,41 @@
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/install-discovery-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/live-memory-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/main.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/privileged-consent-dialog.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/registry-verification-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/trainer-catalog-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/components/SolithWispCompanion.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/RegistryExplorerPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/TrainerLibraryPage.module.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/TrainerLibraryPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/routes/GameLibrary.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/styles/index.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/companion/wisp.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/consent/write-consent.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/ct-library/import-state.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/database/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/definitions/import-definition-ct.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/games/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/epic.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/gog.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/match.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/store.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/types.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/live-memory/live-memory-session.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/live-memory/windows-process-identity.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/index.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/shared/types/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/companion-wisp.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/csp-static.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/fixtures/fake-memory-driver.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/live-memory/memory-manager.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/packaged-smoke.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'vite.config.ts', LF will be replaced by CRLF the next time Git touches it
+src/app/routes/GameLibrary.tsx:286: trailing whitespace.
++                <div 
+src/app/routes/GameLibrary.tsx:303: trailing whitespace.
++                    

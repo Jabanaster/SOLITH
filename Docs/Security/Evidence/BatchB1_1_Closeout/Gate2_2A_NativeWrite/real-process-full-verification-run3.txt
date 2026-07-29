@@ -1,0 +1,6 @@
+PASS: invalid PID is rejected
+PASS: write after process exit is rejected
+FATAL: SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>)
+    at readStatus (G:\ACTIVE_PROJECTS\SOLITH\Docs\Security\Evidence\BatchB1_1_Closeout\Gate2_2A_NativeWrite\verify-write-freeze-rollback.mts:47:15)
+    at main (G:\ACTIVE_PROJECTS\SOLITH\Docs\Security\Evidence\BatchB1_1_Closeout\Gate2_2A_NativeWrite\verify-write-freeze-rollback.mts:119:21)

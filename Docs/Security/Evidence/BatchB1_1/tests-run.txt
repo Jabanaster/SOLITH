@@ -1,0 +1,49 @@
+# Tests Run - Batch B1.1
+
+## Test Suite: test:live-memory
+**Command**: `npm run test:live-memory`
+**Result**: 221 tests passed, 0 failed
+**Duration**: ~668ms
+
+### Key Test Categories Passing:
+- LiveMemorySession (25 tests)
+- LiveMemorySession freeze (13 tests)
+- LiveMemorySession catalog controls (5 tests)
+- Batch B1.1 — freeze propose/issue-consent/confirm (13 tests)
+- evaluateOnlineGuard (13 tests)
+- evaluateWriteConsent (Trust Shift) (3 tests)
+- memory-manager + audit-log (13 tests)
+- process-watcher (5 tests)
+- signature-engine (13 tests)
+- pointer-scanner (7 tests)
+- feature-resolver (4 tests)
+- aob-resolver (4 tests)
+- installed executable hashing (2 tests)
+- game-connection-baselines (4 tests)
+- remote-connection-observer (7 tests)
+- local-crash-reporter (5 tests)
+- local-sandbox (9 tests)
+- zero-input-prepare (5 tests)
+- wireSessionCleanupOnDestroy (3 tests)
+- LiveCorrelationWatcher (7 tests)
+- CtLiveResolution + promote + local pack (5 tests)
+
+## Test Suite: test:v1
+**Command**: `npm run test:v1`
+**Result**: All tests passed
+
+## Test Suite: test:registry
+**Command**: `npm run test:registry`
+**Result**: All tests passed (includes process-selection-registry tests)
+
+## Test Suite: test:trainer-catalog
+**Command**: `npm run test:trainer-catalog`
+**Result**: All tests passed
+
+## Test Suite: test:definitions
+**Command**: `npm run test:definitions`
+**Result**: All tests passed
+
+## TypeScript Compilation
+**Command**: `npx tsc --noEmit`
+**Result**: No errors

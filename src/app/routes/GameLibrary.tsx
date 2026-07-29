@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Icon } from '../components/icons/index.js';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { BrandingArtwork } from '../components/BrandingArtwork.js';
 
@@ -10,20 +9,47 @@ interface Game {
   dateAdded: string;
   lastScan?: string;
   engine?: string;
+  executablePath?: string;
+  coverPath?: string;
+  iconPath?: string;
+  saveLocations?: string[];
+  notes?: string;
+  metadataId?: string;
   fingerprint?: any;
   needsRescan?: boolean;
+}
+
+interface GameFormPayload {
+  name: string;
+  path: string;
+  engine?: string;
+  executablePath?: string;
+  coverPath?: string;
+  iconPath?: string;
+  saveLocations?: string[];
+  notes?: string;
+  metadataId?: string;
 }
 
 interface GameLibraryProps {
   games: Game[];
   onSelect: (id: string) => void;
-  onAddGame?: (gameData: { name: string; path: string; engine?: string }) => void;
+  onAddGame?: (gameData: GameFormPayload) => Promise<{ success?: boolean; error?: string } | void> | { success?: boolean; error?: string } | void;
 }
 
 const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame }) => {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [newGameName, setNewGameName] = useState('');
   const [newGamePath, setNewGamePath] = useState('');
+  const [newGameExecutable, setNewGameExecutable] = useState('');
+  const [newGameLauncher, setNewGameLauncher] = useState('');
+  const [newGameSaveLocations, setNewGameSaveLocations] = useState('');
+  const [newGameCover, setNewGameCover] = useState('');
+  const [newGameIcon, setNewGameIcon] = useState('');
+  const [newGameNotes, setNewGameNotes] = useState('');
+  const [newGameMetadataId, setNewGameMetadataId] = useState('');
+  const [modalError, setModalError] = useState('');
   const [externalScanEnabled, setExternalScanEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -51,22 +77,159 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     }
   };
 
-  const handleAddGame = () => {
-    if (newGameName && newGamePath) {
-      onAddGame?.({ name: newGameName, path: newGamePath });
-      setShowAddModal(false);
-      setNewGameName('');
-      setNewGamePath('');
+  const resetManualForm = () => {
+    setEditingGame(null);
+    setNewGameName('');
+    setNewGamePath('');
+    setNewGameExecutable('');
+    setNewGameLauncher('');
+    setNewGameSaveLocations('');
+    setNewGameCover('');
+    setNewGameIcon('');
+    setNewGameNotes('');
+    setNewGameMetadataId('');
+    setModalError('');
+  };
+
+  const openAddModal = () => {
+    resetManualForm();
+    setShowAddModal(true);
+  };
+
+  const openEditModal = (game: Game, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingGame(game);
+    setNewGameName(game.name);
+    setNewGamePath(game.path);
+    setNewGameExecutable(game.executablePath ?? '');
+    setNewGameLauncher(game.engine === 'Generic' ? '' : game.engine ?? '');
+    setNewGameSaveLocations((game.saveLocations ?? []).join('\n'));
+    setNewGameCover(game.coverPath ?? '');
+    setNewGameIcon(game.iconPath ?? '');
+    setNewGameNotes(game.notes ?? '');
+    setNewGameMetadataId(game.metadataId ?? game.id);
+    setModalError('');
+    setShowAddModal(true);
+  };
+
+  const closeModal = () => {
+    setShowAddModal(false);
+    resetManualForm();
+  };
+
+  const handlePickFolder = async () => {
+    const result = await window.electronAPI?.pickGameFolder?.();
+    if (result?.success && result.folderPath) {
+      setNewGamePath(result.folderPath);
+      setModalError('');
+    } else if (result && !result.canceled) {
+      setModalError(result.error ?? 'Could not select folder.');
+    }
+  };
+
+  const handlePickExecutable = async () => {
+    const result = await window.electronAPI?.pickGameExecutable?.();
+    if (result?.success && result.filePath && result.folderPath) {
+      setNewGameExecutable(result.filePath);
+      setNewGamePath(result.folderPath);
+      if (!newGameName) {
+        const base = result.filePath.slice(Math.max(result.filePath.lastIndexOf('/'), result.filePath.lastIndexOf('\\')) + 1);
+        setNewGameName(base.replace(/\.exe$/i, ''));
+      }
+      setModalError('');
+    } else if (result && !result.canceled) {
+      setModalError(result.error ?? 'Could not select executable.');
+    }
+  };
+
+  const handleAddGame = async () => {
+    const pathToSave = newGamePath.trim();
+    const nameToSave = newGameName.trim();
+    if (!nameToSave || !pathToSave) {
+      setModalError('Game name and install folder are required.');
+      return;
+    }
+    const duplicate = games.find((game) =>
+      game.id !== editingGame?.id &&
+      game.path.trim().toLowerCase() === pathToSave.toLowerCase()
+    );
+    if (duplicate) {
+      setModalError(`This path is already recorded for ${duplicate.name}.`);
+      return;
+    }
+    const engine = newGameLauncher.trim() || 'Manual';
+    const payload: GameFormPayload = {
+      name: nameToSave,
+      path: pathToSave,
+      engine,
+      executablePath: newGameExecutable.trim() || undefined,
+      coverPath: newGameCover.trim() || undefined,
+      iconPath: newGameIcon.trim() || undefined,
+      saveLocations: newGameSaveLocations
+        .split(/[\n;]+/)
+        .map((location) => location.trim())
+        .filter(Boolean),
+      notes: newGameNotes.trim() || undefined,
+      metadataId: newGameMetadataId.trim() || undefined,
+    };
+    if (editingGame) {
+      const result = await window.electronAPI?.updateGame?.({
+        gameId: editingGame.id,
+        ...payload,
+      });
+      if (!result?.success) {
+        setModalError(result?.error ?? 'Could not update game.');
+        return;
+      }
+      if (onAddGame) {
+        await onAddGame(payload);
+      }
+      closeModal();
+      return;
+    }
+    if (onAddGame) {
+      try {
+        const result = await onAddGame(payload);
+        if (result && !result.success) {
+          setModalError(result.error ?? 'Could not add game.');
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to add game:', err);
+        setModalError(err instanceof Error ? err.message : 'Could not add game.');
+        return;
+      }
+    }
+    closeModal();
+  };
+
+  const handleRemoveGame = async (game: Game, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const confirmed = window.confirm(
+      `Remove "${game.name}" from the local Solith library? This does not delete game files.`,
+    );
+    if (!confirmed) return;
+    const result = await window.electronAPI?.deleteGame?.(game.id);
+    if (result?.success) {
+      if (onAddGame) {
+        await onAddGame({ name: '', path: '' });
+      }
+    } else {
+      console.error('Failed to remove game:', result?.error ?? result);
     }
   };
 
   const handleScan = async (e: React.MouseEvent, gameId: string) => {
+    e.preventDefault();
     e.stopPropagation();
     setLoading(true);
     try {
       await window.electronAPI.scanGame(gameId);
-      // Trigger reloading from App component (which should reload the games prop)
-      window.location.reload(); 
+      if (onAddGame) {
+        await onAddGame({ name: '', path: '' });
+      }
     } catch (err) {
       console.error('Failed to scan game:', err);
     } finally {
@@ -81,7 +244,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
         title="Game Library"
         description="Manage local game folders, scan files, and edit saves"
         walkthroughId="game-library"
-        actions={<button id="game-library-add-manual" onClick={() => setShowAddModal(true)} className="btn-add">+ Add Game</button>}
+        actions={<button id="game-library-add-manual" onClick={openAddModal} className="btn-add">+ Add Game Manually</button>}
       />
 
       <div className="settings-panel glass">
@@ -106,7 +269,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
           </div>
           <h3>No games added yet</h3>
           <p>Add a local game directory to build custom file-backed trainers.</p>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary empty-state-cta">Add Game Now</button>
+          <button id="game-library-empty-add-manual" onClick={openAddModal} className="btn-primary empty-state-cta">Add Game Manually</button>
         </div>
       ) : (
         <div className="game-grid">
@@ -119,31 +282,38 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
               <div 
                 key={game.id} 
                 className={`game-card glass ${game.needsRescan ? 'border-warning' : ''}`}
-                onClick={() => onSelect(game.id)}
               >
-                <div className="game-card-art" aria-hidden="true">
-                  <BrandingArtwork artwork="gameLibraryControllerMonitors" size="section" />
-                </div>
-                <div className="game-card-content">
-                  <div className="game-card-header">
-                    <h3 className="game-name">{game.name}</h3>
-                    <span className={`badge engine-badge ${game.engine?.toLowerCase() || 'generic'}`}>
-                      {game.engine || 'Generic'}
-                    </span>
+                <div 
+                  className="game-card-clickable"
+                  onClick={() => onSelect(game.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(game.id); }}
+                >
+                  <div className="game-card-art" aria-hidden="true">
+                    <BrandingArtwork artwork="gameLibraryControllerMonitors" size="section" />
                   </div>
-                  
-                  <div className="game-path" title={game.path}>
-                    📁 {game.path}
-                  </div>
-
-                  {hasScan ? (
-                    <div className="game-stats">
-                      <div>📄 <strong>{fileCount}</strong> scanned files</div>
-                      <div>💾 <strong>{totalSizeMB} MB</strong> total size</div>
+                  <div className="game-card-content">
+                    <div className="game-card-header">
+                      <h3 className="game-name">{game.name}</h3>
+                      <span className={`badge engine-badge ${game.engine?.toLowerCase() || 'generic'}`}>
+                        {game.engine || 'Manual'}
+                      </span>
                     </div>
-                  ) : (
-                    <p className="no-scan-text">⚠️ Game not scanned. Scan now to discover saves & configurations.</p>
-                  )}
+                    
+                    <div className="game-path" title={game.path}>
+                      📁 {game.path}
+                    </div>
+
+                    {hasScan ? (
+                      <div className="game-stats">
+                        <div>📄 <strong>{fileCount}</strong> scanned files</div>
+                        <div>💾 <strong>{totalSizeMB} MB</strong> total size</div>
+                      </div>
+                    ) : (
+                      <p className="no-scan-text">⚠️ Game not scanned. Scan now to discover saves & configurations.</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="game-card-actions">
@@ -153,6 +323,20 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
                     disabled={loading}
                   >
                     {loading ? 'Scanning...' : '🔍 Scan Folder'}
+                  </button>
+                  <button
+                    onClick={(e) => openEditModal(game, e)}
+                    className="btn-scan"
+                    disabled={loading}
+                  >
+                    Edit local record
+                  </button>
+                  <button
+                    onClick={(e) => void handleRemoveGame(game, e)}
+                    className="btn-scan"
+                    disabled={loading}
+                  >
+                    Remove entry only
                   </button>
                 </div>
               </div>
@@ -164,8 +348,11 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content glass">
-            <h3>Add Game Path</h3>
-            <p className="modal-description">Point Solith to the local directory where the game is installed.</p>
+            <h3>{editingGame ? 'Edit Local Game Record' : 'Add Game Manually'}</h3>
+            <p className="modal-description">
+              Create or edit a persisted local metadata record. This does not scan memory, attach to a process, or modify game files.
+            </p>
+            {modalError && <p className="no-scan-text">{modalError}</p>}
             <div className="input-group">
               <label>Game Name</label>
               <input
@@ -176,17 +363,82 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
               />
             </div>
             <div className="input-group">
-              <label>Folder Path</label>
+              <label>Install Folder</label>
               <input
                 type="text"
                 placeholder="e.g. C:\Games\Witcher3"
                 value={newGamePath}
                 onChange={(e) => setNewGamePath(e.target.value)}
               />
+              <button type="button" className="btn-secondary" onClick={() => void handlePickFolder()}>
+                Browse Folder
+              </button>
+            </div>
+            <div className="input-group">
+              <label>Executable (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. C:\Games\Witcher3\witcher3.exe"
+                value={newGameExecutable}
+                onChange={(e) => setNewGameExecutable(e.target.value)}
+              />
+              <button type="button" className="btn-secondary" onClick={() => void handlePickExecutable()}>
+                Browse EXE
+              </button>
+            </div>
+            <div className="input-group">
+              <label>Launcher / Source</label>
+              <input
+                type="text"
+                placeholder="Manual, Steam, GOG, Epic, Xbox"
+                value={newGameLauncher}
+                onChange={(e) => setNewGameLauncher(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label>Save Locations (optional, persisted)</label>
+              <input
+                type="text"
+                placeholder="Optional local save paths, separated by semicolons"
+                value={newGameSaveLocations}
+                onChange={(e) => setNewGameSaveLocations(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label>Cover / Icon (optional, persisted)</label>
+              <input
+                type="text"
+                placeholder="Cover path or URL"
+                value={newGameCover}
+                onChange={(e) => setNewGameCover(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Icon path"
+                value={newGameIcon}
+                onChange={(e) => setNewGameIcon(e.target.value)}
+              />
+            </div>
+            <div className="input-group">
+              <label>Metadata ID / Notes (optional, persisted)</label>
+              <input
+                type="text"
+                placeholder="Optional local ID"
+                value={newGameMetadataId}
+                onChange={(e) => setNewGameMetadataId(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Optional notes"
+                value={newGameNotes}
+                onChange={(e) => setNewGameNotes(e.target.value)}
+              />
             </div>
             <div className="modal-actions">
-              <button onClick={handleAddGame} className="btn-primary">Add Game</button>
-              <button onClick={() => setShowAddModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={() => void handleAddGame()} className="btn-primary">
+                {editingGame ? 'Save Local Record' : 'Add Game'}
+              </button>
+              <button onClick={closeModal} className="btn-secondary">Cancel</button>
             </div>
           </div>
         </div>

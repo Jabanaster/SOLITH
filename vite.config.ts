@@ -20,6 +20,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(moduleDirectory, './dist-electron/dist'),
     emptyOutDir: true,
+    // Production debugging uses external tooling, not eval-style source maps.
+    sourcemap: false,
     rollupOptions: {
       input: {
         main: path.resolve(moduleDirectory, './index.html')

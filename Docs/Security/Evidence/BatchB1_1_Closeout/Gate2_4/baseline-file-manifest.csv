@@ -1,0 +1,9 @@
+Path,GitStatus,Size,LastWriteTimeUtc,SHA256
+electron/live-memory-ipc.ts,tracked-modified-or-clean,73454,captured-this-session,c479a2849dc4f95ab631625b7728e125f6b7674e2b64e9c43a58b11c3323c2fc
+electron/preload.ts,tracked-modified-or-clean,25157,captured-this-session,6f3391027c012006012d4f4d65b17c4ec57569ad81a75f6669609f3bee6d38ac
+electron/main.ts,tracked-modified-or-clean,45986,captured-this-session,d653e41bdbdb3e5e2e4904a9a7eb2c9ec779b40eb73546b8b6be9b26b15a1964
+electron/sender-validation.ts,tracked-modified-or-clean,1736,captured-this-session,290f2116b22bdff034add65262861d6bdc60de48b4a51daaf9ab74c1f334b869
+src/core/security/trusted-sender-registry.ts,tracked-modified-or-clean,4978,captured-this-session,6ebd1197adb3d23caf3045ad87a8289a59ec65f50a8ea9dfb258ab769e3445cd
+src/types/global.d.ts,tracked-modified-or-clean,36287,captured-this-session,5181057041fc2b7bbf2265e7351838bd4b8aa2da3a7f7c7c25fb31e116c9ff47
+electron/wisp-overlay.ts,tracked-modified-or-clean,9124,captured-this-session,72cd8a3e9b55eb72b377e3bb7a05de120f6f8346590fbb2e72351532fc9e033a
+electron/trainer-overlay.ts,tracked-modified-or-clean,3102,captured-this-session,3b70fa3579cceec08fe2ee7d1893e7119f261dc5acd29672ea4a7ac16358fbd3

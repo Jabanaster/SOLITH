@@ -1,0 +1,13 @@
+warning: in the working copy of 'ROADMAP.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/install-discovery-ipc.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/preload.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'electron/wisp-overlay.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/components/SolithWispCompanion.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/live-memory/process-picker.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/pages/LiveMemoryTrainerPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/styles/index.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/core/install-discovery/types.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/types/global.d.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/process-picker.test.ts', LF will be replaced by CRLF the next time Git touches it
+EXIT_CODE=0

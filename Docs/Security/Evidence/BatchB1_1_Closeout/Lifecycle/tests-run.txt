@@ -1,0 +1,8 @@
+# Tests Run
+
+- Scoped security: 7 files, 40 tests, 40 passed, 0 failed, 0 skipped, 0 cancelled. See verification-scoped-security-tests.txt.
+- `npm run test:live-memory`: 24 command-listed files, 221 tests, 221 passed, 0 failed, 0 skipped, 0 cancelled. Exit 0. See verification-live-memory-tests.txt.
+- `npm test`: pretest stopped before test discovery. Exit 1. Node 24.15.0 is unsupported; project requires Node 22.x. See verification-npm-test.txt.
+- `.\node_modules\.bin\tsc.cmd --noEmit`: exit 0. See verification-tsc-main.txt.
+- `.\node_modules\.bin\tsc.cmd -p .\tsconfig.electron.json --noEmit`: exit 2; 31 diagnostics in 13 files after the scoped narrowing fix. No lifecycle/identity/sender file diagnostics; one previously reported unrelated memory-manager diagnostic remains. See verification-tsc-electron.txt.
+- Git status/stat/name-only: exit 0. `git diff --check`: exit 2 due pre-existing unrelated trailing whitespace in `src/app/routes/GameLibrary.tsx` lines 286 and 303. See verification-*.txt.

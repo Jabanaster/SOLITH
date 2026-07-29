@@ -1,0 +1,12 @@
+before: {
+  pid: 6664,
+  addressHex: '0x1bbbcc0a030',
+  value: 424242,
+  updatedAtIso: '2026-07-29T15:27:59.8033059Z'
+}
+read-only write threw as expected: write_failed:5
+PACKAGED read-only-handle-fails-closed: PASS { readOnlyThrew: true, valueUnchanged: true }
+PACKAGED write-capable-handle-write-lands: PASS { value: 555222 }
+PACKAGED restore-to-original: PASS { value: 424242 }
+unmapped-address write threw as expected: write_failed:998
+PACKAGED unmapped-address-write-rejected: PASS

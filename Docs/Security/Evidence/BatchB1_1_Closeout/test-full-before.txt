@@ -1,0 +1,9 @@
+npm test (via test:v1)
+Exit code: 0
+Test files: 24
+Tests: 198
+Passed: 198
+Failed: 0
+Skipped: 0
+Cancelled: 0
+Duration: ~20s

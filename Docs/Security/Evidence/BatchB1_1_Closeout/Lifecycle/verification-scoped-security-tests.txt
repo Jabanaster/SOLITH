@@ -1,0 +1,71 @@
+Command: .\node_modules\.bin\tsx.cmd --test tests\live-memory\renderer-crash-cleanup.test.ts tests\live-memory\app-shutdown-cleanup.test.ts tests\live-memory\feature-disable-cleanup.test.ts tests\live-memory\cleanup-failure-handling.test.ts tests\process-selection-registry.test.ts tests\trusted-sender-registry.test.ts tests\live-memory\rollback-float-integrity.test.ts
+Start time: 2026-07-27T23:19:52.3677453-07:00
+End time: 2026-07-27T23:19:53.0699564-07:00
+Exit code: 0
+Test files: 7
+Tests: 40
+Passed: 40
+Failed: 0
+Skipped: 0
+Cancelled: 0
+Duration: 702.211 ms
+
+✔ will-quit cleanup stops every session and records accurate sanitized results (5.797ms)
+▶ cleanup failure containment
+  ✔ runs the required cleanup order and records success (0.7081ms)
+  ✔ contains multiple failures, continues every later step, and reports sanitized codes (0.2679ms)
+  ✔ audit failure cannot prevent the revocation barrier or remaining cleanup (0.1094ms)
+✔ cleanup failure containment (1.9057ms)
+▶ feature-disable cleanup
+  ✔ stops an active freeze, revokes pending authorization, and prevents later writes (5.6439ms)
+✔ feature-disable cleanup (6.1289ms)
+✔ real render-process-gone wiring performs owner-scoped idempotent cleanup (5.8752ms)
+▶ rollback type integrity
+  ✔ supported integer types compare exactly (0.9339ms)
+  ✔ int64 rejects unsafe precision (0.0907ms)
+  ✔ float compares exact float32 encodings (0.0884ms)
+  ✔ NaN policy is Object.is equality for floats (0.0695ms)
+  ✔ signed zero remains distinct (0.0651ms)
+  ✔ infinities compare by exact sign (0.0649ms)
+  ✔ integer comparisons reject non-finite and fractional values (0.0696ms)
+  ✔ unknown types fail closed (0.0624ms)
+✔ rollback type integrity (2.1556ms)
+▶ process-selection-registry
+  ✔ a selection resolves successfully from the same window before expiry (0.619ms)
+  ✔ rejects an unknown selectionId (0.088ms)
+  ✔ rejects resolution from a different window than the one that created the selection (0.085ms)
+  ✔ rejects an expired selection (0.1115ms)
+  ✔ is still valid one ms before its TTL boundary (no off-by-one) (0.11ms)
+  ✔ is reusable — resolving it twice within the TTL both succeed (deliberately not single-use) (0.0927ms)
+  ✔ consumeProcessSelection explicitly discards a selection (0.0748ms)
+  ✔ clearSelectionsForWindow removes only that window's selections (0.1134ms)
+  ✔ purgeExpiredSelections removes only expired entries, never a still-valid one (0.1058ms)
+  ✔ two different windows can hold independent selections for the same or different processes (0.1689ms)
+  ✔ authoritative selection preserves the complete process identity snapshot (0.4049ms)
+  ✔ verification source revalidates the stored identity immediately before worker execution (0.469ms)
+✔ process-selection-registry (3.0448ms)
+▶ trusted-sender-registry
+  ✔ accepts a registered window, main frame, allowed URL (0.8258ms)
+  ✔ rejects a destroyed sender (0.1273ms)
+  ✔ rejects an unknown webContentsId (never registered) (0.097ms)
+  ✔ rejects a child/devtools frame (not the main frame) (0.1198ms)
+  ✔ rejects a registered window that has navigated to an unauthorized URL (0.1376ms)
+  ✔ a wrong-window-type sender ID is still rejected as unknown if not registered under that ID (0.126ms)
+  ✔ unregistering a window makes subsequent validation fail as unknown (0.0818ms)
+  ✔ a window recreated with a new webContentsId after destruction is not auto-trusted under the old ID (0.132ms)
+  ✔ multiple window types can be registered independently (main + overlay) (0.1543ms)
+  ✔ dev-server URL prefix is honored when registered (localhost:3000) (0.1712ms)
+  ✔ rejects a trusted but unauthorized window type for a privileged channel (0.4868ms)
+  ✔ rejects same-prefix and directory-boundary file URL confusion (0.1559ms)
+  ✔ allows only query/hash variations of the approved file entry (0.0916ms)
+  ✔ rejects malformed and encoded-separator URL variations (0.1081ms)
+✔ trusted-sender-registry (3.6877ms)
+ℹ tests 40
+ℹ suites 5
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 500.6954
+

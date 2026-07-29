@@ -1,0 +1,223 @@
+Handler channel name,Called from renderer (yes/no/uncertain),Window name,File location,Line number,Call context
+add-game,yes,main,src/app/App.tsx,298,const result = await (window as any).electronAPI.addGame(gameData);
+add-game,yes,main,src/app/pages/TrainerLibraryPage.tsx,913,"const result = await api.addGame({ name: gameName, path: installDir });"
+add-user-selected-location,yes,main,src/app/pages/SaveLocations.tsx,117,"const result = await window.electronAPI.addUserSelectedLocation(scopeGameId, userPath.trim());"
+apply-proposal,yes,main,src/app/pages/SaveEditor.tsx,201,const res = await window.electronAPI.applyProposal(proposal);
+apply-proposal,yes,main,src/app/pages/TrainerPage.tsx,159,const res = await (window as any).electronAPI.applyProposal(proposal);
+approve-save-location,yes,main,src/app/pages/SaveEditor.tsx,117,await window.electronAPI.approveSaveLocation(loc.id);
+approve-save-location,yes,main,src/app/pages/SaveLocations.tsx,82,const res = await window.electronAPI.approveSaveLocation(id);
+catalog-demand-list,no,n/a,,,No renderer call site found for preload method 'catalogDemandList' (spot-checked; appears unused from src/app)
+catalog-demand-notify,yes,main,src/app/pages/TrainerDeckPage.tsx,148,"const result = await window.electronAPI?.catalogDemandNotify?.({ catalogGameId, kind: 'notify' });"
+catalog-demand-notify,yes,main,src/app/pages/TrainerLibraryPage.tsx,844,const result = await window.electronAPI?.catalogDemandNotify?.({
+catalog-process-detected,yes,main,src/app/App.tsx,224,const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+catalog-process-detected,yes,main,src/app/pages/TrainerLibraryPage.tsx,424,const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+catalog-process-watch-active,yes,main,src/app/pages/TrainerDeckPage.tsx,107,void window.electronAPI?.catalogProcessWatchActive?.({ active: true });
+catalog-process-watch-active,yes,main,src/app/pages/TrainerDeckPage.tsx,109,void window.electronAPI?.catalogProcessWatchActive?.({ active: false });
+cheat-toggle-clear,yes,main,src/app/hooks/useGameCheatSession.ts,126,"void window.electronAPI.cheatToggleClear({ gameId: game.gameId, cheatId });"
+cheat-toggle-get-all,yes,main,src/app/hooks/useGameCheatSession.ts,859,window.electronAPI.cheatToggleGetAll({ gameId: game.gameId }).then((result) => {
+cheat-toggle-set,yes,main,src/app/hooks/useGameCheatSession.ts,113,void window.electronAPI.cheatToggleSet({
+check-game-running,yes,main,src/app/pages/TrainerPage.tsx,107,const result = await (window as any).electronAPI.checkGameRunning(gameId);
+check-game-running,yes,main,src/app/pages/TrainerPage.tsx,117,checkGameRunning();
+compare-saves,no,n/a,,,No renderer call site found for preload method 'compareSaves' (spot-checked; appears unused from src/app)
+compare-saves-report,yes,main,src/app/pages/DiscoveryLab.tsx,97,"const response = await window.electronAPI.compareSavesReport(saveA, saveB, gameId, valA, valB) as DiscoveryAdvisoryComparison | { error: string };"
+create-proposal-for-edit,yes,main,src/app/pages/SaveEditor.tsx,194,"const proposal = await window.electronAPI.createProposalForEdit(scopeGameId, selectedFile, pathStr, oldValue, parsedNewVal);"
+create-proposal-for-edit,yes,main,src/app/pages/TrainerPage.tsx,144,const proposal = await (window as any).electronAPI.createProposalForEdit(
+create-recipe,yes,main,src/app/pages/DiscoveryLab.tsx,214,const res = await window.electronAPI.createRecipe(recipeData);
+ct-library-game-detail,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,265,const response = await window.electronAPI.ctLibraryGameDetail({ gameId: selected.gameId }) as DetailResponse;
+ct-library-import-progress,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,254,return window.electronAPI?.onCtLibraryImportProgress?.((progress) => {
+ct-library-import-zip-cancel,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,379,await window.electronAPI?.ctLibraryImportZipCancel?.({ jobId: importState.jobId });
+ct-library-import-zip-preview,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,290,"const result = await api.ctLibraryImportZipPreview({ archivePath: picked.archivePath, jobId }) as CtZipPreviewResponse;"
+ct-library-import-zip-start,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,338,"const result = await api.ctLibraryImportZipStart({ archivePath: pendingArchivePath, jobId });"
+ct-library-pick-zip,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,278,const picked = await api.ctLibraryPickZip();
+ct-library-search,yes,main,src/app/pages/CtLibraryExplorerPage.tsx,227,const response = await window.electronAPI.ctLibrarySearch({
+ct-library-summary,no,n/a,,,No renderer call site found for preload method 'ctLibrarySummary' (spot-checked; appears unused from src/app)
+delete-game,yes,main,src/app/routes/GameLibrary.tsx,197,const result = await window.electronAPI?.deleteGame?.(game.id);
+delete-recipe,yes,main,src/app/pages/Recipes.tsx,73,const result = await window.electronAPI.deleteRecipe(recipeId);
+detect-save-files,yes,main,src/app/pages/DiscoveryLab.tsx,75,const files = await window.electronAPI.detectSaveFiles(gameId);
+detect-save-files,yes,main,src/app/pages/SaveEditor.tsx,96,const files = await window.electronAPI.detectSaveFiles(scopeGameId);
+discover-save-locations,yes,main,src/app/pages/SaveEditor.tsx,114,const discovered = await window.electronAPI.discoverSaveLocations(scopeGameId);
+discover-save-locations,yes,main,src/app/pages/SaveLocations.tsx,68,const result = await window.electronAPI.discoverSaveLocations(scopeGameId);
+get-all-profiles,yes,main,src/app/pages/CompatibilityDashboard.tsx,44,(window as any).electronAPI.getAllProfiles().then((rows: ProfileSummary[]) => {
+get-backups,yes,main,src/app/pages/Backups.tsx,41,const result = await window.electronAPI.getBackups(gameId);
+get-compatibility-profile,no,n/a,,,No renderer call site found for preload method 'getCompatibilityProfile' (spot-checked; appears unused from src/app)
+get-games,yes,main,src/app/App.tsx,266,const result = await (window as any).electronAPI.getGames();
+get-games,yes,main,src/app/components/GameScopePicker.tsx,31,const games = await window.electronAPI?.getGames?.();
+get-games,yes,main,src/app/pages/DiscoveryLab.tsx,58,const games = await window.electronAPI.getGames();
+get-games,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,220,void api.getGames()
+get-journal,yes,main,src/app/pages/Journal.tsx,48,const result = await window.electronAPI.getJournal(gameId || undefined);
+get-recipes,yes,main,src/app/pages/Recipes.tsx,53,const result = await window.electronAPI.getRecipes(gameId);
+get-recipes,yes,main,src/app/pages/TrainerPage.tsx,85,const result = await (window as any).electronAPI.getRecipes(gameId);
+get-save-locations,yes,main,src/app/pages/SaveLocations.tsx,49,const result = await window.electronAPI.getSaveLocations(scopeGameId);
+get-settings,yes,main,src/app/App.tsx,190,const settings = await (window as any).electronAPI?.getSettings?.();
+get-settings,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,85,const settings = await api?.getSettings?.();
+get-settings,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,212,api.getSettings().then((s: any) => {
+get-settings,yes,main,src/app/pages/SessionMonitorPage.tsx,82,(window as any).electronAPI.getSettings().then((s: any) => {
+get-settings,yes,main,src/app/pages/TrainerLibraryPage.tsx,390,void api.getSettings().then((settings) => {
+get-settings,yes,main,src/app/routes/GameLibrary.tsx,63,const settings = await window.electronAPI.getSettings();
+in-process-confirm-hook,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,293,const result = await api.inProcessConfirmHook({
+in-process-confirm-injector-launch,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,364,const result = await api.inProcessConfirmInjectorLaunch({
+in-process-issue-injector-consent,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,356,const consentResult = await api.inProcessIssueInjectorConsent({
+in-process-propose-hook,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,274,const result = await api.inProcessProposeHook({
+in-process-propose-injector-launch,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,329,const result = await api.inProcessProposeInjectorLaunch({
+in-process-register-injector-helper,no,n/a,,,No renderer call site found for preload method 'inProcessRegisterInjectorHelper' (spot-checked; appears unused from src/app)
+in-process-rollback-hook,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,313,const result = await api.inProcessRollbackHook();
+install-discovery-commit,yes,main,src/app/pages/TrainerLibraryPage.tsx,807,const result = await api.installDiscoveryCommit({ records });
+install-discovery-list,yes,main,src/app/components/GameScopePicker.tsx,37,const installs = await window.electronAPI?.installDiscoveryList?.();
+install-discovery-list,yes,main,src/app/pages/TrainerLibraryPage.tsx,413,void api.installDiscoveryList().then((result) => {
+install-discovery-list,yes,main,src/app/pages/TrainerLibraryPage.tsx,437,const list = await api.installDiscoveryList();
+install-discovery-open-path,yes,main,src/app/pages/TrainerDeckPage.tsx,118,const result = await window.electronAPI?.installDiscoveryOpenPath?.({ catalogGameId });
+install-discovery-pick-folder,yes,main,src/app/pages/TrainerLibraryPage.tsx,775,const result = await window.electronAPI?.installDiscoveryPickFolder?.();
+install-discovery-preview,yes,main,src/app/pages/TrainerLibraryPage.tsx,512,const result = await api.installDiscoveryPreview({
+install-discovery-scan,no,n/a,,,No renderer call site found for preload method 'installDiscoveryScan' (spot-checked; appears unused from src/app)
+live-memory-attach,yes,main,src/app/hooks/useGameCheatSession.ts,288,let attachResult = await window.electronAPI.liveMemoryAttach(attachPayload);
+live-memory-attach,yes,main,src/app/hooks/useGameCheatSession.ts,297,attachResult = await window.electronAPI.liveMemoryAttach({
+live-memory-attach,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,413,const result = await api.liveMemoryAttach({
+live-memory-attach,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,281,const result: AttachResult = await api.liveMemoryAttach({
+live-memory-confirm-write,yes,main,src/app/hooks/useGameCheatSession.ts,363,const confirmResult = await window.electronAPI.liveMemoryConfirmWrite({
+live-memory-confirm-write,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,365,const result = await api.liveMemoryConfirmWrite({
+live-memory-correlation-event,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,525,const result = await api.liveMemoryCorrelationEvent(event);
+live-memory-correlation-poll,no,n/a,,,No renderer call site found for preload method 'liveMemoryCorrelationPoll' (spot-checked; appears unused from src/app)
+live-memory-correlation-report,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,470,return api.onLiveMemoryCorrelationReport((report: CorrelationReport) => {
+live-memory-correlation-start,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,486,const result = await api.liveMemoryCorrelationStart({
+live-memory-correlation-stop,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,508,const result = await api.liveMemoryCorrelationStop();
+live-memory-detach,yes,main,src/app/hooks/useGameCheatSession.ts,912,void window.electronAPI.liveMemoryDetach();
+live-memory-detach,yes,main,src/app/hooks/useGameCheatSession.ts,941,void window.electronAPI.liveMemoryDetach?.();
+live-memory-detach,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,302,await api.liveMemoryDetach();
+live-memory-freeze-start,yes,main,src/app/hooks/useGameCheatSession.ts,798,const result = await window.electronAPI.liveMemoryFreezeStart({
+live-memory-freeze-start,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,580,const result = await api.liveMemoryFreezeStart({
+live-memory-freeze-start,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,1176,const result = await api.liveMemoryFreezeStart({
+live-memory-freeze-status,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,563,const result = await api.liveMemoryFreezeStatus();
+live-memory-freeze-stop,yes,main,src/app/hooks/useGameCheatSession.ts,312,await window.electronAPI.liveMemoryFreezeStop();
+live-memory-freeze-stop,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,600,const result = await api.liveMemoryFreezeStop();
+live-memory-freeze-stop,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,1194,await api.liveMemoryFreezeStop();
+live-memory-issue-write-consent,yes,main,src/app/hooks/useGameCheatSession.ts,353,const consentResult = await window.electronAPI.liveMemoryIssueWriteConsent({
+live-memory-issue-write-consent,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,357,const consentResult = await api.liveMemoryIssueWriteConsent({
+live-memory-list-controls,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,613,api.liveMemoryListControls().then((result: any) => {
+live-memory-list-processes,yes,main,src/app/components/GameCheatSelector.tsx,30,const result = await window.electronAPI.liveMemoryListProcesses();
+live-memory-list-processes,yes,main,src/app/hooks/useGameCheatSession.ts,212,const listResult = await window.electronAPI.liveMemoryListProcesses();
+live-memory-list-processes,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,96,const result = await api.liveMemoryListProcesses();
+live-memory-list-processes,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,234,const result = await api.liveMemoryListProcesses();
+live-memory-list-processes,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,254,const listResult = await api.liveMemoryListProcesses?.();
+live-memory-list-processes,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,273,const refreshed = await api.liveMemoryListProcesses();
+live-memory-pointer-scan,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,542,const result = await api.liveMemoryPointerScan({
+live-memory-propose-write,yes,main,src/app/hooks/useGameCheatSession.ts,342,const proposeResult = await window.electronAPI.liveMemoryProposeWrite({
+live-memory-propose-write,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,337,const result = await api.liveMemoryProposeWrite({
+live-memory-read,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,321,"const result = await api.liveMemoryRead({ address: address.trim(), dataType });"
+live-memory-read-many,yes,main,src/app/hooks/useGameCheatSession.ts,640,const result = await window.electronAPI.liveMemoryReadMany({
+live-memory-resolve-control,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,663,const result = await api.liveMemoryResolveControl({ controlId: control.id });
+live-memory-resolve-definition-feature,yes,main,src/app/hooks/useGameCheatSession.ts,690,const result = await window.electronAPI.liveMemoryResolveDefinitionFeature?.({
+live-memory-rollback,no,n/a,,,No renderer call site found for preload method 'liveMemoryRollback' (spot-checked; appears unused from src/app)
+live-memory-scan-aob,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,233,const result = await api.liveMemoryScanAob({
+live-memory-scan-first,no,n/a,,,No renderer call site found for preload method 'liveMemoryScanFirst' (spot-checked; appears unused from src/app)
+live-memory-scan-first-auto-matrix,yes,main,src/app/hooks/useGameCheatSession.ts,394,const result = await window.electronAPI.liveMemoryScanFirstAutoMatrix({
+live-memory-scan-first-auto-matrix,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,387,const result = await api.liveMemoryScanFirstAutoMatrix({
+live-memory-scan-first-unknown,yes,main,src/app/hooks/useGameCheatSession.ts,553,const result = await window.electronAPI.liveMemoryScanFirstUnknown({ key: cheat.id });
+live-memory-scan-first-unknown,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,436,const result = await api.liveMemoryScanFirstUnknown({ key: SCAN_KEY });
+live-memory-scan-next,yes,main,src/app/hooks/useGameCheatSession.ts,464,const result = await window.electronAPI.liveMemoryScanNext({
+live-memory-scan-next,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,444,"const result = await api.liveMemoryScanNext({ dataType: matchType, comparison, previous: matches });"
+live-memory-scan-next-from-unknown,yes,main,src/app/hooks/useGameCheatSession.ts,586,const result = await window.electronAPI.liveMemoryScanNextFromUnknown({
+live-memory-scan-next-from-unknown,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,461,const result = await api.liveMemoryScanNextFromUnknown({
+live-memory-zero-input-prepare,yes,main,src/app/hooks/useGameCheatSession.ts,237,"const prepareFn = window.electronAPI.liveMemoryZeroInputPrepare; called indirectly at line 238-239 as prepareFn(preparePayload) - manually verified, missed by direct-name regex due to reassignment indirection"
+local-ocr-list-window-sources,yes,main,src/app/components/LiveCorrelationWatcherPanel.tsx,140,const result = await api.localOcrListWindowSources();
+local-ocr-read-window-region,yes,main,src/app/components/LiveCorrelationWatcherPanel.tsx,158,"const result = await api.localOcrReadWindowRegion({ sourceId: ocrSourceId, roi: ocrRoi });"
+log-event,no,n/a,,,No renderer call site found for preload method 'logEvent' (spot-checked; appears unused from src/app)
+parse-save,yes,main,src/app/pages/SaveEditor.tsx,152,"const res = await window.electronAPI.parseSave(scopeGameId, filePath);"
+pick-game-executable,yes,main,src/app/routes/GameLibrary.tsx,131,const result = await window.electronAPI?.pickGameExecutable?.();
+pick-game-folder,yes,main,src/app/routes/GameLibrary.tsx,121,const result = await window.electronAPI?.pickGameFolder?.();
+pick-save-file,yes,main,src/app/pages/SaveEditor.tsx,129,const result = await window.electronAPI.pickSaveFile(scopeGameId);
+publishToCommunity,yes,main,src/app/components/PublishDefinitionModal.tsx,69,const result = await window.electronAPI.publishToCommunity({
+registry-compare-restart-artifacts,yes,main,src/app/pages/RegistryExplorerPage.tsx,232,const response = await window.electronAPI.registryCompareRestartArtifacts({
+registry-run-readonly-verification,yes,main,src/app/pages/RegistryExplorerPage.tsx,185,const response = await window.electronAPI.registryRunReadOnlyVerification({
+research:hex,yes,main,src/app/components/AddressDataResearchPanel.tsx,91,"const result = await api!.researchHex!({ address: address.trim(), size: hexSize });"
+research:pointer-analyze,yes,main,src/app/components/AddressDataResearchPanel.tsx,106,const result = await api!.researchPointerAnalyze!({ address: address.trim() });
+research:resolve-path,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,1164,const result = await api.researchResolvePath?.({
+research:snapshot-diff,yes,main,src/app/components/AddressDataResearchPanel.tsx,162,"const diff = await api!.researchSnapshotDiff!({ old: snapshotA, new: saved });"
+research:snapshot-save,yes,main,src/app/components/AddressDataResearchPanel.tsx,141,"const result = await api!.researchSnapshotSave!({ snapshot, label: 'A' });"
+research:snapshot-save,yes,main,src/app/components/AddressDataResearchPanel.tsx,154,"const result = await api!.researchSnapshotSave!({ snapshot, label: 'B' });"
+research:view,yes,main,src/app/components/AddressDataResearchPanel.tsx,77,const result = await api!.researchView!({
+restore-backup,yes,main,src/app/pages/Backups.tsx,58,const res = await window.electronAPI.restoreBackup(backupId);
+restore-backup,yes,main,src/app/pages/TrainerPage.tsx,193,const res = await (window as any).electronAPI.restoreBackup(backupId);
+revoke-save-location,yes,main,src/app/pages/SaveLocations.tsx,100,const res = await window.electronAPI.revokeSaveLocation(id);
+scan-game,yes,main,src/app/App.tsx,482,onClick={() => (window as any).electronAPI?.scanGame(selectedGame.id)}
+scan-game,yes,main,src/app/routes/GameLibrary.tsx,209,await window.electronAPI.scanGame(gameId);
+set-setting,yes,main,src/app/components/OnboardingWizard.tsx,21,"await window.electronAPI?.setSetting?.('onboardingCompleted', true);"
+set-setting,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,263,"await api.setSetting('inProcessScriptExecutionEnabled', true);"
+set-setting,yes,main,src/app/pages/SessionMonitorPage.tsx,197,"await (window as any).electronAPI?.setSetting?.('v2SessionMonitorEnabled', true);"
+set-setting,yes,main,src/app/pages/TrainerLibraryPage.tsx,554,"await window.electronAPI?.setSetting?.('communitySyncEnabled', enabled);"
+set-setting,yes,main,src/app/routes/GameLibrary.tsx,74,"await window.electronAPI.setSetting('externalSaveScanEnabled', val.toString());"
+suggest-data-edits,yes,main,src/app/pages/SaveEditor.tsx,158,"const sug = await window.electronAPI.suggestDataEdits(scopeGameId, filePath);"
+trainer-catalog-approve-save-path,yes,main,src/app/pages/CatalogTrainerControlsPage.tsx,45,const result = await window.electronAPI?.trainerCatalogApproveSavePath?.({
+trainer-catalog-approve-save-path,yes,main,src/app/pages/TrainerDeckPage.tsx,156,const result = await window.electronAPI?.trainerCatalogApproveSavePath?.({
+trainer-catalog-certify-l1,yes,main,src/app/pages/TrainerDeckPage.tsx,123,const result = await window.electronAPI?.trainerCatalogCertifyL1?.({ catalogGameId });
+trainer-catalog-evaluate-promotion,yes,main,src/app/pages/TrainerLibraryPage.tsx,941,const result = await api.trainerCatalogEvaluatePromotion({ catalogGameId: entry.catalogGameId });
+trainer-catalog-export-definition,yes,main,src/app/pages/TrainerDeckPage.tsx,138,const result = await window.electronAPI?.trainerCatalogExportDefinition?.({ catalogGameId });
+trainer-catalog-export-definition,yes,main,src/app/pages/TrainerLibraryPage.tsx,849,const result = await api.trainerCatalogExportDefinition({ catalogGameId: entry.catalogGameId });
+trainer-catalog-feedback-record,yes,main,src/app/components/DefinitionRatingPrompt.tsx,28,"await api.trainerCatalogFeedbackRecord({ catalogGameId, featureId, rating });"
+trainer-catalog-feedback-record,yes,main,src/app/pages/TrainerLibraryPage.tsx,861,const result = await api.trainerCatalogFeedbackRecord({
+trainer-catalog-feedback-summary,yes,main,src/app/pages/TrainerLibraryPage.tsx,441,const result = await api.trainerCatalogFeedbackSummary!({ catalogGameId: entry.catalogGameId });
+trainer-catalog-get,no,n/a,,,No renderer call site found for preload method 'trainerCatalogGet' (spot-checked; appears unused from src/app)
+trainer-catalog-get-definition,yes,main,src/app/pages/TrainerLibraryPage.tsx,606,const result = await api.trainerCatalogGetDefinition({ catalogGameId: entry.catalogGameId });
+trainer-catalog-get-trainer-controls,yes,main,src/app/pages/CatalogTrainerControlsPage.tsx,25,const result = await window.electronAPI?.trainerCatalogGetTrainerControls?.({ catalogGameId });
+trainer-catalog-import-ct,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,187,const result = await api.trainerCatalogImportCt({
+trainer-catalog-import-ct,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,516,const result = await api.trainerCatalogImportCt({
+trainer-catalog-import-ct,yes,main,src/app/pages/TrainerLibraryPage.tsx,698,const result = await window.electronAPI.trainerCatalogImportCt({
+trainer-catalog-import-yaml,yes,main,src/app/pages/DiscoveryLab.tsx,158,const result = await window.electronAPI.trainerCatalogImportYaml({ yamlText: bundle.yaml });
+trainer-catalog-import-yaml,yes,main,src/app/pages/TrainerLibraryPage.tsx,628,const result = await window.electronAPI.trainerCatalogImportYaml({ yamlText });
+trainer-catalog-load-game,yes,main,src/app/pages/LiveMemoryTrainerPage.tsx,250,const result = await api.trainerCatalogLoadGame?.({ catalogGameId: initialCatalogGameId });
+trainer-catalog-load-game,yes,main,src/app/pages/MultiGameTrainerPage.tsx,29,const result = await window.electronAPI?.trainerCatalogLoadGame?.({ catalogGameId: initialGameId });
+trainer-catalog-load-game,yes,main,src/app/pages/TrainerDeckPage.tsx,74,await window.electronAPI?.trainerCatalogLoadGame?.({ catalogGameId });
+trainer-catalog-load-game,yes,main,src/app/pages/TrainerDeckPage.tsx,94,const loadResult = await window.electronAPI?.trainerCatalogLoadGame?.({ catalogGameId });
+trainer-catalog-load-game,yes,main,src/app/pages/TrainerLibraryPage.tsx,830,const loadResult = await window.electronAPI?.trainerCatalogLoadGame?.({
+trainer-catalog-pending-quarantine,yes,main,src/app/pages/TrainerLibraryPage.tsx,461,void api.trainerCatalogPendingQuarantine().then((result) => {
+trainer-catalog-pick-ct,yes,main,src/app/pages/TrainerLibraryPage.tsx,743,const picked = await api.trainerCatalogPickCt();
+trainer-catalog-preview-ct,yes,main,src/app/pages/TrainerLibraryPage.tsx,664,const preview = await window.electronAPI.trainerCatalogPreviewCt(picked);
+trainer-catalog-promote-verified,no,n/a,,,No renderer call site found for preload method 'trainerCatalogPromoteVerified' (spot-checked; appears unused from src/app)
+trainer-catalog-search,yes,main,src/app/components/GameScopePicker.tsx,42,const search = await window.electronAPI?.trainerCatalogSearch?.({
+trainer-catalog-search,yes,main,src/app/pages/TrainerLibraryPage.tsx,354,const result = (await window.electronAPI.trainerCatalogSearch({
+trainer-catalog-seed,yes,main,src/app/components/GameScopePicker.tsx,39,await window.electronAPI?.trainerCatalogSeed?.();
+trainer-catalog-seed,yes,main,src/app/pages/TrainerDeckPage.tsx,73,await window.electronAPI?.trainerCatalogSeed?.();
+trainer-catalog-seed,yes,main,src/app/pages/TrainerLibraryPage.tsx,353,if (pageOffset === 0) await window.electronAPI.trainerCatalogSeed?.();
+trainer-catalog-seed,yes,main,src/app/pages/TrainerLibraryPage.tsx,496,await api.trainerCatalogSeed?.();
+trainer-catalog-stats,no,n/a,,,No renderer call site found for preload method 'trainerCatalogStats' (spot-checked; appears unused from src/app)
+trainer-catalog-sync-hub,yes,main,src/app/pages/TrainerLibraryPage.tsx,584,const result = await window.electronAPI.trainerCatalogSyncHub({
+trainer-catalog-sync-remote,yes,main,src/app/pages/TrainerLibraryPage.tsx,538,const result = await window.electronAPI.trainerCatalogSyncRemote();
+trainer-deck-get,yes,main,src/app/pages/TrainerDeckPage.tsx,75,const result = await window.electronAPI?.trainerDeckGet?.({ catalogGameId });
+trainer-health-check,yes,main,src/app/pages/TrainerDeckPage.tsx,133,await window.electronAPI?.trainerHealthCheck?.({ catalogGameId });
+trainer-health-check,yes,main,src/app/pages/TrainerLibraryPage.tsx,813,const health = await api.trainerHealthCheck?.();
+trainer-health-list,yes,main,src/app/pages/TrainerLibraryPage.tsx,418,void api.trainerHealthList?.().then((result) => {
+trainer-host-approve-and-write,yes,main,src/app/pages/TrainerControlPanel.tsx,434,const res = await electronAPI.trainerHostApproveAndWrite({ proposalId: cs.proposalId });
+trainer-host-get-status,no,n/a,,,No renderer call site found for preload method 'trainerHostGetStatus' (spot-checked; appears unused from src/app)
+trainer-host-propose-write,yes,main,src/app/pages/TrainerControlPanel.tsx,406,const res = await electronAPI.trainerHostProposeWrite({
+trainer-host-read-field,yes,main,src/app/pages/TrainerControlPanel.tsx,380,const res = await electronAPI.trainerHostReadField({
+trainer-host-rollback,yes,main,src/app/pages/TrainerControlPanel.tsx,469,const res = await electronAPI.trainerHostRollback({
+trainer-host-start,yes,main,src/app/pages/TrainerControlPanel.tsx,334,electronAPI.trainerHostStart()
+trainer-host-start,yes,main,src/app/pages/TrainerControlPanel.tsx,351,const res = await electronAPI.trainerHostStart();
+trainer-host-stop,yes,main,src/app/pages/TrainerControlPanel.tsx,367,await electronAPI.trainerHostStop();
+trainer-hotkey,yes,main,src/app/hooks/useGameCheatSession.ts,924,const unsubscribe = window.electronAPI?.onTrainerHotkey?.((payload) => {
+trainer-hotkey,yes,main,src/app/pages/MultiGameTrainerPage.tsx,66,const unsubscribe = window.electronAPI?.onTrainerHotkey?.((payload) => {
+trainer-hotkey,yes,overlay/wisp,src/app/pages/TrainerOverlayPage.tsx,26,const unsubscribe = window.electronAPI?.onTrainerHotkey?.((payload: { action: string }) => {
+trainer-hotkeys-get-bindings,yes,main,src/app/components/HotkeyRebindPanel.tsx,26,const result = await api.trainerHotkeysGetBindings();
+trainer-hotkeys-get-defaults,yes,main,src/app/components/HotkeyRebindPanel.tsx,22,const fallback = await api?.trainerHotkeysGetDefaults?.();
+trainer-hotkeys-set-bindings,yes,main,src/app/components/HotkeyRebindPanel.tsx,46,const result = await api.trainerHotkeysSetBindings({ hotkeys: bindings });
+trainer-overlay-hide,yes,overlay/wisp,src/app/pages/TrainerOverlayPage.tsx,22,await window.electronAPI?.trainerOverlayHide?.();
+trainer-overlay-toggle,yes,main,src/app/pages/MultiGameTrainerPage.tsx,59,const result = await window.electronAPI?.trainerOverlayToggle?.();
+trainer-research-analyze-ct-scripts,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,167,const analyzed = await api.trainerResearchAnalyzeCtScripts?.({ xmlText: picked.xmlText });
+trainer-research-analyze-exe,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,393,const analyzed = await api.trainerResearchAnalyzeExe?.({ filePath: picked.filePath });
+trainer-research-import-dumpspace,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,129,const result = await api.trainerResearchImportDumpspace({
+trainer-research-merge-ue-scripts,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,207,const result = await api.trainerResearchMergeUeScripts({
+trainer-research-pick-ct,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,160,const picked = await api.trainerResearchPickCt();
+trainer-research-pick-dumpspace-folder,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,112,const picked = await api.trainerResearchPickDumpspaceFolder();
+trainer-research-pick-exe,yes,main,src/app/pages/ExternalTrainerResearchLab.tsx,387,const picked = await api.trainerResearchPickExe();
+update-game,yes,main,src/app/routes/GameLibrary.tsx,176,const result = await window.electronAPI?.updateGame?.({
+v2-monitor-clear-timeline,yes,main,src/app/pages/SessionMonitorPage.tsx,146,await (window as any).electronAPI.v2MonitorClearTimeline();
+v2-monitor-export-diagnostics,yes,main,src/app/pages/SessionMonitorPage.tsx,154,const data = await (window as any).electronAPI.v2MonitorExportDiagnostics();
+v2-monitor-get-state,yes,main,src/app/pages/SessionMonitorPage.tsx,91,const s = await (window as any).electronAPI.v2MonitorGetState();
+v2-monitor-start,yes,main,src/app/pages/SessionMonitorPage.tsx,119,const result = await (window as any).electronAPI.v2MonitorStart(payload);
+v2-monitor-stop,yes,main,src/app/pages/SessionMonitorPage.tsx,136,await (window as any).electronAPI.v2MonitorStop();
+wisp-overlay-hide,yes,overlay/wisp,src/app/components/SolithWispCompanion.tsx,350,await window.electronAPI?.wispOverlayHide?.();
+wisp-overlay-move-by,yes,overlay/wisp,src/app/components/SolithWispCompanion.tsx,427,"void window.electronAPI?.wispOverlayMoveBy?.({ deltaX, deltaY });"
+wisp-overlay-set-expanded,yes,overlay/wisp,src/app/components/SolithWispCompanion.tsx,244,void window.electronAPI?.wispOverlaySetExpanded?.({ expanded: overlayExpanded });
+wisp-overlay-set-interactive,yes,overlay/wisp,src/app/components/SolithWispCompanion.tsx,252,void window.electronAPI?.wispOverlaySetInteractive?.({ interactive });
+wisp-overlay-set-interactive,yes,overlay/wisp,src/app/components/SolithWispCompanion.tsx,255,void window.electronAPI?.wispOverlaySetInteractive?.({ interactive: false });
+wisp-overlay-toggle,yes,overlay/wisp,src/app/components/SolithWispCompanion.tsx,353,const result = await window.electronAPI?.wispOverlayToggle?.();
+zero-input-ready,no,n/a,,,No renderer call site found for preload method 'onZeroInputReady' (spot-checked; appears unused from src/app)

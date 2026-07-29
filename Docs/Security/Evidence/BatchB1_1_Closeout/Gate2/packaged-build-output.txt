@@ -1,0 +1,176 @@
+Command: PATH="$Node22Dir:$PATH" "$Node22" "$NpmCli" run build:vite
+StartTimeUtc: 2026-07-28T21:48:00Z
+
+> solith@2.4.0-alpha.2 build:vite
+> vite build
+
+[36mvite v8.0.16 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 261 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-electron/dist/index.html                                                           3.60 kB │ gzip:   1.62 kB
+dist-electron/dist/assets/solith-save-tools-uOTIm7Ov.png                               36.26 kB
+dist-electron/dist/assets/solith-banner-backdrop-DUMtCwtG.png                          36.66 kB
+dist-electron/dist/assets/solith-trainer-controller-C0BPEzmP.png                       43.37 kB
+dist-electron/dist/assets/IBMPlexSans-Regular-BiEB_oxT.woff2                           63.02 kB
+dist-electron/dist/assets/solith-emblem-BUdjlZGE.png                                   65.58 kB
+dist-electron/dist/assets/IBMPlexSans-Medium-BQLKo0ot.woff2                            66.74 kB
+dist-electron/dist/assets/IBMPlexSans-SemiBold-KfaJl9PC.woff2                          67.06 kB
+dist-electron/dist/assets/JetBrainsMono-Regular-BQaDgvhP.woff2                         92.16 kB
+dist-electron/dist/assets/JetBrainsMono-Medium-3S3k2nMz.woff2                          93.82 kB
+dist-electron/dist/assets/solith-hooded-profile-CyJXjR5c.png                          165.05 kB
+dist-electron/dist/assets/solith-recovery-phoenix-DGo0ygNN.png                        191.33 kB
+dist-electron/dist/assets/solith-advanced-dragon-DR4E-jk2.png                         192.80 kB
+dist-electron/dist/assets/solith-landscape-background-Bfi_Lisi.png                    291.15 kB
+dist-electron/dist/assets/solith-shell-background-BthADcp-.png                        366.49 kB
+dist-electron/dist/assets/solith-library-temple-book-CJapo9Bj.png                   1,191.79 kB
+dist-electron/dist/assets/solith-trainer-library-stopwatch-clipboard-TdKaKl7Z.png   1,344.31 kB
+dist-electron/dist/assets/solith-wisp-crystal-float-CtU_e1kW.png                    1,946.19 kB
+dist-electron/dist/assets/solith-wisp-base-float-Cx4dIgcx.png                       1,973.28 kB
+dist-electron/dist/assets/solith-wisp-scan-float-C7CstPBo.png                       2,084.29 kB
+dist-electron/dist/assets/solith-wisp-warning-float-CANl9Evy.png                    2,087.77 kB
+dist-electron/dist/assets/solith-wisp-success-float-DkciUyWf.png                    2,098.85 kB
+dist-electron/dist/assets/solith-wisp-controller-float-DnggiMHE.png                 2,208.42 kB
+dist-electron/dist/assets/solith-wisp-dragon-float-BbroGfFX.png                     2,231.31 kB
+dist-electron/dist/assets/solith-wisp-error-float-DsDmtAD2.png                      2,268.94 kB
+dist-electron/dist/assets/solith-wisp-shield-float-D0lEfI3U.png                     2,282.64 kB
+dist-electron/dist/assets/solith-wisp-phoenix-float-DigvzyYX.png                    2,350.65 kB
+dist-electron/dist/assets/solith-game-library-controller-monitors-CG9YRRKt.png      2,613.60 kB
+dist-electron/dist/assets/SOLITH OPENEING SEQUENCE-D0TI9WsQ.mp4                    16,976.31 kB
+dist-electron/dist/assets/main-BjHMm_nR.css                                           108.05 kB │ gzip:  21.63 kB
+dist-electron/dist/assets/rolldown-runtime-Bh1tDfsg.js                                  0.56 kB │ gzip:   0.36 kB
+dist-electron/dist/assets/vendor-bfjfhSru.js                                           69.71 kB │ gzip:  19.18 kB
+dist-electron/dist/assets/vendor-react-C1KQvfwj.js                                    186.13 kB │ gzip:  58.44 kB
+dist-electron/dist/assets/main-BOFYnQ8k.js                                            468.83 kB │ gzip: 122.95 kB
+
+[33m[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vite:asset (72%)
+  - vite:css (24%)
+See https://rolldown.rs/options/checks#plugintimings for more details.
+[39m
+[32m✓ built in 3.15s[39m
+build:vite exit: 0
+
+Command: PATH="$Node22Dir:$PATH" "$Node22" "$NpmCli" run build:electron
+StartTimeUtc: 2026-07-28T21:48:14Z
+
+> solith@2.4.0-alpha.2 build:electron
+> npm run build:scanner && tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
+
+
+> solith@2.4.0-alpha.2 build:scanner
+> node scripts/build-readonly-scanner.mjs
+
+    Finished `release` profile [optimized] target(s) in 1.13s
+[Solith Scanner] Copied G:\ACTIVE_PROJECTS\SOLITH\dist-electron\solith-readonly-scanner.exe
+[34mCLI[39m Building entry: {"main":"electron/main.ts"}
+[34mCLI[39m Using tsconfig: tsconfig.json
+[34mCLI[39m Building entry: {"host-entry":"src/core/trainer-host/host-entry.ts"}
+[34mCLI[39m Using tsconfig: tsconfig.json
+[34mCLI[39m Building entry: {"headless-verification-worker":"src/core/runtime/headless-verification-worker.ts"}
+[34mCLI[39m Using tsconfig: tsconfig.json
+[34mCLI[39m Building entry: {"preload":"electron/preload.ts"}
+[34mCLI[39m Using tsconfig: tsconfig.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Using tsup config: G:\ACTIVE_PROJECTS\SOLITH\tsup.config.ts
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Using tsup config: G:\ACTIVE_PROJECTS\SOLITH\tsup.config.ts
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Using tsup config: G:\ACTIVE_PROJECTS\SOLITH\tsup.config.ts
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Using tsup config: G:\ACTIVE_PROJECTS\SOLITH\tsup.config.ts
+[34mCLI[39m Target: node22
+[34mESM[39m Build start
+[34mCLI[39m Target: node22
+[34mCJS[39m Build start
+[34mCLI[39m Target: node22
+[34mESM[39m Build start
+[34mCLI[39m Target: node22
+[34mESM[39m Build start
+[32mCJS[39m [1mdist-electron\preload.cjs     [22m[32m18.30 KB[39m
+[32mCJS[39m [1mdist-electron\preload.cjs.map [22m[32m33.55 KB[39m
+[32mCJS[39m ⚡️ Build success in 16ms
+[32mESM[39m [1mdist-electron\host-entry.js     [22m[32m48.51 KB[39m
+[32mESM[39m [1mdist-electron\host-entry.js.map [22m[32m117.38 KB[39m
+[32mESM[39m ⚡️ Build success in 29ms
+[32mESM[39m [1mdist-electron\headless-verification-worker.js     [22m[32m42.07 KB[39m
+[32mESM[39m [1mdist-electron\headless-verification-worker.js.map [22m[32m98.73 KB[39m
+[32mESM[39m ⚡️ Build success in 34ms
+[32mESM[39m [1mdist-electron\main.js     [22m[32m999.82 KB[39m
+[32mESM[39m [1mdist-electron\main.js.map [22m[32m1.97 MB[39m
+[32mESM[39m ⚡️ Build success in 82ms
+
+🔍 Solith — Electron Output Verifier
+
+── Required files
+  ✅ PASS [1] main.js exists
+  ✅ PASS [2] preload.cjs exists
+  ✅ PASS [3] host-entry.js exists (TrainerHost child process)
+  ✅ PASS [4] headless-verification-worker.js exists (read-only runtime worker)
+  ✅ PASS [5] solith-readonly-scanner.exe exists (Windows read-only helper)
+
+── No TypeScript leakage
+  ✅ PASS [6] main.js contains no .ts imports
+  ✅ PASS [7] preload.cjs contains no .ts imports
+  ✅ PASS [8] headless-verification-worker.js contains no .ts imports
+
+── No bare relative imports
+  ✅ PASS [9] main.js has no bare relative imports
+  ✅ PASS [10] preload.cjs has no bare relative imports
+  ✅ PASS [11] headless-verification-worker.js has no bare relative imports
+
+── No development-only paths
+  ✅ PASS [12] main.js does not import from .gemini
+  ✅ PASS [13] preload.cjs does not import from .gemini
+  ✅ PASS [14] headless-verification-worker.js does not import from .gemini
+  ✅ PASS [15] main.js does not import a test runner
+  ✅ PASS [16] headless-verification-worker.js does not import a test runner
+
+── Security checks
+  ✅ PASS [17] preload.js uses contextBridge
+  ✅ PASS [18] preload.js uses exposeInMainWorld
+  ✅ PASS [19] main.js has nodeIntegration: false
+  ✅ PASS [20] main.js has contextIsolation: true
+  ✅ PASS [21] main.js has single-instance lock
+
+── Bundle sanity
+  ✅ PASS [22] main.js > 10 KB (not empty/stub)
+  ✅ PASS [23] main.js < 5 MB (not bloated)
+  ✅ PASS [24] preload.cjs > 100 bytes (not empty)
+  ✅ PASS [25] preload.cjs < 100 KB (not bloated)
+  ✅ PASS [26] headless-verification-worker.js > 1 KB (not empty/stub)
+  ✅ PASS [27] headless-verification-worker.js < 500 KB (not bloated)
+  ✅ PASS [28] solith-readonly-scanner.exe > 10 KB on Windows (not empty/stub)
+  ✅ PASS [29] solith-readonly-scanner.exe < 5 MB on Windows (not bloated)
+
+── Summary: 29/29 checks passed
+
+✅ All 29 checks passed. Electron output is verified.
+
+build:electron exit: 0
+
+Command: PATH="$Node22Dir:$PATH" "$Node22" "$NpmCli" run dist:dir
+StartTimeUtc: 2026-07-28T21:48:26Z
+
+> solith@2.4.0-alpha.2 dist:dir
+> electron-builder --dir
+
+  • electron-builder  version=26.15.3 os=10.0.26200
+  • loaded configuration  file=package.json ("build" field)
+  • executing @electron/rebuild  electronVersion=42.4.1 arch=x64 buildFromSource=false workspaceRoot=G:\ACTIVE_PROJECTS\SOLITH projectDir=./ appDir=./
+  • installing native dependencies  arch=x64
+  • preparing       moduleName=vendor/memoryjs-3.5.1-patched arch=x64
+  • finished        moduleName=vendor/memoryjs-3.5.1-patched arch=x64
+  • completed installing native dependencies
+  • packaging       platform=win32 arch=x64 electron=42.4.1 appOutDir=dist\win-unpacked
+  • downloaded      label=electron progress=100%
+  • downloaded electron zip extracted successfully  output=G:\ACTIVE_PROJECTS\SOLITH\dist\win-unpacked
+  • searching for node modules  pm=npm searchDir=G:\ACTIVE_PROJECTS\SOLITH
+  • updating asar integrity executable resource  executablePath=dist\win-unpacked\Solith.exe
+  • signing with signtool.exe  path=dist\win-unpacked\Solith.exe
+  • signing with signtool.exe  path=dist\win-unpacked\resources\app.asar.unpacked\dist-electron\solith-readonly-scanner.exe
+dist:dir exit: 0
+
+=== Packaged executable verification ===
+Path: dist/win-unpacked/Solith.exe
+-rwxr-xr-x 1 chase 197609 232375296 Jul 28 14:49 dist/win-unpacked/Solith.exe

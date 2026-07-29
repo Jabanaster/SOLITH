@@ -27,6 +27,10 @@ export interface ImportCtFailure {
   rejected?: CtImportResult['rejected'];
 }
 
+export interface PreviewCtOutcome extends ImportCtOutcome {
+  previewOnly: true;
+}
+
 function catalogEntryFromImport(result: CtImportResult): TrainerCatalogEntry {
   const definition = result.definition;
   const categories = [...new Set((definition.memoryFeatures ?? []).map((f) => f.category))];
@@ -144,6 +148,76 @@ export async function importDefinitionCt(xmlText: string, options: { title?: str
 
   return {
     success: true,
+    catalogGameId: definition.id,
+    packId: modPack.packId,
+    cheatCount: modPack.cheats.length,
+    title: definition.title,
+    acceptedCount: parsed.accepted.length,
+    rejectedCount: parsed.rejected.length,
+    rejected: parsed.rejected,
+    validationErrors: parsed.errors,
+    scriptAnalysisCount: scriptReport.analyzedScripts,
+  };
+}
+
+export async function previewDefinitionCt(
+  xmlText: string,
+  options: { title?: string } = {},
+): Promise<PreviewCtOutcome | ImportCtFailure> {
+  const parsed = await parseCheatTableXml(xmlText, options);
+
+  if (parsed.accepted.length === 0) {
+    const metadata = await parseCheatTableMetadata(xmlText, {
+      title: options.title,
+      executables: options.title?.toLowerCase().includes('crimson') ? ['CrimsonDesert.exe'] : undefined,
+      pointerImportAccepted: parsed.accepted.length,
+      sourceNote:
+        'Metadata extracted from community Cheat Engine table. Auto Assembler entries are reference-only in Solith until pointer paths are verified.',
+    });
+
+    if (metadata.entries.length === 0) {
+      if (parsed.errors.length > 0) {
+        return { success: false, errors: parsed.errors, rejected: parsed.rejected };
+      }
+      return {
+        success: false,
+        errors: ['no_importable_ct_entries'],
+        rejected: parsed.rejected,
+      };
+    }
+
+    const { definition } = metadata;
+    const scriptReport = await analyzeCheatTableScripts(xmlText, {
+      title: definition.title,
+      executable: definition.target.executables[0],
+    });
+    const modPack = solithDefinitionToModPack(definition);
+    return {
+      success: true,
+      previewOnly: true,
+      catalogGameId: definition.id,
+      packId: modPack.packId,
+      cheatCount: modPack.cheats.length,
+      title: definition.title,
+      acceptedCount: 0,
+      rejectedCount: parsed.rejected.length,
+      rejected: parsed.rejected,
+      validationErrors: parsed.errors,
+      metadataImport: true,
+      scriptOnlyCount: metadata.scriptOnlyCount,
+      scriptAnalysisCount: scriptReport.analyzedScripts,
+    };
+  }
+
+  const scriptReport = await analyzeCheatTableScripts(xmlText, {
+    title: options.title,
+    executable: parsed.definition.target.executables[0],
+  });
+  const { definition } = parsed;
+  const modPack = solithDefinitionToModPack(definition);
+  return {
+    success: true,
+    previewOnly: true,
     catalogGameId: definition.id,
     packId: modPack.packId,
     cheatCount: modPack.cheats.length,

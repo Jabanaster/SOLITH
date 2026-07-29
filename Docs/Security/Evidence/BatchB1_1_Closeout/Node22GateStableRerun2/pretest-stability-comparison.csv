@@ -1,0 +1,3 @@
+Snapshot,ComparedTo,MonitoredFilesTotal,HashDiffCount,StatusDiffCount,Result
+PretestT0,baseline,1089,0,0,"Baseline capture"
+PretestT60,PretestT0,1089,0,0,"Identical CSV content; no non-evidence path changed over 60s"

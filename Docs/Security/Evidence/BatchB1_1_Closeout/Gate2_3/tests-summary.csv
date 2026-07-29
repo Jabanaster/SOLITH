@@ -1,0 +1,9 @@
+Suite,Pass,Fail,Total,Exit,Evidence
+npm test (Node 22),1040,0,1040,0,npm-test-final.txt
+npm run test:live-memory (Node 22),257,0,257,0,npm-test-live-memory-final.txt
+tsc --noEmit (main),n/a (0 diagnostics),0,0,0,tsc-main-check.txt
+tsc -p tsconfig.electron.json --noEmit,n/a (31 diagnostics baseline),31,31,2,tsc-electron-check.txt
+git diff --check,n/a,1 file (GameLibrary.tsx baseline),1,2,gate23-diff-check.txt
+tests/packaged-smoke.test.ts (packaged),23,0,23,0,packaged-smoke-output.txt
+tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts (packaged; rewired to real flow),10,0,10,0,packaged-real-flow-run.txt
+tests/gate2-3-freeze-authorization-security.e2e.test.ts (packaged; new),3,0,3,0,packaged-security-matrix-run.txt

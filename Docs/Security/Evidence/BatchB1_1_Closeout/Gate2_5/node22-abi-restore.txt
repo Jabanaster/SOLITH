@@ -1,0 +1,76 @@
+COMMAND=node-gyp rebuild --target=22.23.1
+WORKDIR=vendor/memoryjs-3.5.1-patched
+EXIT_CODE=0
+gyp info it worked if it ends with ok
+gyp info using node-gyp@12.4.0
+gyp info using node@22.23.1 | win32 | x64
+gyp info find Python using Python version 3.14.5 found at "%USERPROFILE%\AppData\Local\Python\pythoncore-3.14-64\python.exe"
+
+gyp info find VS using VS2022 (17.14.37516.0) found at:
+gyp info find VS "D:\Visual Studio"
+gyp info find VS run with --verbose for detailed information
+gyp info spawn %USERPROFILE%\AppData\Local\Python\pythoncore-3.14-64\python.exe
+gyp info spawn args [
+gyp info spawn args 'G:\\ACTIVE_PROJECTS\\SOLITH\\node_modules\\node-gyp\\gyp\\gyp_main.py',
+gyp info spawn args 'binding.gyp',
+gyp info spawn args '-f',
+gyp info spawn args 'msvs',
+gyp info spawn args '-I',
+gyp info spawn args 'G:\\ACTIVE_PROJECTS\\SOLITH\\vendor\\memoryjs-3.5.1-patched\\build\\config.gypi',
+gyp info spawn args '-I',
+gyp info spawn args 'G:\\ACTIVE_PROJECTS\\SOLITH\\node_modules\\node-gyp\\addon.gypi',
+gyp info spawn args '-I',
+gyp info spawn args 'C:\\Users\\chase\\AppData\\Local\\node-gyp\\Cache\\22.23.1\\include\\node\\common.gypi',
+gyp info spawn args '-Dlibrary=shared_library',
+gyp info spawn args '-Dvisibility=default',
+gyp info spawn args '-Dnode_root_dir=C:\\Users\\chase\\AppData\\Local\\node-gyp\\Cache\\22.23.1',
+gyp info spawn args '-Dnode_gyp_dir=G:\\ACTIVE_PROJECTS\\SOLITH\\node_modules\\node-gyp',
+gyp info spawn args '-Dnode_lib_file=C:\\\\Users\\\\chase\\\\AppData\\\\Local\\\\node-gyp\\\\Cache\\\\22.23.1\\\\<(target_arch)\\\\node.lib',
+gyp info spawn args '-Dmodule_root_dir=G:\\ACTIVE_PROJECTS\\SOLITH\\vendor\\memoryjs-3.5.1-patched',
+gyp info spawn args '-Dnode_engine=v8',
+gyp info spawn args '--depth=.',
+gyp info spawn args '--no-parallel',
+gyp info spawn args '--generator-output',
+gyp info spawn args 'G:\\ACTIVE_PROJECTS\\SOLITH\\vendor\\memoryjs-3.5.1-patched\\build',
+gyp info spawn args '-Goutput_dir=.'
+gyp info spawn args ]
+gyp info spawn D:\Visual Studio\MSBuild\Current\Bin\MSBuild.exe
+gyp info spawn args [
+gyp info spawn args 'build/binding.sln',
+gyp info spawn args '/clp:Verbosity=minimal',
+gyp info spawn args '/nologo',
+gyp info spawn args '/nodeReuse:false',
+gyp info spawn args '/p:Configuration=Release;Platform=x64'
+gyp info spawn args ]
+
+  memoryjs.cc
+G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\lib\functions.h(65,26): warning C4311: 'type cast': pointer truncation from 'LPVOID' to 'int' [G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\memoryjs.vcxproj]
+  (compiling source file '../lib/memoryjs.cc')
+      G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\lib\functions.h(65,26):
+      the template instantiation context (the oldest one first) is
+          G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\lib\memoryjs.cc(939,26):
+          see reference to function template instantiation 'Call functions::call<int>(HANDLE,std::vector<functions::Arg,std::allocator<functions::Arg>>,functions::Type,DWORD64,char **)' being compiled
+  
+G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\lib\functions.h(65,26): warning C4302: 'type cast': truncation from 'LPVOID' to 'int' [G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\memoryjs.vcxproj]
+  (compiling source file '../lib/memoryjs.cc')
+  
+G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\lib\functions.h(116,24): warning C4311: 'type cast': pointer truncation from 'LPVOID' to 'DWORD' [G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\memoryjs.vcxproj]
+  (compiling source file '../lib/memoryjs.cc')
+  
+G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\lib\functions.h(116,24): warning C4302: 'type cast': truncation from 'LPVOID' to 'DWORD' [G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\memoryjs.vcxproj]
+  (compiling source file '../lib/memoryjs.cc')
+  
+  memory.cc
+  process.cc
+  module.cc
+  pattern.cc
+  functions.cc
+  debugger.cc
+  win_delay_load_hook.cc
+     Creating library G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\Release\memoryjs.lib and object G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\Release\memoryjs.exp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 916 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  memoryjs.vcxproj -> G:\ACTIVE_PROJECTS\SOLITH\vendor\memoryjs-3.5.1-patched\build\Release\\memoryjs.node
+gyp info ok 

@@ -1,8 +1,18 @@
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { LiveMemorySession } from '../../src/core/live-memory/live-memory-session.js';
 import { FakeMemoryDriver } from '../fixtures/fake-memory-driver.js';
 import type { RemoteConnectionEvidence, LiveMemoryAddress } from '../../src/core/live-memory/types.js';
+import { _clearActiveFreezesForTests } from '../../src/core/live-memory/freeze-concurrency-registry.js';
+
+// Batch B1.1's cross-session freeze concurrency registry is process-global (by design —
+// it must see freezes started by OTHER sessions). Tests in this file create many
+// short-lived sessions that often share the same fake pid/address, so the registry must be
+// reset before every test or an earlier test's un-stopped freeze registration would cause a
+// later, unrelated test to be spuriously rejected as a "duplicate_address".
+beforeEach(() => {
+  _clearActiveFreezesForTests();
+});
 
 const CLEAN_EVIDENCE: RemoteConnectionEvidence = {
   availability: 'available',
@@ -163,9 +173,215 @@ describe('LiveMemorySession', () => {
     const confirmed = await session.confirmWrite(proposal.proposalId);
     assert.equal(confirmed.success, true);
 
-    const rolledBack = await session.rollback(confirmed.manifest!);
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
     assert.equal(rolledBack.success, true);
     assert.equal(driver.getValue(0x1000n), 100);
+  });
+
+  test('rollback rejects a caller-supplied manifest for a write that was never confirmed', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const forged = await session.rollback('forged-proposal-id-never-confirmed');
+
+    assert.equal(forged.success, false);
+    assert.match(forged.error ?? '', /unknown, expired, or already rolled back/i);
+    assert.equal(driver.getValue(0x1000n), 100, 'no memory should be written for an unknown proposal');
+  });
+
+  test('rollback cannot be replayed after it has already consumed the confirmed write', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    const first = await session.rollback(confirmed.manifest!.proposalId);
+    assert.equal(first.success, true);
+    assert.equal(driver.getValue(0x1000n), 100);
+
+    driver.setValue(0x1000n, 4242);
+    const replay = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(replay.success, false);
+    assert.match(replay.error ?? '', /unknown, expired, or already rolled back/i);
+    assert.equal(driver.getValue(0x1000n), 4242, 'replayed rollback must not touch memory again');
+  });
+
+  test('rollback fails closed when the attached process identity no longer matches', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+
+    driver.setProcessExecutableName(1234, 'different.exe');
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(rolledBack.success, false);
+    assert.match(rolledBack.error ?? '', /identity mismatch/i);
+    assert.equal(driver.getValue(0x1000n), 9999, 'rollback must not write when identity fails closed');
+  });
+
+  test('rollback ledger is cleared on detach — a re-attached session cannot roll back a prior session\'s write', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+
+    session.detach();
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+    assert.equal(rolledBack.success, false);
+    assert.match(rolledBack.error ?? '', /unknown, expired, or already rolled back/i);
+  });
+
+  test('rollback fails closed against a same-PID process restart (path + start time both changed, PID unchanged)', async () => {
+    // Distinct from the generic identity-mismatch test above: this specifically simulates
+    // the PID-reuse scenario (OS assigns the SAME numeric PID to a brand-new process after
+    // the original exits) rather than an executable-name-only discrepancy.
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    driver.setProcessExecutablePath(1234, 'C:\\Games\\demo\\demo.exe');
+    driver.setProcessStartTime(1234, '2026-07-01T00:00:00.000Z');
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach(
+      { pid: 1234, executableName: 'demo.exe', executablePath: 'C:\\Games\\demo\\demo.exe', startTime: '2026-07-01T00:00:00.000Z' },
+      true,
+    );
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+
+    // Simulate PID reuse: same numeric PID 1234, but the OS now reports a different
+    // executable path AND a different process creation time — the signature of a
+    // restarted (or entirely different) process reusing a recycled PID.
+    driver.setProcessExecutablePath(1234, 'C:\\Windows\\Temp\\unrelated.exe');
+    driver.setProcessStartTime(1234, '2026-07-01T00:05:00.000Z');
+
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(rolledBack.success, false);
+    assert.match(rolledBack.error ?? '', /mismatch/i);
+    assert.equal(driver.getValue(0x1000n), 9999, 'rollback must not write to a process that only shares a recycled PID');
+  });
+
+  test('Batch B1.1: confirmWrite is REJECTED (not evicted-and-allowed) once the ledger is full of still-valid entries', async () => {
+    // Each write targets its OWN distinct address, so rolling back an early write is never
+    // itself blocked by the new expected-current-value check picking up a LATER write's
+    // effect on a shared address — this test is specifically about ledger capacity, not
+    // about the expected-value check (covered by separate tests above).
+    const initial: Record<string, number> = {};
+    for (let i = 0; i < 51; i++) initial[String(0x2000 + i)] = 0;
+    const driver = new FakeMemoryDriver(initial);
+    const evidence = Array.from({ length: 120 }, () => CLEAN_EVIDENCE);
+    const session = makeSession(driver, evidence);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const manifests = [];
+    for (let i = 0; i < 50; i++) {
+      const addr: LiveMemoryAddress = { address: BigInt(0x2000 + i), dataType: 'int32' };
+      const proposal = session.proposeWrite(addr, 1000 + i);
+      const confirmed = await session.confirmWrite(proposal.proposalId);
+      assert.equal(confirmed.success, true, `write ${i} should succeed — ledger not yet full`);
+      manifests.push(confirmed.manifest!);
+    }
+
+    // The 51st confirm must be REJECTED — no eviction of a still-valid entry, and no orphan write.
+    const addr51: LiveMemoryAddress = { address: BigInt(0x2000 + 50), dataType: 'int32' };
+    const proposal51 = session.proposeWrite(addr51, 5555);
+    const confirmed51 = await session.confirmWrite(proposal51.proposalId);
+    assert.equal(confirmed51.success, false);
+    assert.match(confirmed51.error ?? '', /rollback_ledger_full/);
+    assert.equal(driver.getValue(BigInt(0x2000 + 50)), 0, 'the rejected 51st write must not have touched memory at all');
+
+    // Every one of the first 50 (still-valid, none evicted) remains rollback-able.
+    const firstRollback = await session.rollback(manifests[0].proposalId);
+    assert.equal(firstRollback.success, true, 'the very first confirmed write must NOT have been evicted');
+  });
+
+  test('Batch B1.1: rollback FAILS CLOSED when current memory no longer matches the confirmed write (fixes the prior "silently overwrites intervening change" gap)', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+    assert.equal(driver.getValue(0x1000n), 9999);
+
+    // Something else changes the same address after the confirmed write — e.g. the game's
+    // own logic, a concurrent freeze, or a second unrelated write to the same address.
+    driver.setValue(0x1000n, 42);
+
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(rolledBack.success, false, 'rollback must refuse to proceed once current memory no longer matches');
+    assert.match(rolledBack.error ?? '', /expected_value_mismatch/);
+    assert.equal(driver.getValue(0x1000n), 42, 'the intervening value must be left untouched, not clobbered');
+  });
+
+  test('Batch B1.1: rollback succeeds when current memory still matches the confirmed write (no false positives from the new check)', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+
+    // Nothing else touches the address — current value is still exactly what the write applied.
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(rolledBack.success, true);
+    assert.equal(driver.getValue(0x1000n), 100);
+  });
+
+  test('Batch B1.1: a confirmed write expires after its TTL and can no longer be rolled back (fixes the prior "indefinite" gap)', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    let simulatedNow = 1_000_000;
+    session._injectNowMsForTests(() => simulatedNow);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+
+    // Advance the fake clock past the centralized 30-minute TTL.
+    simulatedNow += 30 * 60 * 1000 + 1;
+
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(rolledBack.success, false);
+    assert.match(rolledBack.error ?? '', /unknown, expired, or already rolled back/i);
+    assert.equal(driver.getValue(0x1000n), 9999, 'an expired rollback record must not write to memory');
+  });
+
+  test('Batch B1.1: a confirmed write is still rollback-able just before its TTL boundary (no off-by-one)', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    let simulatedNow = 1_000_000;
+    session._injectNowMsForTests(() => simulatedNow);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    const confirmed = await session.confirmWrite(proposal.proposalId);
+    assert.equal(confirmed.success, true);
+
+    // One millisecond before the 30-minute TTL elapses.
+    simulatedNow += 30 * 60 * 1000 - 1;
+
+    const rolledBack = await session.rollback(confirmed.manifest!.proposalId);
+
+    assert.equal(rolledBack.success, true, 'must still be valid one ms before the TTL boundary');
   });
 
   test('detach closes the process handle and clears pending proposals', async () => {
@@ -391,6 +607,81 @@ describe('LiveMemorySession freeze', () => {
 
     assert.equal(driver.isOpen(), false);
     assert.equal(pendingCount(), 0);
+  });
+
+  test('startFreeze rejects an interval below the minimum bound', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const result = session.startFreeze(HEALTH_ADDR, 9999, 1);
+
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /interval/i);
+    assert.equal(session.getFreezeStatus().active, false);
+  });
+
+  test('startFreeze rejects an interval above the maximum bound', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const result = session.startFreeze(HEALTH_ADDR, 9999, 999_999);
+
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /interval/i);
+  });
+
+  test('startFreeze rejects a non-finite freeze value even though the IPC schema would also catch it', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const result = session.startFreeze(HEALTH_ADDR, Number.NaN, 100);
+
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /finite/i);
+    assert.equal(driver.getValue(0x1000n), 100, 'no write should occur for a rejected freeze value');
+  });
+
+  test('freeze auto-stops once the maximum duration is exceeded', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    const { scheduler, fireNext, pendingCount } = makeFakeFreezeScheduler();
+    session._injectFreezeScheduler(scheduler);
+    session._setMaxFreezeDurationMsForTests(300); // 3 ticks at 100ms
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    session.startFreeze(HEALTH_ADDR, 9999, 100);
+    await flushMicrotasks();
+    assert.equal(session.getFreezeStatus().tickCount, 1);
+
+    await fireNext(); // tick 2 — elapsed 200ms, still under the 300ms cap
+    assert.equal(session.getFreezeStatus().active, true);
+    assert.equal(session.getFreezeStatus().tickCount, 2);
+
+    await fireNext(); // tick 3 — elapsed 300ms, hits the cap: stop instead of scheduling tick 4
+    assert.equal(session.getFreezeStatus().active, false);
+    assert.equal(session.getFreezeStatus().stopReason, 'max_duration_exceeded');
+    assert.equal(pendingCount(), 0, 'no further tick should be scheduled once the duration cap is hit');
+  });
+
+  test('freeze auto-stops when the target process identity no longer matches (process exited or PID reused)', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    const { scheduler, fireNext } = makeFakeFreezeScheduler();
+    session._injectFreezeScheduler(scheduler);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    session.startFreeze(HEALTH_ADDR, 9999, 100);
+    await flushMicrotasks();
+    assert.equal(session.getFreezeStatus().active, true);
+
+    driver.setProcessExecutableName(1234, 'different.exe');
+    await fireNext();
+
+    assert.equal(session.getFreezeStatus().active, false);
+    assert.equal(session.getFreezeStatus().stopReason, 'identity_mismatch');
   });
 });
 

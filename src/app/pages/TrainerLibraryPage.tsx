@@ -23,6 +23,22 @@ import {
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
+const DISCOVERY_PREVIEW_HEIGHT_KEY = 'solith:trainer-library:discovery-preview-height';
+const DEFAULT_DISCOVERY_PREVIEW_HEIGHT = 288;
+const MIN_DISCOVERY_PREVIEW_HEIGHT = 192;
+const MAX_DISCOVERY_PREVIEW_HEIGHT = 900;
+
+function initialDiscoveryPreviewHeight(): number {
+  if (typeof window === 'undefined') return DEFAULT_DISCOVERY_PREVIEW_HEIGHT;
+  try {
+    const stored = Number(window.sessionStorage.getItem(DISCOVERY_PREVIEW_HEIGHT_KEY));
+    return Number.isFinite(stored)
+      ? Math.min(MAX_DISCOVERY_PREVIEW_HEIGHT, Math.max(MIN_DISCOVERY_PREVIEW_HEIGHT, stored))
+      : DEFAULT_DISCOVERY_PREVIEW_HEIGHT;
+  } catch {
+    return DEFAULT_DISCOVERY_PREVIEW_HEIGHT;
+  }
+}
 
 function isLocallyAuthoredEntry(entry: TrainerCatalogEntry): boolean {
   return entry.sources.some(
@@ -53,38 +69,58 @@ interface TrustMeta {
   quarantined: boolean;
 }
 
+interface DiscoveryPreviewRecord {
+  id: string;
+  previewCandidateId: string;
+  installIdentity: string;
+  canonicalInstallPath: string;
+  canonicalExecutablePath?: string;
+  launcherAppId?: string;
+  identityVersion: number;
+  identityStatus: 'verified' | 'backfilled' | 'ambiguous' | 'legacy';
+  needsReverification: boolean;
+  catalogGameId?: string;
+  catalogDisplayName?: string;
+  platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+  installPath: string;
+  executablePath?: string;
+  displayName?: string;
+  steamAppId?: number;
+  detectedAt: string;
+  lastSeenAt: string;
+  duplicate: boolean;
+  duplicateReason?: 'same_executable_path' | 'same_launcher_app_id_and_path' | 'same_install_identity';
+  duplicateOfId?: string;
+  source: string;
+  unsupportedReason?: string;
+  classification: 'likely_game' | 'uncertain';
+  classificationReason: string;
+}
+
+interface DiscoveryPreviewState {
+  discovered: number;
+  matched: number;
+  platforms: Record<string, number>;
+  scannedAt: string;
+  records: DiscoveryPreviewRecord[];
+  locationsChecked: string[];
+  duplicatesSkipped: number;
+  unsupported: number;
+  rejected: Array<{ installPath: string; executablePath?: string; displayName?: string; reason: string }>;
+  failures: Array<{ location: string; reason: string }>;
+}
+
+interface PickedCtPayload {
+  filePath: string;
+  xmlText: string;
+  title: string;
+  sha256: string;
+}
+
 const PAGE_SIZE = 120;
 
 function newImportJobId(): string {
   return `ct-import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function readTextFileWithAbort(file: File, signal: AbortSignal): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    const cleanup = () => {
-      signal.removeEventListener('abort', abort);
-    };
-    const abort = () => {
-      cleanup();
-      reader.abort();
-      reject(new DOMException('Import cancelled by user.', 'AbortError'));
-    };
-    if (signal.aborted) {
-      abort();
-      return;
-    }
-    signal.addEventListener('abort', abort, { once: true });
-    reader.onerror = () => {
-      cleanup();
-      reject(reader.error ?? new Error('Failed to read file.'));
-    };
-    reader.onload = () => {
-      cleanup();
-      resolve(String(reader.result ?? ''));
-    };
-    reader.readAsText(file);
-  });
 }
 
 function isCommunityScanEntry(entry: TrainerCatalogEntry): boolean {
@@ -306,8 +342,14 @@ export default function TrainerLibraryPage({
   const [sortMode, setSortMode] = useState<SortMode>('installed-first');
   const [dragOver, setDragOver] = useState(false);
   const [scanningInstalls, setScanningInstalls] = useState(false);
+  const [addingSelectedInstalls, setAddingSelectedInstalls] = useState(false);
+  const [installRootFolder, setInstallRootFolder] = useState('');
+  const [discoveryPreview, setDiscoveryPreview] = useState<DiscoveryPreviewState | null>(null);
+  const [selectedDiscoveryIds, setSelectedDiscoveryIds] = useState<Set<string>>(new Set());
+  const [discoveryPreviewExpanded, setDiscoveryPreviewExpanded] = useState(false);
+  const [discoveryPreviewHeight, setDiscoveryPreviewHeight] = useState(initialDiscoveryPreviewHeight);
+  const discoveryPreviewListRef = useRef<HTMLDivElement>(null);
   const importYamlRef = useRef<HTMLInputElement>(null);
-  const importCtRef = useRef<HTMLInputElement>(null);
   const ctImportAbortRef = useRef<AbortController | null>(null);
   const queryRef = useRef(query);
   const tierFilterRef = useRef(tierFilter);
@@ -466,21 +508,38 @@ export default function TrainerLibraryPage({
 
   const handleScanInstalled = async () => {
     const api = window.electronAPI;
-    if (!api?.installDiscoveryScan) return;
+    if (!api?.installDiscoveryPreview) return;
     setScanningInstalls(true);
     setMessage('');
     try {
       await api.trainerCatalogSeed?.();
-      const result = await api.installDiscoveryScan();
+      const result = await api.installDiscoveryPreview({
+        includeCommonRoots: true,
+        userSelectedRoots: installRootFolder ? [installRootFolder] : undefined,
+      });
       if (result.success) {
-        const list = await api.installDiscoveryList();
-        if (list.success && list.catalogGameIds) {
-          setInstalledIds(new Set(list.catalogGameIds));
-        }
-        const health = await api.trainerHealthCheck?.();
-        if (health?.success && health.map) setHealthMap(health.map);
+        const preview: DiscoveryPreviewState = {
+          discovered: result.discovered ?? 0,
+          matched: result.matched ?? 0,
+          platforms: result.platforms ?? {},
+          scannedAt: result.scannedAt ?? new Date().toISOString(),
+          records: result.records ?? [],
+          locationsChecked: result.locationsChecked ?? [],
+          duplicatesSkipped: result.duplicatesSkipped ?? 0,
+          unsupported: result.unsupported ?? 0,
+          rejected: result.rejected ?? [],
+          failures: result.failures ?? [],
+        };
+        setDiscoveryPreview(preview);
+        setSelectedDiscoveryIds(
+          new Set(
+            preview.records
+              .filter((record) => !record.duplicate && record.classification === 'likely_game')
+              .map((record) => record.previewCandidateId),
+          ),
+        );
         setMessage(
-          `Scan complete — ${result.discovered ?? 0} installs found, ${result.matched ?? 0} matched to catalog.`,
+          `Preview ready — ${preview.discovered} installs found, ${preview.matched} catalog matches. Review before adding.`,
         );
       } else {
         setMessage(result.error ?? 'Install scan failed');
@@ -599,8 +658,8 @@ export default function TrainerLibraryPage({
     }
   };
 
-  const handleImportCt = async (file: File) => {
-    if (!window.electronAPI?.trainerCatalogImportCt) return;
+  const handleImportCt = async (picked: PickedCtPayload) => {
+    if (!window.electronAPI?.trainerCatalogImportCt || !window.electronAPI?.trainerCatalogPreviewCt) return;
     const controller = new AbortController();
     const jobId = newImportJobId();
     ctImportAbortRef.current = controller;
@@ -608,7 +667,9 @@ export default function TrainerLibraryPage({
     setImporting(true);
     setMessage('');
     try {
-      const xmlText = await readTextFileWithAbort(file, controller.signal);
+      if (controller.signal.aborted) {
+        throw new DOMException('Import cancelled by user.', 'AbortError');
+      }
       dispatchCtImport({
         type: 'progress',
         progress: {
@@ -619,7 +680,44 @@ export default function TrainerLibraryPage({
           totalTables: 1,
         },
       });
-      const result = await window.electronAPI.trainerCatalogImportCt({ xmlText, title: file.name.replace(/\.ct$/i, '') });
+      const preview = await window.electronAPI.trainerCatalogPreviewCt(picked);
+      if (!preview.success) {
+        const detail = preview.errors?.join('; ') ?? preview.error ?? 'CT preview failed';
+        dispatchCtImport({ type: 'failed', errorMessage: detail });
+        setMessage(detail);
+        return;
+      }
+      dispatchCtImport({
+        type: 'progress',
+        progress: {
+          jobId,
+          phase: 'scraping-signatures',
+          label: 'Scraping Signatures...',
+          processedTables: 1,
+          totalTables: 1,
+        },
+      });
+      const confirmed = window.confirm(
+        [
+          `Import "${preview.title ?? picked.title}" as inert Solith metadata?`,
+          '',
+          `Source hash: ${(preview.sourceHash ?? picked.sha256).slice(0, 16)}...`,
+          `Accepted pointer/metadata rows: ${preview.acceptedCount ?? 0}`,
+          `Rejected or neutralized rows: ${preview.rejectedCount ?? 0}`,
+          `Script research records: ${preview.scriptAnalysisCount ?? 0}`,
+          '',
+          'Solith will preserve CT research metadata only. It will not execute Auto Assembler, Lua, shell commands, or memory writes.',
+        ].join('\n'),
+      );
+      if (!confirmed) {
+        dispatchCtImport({ type: 'cancelled', errorCode: 'USER_DECLINED_CT_IMPORT' });
+        setMessage('CT import cancelled before writing metadata.');
+        return;
+      }
+      const result = await window.electronAPI.trainerCatalogImportCt({
+        xmlText: picked.xmlText,
+        title: picked.title,
+      });
       if (result.success) {
         dispatchCtImport({
           type: 'complete',
@@ -632,7 +730,7 @@ export default function TrainerLibraryPage({
           },
         });
         setMessage(
-          `Imported "${result.title ?? file.name}" — ${result.acceptedCount ?? 0} accepted, ${result.rejectedCount ?? 0} rejected.`,
+          `Imported "${result.title ?? picked.title}" — ${result.acceptedCount ?? 0} accepted, ${result.rejectedCount ?? 0} rejected.`,
         );
         await load(query);
       } else {
@@ -653,7 +751,96 @@ export default function TrainerLibraryPage({
     } finally {
       setImporting(false);
       ctImportAbortRef.current = null;
-      if (importCtRef.current) importCtRef.current.value = '';
+    }
+  };
+
+  const handlePickAndImportCt = async () => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogPickCt) return;
+    dispatchCtImport({ type: 'reset' });
+    setMessage('');
+    const picked = await api.trainerCatalogPickCt();
+    if (picked.canceled) return;
+    if (!picked.success || !picked.filePath || !picked.xmlText || !picked.title || !picked.sha256) {
+      const detail = picked.error ?? 'Could not pick CT file.';
+      dispatchCtImport({ type: 'failed', errorMessage: detail });
+      setMessage(detail);
+      return;
+    }
+    await handleImportCt({
+      filePath: picked.filePath,
+      xmlText: picked.xmlText,
+      title: picked.title,
+      sha256: picked.sha256,
+    });
+  };
+
+  const handlePickInstallRoot = async () => {
+    const result = await window.electronAPI?.installDiscoveryPickFolder?.();
+    if (result?.success && result.folderPath) {
+      setInstallRootFolder(result.folderPath);
+      setMessage(`Scan root selected: ${result.folderPath}`);
+    } else if (result && !result.canceled) {
+      setMessage(result.error ?? 'Could not select scan root.');
+    }
+  };
+
+  const handleAddSelectedInstalls = async () => {
+    const api = window.electronAPI;
+    if (!api?.installDiscoveryCommit || !discoveryPreview) return;
+    const records = discoveryPreview.records
+      .filter((record) => selectedDiscoveryIds.has(record.previewCandidateId) && !record.duplicate)
+      .map(({ platform, installPath, executablePath, displayName, steamAppId, launcherAppId }) => ({
+        platform,
+        installPath,
+        executablePath,
+        displayName,
+        steamAppId,
+        launcherAppId,
+      }));
+    if (records.length === 0) {
+      setMessage('No non-duplicate installs selected to add.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Add ${records.length} selected local install${records.length === 1 ? '' : 's'} to Solith? This only records local metadata and does not attach to or modify games.`,
+    );
+    if (!confirmed) return;
+    setAddingSelectedInstalls(true);
+    try {
+      const result = await api.installDiscoveryCommit({ records });
+      if (!result.success) {
+        setMessage('Unable to add selected games because the preview data is no longer valid. Run discovery again.');
+        return;
+      }
+      await refreshInstalledList();
+      const health = await api.trainerHealthCheck?.();
+      if (health?.success && health.map) setHealthMap(health.map);
+      setDiscoveryPreview((prev) => prev
+        ? {
+            ...prev,
+            records: prev.records.map((record) =>
+              selectedDiscoveryIds.has(record.previewCandidateId) ? { ...record, duplicate: true } : record,
+            ),
+          }
+        : prev);
+      setSelectedDiscoveryIds(new Set());
+      setMessage(`Added ${result.added ?? 0}; skipped ${result.skipped ?? 0} existing installs.`);
+    } finally {
+      setAddingSelectedInstalls(false);
+    }
+  };
+
+  const rememberDiscoveryPreviewHeight = () => {
+    if (discoveryPreviewExpanded) return;
+    const height = Math.round(discoveryPreviewListRef.current?.getBoundingClientRect().height ?? 0);
+    if (height < MIN_DISCOVERY_PREVIEW_HEIGHT) return;
+    const bounded = Math.min(MAX_DISCOVERY_PREVIEW_HEIGHT, height);
+    setDiscoveryPreviewHeight(bounded);
+    try {
+      window.sessionStorage.setItem(DISCOVERY_PREVIEW_HEIGHT_KEY, String(bounded));
+    } catch {
+      // Session persistence is optional; resizing still works without storage access.
     }
   };
 
@@ -757,9 +944,6 @@ export default function TrainerLibraryPage({
     try {
       const result = await api.addGame({ name: gameName, path: installDir });
       if (result?.success) {
-        if (api.installDiscoveryScan) {
-          await api.installDiscoveryScan();
-        }
         await refreshInstalledList();
         setMessage(`Added "${gameName}" from ${installDir}.`);
       } else {
@@ -864,20 +1048,22 @@ export default function TrainerLibraryPage({
                 if (file) void handleImportYaml(file);
               }}
             />
-            <input
-              ref={importCtRef}
-              type="file"
-              accept=".ct,.xml,text/xml"
-              className={styles.hiddenFileInput}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleImportCt(file);
-              }}
-            />
-            <button id="trainer-library-scan-installed" type="button" className={styles.syncBtn} onClick={() => void handleScanInstalled()} disabled={scanningInstalls}>
+            <button
+              id="trainer-library-scan-installed"
+              type="button"
+              className={styles.syncBtn}
+              onClick={() => void handleScanInstalled()}
+              disabled={scanningInstalls}
+            >
               {scanningInstalls ? 'Scanning…' : 'Scan installed games'}
             </button>
-            <button type="button" className={styles.syncBtn} onClick={() => importCtRef.current?.click()} disabled={importing}>
+            <button
+              id="trainer-library-import-ct"
+              type="button"
+              className={styles.syncBtn}
+              onClick={() => void handlePickAndImportCt()}
+              disabled={importing}
+            >
               {importing ? 'Importing…' : 'Import CT'}
             </button>
             <button type="button" className={styles.syncBtn} onClick={() => importYamlRef.current?.click()} disabled={importing}>
@@ -962,7 +1148,7 @@ export default function TrainerLibraryPage({
                 className={styles.syncBtn}
                 onClick={() => {
                   dispatchCtImport({ type: 'reset' });
-                  importCtRef.current?.click();
+                  void handlePickAndImportCt();
                 }}
               >
                 Retry / Import Another CT
@@ -971,6 +1157,159 @@ export default function TrainerLibraryPage({
           </div>
         </section>
       )}
+
+      <section
+        id="trainer-library-discovery-preview"
+        className={styles.scanPreviewPanel}
+        aria-labelledby="install-discovery-preview-heading"
+      >
+        <div className={styles.scanPreviewHeader}>
+          <div>
+            <h2 id="install-discovery-preview-heading">Installed Game Discovery</h2>
+            <p>
+              Local-only scan preview. Solith records selected installs only after confirmation; it does not attach to or modify games.
+            </p>
+          </div>
+          <div className={styles.scanPreviewActions}>
+            <button
+              id="trainer-library-choose-scan-folder"
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => void handlePickInstallRoot()}
+            >
+              Choose scan folder
+            </button>
+            <button
+              id="trainer-library-run-discovery-preview"
+              type="button"
+              className={styles.syncBtn}
+              onClick={() => void handleScanInstalled()}
+              disabled={scanningInstalls}
+            >
+              {scanningInstalls ? 'Scanning…' : 'Run discovery preview'}
+            </button>
+          </div>
+        </div>
+        {installRootFolder && (
+          <p className={styles.scanRoot} title={installRootFolder}>
+            Extra root: {installRootFolder}
+          </p>
+        )}
+        {discoveryPreview && (
+          <>
+            <div className={styles.scanSummary}>
+              <span>{discoveryPreview.discovered} plausible games</span>
+              <span>{discoveryPreview.matched} matched</span>
+              <span>{discoveryPreview.duplicatesSkipped} duplicates</span>
+              <span>{discoveryPreview.rejected.length} rejected non-games</span>
+            </div>
+            <div className={styles.scanPreviewActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                aria-expanded={discoveryPreviewExpanded}
+                aria-controls="trainer-library-discovery-records"
+                onClick={() => setDiscoveryPreviewExpanded((expanded) => !expanded)}
+              >
+                {discoveryPreviewExpanded ? 'Collapse preview' : 'Expand preview'}
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={() =>
+                  setSelectedDiscoveryIds(new Set(discoveryPreview.records.filter((record) => !record.duplicate && record.classification === 'likely_game').map((record) => record.previewCandidateId)))
+                }
+              >
+                Select all new
+              </button>
+              <button type="button" className={styles.secondaryBtn} onClick={() => setSelectedDiscoveryIds(new Set())}>
+                Deselect all
+              </button>
+              <button
+                type="button"
+                className={styles.syncBtn}
+                onClick={() => void handleAddSelectedInstalls()}
+                disabled={addingSelectedInstalls || selectedDiscoveryIds.size === 0}
+              >
+                {addingSelectedInstalls ? 'Adding…' : `Add selected (${selectedDiscoveryIds.size})`}
+              </button>
+            </div>
+            <div
+              id="trainer-library-discovery-records"
+              ref={discoveryPreviewListRef}
+              className={`${styles.scanRecordList}${discoveryPreviewExpanded ? ` ${styles.scanRecordListExpanded}` : ''}`}
+              style={discoveryPreviewExpanded ? undefined : { height: `${discoveryPreviewHeight}px` }}
+              onPointerUp={rememberDiscoveryPreviewHeight}
+            >
+              {discoveryPreview.records.length === 0 ? (
+                <p>No local installs were found in the checked locations.</p>
+              ) : (
+                discoveryPreview.records.slice(0, 60).map((record) => (
+                  <label
+                    key={record.previewCandidateId}
+                    className={`${styles.scanRecord}${record.duplicate ? ` ${styles.scanRecordMuted}` : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDiscoveryIds.has(record.previewCandidateId)}
+                      disabled={record.duplicate}
+                      onChange={(event) => {
+                        setSelectedDiscoveryIds((prev) => {
+                          const next = new Set(prev);
+                          if (event.target.checked) next.add(record.previewCandidateId);
+                          else next.delete(record.previewCandidateId);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>
+                      <strong>{record.catalogDisplayName ?? record.displayName ?? record.catalogGameId ?? 'Unmatched local executable'}</strong>
+                      <small>{record.platform} · {record.installPath}</small>
+                      {record.duplicate && (
+                        <small>
+                          Already in local library
+                          {record.duplicateReason ? ` (${record.duplicateReason.replace(/_/g, ' ')})` : ''}
+                        </small>
+                      )}
+                      <small>{record.classification === 'uncertain' ? 'Uncertain: ' + record.classificationReason : 'Likely game: ' + record.classificationReason}</small>
+                      {record.unsupportedReason && <small>Reason: {record.unsupportedReason}</small>}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+            <details className={styles.scanDiagnostics}>
+              <summary>Scan locations and diagnostics</summary>
+              <ul>
+                {discoveryPreview.locationsChecked.map((location) => (
+                  <li key={location}>{location}</li>
+                ))}
+              </ul>
+              {discoveryPreview.rejected.length > 0 && (
+                <>
+                  <strong>Rejected non-games</strong>
+                  <ul>
+                    {discoveryPreview.rejected.map((record) => (
+                      <li key={record.installPath + record.reason}>{record.installPath}: {record.reason}</li>
+                    ))}
+                  </ul>
+                </>
+              )}              {discoveryPreview.failures.length > 0 && (
+                <>
+                  <strong>Failures</strong>
+                  <ul>
+                    {discoveryPreview.failures.map((failure) => (
+                      <li key={`${failure.location}:${failure.reason}`}>
+                        {failure.location}: {failure.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </details>
+          </>
+        )}
+      </section>
 
       <form className={styles.searchRow} onSubmit={handleSearch}>
         <input

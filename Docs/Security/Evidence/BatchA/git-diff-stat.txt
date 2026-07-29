@@ -1,0 +1,18 @@
+ ROADMAP.md                                   |  14 ++
+ electron/install-discovery-ipc.ts            |   9 +-
+ electron/preload.ts                          |   6 +
+ electron/wisp-overlay.ts                     | 192 ++++++++++++++--
+ src/app/assets/wisp/index.ts                 |  20 +-
+ src/app/components/SolithWispCompanion.tsx   | 331 ++++++++++++++++++++-------
+ src/app/live-memory/process-picker.ts        |  41 +++-
+ src/app/pages/LiveMemoryTrainerPage.tsx      |  16 +-
+ src/app/pages/TrainerLibraryPage.tsx         |  34 ++-
+ src/app/styles/index.css                     | 242 +++++++++++++++++---
+ src/core/install-discovery/index.ts          | 144 ++++++++----
+ src/core/install-discovery/types.ts          |  19 ++
+ src/core/live-memory/native-memory-driver.ts |  26 ++-
+ src/index.tsx                                |   5 +
+ src/types/global.d.ts                        |  74 +++++-
+ tests/process-picker.test.ts                 |  39 ++++
+ tests/trainer-library-preview-gates.test.ts  |  57 +++++
+ 17 files changed, 1062 insertions(+), 207 deletions(-)

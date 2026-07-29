@@ -1,0 +1,65 @@
+electron/local-ocr-ipc.ts(78,7): error TS2322: Type '"7"' is not assignable to type 'PSM'.
+electron/run-compat-test.ts(11,18): error TS2307: Cannot find module './compat-test-main.js' or its corresponding type declarations.
+electron/trainer-catalog-ipc.ts(190,58): error TS2345: Argument of type '{ definition: { schemaVersion: 1; id: string; title: string; gameVersion: string; executableHashPrefixes: string[]; author: string; safety: { requiresApproval: boolean; requiresOfflineConfirm: boolean; verificationStatus: "verified" | ... 2 more ... | "unverified"; }; ... 6 more ...; saveEditor?: { ...; }; }; execut...' is not assignable to parameter of type '{ definition: SolithDefinitionV1; executableHash: string; }'.
+  The types of 'definition.memoryFeatures' are incompatible between these types.
+    Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }[]' is not assignable to type 'MemoryFeatureV1[]'.
+      Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' is not assignable to type 'MemoryFeatureV1'.
+        Property 'defaultValue' is optional in type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' but required in type 'MemoryFeatureV1'.
+electron/trainer-catalog-ipc.ts(309,49): error TS2339: Property 'errors' does not exist on type 'ImportCtFailure | PreviewCtOutcome'.
+  Property 'errors' does not exist on type 'PreviewCtOutcome'.
+electron/trainer-catalog-ipc.ts(337,49): error TS2339: Property 'errors' does not exist on type 'ImportCtOutcome | ImportCtFailure'.
+  Property 'errors' does not exist on type 'ImportCtOutcome'.
+electron/trainer-catalog-ipc.ts(358,32): error TS2345: Argument of type '{ catalogGameId: string; featureId: string; executableHashPrefix?: string; rating?: 0 | 1 | -1; note?: string; }' is not assignable to parameter of type '{ catalogGameId: string; featureId: string; executableHashPrefix?: string; rating: 0 | 1 | -1; note?: string; }'.
+  Property 'rating' is optional in type '{ catalogGameId: string; featureId: string; executableHashPrefix?: string; rating?: 0 | 1 | -1; note?: string; }' but required in type '{ catalogGameId: string; featureId: string; executableHashPrefix?: string; rating: 0 | 1 | -1; note?: string; }'.
+electron/trainer-catalog-ipc.ts(434,49): error TS2339: Property 'errors' does not exist on type 'ImportYamlOutcome'.
+  Property 'errors' does not exist on type 'ImportYamlResult'.
+electron/trainer-research-ipc.ts(100,49): error TS2339: Property 'errors' does not exist on type 'ImportDumpspaceOutcome | ImportDumpspaceFailure'.
+  Property 'errors' does not exist on type 'ImportDumpspaceOutcome'.
+src/core/adapters/drill-core-settings.ts(92,53): error TS2339: Property 'error' does not exist on type '{ ok: true; data: any; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; data: any; }'.
+src/core/adapters/drill-core-settings.ts(163,66): error TS2339: Property 'error' does not exist on type '{ ok: true; value: number; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; value: number; }'.
+src/core/adapters/drill-core-settings.ts(166,56): error TS2339: Property 'error' does not exist on type '{ ok: true; token: MasterVolumeToken; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; token: MasterVolumeToken; }'.
+src/core/adapters/drill-core-settings.ts(225,73): error TS2339: Property 'error' does not exist on type '{ ok: true; token: MasterVolumeToken; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; token: MasterVolumeToken; }'.
+src/core/adapters/drill-core-settings.ts(254,77): error TS2339: Property 'error' does not exist on type '{ ok: true; token: MasterVolumeToken; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; token: MasterVolumeToken; }'.
+src/core/adapters/drill-core-settings.ts(271,58): error TS2339: Property 'error' does not exist on type '{ ok: true; data: any; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; data: any; }'.
+src/core/definitions/catalog-definition-capabilities.ts(33,7): error TS2339: Property 'moduleName' does not exist on type '{}'.
+src/core/definitions/catalog-definition-capabilities.ts(34,18): error TS2339: Property 'baseOffset' does not exist on type '{}'.
+src/core/definitions/catalog-definition-capabilities.ts(34,43): error TS2339: Property 'signature' does not exist on type '{}'.
+src/core/definitions/catalog-definition-capabilities.ts(34,60): error TS2339: Property 'pointerChain' does not exist on type '{}'.
+src/core/definitions/import-definition.ts(57,47): error TS2339: Property 'errors' does not exist on type 'CompileYamlOutcome'.
+  Property 'errors' does not exist on type 'CompileYamlResult'.
+src/core/definitions/schema.v1.ts(218,3): error TS2322: Type '{ schemaVersion: 1; id: string; title: string; gameVersion: string; executableHashPrefixes: string[]; author: string; safety: { requiresApproval: boolean; requiresOfflineConfirm: boolean; verificationStatus: "verified" | ... 2 more ... | "unverified"; }; ... 6 more ...; saveEditor?: { ...; }; }' is not assignable to type 'SolithDefinitionV1'.
+  Types of property 'memoryFeatures' are incompatible.
+    Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }[]' is not assignable to type 'MemoryFeatureV1[]'.
+      Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' is not assignable to type 'MemoryFeatureV1'.
+        Property 'defaultValue' is optional in type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' but required in type 'MemoryFeatureV1'.
+src/core/in-process-script/injector-launcher.ts(288,43): error TS2339: Property 'reason' does not exist on type 'ConsumeConsentResult'.
+  Property 'reason' does not exist on type '{ ok: true; }'.
+src/core/live-memory/memory-manager.ts(252,48): error TS2339: Property 'error' does not exist on type '{ ok: true; } | { ok: false; error: string; }'.
+  Property 'error' does not exist on type '{ ok: true; }'.
+src/core/runtime/headless-verification.ts(271,39): error TS2339: Property 'error' does not exist on type 'ReadOnlyScannerResponse'.
+  Property 'error' does not exist on type '{ protocolVersion: "1.0.0"; requestId: string; type: "POINTER_L2_RESULT"; ok: true; process: { pid: number; executableName: string; }; modules: ReadOnlyScannerModuleSummary[]; pointerResults: PointerL2Result[]; }'.
+src/core/runtime/headless-verification.ts(271,63): error TS2339: Property 'error' does not exist on type 'ReadOnlyScannerResponse'.
+  Property 'error' does not exist on type '{ protocolVersion: "1.0.0"; requestId: string; type: "POINTER_L2_RESULT"; ok: true; process: { pid: number; executableName: string; }; modules: ReadOnlyScannerModuleSummary[]; pointerResults: PointerL2Result[]; }'.
+src/core/trainer-catalog/sync/hub-client.ts(118,5): error TS2322: Type '{ certificationLevel: any; resolution: { moduleName: string; signature?: string; baseOffset?: string; pointerChain?: number[]; }; id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | ... 4 more ... | "byte"; defaultValue?: number ...' is not assignable to type 'MemoryFeatureV1[]'.
+  Type '{ certificationLevel: any; resolution: { moduleName: string; signature?: string; baseOffset?: string; pointerChain?: number[]; }; id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | ... 4 more ... | "byte"; defaultValue?: number ...' is not assignable to type 'MemoryFeatureV1'.
+    Property 'defaultValue' is optional in type '{ certificationLevel: any; resolution: { moduleName: string; signature?: string; baseOffset?: string; pointerChain?: number[]; }; id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | ... 4 more ... | "byte"; defaultValue?: number ...' but required in type 'MemoryFeatureV1'.
+src/core/trainer-catalog/sync/hub-client.ts(128,3): error TS2322: Type '{ schemaVersion: 1; id: string; title: string; gameVersion: string; executableHashPrefixes: string[]; author: string; safety: { requiresApproval: boolean; requiresOfflineConfirm: boolean; verificationStatus: "verified" | ... 2 more ... | "unverified"; }; ... 6 more ...; saveEditor?: { ...; }; }' is not assignable to type 'SolithDefinitionV1'.
+  Types of property 'memoryFeatures' are incompatible.
+    Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }[]' is not assignable to type 'MemoryFeatureV1[]'.
+      Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' is not assignable to type 'MemoryFeatureV1'.
+        Property 'defaultValue' is optional in type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' but required in type 'MemoryFeatureV1'.
+src/core/trainer-catalog/sync/hub-client.ts(232,3): error TS2322: Type '{ schemaVersion: 1; id: string; title: string; gameVersion: string; executableHashPrefixes: string[]; author: string; safety: { requiresApproval: boolean; requiresOfflineConfirm: boolean; verificationStatus: "verified" | ... 2 more ... | "unverified"; }; ... 6 more ...; saveEditor?: { ...; }; }' is not assignable to type 'SolithDefinitionV1'.
+  Types of property 'memoryFeatures' are incompatible.
+    Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }[]' is not assignable to type 'MemoryFeatureV1[]'.
+      Type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' is not assignable to type 'MemoryFeatureV1'.
+        Property 'defaultValue' is optional in type '{ id: string; name: string; category: string; type: "toggle" | "freeze" | "write_once" | "scan_first" | "scan_unknown"; dataType: "boolean" | "int32" | "float" | "double" | "int64" | "byte"; resolution: { ...; }; defaultValue?: number | boolean; certificationLevel?: "L0" | ... 3 more ... | "L4"; }' but required in type 'MemoryFeatureV1'.
+src/core/trainer-health/index.ts(177,19): error TS2339: Property 'moduleName' does not exist on type '{}'.
+src/core/trainer-health/index.ts(178,20): error TS2339: Property 'baseOffset' does not exist on type '{}'.
+src/core/trainer-health/index.ts(178,45): error TS2339: Property 'signature' does not exist on type '{}'.
+src/core/trainer-health/index.ts(178,62): error TS2339: Property 'pointerChain' does not exist on type '{}'.

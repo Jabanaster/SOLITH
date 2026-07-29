@@ -12,9 +12,13 @@ using v8::Exception;
 using v8::Isolate;
 using v8::String;
 
-process::Pair process::openProcess(const char* processName, char** errorMessage){
+process::Pair process::openProcess(const char* processName, char** errorMessage, bool requestWriteAccess){
   PROCESSENTRY32 process;
   HANDLE handle = NULL;
+  DWORD desiredAccess = PROCESS_QUERY_INFORMATION | PROCESS_VM_READ;
+  if (requestWriteAccess) {
+    desiredAccess |= PROCESS_VM_WRITE | PROCESS_VM_OPERATION;
+  }
 
   // A list of processes (PROCESSENTRY32)
   std::vector<PROCESSENTRY32> processes = getProcesses(errorMessage);
@@ -22,7 +26,7 @@ process::Pair process::openProcess(const char* processName, char** errorMessage)
   for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processes.size(); i++) {
     // Check to see if this is the process we want.
     if (!strcmp(processes[i].szExeFile, processName)) {
-      handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i].th32ProcessID);
+      handle = OpenProcess(desiredAccess, FALSE, processes[i].th32ProcessID);
       process = processes[i];
       break;
     }
@@ -38,9 +42,13 @@ process::Pair process::openProcess(const char* processName, char** errorMessage)
   };
 }
 
-process::Pair process::openProcess(DWORD processId, char** errorMessage) {
+process::Pair process::openProcess(DWORD processId, char** errorMessage, bool requestWriteAccess) {
   PROCESSENTRY32 process;
   HANDLE handle = NULL;
+  DWORD desiredAccess = PROCESS_QUERY_INFORMATION | PROCESS_VM_READ;
+  if (requestWriteAccess) {
+    desiredAccess |= PROCESS_VM_WRITE | PROCESS_VM_OPERATION;
+  }
 
   // A list of processes (PROCESSENTRY32)
   std::vector<PROCESSENTRY32> processes = getProcesses(errorMessage);
@@ -48,7 +56,7 @@ process::Pair process::openProcess(DWORD processId, char** errorMessage) {
   for (std::vector<PROCESSENTRY32>::size_type i = 0; i != processes.size(); i++) {
     // Check to see if this is the process we want.
     if (processId == processes[i].th32ProcessID) {
-      handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processes[i].th32ProcessID);
+      handle = OpenProcess(desiredAccess, FALSE, processes[i].th32ProcessID);
       process = processes[i];
       break;
     }

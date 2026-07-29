@@ -77,6 +77,21 @@ function writeTyped(buffer: Buffer, offset: number, dataType: LiveValueType, val
  */
 export class FakeMemoryDriver implements MemoryDriver {
   private memory = new Map<string, number>();
+  /**
+   * (Gate 2) Byte-precise shadow of `memory`, populated whenever a write goes
+   * through `writeMemory`/`writeBuffer`. `readBuffer` and `readMemory` prefer
+   * this when present so a propose→confirm→rollback flow round-trips exact
+   * bytes, matching how a real process's memory has no separate "decoded
+   * number" cache — it is just bytes, decoded at read time.
+   */
+  private rawBytes = new Map<string, Buffer>();
+  /**
+   * (Gate 2) Remembers the dataType last used by writeMemory/readMemory for
+   * an address, purely so getValue() — an untyped test-introspection helper —
+   * can still decode correctly after a byte-only writeBuffer restore (which
+   * has no dataType to work with, matching memoryjs's real writeBuffer).
+   */
+  private lastDataType = new Map<string, LiveValueType>();
   private regions: FakeRegion[] = [];
   private unreadableRegions: { baseAddress: bigint; size: number; writable: boolean }[] = [];
   private modules: MemoryModule[] = [];
@@ -96,10 +111,22 @@ export class FakeMemoryDriver implements MemoryDriver {
 
   setValue(address: bigint, value: number): void {
     this.memory.set(address.toString(), value);
+    // (Gate 2) Invalidate any byte-precise snapshot for this address — tests
+    // use setValue to simulate an out-of-band external change (game logic, a
+    // concurrent freeze, another writer), which must be visible to readMemory
+    // and readBuffer alike. Without this, a stale rawBytes entry from an
+    // earlier writeMemory/writeBuffer would keep shadowing the new value.
+    this.rawBytes.delete(address.toString());
   }
 
   getValue(address: bigint): number | undefined {
-    return this.memory.get(address.toString());
+    const key = address.toString();
+    const raw = this.rawBytes.get(key);
+    const type = this.lastDataType.get(key);
+    if (raw !== undefined && type !== undefined && raw.length >= sizeOf(type)) {
+      return readTyped(raw, 0, type);
+    }
+    return this.memory.get(key);
   }
 
   /** Seed a simulated memory region for scanner tests. */
@@ -194,6 +221,11 @@ export class FakeMemoryDriver implements MemoryDriver {
   }
 
   readMemory(_handle: LiveProcessHandle, address: bigint, dataType: LiveValueType): number {
+    const raw = this.rawBytes.get(address.toString());
+    if (raw !== undefined && raw.length >= sizeOf(dataType)) {
+      return readTyped(raw, 0, dataType);
+    }
+
     const explicit = this.memory.get(address.toString());
     if (explicit !== undefined) return explicit;
 
@@ -208,12 +240,37 @@ export class FakeMemoryDriver implements MemoryDriver {
 
   writeMemory(_handle: LiveProcessHandle, address: bigint, dataType: LiveValueType, value: number): void {
     this.memory.set(address.toString(), value);
+    this.lastDataType.set(address.toString(), dataType);
+
+    const buf = Buffer.alloc(sizeOf(dataType));
+    writeTyped(buf, 0, dataType, value);
+    this.rawBytes.set(address.toString(), buf);
 
     const region = this.findRegion(address);
     if (region) {
       const offset = Number(address - region.baseAddress);
       writeTyped(region.buffer, offset, dataType, value);
     }
+  }
+
+  /**
+   * (Gate 2) Raw-byte write, mirroring the real driver's writeBuffer. Only
+   * updates the byte-precise store — it intentionally does NOT touch the
+   * legacy numeric `memory` map (there is no dataType to decode with here,
+   * matching memoryjs's real, genuinely type-less writeBuffer). Production
+   * rollback restore calls writeMemory (typed, keeps `memory` and existing
+   * getValue()-based assertions correct) immediately before writeBuffer
+   * (raw, gives byte-exact fidelity for readMemory/readBuffer afterward) —
+   * see live-memory-session.ts rollback().
+   */
+  writeBuffer(_handle: LiveProcessHandle, address: bigint, buffer: Buffer): void {
+    const region = this.findRegion(address);
+    if (region) {
+      const offset = Number(address - region.baseAddress);
+      buffer.copy(region.buffer, offset);
+      return;
+    }
+    this.rawBytes.set(address.toString(), Buffer.from(buffer));
   }
 
   closeProcess(_handle: LiveProcessHandle): void {
@@ -238,11 +295,52 @@ export class FakeMemoryDriver implements MemoryDriver {
     }
 
     const region = this.findRegion(address);
-    if (!region) throw new Error(`No fake region contains address ${address}`);
-    const offset = Number(address - region.baseAddress);
-    if (offset + size > region.buffer.length) {
-      throw new Error(`readBuffer out of bounds for fake region at ${address}, size ${size}`);
+    if (region) {
+      const offset = Number(address - region.baseAddress);
+      if (offset + size > region.buffer.length) {
+        throw new Error(`readBuffer out of bounds for fake region at ${address}, size ${size}`);
+      }
+      return region.buffer.subarray(offset, offset + size);
     }
-    return region.buffer.subarray(offset, offset + size);
+
+    const raw = this.rawBytes.get(address.toString());
+    if (raw !== undefined && raw.length >= size) {
+      return raw.subarray(0, size);
+    }
+
+    const explicit = this.memory.get(address.toString());
+    if (explicit !== undefined) {
+      // No prior byte-precise write recorded (address was seeded via setValue) —
+      // best-effort encode by requested width, same heuristic as writeBuffer's decode.
+      const buf = Buffer.alloc(size);
+      encodeBySizeHeuristic(buf, explicit);
+      return buf;
+    }
+
+    throw new Error(`No fake region contains address ${address}`);
+  }
+}
+
+/**
+ * (Gate 2 test-fixture only) Best-effort number<->bytes conversion for the
+ * byte-level fake path when no dataType is available (mirrors memoryjs's
+ * real writeBuffer, which is genuinely type-less). Not used by production
+ * code — NativeMemoryDriver always has a concrete Buffer already in hand.
+ */
+function encodeBySizeHeuristic(buf: Buffer, value: number): void {
+  switch (buf.length) {
+    case 1:
+      buf.writeUInt8(value & 0xff, 0);
+      return;
+    case 4:
+      if (Number.isInteger(value)) buf.writeInt32LE(value | 0, 0);
+      else buf.writeFloatLE(value, 0);
+      return;
+    case 8:
+      if (Number.isSafeInteger(value)) buf.writeBigInt64LE(BigInt(value), 0);
+      else buf.writeDoubleLE(value, 0);
+      return;
+    default:
+      throw new Error(`decodeBySizeHeuristic: unsupported buffer size ${buf.length}`);
   }
 }

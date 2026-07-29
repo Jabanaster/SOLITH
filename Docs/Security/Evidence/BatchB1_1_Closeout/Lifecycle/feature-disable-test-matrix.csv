@@ -1,0 +1,2 @@
+"Requirement","ImplementationFile","Function","TestName","ExpectedResult","ActualResult","Status","Evidence","ResidualRisk"
+"Disable active freeze; exact feature_disabled reason; revoke pending auth/token; no later write; no restart on re-enable","src/core/live-memory/live-memory-session.ts","_injectFreezeFeatureFlagCheck","stops an active freeze, revokes pending authorization, and prevents later writes","All conditions enforced","Passed","PASS","verification-scoped-security-tests.txt","Feature flag enforcement is synchronous at injected check and again on each tick"

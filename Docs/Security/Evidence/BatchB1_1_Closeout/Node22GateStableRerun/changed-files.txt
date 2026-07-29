@@ -1,0 +1,19 @@
+# Changed Files
+
+This task created files exclusively under:
+
+Docs\Security\Evidence\BatchB1_1_Closeout\Node22GateStableRerun
+
+During the 120-second stability observation window (T0 -> T60 -> T120),
+zero non-evidence monitored paths changed hash, status, or existence.
+The only git-status deltas observed between T0 and T120 were the
+appearance of this task's own evidence files
+(stability-snapshot-t60.csv, stability-snapshot-t120.csv) as they were
+written — expected and authorized.
+
+No production file, test file, package file, lockfile, tsconfig,
+Vite config, or CI file was created, edited, staged, unstaged, reverted,
+or removed by this task.
+
+No prior evidence directory (Node22Gate, Node22GateReconciliation, or
+any other) was overwritten.

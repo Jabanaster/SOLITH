@@ -1,14 +1,10 @@
 import path from 'node:path';
 import type { TrainerCatalogEntry } from '../trainer-catalog/types.js';
 import type { InstalledGameRecord, RawInstalledGame } from './types.js';
+import { createInstallIdentity, INSTALL_IDENTITY_VERSION } from './identity.js';
 
 function normalizeExe(name: string): string {
   return path.basename(name).toLowerCase();
-}
-
-function buildInstalledId(game: RawInstalledGame): string {
-  const key = `${game.platform}:${path.resolve(game.installPath).toLowerCase()}`;
-  return key;
 }
 
 export function matchInstalledToCatalog(
@@ -50,9 +46,17 @@ export function matchInstalledToCatalog(
       }
     }
 
+    const identity = createInstallIdentity(game);
     records.push({
       ...game,
-      id: buildInstalledId(game),
+      id: identity.installIdentity,
+      installIdentity: identity.installIdentity,
+      canonicalInstallPath: identity.canonicalInstallPath,
+      canonicalExecutablePath: identity.canonicalExecutablePath,
+      launcherAppId: identity.launcherAppId,
+      identityVersion: INSTALL_IDENTITY_VERSION,
+      identityStatus: identity.identityStatus,
+      needsReverification: identity.needsReverification,
       catalogGameId: match?.catalogGameId,
       catalogDisplayName: match?.displayName,
       detectedAt: scannedAt,

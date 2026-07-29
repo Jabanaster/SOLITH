@@ -1,0 +1,36 @@
+# Changed Files
+
+This reconciliation created these 19 files only under:
+
+`Docs\Security\Evidence\BatchB1_1_Closeout\Node22GateReconciliation`
+
+- `actor-indicators.txt`
+- `b1_1-impact.csv`
+- `changed-files.txt`
+- `changed-status-paths.csv`
+- `current-diff-check.txt`
+- `current-diff-name-status.txt`
+- `current-diff-numstat.txt`
+- `current-diff-stat.txt`
+- `current-diff-summary.txt`
+- `current-staged-name-status.txt`
+- `current-staged-stat.txt`
+- `current-status.txt`
+- `file-hashes.csv`
+- `final-status.txt`
+- `line-ending-state.txt`
+- `path-diff-evidence.txt`
+- `reconciliation-findings.md`
+- `tracked-file-flags.txt`
+- `verification-final.txt`
+
+No production, test, configuration, package, lockfile, prior evidence, or CI file was intentionally modified by this reconciliation. No staging, unstaging, reset, clean, restore, checkout, revert, formatter, fix command, package install, or release action was performed.
+
+The final status comparison detected four additional external changes outside the authorized evidence directory and outside the scoped 23 paths:
+
+- `tests/companion-wisp.test.ts` became modified.
+- `src/core/ct-library/preview-receipt.ts` appeared untracked.
+- `tests/ct-preview-receipt.test.ts` appeared untracked.
+- `tests/wisp-preferences.test.ts` appeared untracked.
+
+They were not inspected, classified, or reverted.

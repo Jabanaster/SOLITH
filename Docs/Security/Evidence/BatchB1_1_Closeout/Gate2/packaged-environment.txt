@@ -1,0 +1,4 @@
+Command: "$Node22" --version
+v22.23.1
+Command: "$Node22" "$NpmCli" --version
+10.9.8

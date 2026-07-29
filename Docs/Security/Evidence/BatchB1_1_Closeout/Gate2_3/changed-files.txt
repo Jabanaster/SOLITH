@@ -1,0 +1,113 @@
+ M electron/install-discovery-ipc.ts
+ M electron/ipc-validation.ts
+ M electron/live-memory-ipc.ts
+ M electron/main.ts
+ M electron/preload.ts
+ M electron/privileged-consent-dialog.ts
+ M electron/registry-verification-ipc.ts
+ M electron/trainer-catalog-ipc.ts
+ M electron/trainer-overlay.ts
+ M electron/wisp-overlay.ts
+ M src/app/App.tsx
+ M src/app/assets/wisp/index.ts
+ M src/app/components/SolithWispCompanion.tsx
+ M src/app/hooks/useGameCheatSession.ts
+ M src/app/pages/LiveMemoryTrainerPage.tsx
+ M src/app/pages/RegistryExplorerPage.tsx
+ M src/app/pages/TrainerLibraryPage.module.css
+ M src/app/pages/TrainerLibraryPage.tsx
+ M src/app/routes/GameLibrary.tsx
+ M src/app/styles/index.css
+ M src/core/companion/wisp.ts
+ M src/core/consent/write-consent.ts
+ M src/core/ct-library/import-state.ts
+ M src/core/database/index.ts
+ M src/core/definitions/import-definition-ct.ts
+ M src/core/games/index.ts
+ M src/core/install-discovery/epic.ts
+ M src/core/install-discovery/gog.ts
+ M src/core/install-discovery/index.ts
+ M src/core/install-discovery/match.ts
+ M src/core/install-discovery/store.ts
+ M src/core/install-discovery/types.ts
+ M src/core/live-memory/live-memory-session.ts
+ M src/core/live-memory/memory-manager.ts
+ M src/core/live-memory/native-memory-driver.ts
+ M src/core/live-memory/types.ts
+ M src/core/live-memory/windows-process-identity.ts
+ M src/index.tsx
+ M src/shared/types/index.ts
+ M src/types/global.d.ts
+ M tests/companion-wisp.test.ts
+ M tests/csp-static.test.ts
+ M tests/fixtures/fake-memory-driver.ts
+ M tests/live-memory/live-memory-session.test.ts
+ M tests/live-memory/memory-manager.test.ts
+ M tests/packaged-smoke.test.ts
+?? electron/sender-validation.ts
+?? src/app/assets/wisp/solith-wisp-base-float.png
+?? src/app/assets/wisp/solith-wisp-controller-float.png
+?? src/app/assets/wisp/solith-wisp-crystal-float.png
+?? src/app/assets/wisp/solith-wisp-dragon-float.png
+?? src/app/assets/wisp/solith-wisp-error-float.png
+?? src/app/assets/wisp/solith-wisp-phoenix-float.png
+?? src/app/assets/wisp/solith-wisp-scan-float.png
+?? src/app/assets/wisp/solith-wisp-shield-float.png
+?? src/app/assets/wisp/solith-wisp-success-float.png
+?? src/app/assets/wisp/solith-wisp-warning-float.png
+?? src/app/wisp/preferences.ts
+?? src/configure-zod-csp.ts
+?? src/core/ct-library/preview-receipt.ts
+?? src/core/install-discovery/identity.ts
+?? src/core/live-memory/cleanup-coordinator.ts
+?? src/core/live-memory/freeze-concurrency-registry.ts
+?? src/core/live-memory/session-cleanup.ts
+?? src/core/security/process-selection-registry.ts
+?? src/core/security/trusted-sender-registry.ts
+?? tests/add-game-integration.test.ts
+?? tests/ct-preview-receipt.test.ts
+?? tests/fixtures/gate2-2-memory-fixture/Gate2_2Fixture.csproj
+?? tests/fixtures/gate2-2-memory-fixture/Program.cs
+?? tests/fixtures/gate2-2-memory-fixture/bin/Release/net9.0/Gate2_2Fixture.deps.json
+?? tests/fixtures/gate2-2-memory-fixture/bin/Release/net9.0/Gate2_2Fixture.dll
+?? tests/fixtures/gate2-2-memory-fixture/bin/Release/net9.0/Gate2_2Fixture.pdb
+?? tests/fixtures/gate2-2-memory-fixture/bin/Release/net9.0/Gate2_2Fixture.runtimeconfig.json
+?? tests/fixtures/gate2-2-memory-fixture/obj/Gate2_2Fixture.csproj.nuget.dgspec.json
+?? tests/fixtures/gate2-2-memory-fixture/obj/Gate2_2Fixture.csproj.nuget.g.props
+?? tests/fixtures/gate2-2-memory-fixture/obj/Gate2_2Fixture.csproj.nuget.g.targets
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/.NETCoreApp,Version=v9.0.AssemblyAttributes.cs
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.AssemblyInfo.cs
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.AssemblyInfoInputs.cache
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.GeneratedMSBuildEditorConfig.editorconfig
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.GlobalUsings.g.cs
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.assets.cache
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.csproj.CoreCompileInputs.cache
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.csproj.FileListAbsolute.txt
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.dll
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.genruntimeconfig.cache
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.pdb
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/Gate2_2Fixture.sourcelink.json
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/ref/Gate2_2Fixture.dll
+?? tests/fixtures/gate2-2-memory-fixture/obj/Release/net9.0/refint/Gate2_2Fixture.dll
+?? tests/fixtures/gate2-2-memory-fixture/obj/project.assets.json
+?? tests/fixtures/gate2-2-memory-fixture/obj/project.nuget.cache
+?? tests/game-metadata-persistence.test.ts
+?? tests/gate2-2-resume-packaged-lifecycle.e2e.test.ts
+?? tests/gate2-2a1-packaged-real-process-write-proof.e2e.test.ts
+?? tests/gate2-3-freeze-authorization-security.e2e.test.ts
+?? tests/installed-game-identity.test.ts
+?? tests/live-memory-rollback-freeze-ipc-validation.test.ts
+?? tests/live-memory/app-shutdown-cleanup.test.ts
+?? tests/live-memory/cleanup-failure-handling.test.ts
+?? tests/live-memory/feature-disable-cleanup.test.ts
+?? tests/live-memory/gate2-1-test-build-hooks.test.ts
+?? tests/live-memory/renderer-crash-cleanup.test.ts
+?? tests/live-memory/rollback-byte-integrity.test.ts
+?? tests/live-memory/rollback-float-integrity.test.ts
+?? tests/live-memory/session-cleanup-on-destroy.test.ts
+?? tests/packaged-lifecycle-gate2-1.e2e.test.ts
+?? tests/process-selection-registry.test.ts
+?? tests/trainer-library-persistence-lifecycle.test.ts
+?? tests/trainer-library-preview-gates.test.ts
+?? tests/trusted-sender-registry.test.ts
+?? tests/wisp-preferences.test.ts

@@ -1,0 +1,36 @@
+
+Running 5 tests using 1 worker
+
+  ok 1 tests\packaged-lifecycle-gate2-1.e2e.test.ts:98:1 › point 00 — packaged exe exists and test-build seams are active (4ms)
+  ok 2 tests\packaged-lifecycle-gate2-1.e2e.test.ts:103:1 › scenario 1 — a forced cleanup-step failure still tears down the session and blocks future writes (5.7s)
+  ok 3 tests\packaged-lifecycle-gate2-1.e2e.test.ts:148:1 › scenario 2 — renderer crash disposes the live-memory session for that owner (5.5s)
+  x  4 tests\packaged-lifecycle-gate2-1.e2e.test.ts:185:1 › scenario 3 — identity mismatch (simulated PID reuse) is rejected against a real spawned process (657ms)
+  ok 5 tests\packaged-lifecycle-gate2-1.e2e.test.ts:247:1 › scenario 4 — app close (will-quit) resolves cleanly with no hang after a full session lifecycle (100ms)
+
+
+  1) tests\packaged-lifecycle-gate2-1.e2e.test.ts:185:1 › scenario 3 — identity mismatch (simulated PID reuse) is rejected against a real spawned process 
+
+    Error: expected simulated identity, got: {"error":"Error: electronApplication.evaluate: TypeError: A dynamic import callback was not specified.\n    at importModuleDynamicallyCallback (node:internal/modules/esm/utils:279:9)\n    at eval (eval at evaluate (:303:30), <anonymous>:2:17)\n    at UtilityScript.evaluate (<anonymous>:305:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"}
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "different-image.exe"
+    Received: undefined
+
+      219 |     (liveIdentity as any)?.executableName,
+      220 |     `expected simulated identity, got: ${JSON.stringify(liveIdentity)}`,
+    > 221 |   ).toBe('different-image.exe');
+          |     ^
+      222 |
+      223 |   // And prove the fail-closed comparison itself rejects the mismatch, using
+      224 |   // the expected identity a real attach would have recorded for the
+        at G:\ACTIVE_PROJECTS\SOLITH\tests\packaged-lifecycle-gate2-1.e2e.test.ts:221:5
+
+    Error Context: test-results\packaged-lifecycle-gate2-1-a9e70-inst-a-real-spawned-process\error-context.md
+
+    Error Context: test-results\packaged-lifecycle-gate2-1-a9e70-inst-a-real-spawned-process\error-context.md
+
+  1 failed
+    tests\packaged-lifecycle-gate2-1.e2e.test.ts:185:1 › scenario 3 — identity mismatch (simulated PID reuse) is rejected against a real spawned process 
+  4 passed (20.2s)
+exit: 1

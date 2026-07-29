@@ -1,0 +1,7 @@
+Comparison,MonitoredFilesTotal,HashDiffCount,StatusDiffCount,MtimeOnlyDiffCount,Result
+Pretest_vs_AfterNpmTest,1089,0,0,20,"20 tests/fixtures/parsers/* files mtime-touched by parser test suite reads; zero hash/content/status change; test-harness generated, non-contaminating"
+AfterNpmTest_vs_AfterLiveMemory,1089,0,0,0,"Identical"
+AfterLiveMemory_vs_AfterMainTsc,1089,0,0,0,"Identical"
+AfterMainTsc_vs_AfterElectronTsc,1089,0,0,0,"Identical"
+AfterElectronTsc_vs_AfterDiffCheck,1089,0,0,0,"Identical"
+Pretest_vs_Final(60s quiet window after last command),1089,0,0,20,"Matches AfterNpmTest state exactly; no additional drift after tsc/diff-check/quiet-window"
