@@ -1,0 +1,10 @@
+{
+  "devtools": {
+    "opened": true
+  },
+  "devtoolsProbe": {
+    "hasDevToolsWebContents": false,
+    "hadElectronAPI": null,
+    "note": "devToolsWebContents not available on this webContents"
+  }
+}

@@ -1,0 +1,11 @@
+Preserved:
+- devtools-frame-failed-result.json
+- README.md
+
+Inspected but not copied as matching evidence:
+- playwright-report/index.html (last write 2026-07-29 22:28:09)
+- playwright-report/data/*.md (available failures concern other phases)
+- test-results/*/error-context.md (last write 2026-07-29 22:48:37; available failure concerns the missing Gate2_2Fixture executable)
+
+No matching Phase 6 Playwright failure artifact or exact invocation command
+was recoverable for the JSON written at 2026-07-29 22:45:23.
