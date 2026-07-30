@@ -1135,6 +1135,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-confirm-hook', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = InProcessConfirmHookSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
@@ -1163,6 +1165,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-rollback-hook', async (event) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
 

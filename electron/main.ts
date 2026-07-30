@@ -1208,7 +1208,8 @@ ipcMain.handle('trainer-host-approve-and-write', async (event, payload: unknown)
 // Roll back a completed write using the backup created during execute.
 ipcMain.handle('trainer-host-rollback', async (event, payload: unknown) => {
   try {
-    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
       return { success: false, error: 'not_owner' };
     }
