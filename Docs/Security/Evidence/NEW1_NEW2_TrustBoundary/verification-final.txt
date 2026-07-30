@@ -25,6 +25,11 @@ Wisp isolation check:
   and the window-creation call site (hoist allowed-URL array to a const, add
   applyWindowNavigationPolicy call). No reducer/state/message/lifecycle code touched.
 
-No CRITICAL, HIGH, or unresolved MEDIUM findings remain open for NEW-1/NEW-2
-at self-verification time. Independent review pending (Phase 8) — see
-independent-review.md once produced.
+Independent review (Phase 8) verdict: VERIFIED WITH CONDITIONS. Of 8
+findings, 6 were within this patch's own scope and are fixed and re-verified
+(see independent-review.md and tests-run.txt item 14 for the post-fix
+re-run: all totals unchanged or improved, e2e suite now 17/17). 2 findings
+(HIGH: in-process-confirm-hook/rollback-hook; MEDIUM: trainer-host-rollback)
+are real but were not in the explicitly authorized channel list — recorded
+in remaining-risks.md as open, not silently closed, pending a scope
+decision.

@@ -32,11 +32,11 @@ Every check calls the existing `validateIpcSender()` (electron/sender-validation
 
 | Window | File | Guard added | Allowed origins |
 |---|---|---|---|
-| main | electron/main.ts (`createWindow`) | `applyWindowNavigationPolicy` right after `registerTrustedSolithWindow`, same `allowedUrlPrefixes` array | `http://localhost:3000` (dev), packaged `file://.../dist/index.html` |
-| Wisp overlay | electron/wisp-overlay.ts (`showWispOverlay`) | same | same two origins |
-| trainer overlay | electron/trainer-overlay.ts (`showTrainerOverlay`) | same | same two origins |
+| main | electron/main.ts (`createWindow`) | `applyWindowNavigationPolicy` right after `registerTrustedSolithWindow`, same `allowedUrlPrefixes` array | dev builds: `http://localhost:3000` only. Packaged builds: `file://.../dist/index.html` only — never both (fixed in corrective pass; see remaining-risks.md item 1) |
+| Wisp overlay | electron/wisp-overlay.ts (`showWispOverlay`) | same | same, gated the same way |
+| trainer overlay | electron/trainer-overlay.ts (`showTrainerOverlay`) | same | same, gated the same way |
 
-`applyWindowNavigationPolicy` (new, electron/sender-validation.ts) denies same-window navigation to any URL not matching `allowedUrlPrefixes` (reusing the exported `isApprovedUrl()` from trusted-sender-registry.ts — the identical origin/path matcher IPC trust already uses, so the two policies cannot drift apart) and denies every `window.open()`/`target="_blank"` popup unconditionally. Solith has no existing supported external-browser handoff flow, so no allowlisted popup path was added.
+`applyWindowNavigationPolicy` (new, electron/sender-validation.ts) denies same-window navigation to any URL not matching `allowedUrlPrefixes` (reusing the exported `isApprovedUrl()` from trusted-sender-registry.ts — the identical origin/path matcher IPC trust already uses, so the two policies cannot drift apart) and denies every `window.open()`/`target="_blank"` popup as an in-app `BrowserWindow`. A strictly `https:` popup is instead handed to the OS's default browser via `shell.openExternal` (dynamically imported, so the module stays unit-testable outside a real Electron process) — added in the corrective pass after the independent reviewer found this was needed to preserve a real, pre-existing external link in the UI (see remaining-risks.md item 2). Every other scheme is denied with no handoff.
 
 ## Wisp ownership boundary
 

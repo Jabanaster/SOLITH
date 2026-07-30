@@ -75,3 +75,42 @@ package.json
   Reason: add tests/new1-new2-sender-validation.test.ts to the main `test`
   script; add a dedicated `test:new1-new2-trust-boundary` playwright script
   for the e2e file, matching the existing gate-test convention.
+
+--- Corrective pass (after independent review — see independent-review.md) ---
+
+electron/main.ts, electron/wisp-overlay.ts, electron/trainer-overlay.ts
+  Reason: independent review found `http://localhost:3000` was trusted
+  unconditionally, including in packaged builds, for both IPC sender trust
+  and the new navigation guard.
+  Runtime behavior change: each window's `allowedUrlPrefixes` is now gated
+  by the existing `isDev` flag — dev builds trust only localhost:3000,
+  packaged builds trust only the packaged file:// route, never both.
+  Security impact: closes an attacker-bindable-origin gap in shipped builds.
+  Tests: tests/new1-new2-sender-validation.test.ts already covered both
+  branches of isApprovedUrl(); no new test needed, existing suite re-passed.
+
+electron/sender-validation.ts
+  Reason: denying all popups silently broke a real, pre-existing
+  target="_blank" external link in the UI (ExternalTrainerResearchLab.tsx).
+  Runtime behavior change: a strictly https: popup request is now handed to
+  shell.openExternal (dynamically imported, so the file stays plain-Node
+  testable) instead of being silently dropped; every other scheme is still
+  denied with no handoff; in-app BrowserWindow creation is still always
+  denied for every popup regardless of scheme.
+  Security impact: closes a functional regression from the first pass while
+  preserving the "no in-app popup gets privileged preload access" property.
+  Tests: tests/new1-new2-sender-validation.test.ts's "denies every
+  window.open / popup request by default" test still passes (return value
+  unchanged); the openExternal side effect is a fire-and-forget best-effort
+  call not asserted directly (would require a real Electron process check —
+  out of scope for this pass).
+
+tests/new1-new2-trust-boundary.e2e.test.ts
+  Reason: independent review found the original 7 NEW-1 tests only proved
+  non-regression for a legitimate caller — they would still pass if the new
+  trusted-sender check were deleted entirely.
+  Change: added a negative-control test calling all 7 hardened channels
+  from the real Wisp overlay window (registered windowType 'wisp-overlay',
+  same preload as main) and asserting genuine
+  sender_rejected:unauthorized_window_type — this fails if the check is
+  ever removed. 16 tests → 17 tests, all passing.

@@ -25,7 +25,11 @@ needed to satisfy.
 
 4) Focused NEW-1/NEW-2 real-Electron wiring tests
    npx playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts
-   16 passed (2.1m), 0 failed
+   First pass (before corrective commit): 16 passed (2.1m), 0 failed
+   After corrective pass (added negative-control test, see independent-review.md):
+   17 passed (1.2m), 0 failed — includes the new negative-control test proving
+   all 7 hardened channels genuinely reject the real Wisp overlay window with
+   sender_rejected:unauthorized_window_type.
 
 5) Trusted-sender registry tests (pre-existing, regression check)
    Included in the full `npm test` run below (tests/trusted-sender-registry.test.ts) — passed.
@@ -77,3 +81,15 @@ needed to satisfy.
 
 13) Packaging
     NOT RUN — explicitly out of scope for this pass.
+
+14) Post-corrective-pass full re-verification (after fixing the 4 items in
+    independent-review.md that were in-scope: dev-gated allowed origins,
+    https external-link handoff, strengthened e2e tests, evidence corrections)
+    - tsc -p tsconfig.electron.json --noEmit: exit 0
+    - tsc -p tsconfig.json --noEmit: exit 0
+    - tests/new1-new2-sender-validation.test.ts: 16/16 pass (unchanged)
+    - npm run build:vite: exit 0
+    - npm run build:electron: 29/29 checks passed
+    - tests/new1-new2-trust-boundary.e2e.test.ts: 17/17 pass (see item 4 above)
+    - full `npm test` equivalent command: 1046 + 10 = 1056 tests, 1056 pass, 0 fail
+    - git diff --check: clean
