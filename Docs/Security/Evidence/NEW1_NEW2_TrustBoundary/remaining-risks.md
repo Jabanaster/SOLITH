@@ -30,10 +30,20 @@ and re-verified.
   commit. **Now hardened** with the same `requireTrustedSender(event)`
   helper already used by `trainer-host-approve-and-write`.
 
-All 10 destructive/privileged channels in the NEW-1 finding's actual subsystem
+All destructive/privileged channels in the NEW-1 finding's actual subsystem
 (the V2 live-memory / injector-launch / in-process-hook / TrainerHost feature
 area that the original audit named) now share the identical trusted-sender
-mechanism. **Correction (found by the second narrow independent review):**
+mechanism — **16 channels total** (6 already hardened before this branch:
+the freeze/rollback cluster; 10 hardened across this branch's two
+implementation passes: `live-memory-issue-write-consent`,
+`live-memory-confirm-write`, `in-process-propose-injector-launch`,
+`in-process-issue-injector-consent`, `in-process-register-injector-helper`,
+`in-process-confirm-injector-launch`, `trainer-host-approve-and-write`,
+`in-process-confirm-hook`, `in-process-rollback-hook`,
+`trainer-host-rollback`). Earlier drafts of this file said "10" without
+naming the other 6 already-hardened channels, which read as an inconsistent
+denominator against the ledger below — corrected here (found by the third,
+final independent review). **Correction (found by the second narrow independent review):**
 the sentence that previously stood here — "No further NEW-1 gaps are open as
 of this pass" — was an overclaim about the codebase as a whole, not just the
 authorized channel list, and was not true. See "Final same-class
@@ -50,9 +60,11 @@ three handlers (and nothing else), which is what closed them.
 
 ## Final same-class destructive-handler audit
 
-Every `ipcMain.handle` registration in `electron/live-memory-ipc.ts` (41
-channels) and `electron/main.ts` (45 channels) was re-enumerated and
-classified. Classifications used: `HARDENED — TRUSTED SENDER REQUIRED`,
+Every `ipcMain.handle` registration in `electron/live-memory-ipc.ts` (42
+channels) and `electron/main.ts` (44 channels) was re-enumerated and
+classified (counts corrected here per the third independent review, which
+found the previous draft's 41/45 was off by one in each direction).
+Classifications used: `HARDENED — TRUSTED SENDER REQUIRED`,
 `READ-ONLY / NON-DESTRUCTIVE`, `OUTSIDE NEW-1 CLASS — JUSTIFIED`,
 `REMAINING DEFECT`.
 
@@ -68,12 +80,15 @@ classified. Classifications used: `HARDENED — TRUSTED SENDER REQUIRED`,
 
 Zero entries in this subsystem are `REMAINING DEFECT`.
 
+**Note added per the third independent review (informational, not a NEW-1 defect):** `in-process-propose-hook`'s proposal store (`src/core/in-process-script/hook-engine.ts`'s module-level `proposals` map) is keyed by `proposalId` alone, not scoped by session — `installHookFromProposal` (called from the now-hardened `in-process-confirm-hook`) looks up a proposal by ID without checking which session staged it. This is a confused-deputy-shaped coupling between an unhardened staging channel and a hardened execution channel, but it is not independently exploitable: reaching `in-process-confirm-hook` still requires passing `requireTrustedSender(event)` as the trusted main window, and nothing lets an untrusted sender make the trusted window supply an attacker-chosen `proposalId`. Recorded for awareness in any future "beyond B1.1" hardening pass, not treated as a NEW-1 gap.
+
 ### NEW-1 subsystem (`electron/main.ts` — TrainerHost + V2 session monitor)
 
 | Channel(s) | Classification |
 |---|---|
 | `trainer-host-approve-and-write`, `trainer-host-rollback` | **HARDENED — TRUSTED SENDER REQUIRED** |
-| `trainer-host-start`, `trainer-host-stop`, `trainer-host-get-status`, `trainer-host-read-field`, `trainer-host-propose-write` | **READ-ONLY / NON-DESTRUCTIVE** — lifecycle/read/staging; no destructive write happens until `-approve-and-write`, which is hardened |
+| `trainer-host-start` | **LIFECYCLE — fixed-argv process spawn, non-destructive** (corrected from "READ-ONLY" per the third independent review: `host-supervisor.ts` spawns a child process here via `realSpawnFn(process.execPath, [entryPath], …)` with `shell: false` and a fixed, non-renderer-controlled argv — a real spawn, not a no-op, but not a destructive write and not attacker-influenceable) |
+| `trainer-host-stop`, `trainer-host-get-status`, `trainer-host-read-field`, `trainer-host-propose-write` | **READ-ONLY / NON-DESTRUCTIVE** — lifecycle/read/staging; no destructive write happens until `-approve-and-write`, which is hardened |
 | `v2-monitor-start`, `v2-monitor-stop`, `v2-monitor-get-state`, `v2-monitor-clear-timeline`, `v2-monitor-export-diagnostics` | **READ-ONLY / NON-DESTRUCTIVE** |
 
 Zero entries in this subsystem are `REMAINING DEFECT`.
@@ -89,12 +104,23 @@ Zero entries in this subsystem are `REMAINING DEFECT`.
 `discover-save-locations`, `get-save-locations`, `approve-save-location`,
 `revoke-save-location`, `add-user-selected-location`, `check-game-running`,
 `get-compatibility-profile`, `get-all-profiles` —
-**OUTSIDE NEW-1 CLASS — JUSTIFIED.** This is Solith's pre-existing,
-file-based V1 game-profile/save editor, a distinct feature area from the V2
-live-memory/injector/hook/TrainerHost system the audited NEW-1 finding
-named. It was never in scope for Batch B1.1 or either NEW-1/NEW-2 review
-pass, and is tracked under the separate, still-`PENDING`
-"Privileged IPC hardening beyond B1.1" roadmap item.
+**OUTSIDE NEW-1 CLASS — JUSTIFIED.** This is Solith's pre-existing V1
+game-profile/save editor. **The dividing line is provenance, not
+implementation mechanism** — a correction made per the third independent
+review, which pointed out that framing this as "file-based V1 vs.
+memory/hook-based V2" is factually wrong: `trainer-host-approve-and-write`
+and `trainer-host-rollback` (hardened, V2/TrainerHost) also do plain file
+writes (`fs.writeFileSync`/`fs.copyFileSync` in
+`src/core/trainer-host/write-save-field.ts`), structurally the same
+operation as `apply-proposal`/`restore-backup` (unhardened, V1). The actual
+boundary is: these V1 handlers were never named by the original NEW-1/NEW-2
+audit and were never in scope for Batch B1.1 or either review pass on this
+branch — full stop, regardless of whether they write memory or files. They
+are tracked under the separate, still-`PENDING`
+"Privileged IPC hardening beyond B1.1" roadmap item. Stating the boundary
+as memory-vs-file risked a future reader using that false distinction to
+justify leaving some other file-writing handler unhardened; stating it as
+audit-provenance does not have that failure mode.
 
 **This justification does not minimize the following real gap, flagged
 explicitly rather than left implicit:** `restore-backup` and `apply-proposal`
