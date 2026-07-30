@@ -30,15 +30,87 @@ and re-verified.
   commit. **Now hardened** with the same `requireTrustedSender(event)`
   helper already used by `trainer-host-approve-and-write`.
 
-All 10 destructive/privileged channels identified across both review passes
-now share the identical trusted-sender mechanism. No further NEW-1 gaps are
-open as of this pass.
+All 10 destructive/privileged channels in the NEW-1 finding's actual subsystem
+(the V2 live-memory / injector-launch / in-process-hook / TrainerHost feature
+area that the original audit named) now share the identical trusted-sender
+mechanism. **Correction (found by the second narrow independent review):**
+the sentence that previously stood here — "No further NEW-1 gaps are open as
+of this pass" — was an overclaim about the codebase as a whole, not just the
+authorized channel list, and was not true. See "Final same-class
+destructive-handler audit" below for the corrected, complete picture: two
+V1-era save-editor handlers (`restore-backup`, `apply-proposal`) have **zero**
+sender check of any kind, and are a real, separately-tracked gap outside the
+NEW-1 subsystem, not silently swept into "no further gaps."
 
 These were surfaced during Phase 2 inventory but excluded from the first
 pass's explicitly authorized "harden exactly these six channels +
 trainer-host-approve-and-write" scope. The task owner then explicitly
 authorized a second, narrowly-scoped corrective pass covering exactly these
 three handlers (and nothing else), which is what closed them.
+
+## Final same-class destructive-handler audit
+
+Every `ipcMain.handle` registration in `electron/live-memory-ipc.ts` (41
+channels) and `electron/main.ts` (45 channels) was re-enumerated and
+classified. Classifications used: `HARDENED — TRUSTED SENDER REQUIRED`,
+`READ-ONLY / NON-DESTRUCTIVE`, `OUTSIDE NEW-1 CLASS — JUSTIFIED`,
+`REMAINING DEFECT`.
+
+### NEW-1 subsystem (`electron/live-memory-ipc.ts` — live-memory / research / in-process-hook / injector)
+
+| Channel(s) | Classification |
+|---|---|
+| `live-memory-issue-write-consent`, `live-memory-confirm-write`, `live-memory-rollback`, `live-memory-freeze-propose`, `live-memory-freeze-issue-consent`, `live-memory-freeze-start`, `live-memory-freeze-stop`, `live-memory-freeze-status` | **HARDENED — TRUSTED SENDER REQUIRED** |
+| `in-process-confirm-hook`, `in-process-rollback-hook` | **HARDENED — TRUSTED SENDER REQUIRED** (this pass) |
+| `in-process-propose-injector-launch`, `in-process-issue-injector-consent`, `in-process-register-injector-helper`, `in-process-confirm-injector-launch` | **HARDENED — TRUSTED SENDER REQUIRED** |
+| `live-memory-list-processes`, `live-memory-attach`, `live-memory-zero-input-prepare`, `live-memory-detach`, `live-memory-read`, `live-memory-propose-write`, `live-memory-scan-first*`, `live-memory-scan-next*`, `live-memory-read-many`, `live-memory-correlation-*`, `live-memory-list-controls`, `live-memory-resolve-*`, `live-memory-pointer-scan`, `live-memory-scan-aob`, `research:view`, `research:hex`, `research:pointer-analyze`, `research:resolve-path`, `research:snapshot-diff`, `in-process-propose-hook` | **READ-ONLY / NON-DESTRUCTIVE** — staging, scanning, or read-only; no live write/spawn occurs at these channels; consistent with why they were never in NEW-1's scope |
+| `research:snapshot-save` | **OUTSIDE NEW-1 CLASS — JUSTIFIED** — writes a diagnostic snapshot file under the app's own `userData/research-sessions`, not a user's game save/config or process memory; L-tier (liveness-only), a real but low-severity gap, noted here rather than silently dropped |
+
+Zero entries in this subsystem are `REMAINING DEFECT`.
+
+### NEW-1 subsystem (`electron/main.ts` — TrainerHost + V2 session monitor)
+
+| Channel(s) | Classification |
+|---|---|
+| `trainer-host-approve-and-write`, `trainer-host-rollback` | **HARDENED — TRUSTED SENDER REQUIRED** |
+| `trainer-host-start`, `trainer-host-stop`, `trainer-host-get-status`, `trainer-host-read-field`, `trainer-host-propose-write` | **READ-ONLY / NON-DESTRUCTIVE** — lifecycle/read/staging; no destructive write happens until `-approve-and-write`, which is hardened |
+| `v2-monitor-start`, `v2-monitor-stop`, `v2-monitor-get-state`, `v2-monitor-clear-timeline`, `v2-monitor-export-diagnostics` | **READ-ONLY / NON-DESTRUCTIVE** |
+
+Zero entries in this subsystem are `REMAINING DEFECT`.
+
+### Outside the NEW-1 subsystem (`electron/main.ts` — V1 legacy game-profile / save-editor feature)
+
+`get-games`, `pick-game-folder`, `pick-game-executable`, `add-game`,
+`update-game`, `scan-game`, `delete-game`, `get-recipes`, `create-recipe`,
+`get-journal`, `log-event`, `get-settings`, `set-setting`, `delete-recipe`,
+`get-backups`, `restore-backup`, `detect-save-files`, `pick-save-file`,
+`parse-save`, `compare-saves`, `compare-saves-report`,
+`create-proposal-for-edit`, `apply-proposal`, `suggest-data-edits`,
+`discover-save-locations`, `get-save-locations`, `approve-save-location`,
+`revoke-save-location`, `add-user-selected-location`, `check-game-running`,
+`get-compatibility-profile`, `get-all-profiles` —
+**OUTSIDE NEW-1 CLASS — JUSTIFIED.** This is Solith's pre-existing,
+file-based V1 game-profile/save editor, a distinct feature area from the V2
+live-memory/injector/hook/TrainerHost system the audited NEW-1 finding
+named. It was never in scope for Batch B1.1 or either NEW-1/NEW-2 review
+pass, and is tracked under the separate, still-`PENDING`
+"Privileged IPC hardening beyond B1.1" roadmap item.
+
+**This justification does not minimize the following real gap, flagged
+explicitly rather than left implicit:** `restore-backup` and `apply-proposal`
+are genuinely destructive (file restore / save-file write) and have **zero**
+sender check of any kind — not `requireTrustedSender`, not even
+`isDestroyed()`. `delete-game`, `delete-recipe`, and `revoke-save-location`
+are also destructive with no sender check. `create-proposal-for-edit` is
+staging-only (builds a proposal object, does not write) but also has zero
+sender check. All of them do have their own non-identity protections
+(`validateIpcPathSafety` scopes `apply-proposal`/`create-proposal-for-edit`
+writes to within the game's own directory; Zod schema validation on every
+payload), but none check who is calling. This is a real, pre-existing
+security debt for a follow-up "Privileged IPC hardening beyond B1.1" pass —
+it is explicitly NOT fixed by this branch, which is scoped to the NEW-1/NEW-2
+finding only, and is recorded here so it cannot be mistaken for "no further
+gaps."
 
 ## Scope boundaries (intentional, per authorized task)
 

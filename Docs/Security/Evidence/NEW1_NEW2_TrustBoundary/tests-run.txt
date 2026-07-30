@@ -135,3 +135,49 @@ needed to satisfy.
     - npm run build:vite: exit 0
     - npm run build:electron: 29/29 checks passed
     - git diff --check: exit 0, clean
+
+16) Final independent-review-driven re-verification (this pass — after the
+    second narrow independent review returned VERIFIED WITH CONDITIONS, whose
+    only condition was an evidence-accuracy overclaim, fixed in
+    remaining-risks.md; no code change was required by this review)
+    Node executable: C:\Program Files\nodejs\node.exe (via `where node`),
+    version v24.15.0 (via `node --version`), npm 11.12.1 (via `npm --version`).
+    No local Node 22 toolchain exists (checked: no .nvmrc-honoring version
+    manager, no Volta, no nvm — confirmed via `where`/`volta --version`/
+    `fnm --version` all failing). Did not download or install a runtime.
+    Lockfile identity re-confirmed: package-lock.json byte-identical to
+    G:\ACTIVE_PROJECTS\solith-b11-integration\package-lock.json (the source
+    of this worktree's copied node_modules) via `diff`.
+
+    - npx tsc -p tsconfig.electron.json --noEmit --pretty false: exit 0, no output
+    - npx tsc -p tsconfig.json --noEmit --pretty false: exit 0, no output
+    - npx tsx --test tests/new1-new2-sender-validation.test.ts
+      tests/trusted-sender-registry.test.ts
+      tests/live-memory-rollback-freeze-ipc-validation.test.ts
+      tests/live-memory/gate2-1-test-build-hooks.test.ts
+      Exit code: 0 — tests 62, suites 8, pass 62, fail 0, cancelled 0, skipped 0, todo 0
+    - npm run build:vite: exit 0
+    - npm run build:electron: 29/29 checks passed
+    - npx playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts
+      First run: 19 passed, 1 failed — `trainer-host-rollback passes the
+      sender check...` failed with "Error: worker process exited
+      unexpectedly (code=3221226505, signal=null)" (a Windows access-
+      violation-style exit code on the Electron worker process itself, not
+      a test assertion failure). Reran that single test in isolation
+      (`-g "trainer-host-rollback passes the sender check"`): passed (4.1s).
+      Reran the full 20-test suite again: 20 passed, 0 failed (1.5m),
+      matching the independent reviewer's own clean 20/20 run. Logged as a
+      one-off environment flake (sequential real-Electron process launches
+      under load in this sandbox), not a defect — see independent-review.md.
+    - npm run test:live-memory: exit 0 — tests 257, pass 257, fail 0
+    - Literal `npm test`: reconfirmed BLOCKED — ran it directly, exit 1,
+      output: "[solith] Unsupported Node.js v24.15.0. Required: Node.js
+      22.x (see .nvmrc and package.json engines)." NOT claimed as passed.
+      Ran the exact package.json "test" script string instead (confirmed
+      byte-identical to prior passes via `diff`), with node_modules/.bin on
+      PATH, under the same v24.15.0 node.exe reported above:
+        npx tsx --test <full file list from package.json "test" script> && npx tsx --test tests/sql-parameter-binding.test.ts
+      Exit code: 0 — 1046 pass + 10 pass = 1056 tests, 1056 pass, 0 fail
+      (unchanged from all prior passes — no regression).
+    - git diff --check: exit 0, clean
+    - git status --short --untracked-files=all: empty (clean tree)

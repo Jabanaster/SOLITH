@@ -52,5 +52,53 @@ pretest gate, same substitution as before, reconfirmed rather than assumed).
 The original VERIFIED WITH CONDITIONS verdict from the first review is
 preserved as the historical record (see independent-review.md); this
 section documents that both of its open conditions were subsequently
-closed and re-verified. A second, narrowly-scoped independent review pass
-covering only these 3 handlers follows this commit range.
+closed and re-verified.
+
+Second, narrowly-scoped independent review (scope: exactly
+in-process-confirm-hook, in-process-rollback-hook, trainer-host-rollback,
+and their tests/evidence): verdict VERIFIED WITH CONDITIONS. The reviewer
+mutation-tested all 3 handlers (deleted each check individually against the
+built app, confirmed the negative-control test fails each time, restored
+the build bit-for-bit) — real proof the fix is genuinely wired, not just
+present in source. Its one substantive condition was evidence accuracy: an
+overclaim in remaining-risks.md ("no further NEW-1 gaps are open") that
+didn't account for two V1-era save-editor handlers with zero sender check
+(restore-backup, apply-proposal) and the TrainerHost lifecycle handlers
+being liveness-only. No code or test change was required by this review.
+
+Final same-class destructive-handler audit (this pass, independent of and
+in addition to the reviewer's own check): every ipcMain.handle in
+electron/live-memory-ipc.ts (41) and electron/main.ts (45) was
+re-enumerated and classified. Zero entries within the NEW-1 subsystem (V2
+live-memory / injector-launch / in-process-hook / TrainerHost) are
+classified REMAINING DEFECT. restore-backup, apply-proposal, delete-game,
+delete-recipe, revoke-save-location (V1 legacy save-editor, a distinct
+feature area never in Batch B1.1/NEW-1/NEW-2 scope) are classified OUTSIDE
+NEW-1 CLASS — JUSTIFIED, with the zero-sender-check gap explicitly
+documented rather than implied closed — see remaining-risks.md's "Final
+same-class destructive-handler audit" section for the complete ledger.
+
+Re-verification this pass (see tests-run.txt item 16): both tsc checks
+clean, 62/62 focused tests, 20/20 e2e (one transient worker-process crash
+on a single run investigated and confirmed a flake — isolated rerun and
+full-suite rerun both clean, matching the reviewer's own clean run),
+257/257 test:live-memory, 1056/1056 full-suite equivalent (unchanged — no
+regression), build:vite clean, build:electron 29/29, git diff --check
+clean, working tree clean.
+
+Status at this point: the second review's condition was evidence-only and
+has been corrected above; no further code change is pending. A third,
+final narrow independent review (scope: all NEW-1/NEW-2 production changes
+a63e9f5..HEAD, all tests, the complete destructive-handler ledger, Wisp
+isolation, evidence accuracy) is required before NEW-1/NEW-2 can be
+declared VERIFIED COMPLETE, per this task's stop rule — that verdict is not
+self-declared. See the bottom of this file for the final verdict once that
+review returns.
+
+Packaged verification: NOT PERFORMED
+Clean-machine acceptance: NOT PERFORMED — EXTERNAL ENVIRONMENT REQUIRED
+Merge authorization: NOT GRANTED
+Master verification: NOT PERFORMED
+B1.1 promotion: NOT AUTHORIZED
+Release authorization: DENIED
+B2/B2A: NOT AUTHORIZED

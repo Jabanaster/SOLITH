@@ -60,4 +60,18 @@ tsc (electron + main): both exit 0. Focused suite (`new1-new2-sender-validation.
 
 ### Independent hostile review — second pass (scope: these 3 handlers + their tests/evidence only)
 
-[Result appended below once the dispatched reviewer returns.]
+**Verdict: VERIFIED WITH CONDITIONS**
+
+The reviewer independently re-read every changed line, reran both tsc checks (exit 0/0), the full e2e suite (20/20), the focused unit suite (59/59), `test:live-memory` (257/257), and rebuilt (`build:vite`+`build:electron`, 29/29, confirming the rebuilt bundle was byte-identical in size to the one already tested — source and tested artifact agree). It then went further than asked and **mutation-tested the fix**: on the gitignored build output only (backed up and restored bit-for-bit; confirmed `git status` clean afterward), it deleted the `requireTrustedSender` check from each of the 3 handlers individually and reran the negative-control test each time. All three mutants were killed — deleting the check makes the corresponding negative-control assertion fail with the pre-existing business-logic error (`not_attached` / `not_running`) instead of `sender_rejected:unauthorized_window_type`. This is real, reproduced proof that the check is genuinely load-bearing for all 3 channels, not just present in source.
+
+It also independently confirmed: check ordering (first synchronous statement, before every existing protection), that both `requireTrustedSender` helpers are unchanged and use the same `['main']` restriction, that removing the bare `isDestroyed()` in `trainer-host-rollback` is not a weakening (the same check happens inside `validateIpcSender` first), that the earlier dev/packaged origin-gating fix is still intact and is exactly what these 3 handlers now depend on, and that Wisp isolation and the unmodified original verdict text both hold.
+
+**Findings:**
+
+1. **MEDIUM (evidence accuracy)** — `remaining-risks.md`'s claim "No further NEW-1 gaps are open as of this pass" was false: `restore-backup` and `apply-proposal` (`electron/main.ts`) have zero sender check of any kind, and the TrainerHost lifecycle handlers are liveness-only. The reviewer was explicit that fixing these was **not** part of its authorized 3-handler scope, and that its condition was on the documentation, not the code: "correct the sentence in `remaining-risks.md`."
+2. **LOW (coverage observation, not a defect)** — the negative-control test only exercises the `wisp-overlay` window type, not `trainer-overlay`, against the 10 hardened channels. Same code path (`validateIpcSender`'s window-type check), so residual risk assessed as nil; noted for completeness.
+3. **Informational** — reconfirmed the known, previously-recorded limitation that positive-control tests alone are non-discriminating (this was never in question; the negative-control/mutation-testing result is what actually proves wiring).
+
+**Disposition:** condition #1 fixed in this evidence file (see "Final same-class destructive-handler audit" above, added specifically in response to this finding) — the overclaim is corrected and `restore-backup`/`apply-proposal`/TrainerHost-lifecycle are now explicitly documented as a real, separately-tracked, out-of-scope gap rather than implied to be closed. Condition #2 and #3 required no code or test change (reviewer classified them as non-defects / low-priority coverage notes, not required for sign-off). No code changes were required by this review — the 3-handler fix itself was found sound as committed.
+
+Separately, one of my own verification runs hit a single flaky Playwright worker crash on the `trainer-host-rollback` positive-control test (`worker process exited unexpectedly`); rerunning that test alone, and rerunning the full suite again, both came back clean (20/20), matching the reviewer's own clean 20/20 run. Logged as an environment flake, not a defect — see tests-run.txt.
