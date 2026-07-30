@@ -50,7 +50,7 @@ import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
-import { registerTrustedSolithWindow, validateIpcSender } from './sender-validation.js';
+import { registerTrustedSolithWindow, applyWindowNavigationPolicy, validateIpcSender } from './sender-validation.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
@@ -262,10 +262,12 @@ function createWindow() {
     mainWindow.loadFile(path.join(moduleDirectory, 'dist/index.html'));
   }
 
-  registerTrustedSolithWindow(mainWindow.webContents, 'main', [
+  const mainAllowedUrlPrefixes = [
     'http://localhost:3000',
     pathToFileURL(path.join(moduleDirectory, 'dist/index.html')).href,
-  ]);
+  ];
+  registerTrustedSolithWindow(mainWindow.webContents, 'main', mainAllowedUrlPrefixes);
+  applyWindowNavigationPolicy(mainWindow.webContents, mainAllowedUrlPrefixes);
 
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.setMenuBarVisibility(false);

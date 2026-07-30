@@ -3,6 +3,7 @@ import {
   registerTrustedWindow,
   unregisterTrustedWindow,
   validateTrustedSender,
+  isApprovedUrl,
   type SolithWindowType,
   type SenderValidationResult,
 } from '../src/core/security/trusted-sender-registry.js';
@@ -48,4 +49,23 @@ export function validateIpcSender(
     isMainFrame: frame === sender.mainFrame,
     frameUrl: frame.url,
   }, allowedWindowTypes);
+}
+
+/**
+ * Deny-by-default navigation and popup policy for a privileged Solith
+ * BrowserWindow. Call once, right after `registerTrustedSolithWindow`, with
+ * the SAME `allowedUrlPrefixes` used for that registration — a window may
+ * only navigate within the exact origin(s)/path(s) it was already trusted
+ * for. Blocks same-window navigation to any other http(s)/file/data/custom
+ * scheme, and denies all `window.open()`/target="_blank" popups outright
+ * (Solith has no supported external-browser handoff flow today).
+ */
+export function applyWindowNavigationPolicy(webContents: WebContents, allowedUrlPrefixes: string[]): void {
+  webContents.on('will-navigate', (navigationEvent, targetUrl) => {
+    const allowed = allowedUrlPrefixes.some((prefix) => isApprovedUrl(targetUrl, prefix));
+    if (!allowed) {
+      navigationEvent.preventDefault();
+    }
+  });
+  webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
