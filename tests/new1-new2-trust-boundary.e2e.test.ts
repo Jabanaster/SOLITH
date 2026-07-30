@@ -8,18 +8,26 @@
  * involved) and drives it through Playwright's real Electron support,
  * mirroring the existing convention in tests/electron.e2e.test.ts.
  *
- * It proves two things end-to-end that the unit tests cannot:
- *  1. The six hardened live-memory/injector IPC channels plus
- *     trainer-host-approve-and-write actually call the new trusted-sender
- *     check in production wiring (not just that the check function itself
- *     works) — a legitimate main-frame caller must pass the sender check and
- *     reach the next real validation layer (session/bundle ownership),
- *     never a sender_rejected:* error.
- *  2. The main window, the Wisp overlay window, and the trainer overlay
+ * It proves three things end-to-end that the unit tests cannot:
+ *  1. (positive control) The six hardened live-memory/injector IPC channels
+ *     plus trainer-host-approve-and-write let a legitimate main-frame caller
+ *     pass the new sender check and reach the next real validation layer
+ *     (session/bundle ownership) — never a sender_rejected:* error.
+ *  2. (negative control — this is the direction that actually proves the
+ *     check is wired, not just present in source) The same seven channels,
+ *     called from the real Wisp overlay window's own window.electronAPI
+ *     (same preload, different registered window type), are genuinely
+ *     rejected with sender_rejected:unauthorized_window_type. Deleting the
+ *     requireTrustedSender()/validateIpcSender() call from a handler makes
+ *     this specific assertion fail — the positive-control tests alone would
+ *     not catch that regression.
+ *  3. The main window, the Wisp overlay window, and the trainer overlay
  *     window each have a real will-navigate/setWindowOpenHandler guard wired
  *     via applyWindowNavigationPolicy — same-window navigation to anything
  *     outside the registered origin is blocked, and window.open/target=_blank
- *     popups are always denied.
+ *     popups are always denied (except a strictly https: popup, which is
+ *     handed to the OS browser via shell.openExternal instead of being
+ *     silently dropped — see electron/sender-validation.ts).
  *
  * Run with: npm run test:new1-new2-trust-boundary
  *
@@ -316,6 +324,60 @@ test.describe('NEW-1 — hardened IPC channels still reach existing consent/proc
       });
       expect(result.success).toBe(false);
       expect(String(result.error)).not.toMatch(/^sender_rejected:/);
+    } finally {
+      await cleanup(app, userDataDir);
+    }
+  });
+});
+
+test.describe('NEW-1 — negative control: the same hardened channels genuinely reject a real, differently-registered sender', () => {
+  test('all 7 hardened channels reject the Wisp overlay window with sender_rejected:unauthorized_window_type', async () => {
+    const { app, win, userDataDir } = await launchApp('ipc-negative-control-overlay');
+    try {
+      await win.evaluate(async () => {
+        // @ts-expect-error electronAPI is the real preload bridge
+        await window.electronAPI.wispOverlayToggle();
+      });
+      await win.waitForTimeout(500);
+      const overlay = app.windows().find((p) => p.url().includes('#wisp-overlay'));
+      expect(overlay, 'Wisp overlay window should have opened').toBeTruthy();
+      if (!overlay) return;
+
+      // The overlay shares the exact same preload/electronAPI surface as the main
+      // window (electron/wisp-overlay.ts uses the same preload.cjs) — this is a
+      // REAL sender (registered as windowType 'wisp-overlay'), not a fake. Every
+      // one of these calls must be rejected before reaching any business logic,
+      // proving the requireTrustedSender/validateIpcSender(event, ['main']) call
+      // is genuinely wired into each handler.
+      const calls: Array<() => Promise<unknown>> = [
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.liveMemoryIssueWriteConsent({ proposalId: 'x' })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.liveMemoryConfirmWrite({ proposalId: 'x', consentToken: 'x' })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.inProcessProposeInjectorLaunch({ exePath: 'x', userConfirmedOffline: true, userApprovedAction: true })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.inProcessIssueInjectorConsent({ proposalId: 'x' })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.inProcessRegisterInjectorHelper({ exePath: 'x' })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.inProcessConfirmInjectorLaunch({ proposalId: 'x', userApprovedAction: true, consentToken: 'x' })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.trainerHostApproveAndWrite({ proposalId: 'x' })),
+      ];
+
+      for (const call of calls) {
+        const result: any = await call();
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('sender_rejected:unauthorized_window_type');
+      }
     } finally {
       await cleanup(app, userDataDir);
     }

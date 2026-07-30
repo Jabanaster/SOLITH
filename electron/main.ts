@@ -262,10 +262,12 @@ function createWindow() {
     mainWindow.loadFile(path.join(moduleDirectory, 'dist/index.html'));
   }
 
-  const mainAllowedUrlPrefixes = [
-    'http://localhost:3000',
-    pathToFileURL(path.join(moduleDirectory, 'dist/index.html')).href,
-  ];
+  // Packaged builds must only trust the packaged file:// route — the dev-server
+  // origin is attacker-bindable on any machine and must never be trusted once
+  // shipped (isDev is the same flag already used to choose what to load above).
+  const mainAllowedUrlPrefixes = isDev
+    ? ['http://localhost:3000']
+    : [pathToFileURL(path.join(moduleDirectory, 'dist/index.html')).href];
   registerTrustedSolithWindow(mainWindow.webContents, 'main', mainAllowedUrlPrefixes);
   applyWindowNavigationPolicy(mainWindow.webContents, mainAllowedUrlPrefixes);
 

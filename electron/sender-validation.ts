@@ -51,14 +51,32 @@ export function validateIpcSender(
   }, allowedWindowTypes);
 }
 
+function isHttpsUrl(url: string): boolean {
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Deny-by-default navigation and popup policy for a privileged Solith
  * BrowserWindow. Call once, right after `registerTrustedSolithWindow`, with
  * the SAME `allowedUrlPrefixes` used for that registration — a window may
  * only navigate within the exact origin(s)/path(s) it was already trusted
  * for. Blocks same-window navigation to any other http(s)/file/data/custom
- * scheme, and denies all `window.open()`/target="_blank" popups outright
- * (Solith has no supported external-browser handoff flow today).
+ * scheme.
+ *
+ * Every `window.open()`/target="_blank" request is denied as an in-app
+ * BrowserWindow — a popup never gets privileged preload access — but a
+ * strictly `https:` request is handed off to the OS's default browser via
+ * `shell.openExternal` first (the app has real https external links in its
+ * UI, e.g. documentation/reference links, and they must keep working; only
+ * the in-app popup surface is what's being removed). `electron` is imported
+ * dynamically here, not at module top level, so this file stays runnable
+ * under plain Node in unit tests (see tests/new1-new2-sender-validation.test.ts) —
+ * outside a real Electron process the dynamic import resolves to a non-Electron
+ * value and the openExternal call is a caught no-op.
  */
 export function applyWindowNavigationPolicy(webContents: WebContents, allowedUrlPrefixes: string[]): void {
   webContents.on('will-navigate', (navigationEvent, targetUrl) => {
@@ -67,5 +85,12 @@ export function applyWindowNavigationPolicy(webContents: WebContents, allowedUrl
       navigationEvent.preventDefault();
     }
   });
-  webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  webContents.setWindowOpenHandler(({ url }) => {
+    if (isHttpsUrl(url)) {
+      import('electron')
+        .then((electron) => electron.shell?.openExternal(url))
+        .catch(() => { /* not running under Electron (e.g. unit tests) — no-op */ });
+    }
+    return { action: 'deny' };
+  });
 }
