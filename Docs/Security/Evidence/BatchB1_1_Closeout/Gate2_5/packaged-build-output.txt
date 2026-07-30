@@ -1,11 +1,9 @@
-===== npm run build:vite =====
 
 > solith@2.4.0-alpha.2 build:vite
 > vite build
 
 [36mvite v8.0.16 [32mbuilding client environment for production...[36m[39m
-[2K
-transforming...✓ 261 modules transformed.
+[2Ktransforming...✓ 261 modules transformed.
 rendering chunks...
 computing gzip size...
 dist-electron/dist/index.html                                                           3.60 kB │ gzip:   1.62 kB
@@ -43,9 +41,8 @@ dist-electron/dist/assets/vendor-bfjfhSru.js                                    
 dist-electron/dist/assets/vendor-react-C1KQvfwj.js                                    186.13 kB │ gzip:  58.44 kB
 dist-electron/dist/assets/main-CHscleAC.js                                            470.02 kB │ gzip: 123.13 kB
 
-[32m✓ built in 271ms[39m
-EXIT_CODE=0
-===== npm run build:electron =====
+[32m✓ built in 292ms[39m
+vite exit: 0
 
 > solith@2.4.0-alpha.2 build:electron
 > npm run build:scanner && tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs
@@ -77,21 +74,21 @@ EXIT_CODE=0
 [34mCLI[39m Target: node22
 [34mESM[39m Build start
 [34mCLI[39m Target: node22
-[34mCJS[39m Build start
-[34mCLI[39m Target: node22
 [34mESM[39m Build start
+[34mCLI[39m Target: node22
+[34mCJS[39m Build start
 [32mCJS[39m [1mdist-electron\preload.cjs     [22m[32m18.53 KB[39m
 [32mCJS[39m [1mdist-electron\preload.cjs.map [22m[32m33.95 KB[39m
 [32mCJS[39m ⚡️ Build success in 18ms
 [32mESM[39m [1mdist-electron\host-entry.js     [22m[32m48.51 KB[39m
 [32mESM[39m [1mdist-electron\host-entry.js.map [22m[32m117.38 KB[39m
-[32mESM[39m ⚡️ Build success in 24ms
+[32mESM[39m ⚡️ Build success in 22ms
 [32mESM[39m [1mdist-electron\headless-verification-worker.js     [22m[32m45.41 KB[39m
 [32mESM[39m [1mdist-electron\headless-verification-worker.js.map [22m[32m102.97 KB[39m
 [32mESM[39m ⚡️ Build success in 24ms
 [32mESM[39m [1mdist-electron\main.js     [22m[32m1002.68 KB[39m
 [32mESM[39m [1mdist-electron\main.js.map [22m[32m1.97 MB[39m
-[32mESM[39m ⚡️ Build success in 67ms
+[32mESM[39m ⚡️ Build success in 70ms
 
 🔍 Solith — Electron Output Verifier
 
@@ -140,8 +137,7 @@ EXIT_CODE=0
 
 ✅ All 29 checks passed. Electron output is verified.
 
-EXIT_CODE=0
-===== npm run dist:dir =====
+electron exit: 0
 
 > solith@2.4.0-alpha.2 dist:dir
 > electron-builder --dir
@@ -160,4 +156,4 @@ EXIT_CODE=0
   • updating asar integrity executable resource  executablePath=dist\win-unpacked\Solith.exe
   • signing with signtool.exe  path=dist\win-unpacked\Solith.exe
   • signing with signtool.exe  path=dist\win-unpacked\resources\app.asar.unpacked\dist-electron\solith-readonly-scanner.exe
-EXIT_CODE=0
+dist:dir exit: 0

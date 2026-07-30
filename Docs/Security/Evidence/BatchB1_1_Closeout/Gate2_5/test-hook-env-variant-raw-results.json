@@ -1,0 +1,34 @@
+[
+  {
+    "label": "absent",
+    "hooksPresent": false
+  },
+  {
+    "label": "0",
+    "hooksPresent": false
+  },
+  {
+    "label": "false",
+    "hooksPresent": false
+  },
+  {
+    "label": "true",
+    "hooksPresent": false
+  },
+  {
+    "label": "01",
+    "hooksPresent": false
+  },
+  {
+    "label": "whitespace-padded",
+    "hooksPresent": false
+  },
+  {
+    "label": "trailing-newline",
+    "hooksPresent": false
+  },
+  {
+    "label": "exact-1-control",
+    "hooksPresent": true
+  }
+]

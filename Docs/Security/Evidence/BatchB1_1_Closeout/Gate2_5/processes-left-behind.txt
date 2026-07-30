@@ -1,1 +1,8 @@
 Harness-created Solith/Gate2_2Fixture processes remaining: 0
+
+--- Addendum (this session, Claude Sonnet, independent recheck) ---
+Confirmed via `tasklist` after every suite run this cycle: 0 Solith.exe or
+Gate2_2Fixture.exe processes remaining at session end. One transient
+exception occurred mid-session (4 Solith.exe processes orphaned after a
+stalled Gate 2.2 Resume test run); confirmed harness-created via their
+--user-data-dir command-line arguments and terminated before continuing.

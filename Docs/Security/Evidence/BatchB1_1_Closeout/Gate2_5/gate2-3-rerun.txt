@@ -1,0 +1,8 @@
+
+Running 3 tests using 1 worker
+
+  ok 1 tests\gate2-3-freeze-authorization-security.e2e.test.ts:98:1 › retired legacy freeze-start payload ({address,dataType,value,intervalMs}) is rejected by the real IPC handler (9.5s)
+  ok 2 tests\gate2-3-freeze-authorization-security.e2e.test.ts:139:1 › proposal and consent token cannot be replayed after a successful confirmed start (24.4s)
+  ok 3 tests\gate2-3-freeze-authorization-security.e2e.test.ts:191:1 › an unknown/fabricated proposal ID and an unknown consent token are both rejected (14.0s)
+
+  3 passed (48.4s)

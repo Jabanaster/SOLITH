@@ -1,0 +1,9 @@
+{
+  "openResult": {
+    "opened": true
+  },
+  "devtoolsProbe": {
+    "hasDevToolsWebContents": true,
+    "hadElectronAPI": false
+  }
+}

@@ -1,0 +1,15 @@
+
+Running 10 tests using 1 worker
+
+  ok  1 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:154:1 › Phase 3 — fixture and packaged native write/read/restore prerequisite (28.1s)
+  ok  2 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:207:1 › Phase 4.1/4.2 — active real freeze; window close / app quit stops it and revokes state (same event on Windows) (30.6s)
+  ok  3 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:260:1 › Phase 4.3 — shutdown with pending (unconfirmed) write consent: stale proposal/token rejected after restart (15.1s)
+  ok  4 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:296:1 › Phase 4.4 — shutdown with an active process selection (attach, no freeze): stale attach state rejected after restart (12.8s)
+  ok  5 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:325:1 › Phase 4.5 — shutdown with a confirmed rollback entry: old rollback ID rejected after restart, raw bytes released (22.0s)
+  ok  6 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:368:1 › Phase 4.6 — controlled forced termination: no further writes reach the fixture after the process is killed (21.0s)
+  ok  7 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:398:1 › Phase 5 — real freeze stops when v2LiveModeEnabled is disabled via the real settings IPC (33.0s)
+  ok  8 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:441:1 › Phase 6 — main-window reload: stale operation IDs and sender identity are rejected after reload (11.6s)
+  ok  9 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:488:1 › Phase 9.1/9.6 — unauthorized navigation revokes authority; returning to trusted content does not restore it (8.9s)
+  ok 10 tests\gate2-2-resume-packaged-lifecycle.e2e.test.ts:539:1 › Phase 11 — normal packaged candidate exposes no Gate 2.1/2.2 test-only hooks (3.5s)
+
+  10 passed (3.1m)
