@@ -1,0 +1,77 @@
+electron/live-memory-ipc.ts
+  Reason: NEW-1 — add requireTrustedSender(event) check to the 6 destructive
+  write/injector channels named in the audit scope.
+  Runtime behavior change: those 6 channels now return
+  { success:false, error:"sender_rejected:<reason>" } for a non-trusted
+  sender (unregistered window, child/devtools frame, destroyed sender,
+  navigated-away sender, wrong window type) before reaching any existing
+  logic. Legitimate trusted main-frame callers see no behavior change.
+  Security impact: closes NEW-1 for these 6 channels.
+  Tests: tests/new1-new2-sender-validation.test.ts (unit),
+  tests/new1-new2-trust-boundary.e2e.test.ts (real Electron wiring proof).
+
+electron/main.ts
+  Reason: NEW-1 — harden trainer-host-approve-and-write (same destructive-
+  write gap class, flagged as an extra finding beyond the audit's named
+  handlers). NEW-2 — wire applyWindowNavigationPolicy into the main window
+  right after registerTrustedSolithWindow.
+  Runtime behavior change: trainer-host-approve-and-write now sender-checked
+  identically to the live-memory-ipc.ts handlers. The main BrowserWindow now
+  rejects same-window navigation outside its registered origin and denies
+  all window.open()/target=_blank popups.
+  Security impact: closes the extra NEW-1 finding; closes NEW-2 for the main
+  window.
+  Tests: same two files as above.
+
+electron/sender-validation.ts
+  Reason: NEW-2 — add applyWindowNavigationPolicy(), the shared nav/popup
+  guard helper used by all three windows.
+  Runtime behavior change: none by itself (new exported function; existing
+  validateIpcSender/registerTrustedSolithWindow unchanged).
+  Security impact: provides the NEW-2 fix mechanism.
+  Tests: tests/new1-new2-sender-validation.test.ts (unit, faked WebContents).
+
+electron/wisp-overlay.ts
+  Reason: NEW-2 — wire applyWindowNavigationPolicy into the Wisp overlay
+  window's creation call site only.
+  Runtime behavior change: the Wisp overlay window now rejects unexpected
+  same-window navigation and denies popups. No Wisp reducer, state, or
+  visual behavior touched — src/core/companion/wisp.ts and
+  tests/companion-wisp.test.ts are untouched (verified via git diff).
+  Security impact: closes NEW-2 for the Wisp overlay window.
+  Tests: tests/new1-new2-trust-boundary.e2e.test.ts (real Electron, toggles
+  the overlay via the production wisp-overlay-toggle IPC channel).
+
+electron/trainer-overlay.ts
+  Reason: NEW-2 — wire applyWindowNavigationPolicy into the trainer overlay
+  window's creation call site.
+  Runtime behavior change: same as Wisp overlay, for the trainer overlay
+  window.
+  Security impact: closes NEW-2 for the trainer overlay window.
+  Tests: tests/new1-new2-trust-boundary.e2e.test.ts.
+
+src/core/security/trusted-sender-registry.ts
+  Reason: NEW-2 — export the previously-module-private isApprovedUrl() so
+  the navigation guard reuses the EXACT SAME origin/path matcher already
+  used for IPC sender trust, instead of a second, possibly-drifting
+  implementation.
+  Runtime behavior change: none (function body unchanged, only visibility).
+  Security impact: keeps the IPC-trust allowed-URL policy and the
+  navigation-guard allowed-URL policy from diverging.
+  Tests: existing tests/trusted-sender-registry.test.ts already covers
+  isApprovedUrl() behavior; tests/new1-new2-sender-validation.test.ts
+  exercises it indirectly via applyWindowNavigationPolicy.
+
+tests/new1-new2-sender-validation.test.ts (new)
+  Reason: unit coverage of validateIpcSender/applyWindowNavigationPolicy
+  against faked Electron shapes (both functions are electron-import
+  type-only, so real production code, no Electron runtime needed).
+
+tests/new1-new2-trust-boundary.e2e.test.ts (new)
+  Reason: real-Electron wiring proof (dist-electron/main.js, no packaging)
+  that the 7 hardened channels and 3 windows behave correctly end-to-end.
+
+package.json
+  Reason: add tests/new1-new2-sender-validation.test.ts to the main `test`
+  script; add a dedicated `test:new1-new2-trust-boundary` playwright script
+  for the e2e file, matching the existing gate-test convention.

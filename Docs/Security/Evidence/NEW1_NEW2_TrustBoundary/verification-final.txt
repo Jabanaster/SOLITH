@@ -1,0 +1,30 @@
+NEW-1 / NEW-2 verification summary — branch security/new-1-new-2-trust-boundary
+
+Base:        integration/b1-1-closeout @ a63e9f57bc608e70212da1b09fb578f40eab889a
+Worktree:    G:\ACTIVE_PROJECTS\solith-new1-new2 (dedicated, verified clean before any edit)
+Final HEAD (pre-review): commit "test: cover NEW-1 and NEW-2 trust boundaries" (3rd of the 4 planned commits;
+             4th commit — this evidence — follows immediately, independent review comes after)
+
+Checks (see tests-run.txt for full detail):
+  [PASS] tsc -p tsconfig.electron.json --noEmit          exit 0
+  [PASS] tsc -p tsconfig.json --noEmit                   exit 0
+  [PASS] new1-new2 unit tests                            16/16
+  [PASS] new1-new2 real-Electron e2e tests                16/16
+  [PASS] npm run test:live-memory                        257/257
+  [PASS] full `npm test` equivalent (see env note)        1056/1056
+  [PASS] npm run build:vite                               exit 0
+  [PASS] npm run build:electron (29-point verifier)       29/29
+  [PASS] git diff --check                                 clean
+  [SKIP] packaging (electron-builder)                     not authorized for this pass
+  [SKIP] gate2-5 packaged frame/devtools/overlay e2e       requires packaging; not run
+
+Wisp isolation check:
+  git diff a63e9f5 -- src/core/companion/wisp.ts tests/companion-wisp.test.ts   → empty (no changes)
+  git diff (this branch) -- src/core/companion/wisp.ts tests/companion-wisp.test.ts → empty (no changes)
+  electron/wisp-overlay.ts diff is limited to two lines: the import statement
+  and the window-creation call site (hoist allowed-URL array to a const, add
+  applyWindowNavigationPolicy call). No reducer/state/message/lifecycle code touched.
+
+No CRITICAL, HIGH, or unresolved MEDIUM findings remain open for NEW-1/NEW-2
+at self-verification time. Independent review pending (Phase 8) — see
+independent-review.md once produced.
