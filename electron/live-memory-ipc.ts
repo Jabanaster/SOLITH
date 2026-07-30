@@ -350,6 +350,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-issue-write-consent', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = LiveMemoryIssueWriteConsentSchema.parse(payload);
       const identityError = bundle.session.verifyAttachedProcessIdentity();
@@ -410,6 +412,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-confirm-write', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = LiveMemoryConfirmWriteSchema.parse(payload);
       const identityError = bundle.session.verifyAttachedProcessIdentity();
@@ -1131,6 +1135,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-confirm-hook', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = InProcessConfirmHookSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
@@ -1159,6 +1165,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-rollback-hook', async (event) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
 
@@ -1179,6 +1187,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-propose-injector-launch', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = InProcessProposeInjectorSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
@@ -1231,6 +1241,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-issue-injector-consent', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = InProcessIssueInjectorConsentSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
@@ -1281,6 +1293,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-register-injector-helper', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const parsed = InProcessRegisterInjectorHelperSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };
       const { getAppPaths } = await import('../src/shared/app-paths.js');
@@ -1341,6 +1355,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-confirm-injector-launch', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = InProcessConfirmInjectorSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };

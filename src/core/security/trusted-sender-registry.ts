@@ -110,7 +110,13 @@ function normalizedPathname(url: URL): string {
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
-function isApprovedUrl(candidateValue: string, approvedValue: string): boolean {
+/**
+ * Exported for reuse by navigation/popup guards (electron/sender-validation.ts),
+ * which must apply the exact same origin/path matching used for IPC sender
+ * trust so a window's "allowed to navigate here" policy can't drift from its
+ * "allowed to call privileged IPC from here" policy.
+ */
+export function isApprovedUrl(candidateValue: string, approvedValue: string): boolean {
   let candidate: URL;
   let approved: URL;
   try {
