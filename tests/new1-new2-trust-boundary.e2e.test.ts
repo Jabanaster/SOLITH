@@ -10,11 +10,14 @@
  *
  * It proves three things end-to-end that the unit tests cannot:
  *  1. (positive control) The six hardened live-memory/injector IPC channels
- *     plus trainer-host-approve-and-write let a legitimate main-frame caller
- *     pass the new sender check and reach the next real validation layer
- *     (session/bundle ownership) — never a sender_rejected:* error.
+ *     plus trainer-host-approve-and-write, and — added in the second
+ *     corrective pass — in-process-confirm-hook, in-process-rollback-hook,
+ *     and trainer-host-rollback (10 channels total) let a legitimate
+ *     main-frame caller pass the new sender check and reach the next real
+ *     validation layer (session/bundle ownership) — never a
+ *     sender_rejected:* error.
  *  2. (negative control — this is the direction that actually proves the
- *     check is wired, not just present in source) The same seven channels,
+ *     check is wired, not just present in source) The same ten channels,
  *     called from the real Wisp overlay window's own window.electronAPI
  *     (same preload, different registered window type), are genuinely
  *     rejected with sender_rejected:unauthorized_window_type. Deleting the
@@ -328,10 +331,57 @@ test.describe('NEW-1 — hardened IPC channels still reach existing consent/proc
       await cleanup(app, userDataDir);
     }
   });
+
+  test('in-process-confirm-hook passes the sender check and fails on business logic, not sender_rejected', async () => {
+    const { app, win, userDataDir } = await launchApp('ipc-confirm-hook');
+    try {
+      const result = await win.evaluate(async () => {
+        // @ts-expect-error electronAPI is the real preload bridge
+        return window.electronAPI.inProcessConfirmHook({ proposalId: 'nonexistent-proposal', userApprovedAction: true });
+      });
+      expect(result.success).toBe(false);
+      expect(String(result.error)).not.toMatch(/^sender_rejected:/);
+    } finally {
+      await cleanup(app, userDataDir);
+    }
+  });
+
+  test('in-process-rollback-hook passes the sender check and fails on business logic, not sender_rejected', async () => {
+    const { app, win, userDataDir } = await launchApp('ipc-rollback-hook');
+    try {
+      const result = await win.evaluate(async () => {
+        // @ts-expect-error electronAPI is the real preload bridge
+        return window.electronAPI.inProcessRollbackHook();
+      });
+      expect(result.success).toBe(false);
+      expect(String(result.error)).not.toMatch(/^sender_rejected:/);
+    } finally {
+      await cleanup(app, userDataDir);
+    }
+  });
+
+  test('trainer-host-rollback passes the sender check and fails on business logic, not sender_rejected', async () => {
+    const { app, win, userDataDir } = await launchApp('ipc-trainer-host-rollback');
+    try {
+      const result = await win.evaluate(async () => {
+        // @ts-expect-error electronAPI is the real preload bridge
+        return window.electronAPI.trainerHostRollback({
+          gameId: 'nonexistent-game',
+          filePath: 'C:\\nonexistent\\save.dat',
+          backupPath: 'C:\\nonexistent\\save.dat.bak',
+          field: 'nonexistent-field',
+        });
+      });
+      expect(result.success).toBe(false);
+      expect(String(result.error)).not.toMatch(/^sender_rejected:/);
+    } finally {
+      await cleanup(app, userDataDir);
+    }
+  });
 });
 
 test.describe('NEW-1 — negative control: the same hardened channels genuinely reject a real, differently-registered sender', () => {
-  test('all 7 hardened channels reject the Wisp overlay window with sender_rejected:unauthorized_window_type', async () => {
+  test('all 10 hardened channels reject the Wisp overlay window with sender_rejected:unauthorized_window_type', async () => {
     const { app, win, userDataDir } = await launchApp('ipc-negative-control-overlay');
     try {
       await win.evaluate(async () => {
@@ -371,6 +421,17 @@ test.describe('NEW-1 — negative control: the same hardened channels genuinely 
         () => overlay.evaluate(() =>
           // @ts-expect-error electronAPI is the real preload bridge
           window.electronAPI.trainerHostApproveAndWrite({ proposalId: 'x' })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.inProcessConfirmHook({ proposalId: 'x', userApprovedAction: true })),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.inProcessRollbackHook()),
+        () => overlay.evaluate(() =>
+          // @ts-expect-error electronAPI is the real preload bridge
+          window.electronAPI.trainerHostRollback({
+            gameId: 'x', filePath: 'C:\\x\\save.dat', backupPath: 'C:\\x\\save.dat.bak', field: 'x',
+          })),
       ];
 
       for (const call of calls) {
