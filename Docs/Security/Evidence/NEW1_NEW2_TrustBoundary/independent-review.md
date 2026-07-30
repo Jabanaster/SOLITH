@@ -39,3 +39,25 @@ Findings #1 and #2 are real and are the only remaining open items from this revi
 Re-ran: both tsc checks, the unit test file (16/16, unchanged), `npm run build:vite`, `npm run build:electron` (29/29), the full e2e suite (17/17 — 16 original + 1 new negative-control), the full `npm test`-equivalent (1056/1056), and `git diff --check` (clean). See tests-run.txt item 14 for the consolidated re-run.
 
 This corrective pass and re-verification were performed by the implementer (not a second independent reviewer), per the task's "address in a separate corrective pass and repeat narrow independent verification" instruction — the "repeat" step here is the self-verification re-run above. Whether a second independent hostile-review pass is warranted before this is considered closed is a call for the task owner.
+
+---
+
+## Second corrective pass — closing the two remaining conditions
+
+The task owner explicitly authorized hardening exactly the two open findings from the table above (#1 and #2), and nothing else, in a narrowly-scoped follow-up.
+
+**This VERIFIED WITH CONDITIONS verdict above is left unmodified as the historical record of the first review.** This section records what happened after it.
+
+### What changed
+
+- `in-process-confirm-hook`, `in-process-rollback-hook` (`electron/live-memory-ipc.ts`) and `trainer-host-rollback` (`electron/main.ts`) each now run `requireTrustedSender(event)` as the first statement in the handler's `try` block, before any existing `requireSession`/ownership/gate/guard check — identical placement and pattern to the 7 channels hardened in the first pass. `trainer-host-rollback` reuses the exact same local `requireTrustedSender` helper already defined in `electron/main.ts` for `trainer-host-approve-and-write`.
+- All existing protections are unchanged: in-process feature gate (`isInProcessEnabled`), online-guard recheck (`session.recheckOnlineGuard`), session/bundle ownership (`requireSession`), TrainerHost ownership-by-`webContents.id`, and supervisor state checks all still run, in the same order, after the new sender check passes.
+- Test coverage extended: 3 new positive-control e2e tests (legitimate main-frame caller reaches business logic, never `sender_rejected:*`), and all 3 new channels added to the existing shared negative-control test (now asserts all **10** hardened channels — not 7 — genuinely reject the real Wisp overlay window with `sender_rejected:unauthorized_window_type`).
+
+### Re-verification (self, by the implementer)
+
+tsc (electron + main): both exit 0. Focused suite (`new1-new2-sender-validation.test.ts` + `trusted-sender-registry.test.ts` + `live-memory-rollback-freeze-ipc-validation.test.ts`): 59/59. e2e (`new1-new2-trust-boundary.e2e.test.ts`, rebuilt via `build:vite`+`build:electron` first): 20/20 (up from 17). `test:live-memory`: 257/257. Full-suite equivalent (literal `npm test` still blocked by this environment's Node 24 vs. the repo's pinned Node 22 — reconfirmed, not assumed, by running it and observing the same `check-node.mjs` failure before substituting the identical underlying command): 1056/1056, unchanged from the first pass. `git diff --check`: clean. Full detail in `tests-run.txt` item 15.
+
+### Independent hostile review — second pass (scope: these 3 handlers + their tests/evidence only)
+
+[Result appended below once the dispatched reviewer returns.]

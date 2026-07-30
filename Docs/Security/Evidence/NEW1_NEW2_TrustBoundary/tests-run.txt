@@ -93,3 +93,45 @@ needed to satisfy.
     - tests/new1-new2-trust-boundary.e2e.test.ts: 17/17 pass (see item 4 above)
     - full `npm test` equivalent command: 1046 + 10 = 1056 tests, 1056 pass, 0 fail
     - git diff --check: clean
+
+15) Second corrective pass (hardening in-process-confirm-hook,
+    in-process-rollback-hook, trainer-host-rollback — the two remaining
+    conditions from the first independent review)
+    Node version confirmed at time of this pass: v24.15.0 (same environment
+    as all prior runs in this file; repo still pins 22.x via .nvmrc/engines).
+
+    - npx tsc -p tsconfig.electron.json --noEmit --pretty false: exit 0
+    - npx tsc -p tsconfig.json --noEmit --pretty false: exit 0
+    - npx tsx --test tests/new1-new2-sender-validation.test.ts
+      tests/trusted-sender-registry.test.ts
+      tests/live-memory-rollback-freeze-ipc-validation.test.ts
+      (focused hook-confirm/hook-rollback + trainer-host-rollback trust
+      logic is exercised via the generic validateIpcSender/
+      applyWindowNavigationPolicy unit tests plus the e2e wiring proof below;
+      these three files are the "trusted-sender and frame-security" +
+      "live-memory rollback/freeze" regression set)
+      Exit code: 0 — tests 59, suites 8, pass 59, fail 0
+    - npx playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts
+      (rebuilt via npm run build:vite && npm run build:electron first)
+      Exit code: 0 — 20 passed (1.8m), 0 failed. 3 new positive-control tests
+      (in-process-confirm-hook, in-process-rollback-hook,
+      trainer-host-rollback each reach business logic, never sender_rejected)
+      plus all 3 added to the shared negative-control test (now asserts all
+      10 hardened channels reject the Wisp overlay window with
+      sender_rejected:unauthorized_window_type).
+    - npm run test:live-memory: exit 0 — tests 257, pass 257, fail 0
+    - Full test suite: the literal `npm test` invocation is STILL blocked by
+      this environment's Node 24 vs. the repo's pinned Node 22
+      (`scripts/check-node.mjs` pretest gate) — reconfirmed by directly
+      running `npm test` and observing the same
+      "[solith] Unsupported Node.js v24.15.0" failure before running the
+      substitute command below. Ran the exact string of package.json's
+      "test" script directly (confirmed byte-identical to the string used
+      in the first pass via `diff`) with node_modules/.bin on PATH:
+        npx tsx --test <full file list from package.json "test" script> && npx tsx --test tests/sql-parameter-binding.test.ts
+      Exit code: 0 — 1046 pass + 10 pass = 1056 tests, 1056 pass, 0 fail
+      (identical totals to the first pass — no regression from hardening
+      the 3 additional handlers).
+    - npm run build:vite: exit 0
+    - npm run build:electron: 29/29 checks passed
+    - git diff --check: exit 0, clean

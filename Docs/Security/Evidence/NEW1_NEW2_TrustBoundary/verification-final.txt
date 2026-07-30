@@ -26,10 +26,31 @@ Wisp isolation check:
   applyWindowNavigationPolicy call). No reducer/state/message/lifecycle code touched.
 
 Independent review (Phase 8) verdict: VERIFIED WITH CONDITIONS. Of 8
-findings, 6 were within this patch's own scope and are fixed and re-verified
-(see independent-review.md and tests-run.txt item 14 for the post-fix
-re-run: all totals unchanged or improved, e2e suite now 17/17). 2 findings
-(HIGH: in-process-confirm-hook/rollback-hook; MEDIUM: trainer-host-rollback)
-are real but were not in the explicitly authorized channel list — recorded
-in remaining-risks.md as open, not silently closed, pending a scope
-decision.
+findings, 6 were within this patch's own scope and were fixed and
+re-verified in the first corrective pass (all totals unchanged or improved,
+e2e suite 17/17). 2 findings (HIGH: in-process-confirm-hook/rollback-hook;
+MEDIUM: trainer-host-rollback) were real but not in the explicitly
+authorized channel list at that time — recorded as open pending a scope
+decision, not silently closed.
+
+Second corrective pass (this commit range): the task owner explicitly
+authorized hardening exactly those two remaining findings.
+in-process-confirm-hook, in-process-rollback-hook (electron/live-memory-ipc.ts),
+and trainer-host-rollback (electron/main.ts) now all run
+requireTrustedSender(event) -> validateIpcSender(event, ['main']) as the
+first statement in the handler, identical to the other 7 already-hardened
+channels. Re-verified: both tsc checks, 59/59 focused trusted-sender/
+frame-security/rollback-freeze tests, 20/20 e2e tests (up from 17 — 3 new
+positive-control tests plus all 3 new handlers added to the shared
+negative-control test), 257/257 test:live-memory, 1056/1056 full-suite
+equivalent (unchanged from the first pass — no regression), build:vite
+clean, build:electron 29/29, git diff --check clean. See tests-run.txt item
+15 for exact commands and the Node-version note (still Node 24 in this
+environment; literal `npm test` still blocked by the repo's own Node-22
+pretest gate, same substitution as before, reconfirmed rather than assumed).
+
+The original VERIFIED WITH CONDITIONS verdict from the first review is
+preserved as the historical record (see independent-review.md); this
+section documents that both of its open conditions were subsequently
+closed and re-verified. A second, narrowly-scoped independent review pass
+covering only these 3 handlers follows this commit range.

@@ -1,33 +1,44 @@
 # Remaining limitations — NEW-1 / NEW-2
 
-## Independent review findings NOT fixed in this pass (out of authorized scope)
+## Independent review findings — subsequently corrected (second pass)
 
 An independent hostile reviewer (Phase 8) found two additional handlers in
-the SAME liveness/ownership-only trust class as the six that were hardened,
-which were NOT in the explicitly authorized channel list and are therefore
-**deliberately left unhardened by this patch**, pending an explicit scope
-decision:
+the SAME liveness/ownership-only trust class as the six that were first
+hardened, which were NOT in the originally authorized channel list and were
+therefore initially left unhardened, pending an explicit scope decision.
+**That decision was made and both were hardened in a second, narrowly-scoped
+corrective pass** (see the 3 commits after `152a608` and
+`independent-review.md`'s "Second corrective pass" section below) — this
+does not erase the original `VERIFIED WITH CONDITIONS` verdict from the
+first review; it records that both open conditions were subsequently closed
+and re-verified.
 
 - **`in-process-confirm-hook` / `in-process-rollback-hook`**
   (`electron/live-memory-ipc.ts`) — these call `installHookFromProposal`,
   which reaches `writeProcessBuffer()` in `src/core/in-process-script/hook-engine.ts`
   to write shellcode plus a jump patch directly into a live target process.
-  Only `requireSession(event)` (liveness + ownership map) gates them — the
-  exact NEW-1 pattern, on an arguably MORE destructive path than the
-  injector-launch handlers that were hardened.
+  Previously only `requireSession(event)` (liveness + ownership map) gated
+  them — the exact NEW-1 pattern, on an arguably MORE destructive path than
+  the injector-launch handlers that were hardened in the first pass. **Now
+  hardened** with `requireTrustedSender(event)`, run before the existing
+  session/gate/guard checks.
 - **`trainer-host-rollback`** (`electron/main.ts`) — restores a game save
-  file from backup; still only `event.sender.isDestroyed()`. Its sibling
-  `trainer-host-approve-and-write` was hardened; this rollback counterpart
-  was not, which is the same asymmetry NEW-1 exists to close (and mirrors
-  how `live-memory-rollback` was already hardened alongside
-  `live-memory-confirm-write` in the base commit).
+  file from backup; previously only `event.sender.isDestroyed()`. Its
+  sibling `trainer-host-approve-and-write` was hardened in the first pass;
+  this rollback counterpart was not, mirroring how `live-memory-rollback`
+  was already hardened alongside `live-memory-confirm-write` in the base
+  commit. **Now hardened** with the same `requireTrustedSender(event)`
+  helper already used by `trainer-host-approve-and-write`.
 
-These were surfaced during Phase 2 inventory but excluded from the
-explicitly authorized "harden exactly these six channels + trainer-host-
-approve-and-write" scope. Fixing them was judged out of bounds for this
-patch without an explicit scope decision, since the task instructions
-explicitly said not to broaden this task. Flagging here rather than silently
-leaving them out of the evidence pack.
+All 10 destructive/privileged channels identified across both review passes
+now share the identical trusted-sender mechanism. No further NEW-1 gaps are
+open as of this pass.
+
+These were surfaced during Phase 2 inventory but excluded from the first
+pass's explicitly authorized "harden exactly these six channels +
+trainer-host-approve-and-write" scope. The task owner then explicitly
+authorized a second, narrowly-scoped corrective pass covering exactly these
+three handlers (and nothing else), which is what closed them.
 
 ## Scope boundaries (intentional, per authorized task)
 

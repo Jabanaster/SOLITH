@@ -25,8 +25,11 @@ Worktree: `G:\ACTIVE_PROJECTS\solith-new1-new2` (dedicated, created fresh off ba
 | `in-process-register-injector-helper` | electron/live-memory-ipc.ts | same (previously had **zero** sender check of any kind) | SHA-256/publisher/path checks, native approval dialog |
 | `in-process-confirm-injector-launch` | electron/live-memory-ipc.ts | same | consent-token consumption, live-identity re-verify, session ownership |
 | `trainer-host-approve-and-write` | electron/main.ts | new local `requireTrustedSender(event)` wrapping `validateIpcSender(event, ['main'])` (mirrors the live-memory-ipc.ts helper — file boundary made sharing the exact same function impractical without a cross-file refactor out of scope for this patch) | TrainerHost ownership-by-webContents.id, supervisor state |
+| `in-process-confirm-hook` | electron/live-memory-ipc.ts | `requireTrustedSender(event)` (added in the second corrective pass, closing an independent-review finding) | in-process feature gate, online-guard recheck, session ownership — this handler writes shellcode plus a jump patch directly into a live process via `installHookFromProposal` |
+| `in-process-rollback-hook` | electron/live-memory-ipc.ts | same | in-process feature gate, session ownership |
+| `trainer-host-rollback` | electron/main.ts | same local `requireTrustedSender(event)` used by `trainer-host-approve-and-write` | TrainerHost ownership-by-webContents.id, supervisor state |
 
-Every check calls the existing `validateIpcSender()` (electron/sender-validation.ts) → `validateTrustedSender()` (src/core/security/trusted-sender-registry.ts) — the same registry and function already used by the freeze/rollback path. No new or parallel trust mechanism was created.
+Every check calls the existing `validateIpcSender()` (electron/sender-validation.ts) → `validateTrustedSender()` (src/core/security/trusted-sender-registry.ts) — the same registry and function already used by the freeze/rollback path. No new or parallel trust mechanism was created. All 10 hardened channels now share this exact mechanism.
 
 ## Window inventory (final navigation/popup policy)
 
