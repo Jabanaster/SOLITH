@@ -267,7 +267,7 @@ async function verifyPipelinePointersWithL2Helper(
           timeoutMs: input.timeoutMs,
           scannerPath: input.scannerPath,
         });
-        if (!response.ok) {
+        if (response.ok === false) {
           throw new Error(`${response.error.code}: ${response.error.message}`);
         }
         return response.pointerResults;

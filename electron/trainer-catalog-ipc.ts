@@ -305,7 +305,7 @@ export function registerTrainerCatalogIpc(): void {
         return { success: false, errors: ['source_hash_changed_before_preview'] };
       }
       const result = await previewDefinitionCt(parsed.xmlText, { title: parsed.title });
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors, rejected: result.rejected };
       }
       return {
@@ -333,7 +333,7 @@ export function registerTrainerCatalogIpc(): void {
     try {
       const parsed = ImportCtSchema.parse(payload);
       const result = await importDefinitionCt(parsed.xmlText, { title: parsed.title });
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors, rejected: result.rejected };
       }
       return {
@@ -355,7 +355,11 @@ export function registerTrainerCatalogIpc(): void {
   ipcMain.handle('trainer-catalog-feedback-record', async (_event, payload: unknown) => {
     try {
       const parsed = DefinitionFeedbackSchema.parse(payload);
-      recordDefinitionFeedback(parsed);
+      // `rating` is a required z.union of literals in DefinitionFeedbackSchema
+      // and always present after a successful .parse(); tsconfig.electron.json
+      // runs with strictNullChecks disabled, under which zod's own optionality
+      // inference loosens every required object property to optional.
+      recordDefinitionFeedback({ ...parsed, rating: parsed.rating as -1 | 0 | 1 });
       const summary = getDefinitionFeedbackSummary(parsed.catalogGameId, parsed.featureId);
       return { success: true, summary };
     } catch (error) {
@@ -430,7 +434,7 @@ export function registerTrainerCatalogIpc(): void {
     try {
       const parsed = ImportYamlSchema.parse(payload);
       const result = importDefinitionYaml(parsed.yamlText);
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors };
       }
       return {

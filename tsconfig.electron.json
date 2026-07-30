@@ -23,6 +23,13 @@
     "node_modules",
     "dist",
     "dist-electron",
-    "src/app/**/*"
+    "src/app/**/*",
+    // electron/run-compat-test.ts is an orphaned developer runner: unreferenced
+    // by any package script, build entry, test, or other source file since the
+    // repository's initial commit, and it imports a sibling module that does
+    // not exist. It is not part of the production Electron compilation
+    // boundary; excluded here rather than stubbed or deleted (deletion not
+    // authorized).
+    "electron/run-compat-test.ts"
   ]
 }
