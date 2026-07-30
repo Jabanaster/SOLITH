@@ -68,7 +68,7 @@ being liveness-only. No code or test change was required by this review.
 
 Final same-class destructive-handler audit (this pass, independent of and
 in addition to the reviewer's own check): every ipcMain.handle in
-electron/live-memory-ipc.ts (41) and electron/main.ts (45) was
+electron/live-memory-ipc.ts (42) and electron/main.ts (44) was
 re-enumerated and classified. Zero entries within the NEW-1 subsystem (V2
 live-memory / injector-launch / in-process-hook / TrainerHost) are
 classified REMAINING DEFECT. restore-backup, apply-proposal, delete-game,
@@ -86,14 +86,42 @@ full-suite rerun both clean, matching the reviewer's own clean run),
 regression), build:vite clean, build:electron 29/29, git diff --check
 clean, working tree clean.
 
-Status at this point: the second review's condition was evidence-only and
-has been corrected above; no further code change is pending. A third,
-final narrow independent review (scope: all NEW-1/NEW-2 production changes
-a63e9f5..HEAD, all tests, the complete destructive-handler ledger, Wisp
-isolation, evidence accuracy) is required before NEW-1/NEW-2 can be
-declared VERIFIED COMPLETE, per this task's stop rule — that verdict is not
-self-declared. See the bottom of this file for the final verdict once that
-review returns.
+Third, full-scope independent review (scope: all NEW-1/NEW-2 production
+changes a63e9f5..HEAD, all tests, an independently-built complete
+destructive-handler ledger, Wisp isolation, evidence accuracy): verdict
+VERIFIED WITH CONDITIONS. Explicitly answered the required question — "Is
+there any renderer-triggered destructive IPC handler in the reviewed NEW-1
+class that lacks the established trusted main-window/main-frame/URL
+boundary?" — No. Built its own ledger from scratch (42 + 44 ipcMain.handle
+registrations, cross-checked against 66 more across 10 other electron/*.ts
+files for any missed NEW-1-class primitive, zero found), independently
+reran every check (both tsc, 59/59 unit, 20/20 e2e on first run with no
+flake, 257/257 live-memory, 1056/1056 full suite), and inspected the built
+dist-electron/main.js artifact directly to confirm source and tested bundle
+agree. All 6 findings were evidence-accuracy only (handler-count off-by-one
+in both files; an inconsistent "10 vs 16" hardened-channel denominator; a
+mislabeled trainer-host-start; and a factually-imprecise OUTSIDE NEW-1
+CLASS justification framed as "file vs memory" when TrainerHost's own
+hardened handlers also do file writes) — zero code defects, explicitly
+confirmed by the reviewer: "No code change is required." All 5 in-scope
+findings corrected in evidence-only commit 1bfe1f3; see independent-review.md.
+
+Fourth review (narrow — confirm the 1bfe1f3 corrections and give the final
+closure verdict): verdict VERIFIED COMPLETE. Independently reproduced every
+corrected figure (42/44 handler counts, the 16=6+10 breakdown, the
+trainer-host-start spawn-call analysis), judged the reframed provenance
+justification "structurally immune to the old failure mode", independently
+enumerated all 86 ipcMain.handle registrations across both files and
+reconciled every one against the ledger with zero omissions, confirmed
+commit 1bfe1f3 touches only the 3 evidence files (zero code/test files),
+reran both tsc checks (exit 0/0) and git diff --check (clean), and
+reconfirmed Wisp isolation. Two LOW-severity informational notes raised
+(evidence traceability of the "never audited" phrasing; a pre-existing,
+non-privilege-escalating trainer-host-start ownership-claim race) — neither
+blocking, no action required, no code change made.
+
+NEW-1: VERIFIED COMPLETE AT SOURCE/TEST LEVEL
+NEW-2: VERIFIED COMPLETE AT SOURCE/TEST LEVEL
 
 Packaged verification: NOT PERFORMED
 Clean-machine acceptance: NOT PERFORMED — EXTERNAL ENVIRONMENT REQUIRED

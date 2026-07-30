@@ -100,3 +100,28 @@ It also explicitly assessed whether the "OUTSIDE NEW-1 CLASS" boundary for `rest
 6. **Task-brief drift, not a repo defect** — the review brief said "12 commits"; actual is 10. No evidence-file claim was wrong here, just an inaccuracy in how this review was framed to the reviewer; noted for completeness, nothing to correct in the pack.
 
 **Disposition:** all 5 in-scope findings (1-5) corrected in this evidence set (`remaining-risks.md`, `design.md`) in the same commit that added this section. No code or test change was required or made. The reviewer's own closing assessment: *"Once Finding 4's rationale is restated... this is VERIFIED COMPLETE territory."*
+
+---
+
+## Fourth review — final closure confirmation
+
+Scope: narrow — verify the 5 corrections made in commit `1bfe1f3` in response to the third review are accurate, confirm the commit is docs-only, re-run core regression checks, re-confirm Wisp isolation, and give the final closure verdict.
+
+**Verdict: VERIFIED COMPLETE**
+
+**Explicit answer to "is this branch ready to be closed as NEW-1/NEW-2 verified complete at source/test level?": Yes.**
+
+The reviewer independently reproduced every corrected claim rather than trusting the commit message:
+- Recounted `ipcMain.handle` registrations itself: 42 in `electron/live-memory-ipc.ts`, 44 in `electron/main.ts` — matches the corrected figures exactly.
+- Independently reproduced the 16 = 6 + 10 breakdown by diffing `requireTrustedSender`/`validateIpcSender` call sites between base `a63e9f5` (6: the freeze/rollback cluster, resolved back to their exact channel names) and HEAD (16 total) — exactly 10 added, matching the named list.
+- Read `trainer-host-start`'s actual spawn call in `src/core/trainer-host/host-supervisor.ts:188` and confirmed the argv is genuinely fixed (`entryPath` derived only from `import.meta.url`; `start()` takes zero arguments; the renderer payload is parsed but never forwarded) — the new "LIFECYCLE — fixed-argv process spawn, non-destructive" label is accurate.
+- Assessed the reframed OUTSIDE NEW-1 CLASS justification and found it "structurally immune to the old failure mode" — it no longer offers technical reasoning ("V1 vs V2", "file vs memory") that a future reader could misuse to justify leaving some other file-write handler unhardened; it states a scope/provenance boundary instead, immediately followed by an unminimized disclosure of the real gap.
+- Independently enumerated **all 86** `ipcMain.handle` registrations across both files (not just the ones already in the ledger) and reconciled every single one 1:1 against the ledger's classifications, explicitly searching for — and finding none of — a handler that was actually in the NEW-1/NEW-2 audit's scope but left unhardened.
+- Confirmed `git show 1bfe1f3 --stat` touches only the 3 evidence files, zero production/test code; reran both tsc checks (exit 0/0), `git diff --check` (clean), `git status` (clean); reconfirmed Wisp isolation (`git diff a63e9f5..HEAD` on `wisp.ts`/`companion-wisp.test.ts` → empty).
+
+**Two informational findings, explicitly not blocking, no action taken:**
+
+1. **LOW (evidence traceability)** — the phrase "never named by the original NEW-1/NEW-2 audit" isn't independently verifiable from an in-repo artifact (the strings "NEW-1"/"NEW-2" only appear in this evidence directory); what *is* verifiable in base is the roadmap deferral (`SOLITH_SECURITY_ROADMAP.md:1782`). Doesn't reproduce the prior defect and doesn't affect the scope boundary's soundness, which the reviewer confirmed independently via its own full 86-handler reconciliation.
+2. **LOW (informational, pre-existing, not a NEW-1 destructive gap)** — `trainer-host-start` sets `trainerHostOwner` gated only by `isDestroyed()`; an untrusted window could claim ownership first, causing a denial-of-service against the legitimate window for `trainer-host-approve-and-write`/`trainer-host-rollback`. Not a privilege-escalation risk: `requireTrustedSender` still runs before the ownership check on both destructive channels, so the untrusted claimant still cannot write or roll back anything. Same shape as the already-documented `in-process-propose-hook` note.
+
+Also noted: the review brief said "13 commits" / "12 commits" at different points; actual commit count on the branch is 10-11 depending on range. Task-brief drift only, not a repo or evidence-pack defect — nothing to correct here.
