@@ -1,6 +1,6 @@
 using Microsoft.Gaming.XboxGameBar;
 using System;
-using System.Net.Http;
+
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 
@@ -8,8 +8,8 @@ namespace WispGameBarWidget
 {
     /// <summary>
     /// Wisp widget surface: static companion image, one clickable test
-    /// button (hidden while click-through is active), and a mock localhost
-    /// call to simulate talking to the real Solith desktop app.
+    /// button (hidden while click-through is active), and an authenticated
+    /// loopback call to the real Solith desktop app.
     ///
     /// Click-through model corrected against Microsoft's actual docs
     /// (learn.microsoft.com/en-us/xbox/game-bar/guide/click-through, fetched
@@ -28,22 +28,15 @@ namespace WispGameBarWidget
     /// Explicit non-goals (see ARCHITECTURE.md and the task's scope
     /// constraint): no process attach, no memory read/write, no shell
     /// execution, no anti-detection/bypass logic, no trainer promotion or
-    /// injection logic. This class only renders UI and makes one HTTP GET.
+    /// injection logic. This class only renders UI and invokes the narrow
+    /// authenticated transport client.
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        // Loopback-only mock endpoint (see ../mock-solith-service/server.py).
-        // Never point this at a non-localhost host - it exists purely to
-        // simulate the shape of a future real IPC channel between the widget
-        // and the actual Solith Electron app.
-        private const string MockSolithPingUrl = "http://127.0.0.1:8787/ping";
-
-        private static readonly HttpClient HttpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(2),
-        };
+        private static readonly SolithTransportClient TransportClient = new SolithTransportClient();
 
         private XboxGameBarWidget? _widget;
+        private bool _pingInFlight;
 
         public MainPage()
         {
@@ -84,15 +77,19 @@ namespace WispGameBarWidget
 
         private async void PingSolithButton_Click(object sender, Windows.UI.Xaml.RoutedEventArgs e)
         {
-            StatusText.Text = "Contacting mock Solith service...";
+            if (_pingInFlight) return;
+            _pingInFlight = true;
+            PingSolithButton.IsEnabled = false;
+            StatusText.Text = "Contacting SOLITH...";
             try
             {
-                var response = await HttpClient.GetStringAsync(MockSolithPingUrl).ConfigureAwait(true);
-                StatusText.Text = $"Solith mock replied: {response}";
+                StatusText.Text = await TransportClient.PingAsync();
             }
-            catch (Exception ex)
+            finally
             {
-                StatusText.Text = $"Mock Solith service unreachable: {ex.Message}";
+                await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(true);
+                PingSolithButton.IsEnabled = true;
+                _pingInFlight = false;
             }
         }
     }

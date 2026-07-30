@@ -20,7 +20,7 @@
   <Identity
     Name="Solith.WispGameBarWidget.Poc"
     Publisher="CN=SolithLocalDevPoc"
-    Version="0.1.0.0" />
+    Version="0.1.0.1" />
 
   <mp:PhoneIdentity PhoneProductId="7f2e0c9a-0000-4000-8000-000000000001" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 

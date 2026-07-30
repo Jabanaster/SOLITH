@@ -62,6 +62,11 @@ import {
   installLocalCrashHandlers,
   installElectronAppCrashHooks,
 } from '../src/core/crash/local-crash-reporter.js';
+import {
+  resolveGameBarDiscoveryPath,
+  startGameBarTransport,
+  type GameBarTransport,
+} from './gamebar-transport.js';
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -131,6 +136,8 @@ app.on('second-instance', () => {
 });
 
 let mainWindow: BrowserWindow | null = null;
+let gameBarTransport: GameBarTransport | null = null;
+let quittingAfterGameBarTransportStop = false;
 
 // V2 lifecycle wiring — initialised once in app.whenReady(), after the session
 // monitor is available. Null until then so IPC handlers can detect unready state.
@@ -268,6 +275,14 @@ app.whenReady().then(async () => {
   registerSolithAssetProtocol();
 
   try {
+    gameBarTransport = await startGameBarTransport({
+      discoveryPath: resolveGameBarDiscoveryPath(),
+    });
+  } catch (error) {
+    console.error('[GameBar Transport] Startup failed; transport remains unavailable:', error);
+  }
+
+  try {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
 
@@ -308,6 +323,21 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', (event) => {
+  if (!gameBarTransport || quittingAfterGameBarTransportStop) return;
+  event.preventDefault();
+  const transport = gameBarTransport;
+  gameBarTransport = null;
+  void transport.stop()
+    .catch((error) => {
+      console.error('[GameBar Transport] Shutdown failed:', error);
+    })
+    .finally(() => {
+      quittingAfterGameBarTransportStop = true;
+      app.quit();
+    });
 });
 
 app.on('will-quit', () => {
