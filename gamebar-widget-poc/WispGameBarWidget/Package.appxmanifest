@@ -26,7 +26,7 @@
 
   <Properties>
     <DisplayName>Solith Wisp (Game Bar Widget POC)</DisplayName>
-    <PublisherDisplayName>Solith (local proof of concept, unsigned)</PublisherDisplayName>
+    <PublisherDisplayName>Solith (local proof of concept)</PublisherDisplayName>
     <Logo>Assets\StoreLogo50.png</Logo>
   </Properties>
 

@@ -33,8 +33,7 @@
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WindowsXamlEnableOverview>true</WindowsXamlEnableOverview>
     <AppxPackageSigningEnabled>true</AppxPackageSigningEnabled>
-    <PackageCertificateKeyFile>WispGameBarWidget_TemporaryKey.pfx</PackageCertificateKeyFile>
-    <PackageCertificateThumbprint>0891FB3094E22701D683AB1DC453F4FD94CAEA47</PackageCertificateThumbprint>
+    <PackageCertificateKeyFile>WispGameBarWidget_LocalDevKey.pfx</PackageCertificateKeyFile>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
