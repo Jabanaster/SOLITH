@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol, type IpcMainInvokeEvent } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
@@ -50,7 +50,7 @@ import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
-import { registerTrustedSolithWindow } from './sender-validation.js';
+import { registerTrustedSolithWindow, validateIpcSender } from './sender-validation.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
@@ -142,6 +142,16 @@ let lifecycleWiring: LifecycleWiring | null = null;
 let trainerHostSupervisor: TrainerHostSupervisor | null = null;
 // Tracks the webContentsId that owns the current TrainerHost session.
 let trainerHostOwner: number | null = null;
+
+// Real sender identity validation for the destructive TrainerHost write path —
+// mirrors requireTrustedSender() in electron/live-memory-ipc.ts. Beyond
+// isDestroyed()/ownership, this confirms the sender is a registered Solith
+// window, in its own main frame, still showing an allowed URL.
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
 
 function isPathInside(candidatePath: string, rootPath: string): boolean {
   const relative = path.relative(rootPath, candidatePath);
@@ -1177,7 +1187,8 @@ ipcMain.handle('trainer-host-propose-write', async (event, payload: unknown) => 
 // pending-proposal map — consuming it is the approval gate.
 ipcMain.handle('trainer-host-approve-and-write', async (event, payload: unknown) => {
   try {
-    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
       return { success: false, error: 'not_owner' };
     }
