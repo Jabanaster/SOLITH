@@ -9,3 +9,24 @@
 - The repository retains substantial unrelated modified and untracked work captured in baseline-file-manifest.csv. Gate 2.5 neither certifies nor closes that work.
 
 No unresolved exploitable Gate 2.5 defect remains after the freeze-stop/status sender guards and complete packaged rerun.
+
+## Evidence correction (owner-authorized, candidate 502300b4498828b40dcbb5be320c2f8d48603089)
+
+Prior Electron TypeScript result of 31 diagnostics did not reproduce under
+the repository-pinned Node 22.23.1 runtime with a clean npm ci. Independent
+reruns in both the isolated cleanup worktree
+(`G:\ACTIVE_PROJECTS\solith-electron-ts-cleanup`, branch
+`chore/electron-ts-baseline-cleanup`) and the frozen integration worktree
+(`G:\ACTIVE_PROJECTS\solith-b11-integration`, branch
+`integration/b1-1-closeout`) produced 0 diagnostics. The earlier result is
+classified as environment contamination, not an accepted unresolved
+baseline.
+
+This does not erase the original 31-diagnostic observation recorded above
+(line 5 of this file, and `tests-summary.csv` rows 10 and 23) — that
+observation stands as a historical record of what a prior session reported
+under a contaminated environment. Main TypeScript also independently
+reconfirmed at 0 diagnostics. Full test/build battery (npm test, live-memory,
+Vite build, Electron build, Electron output verifier) passed in the
+re-verification. No source change was required and no cleanup commit exists,
+because there was no code defect to fix.
