@@ -1,0 +1,10 @@
+<!--
+    Runtime Directives for .NET Native (Release builds only for this
+    project). Debug builds do not use the .NET Native toolchain.
+    https://go.microsoft.com/fwlink/?LinkID=391919
+-->
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="*Application*" Dynamic="Required All" />
+  </Application>
+</Directives>
