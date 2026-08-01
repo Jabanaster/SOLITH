@@ -22,6 +22,20 @@ No clean external machine or VM is available in this environment. This document 
 
 - Exact candidate SHA-256 (installer and unpacked `Solith.exe`) must be recorded from Phase 10 evidence before use here. This plan does not authorize using any historical hash.
 
+## Current candidate (2026-08-01)
+
+- Candidate ID: `SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z`
+- Source SHA: `5944beaa16607a4a96359676d05436bbf3568d19`
+- Version: `2.4.0-alpha.2`, architecture `x64`
+- Installer: `Solith Setup 2.4.0-alpha.2.exe`, SHA-256 `BB880D6F4A0D375FB294626B4FADD2B2AA687BD18A81A54D8A66EDA335A72B58`
+- Unpacked `Solith.exe` SHA-256: `3B7A6CD1894444FE81909D5B165B0442894EE7D34BECD9BCD3A1500635CEB4C6`
+- Signing: unsigned (`NotSigned`, confirmed via `Get-AuthenticodeSignature` on installer, unpacked exe, and installed exe)
+- Local-machine (non-clean) install/launch/uninstall/reinstall already verified — see `Candidates/SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z/installation-verification.md`. This is NOT a substitute for the clean-machine run below.
+- Local-machine packaged Gate 2.5 result: 44/44 pass — see `Candidates/.../gate2-5-packaged-verification.md`.
+- Required screenshots/logs for the actual external run: unsigned-warning dialog (SmartScreen), install-wizard screens, first-launch window, uninstall confirmation, `Get-CimInstance Win32_Process` before/after uninstall.
+- Evidence file naming for the external run: `Candidates/SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z/clean-machine-run-<date>.md`.
+- VM snapshot instructions: snapshot immediately after OS provisioning and Windows Update completion, before any candidate transfer; restore before every scenario requiring a clean state, per Procedure step 1 above.
+
 ## Procedure
 
 1. Restore VM to clean snapshot.
