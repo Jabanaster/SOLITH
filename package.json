@@ -42,6 +42,7 @@
     "generate:trainer-catalog": "node scripts/generate-trainer-catalog-seed.mjs",
     "prepare:branding": "node scripts/prepare-branding-assets.mjs",
     "scan:installed-games": "tsx scripts/scan-installed-games.mjs",
+    "measure:startup": "node scripts/measure-startup.mjs",
     "registry:compile": "tsx scripts/compile-ct-registry.mjs",
     "ct-library:import": "tsx scripts/compile-ct-zip.mjs",
     "registry:inspect": "tsx scripts/inspect-registry.mjs",
