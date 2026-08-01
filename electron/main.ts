@@ -69,6 +69,9 @@ import {
   startGameBarTransport,
   type GameBarTransport,
 } from './gamebar-transport.js';
+import { mark } from './startup-timing.js';
+
+mark('module-loaded');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -99,6 +102,14 @@ registerWispOverlayIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
+
+// Bound for the ready-to-show fallback (see createWindow()). Overridable
+// only for deterministic test timing; falls back to the 10s default on any
+// unset/invalid value.
+const READY_TO_SHOW_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.SOLITH_READY_TO_SHOW_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10_000;
+})();
 
 // ── Isolated userData for test runs ─────────────────────────────────────────
 // Must run before app.requestSingleInstanceLock() and app.whenReady().
@@ -228,6 +239,7 @@ function resolveWindowIconPath(): string | undefined {
 }
 
 function createWindow() {
+  mark('create-window-start');
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -247,9 +259,36 @@ function createWindow() {
     },
     backgroundColor: '#080b12',
     titleBarStyle: 'hiddenInset',
-    frame: true
+    frame: true,
+    show: false
   });
 
+  mark('browserwindow-constructed');
+  const readyToShowWindow = mainWindow;
+  let shown = false;
+  const showOnce = (reason: string) => {
+    if (shown || readyToShowWindow.isDestroyed()) return;
+    shown = true;
+    mark(reason);
+    readyToShowWindow.show();
+    // Kick off deferred, non-critical catalog bootstrap only once the
+    // window is actually being shown (real ready-to-show signal, or the
+    // fallback timeout if the renderer never signals). Starting it earlier
+    // (e.g. right after window construction) let it compete with the
+    // renderer's own startup work for the same process's I/O, which showed
+    // up as a several-second ready-to-show delay in measurement. Same
+    // operations and error handling as before — only the kick-off point
+    // moved.
+    void runDeferredTrainerCatalogBootstrap();
+  };
+  readyToShowWindow.once('ready-to-show', () => showOnce('ready-to-show'));
+  // Fallback: if the renderer never signals ready (crash, hang, missing
+  // asset), still show the window instead of leaving the app invisible with
+  // no window at all — a controlled, visible failure beats a silent one.
+  // Bound is explicit and overridable (test-only) via
+  // SOLITH_READY_TO_SHOW_TIMEOUT_MS; defaults to 10s in normal operation.
+  const readyToShowFallback = setTimeout(() => showOnce('ready-to-show-fallback-timeout'), READY_TO_SHOW_TIMEOUT_MS);
+  readyToShowWindow.once('closed', () => clearTimeout(readyToShowFallback));
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setMenu(null);
 
@@ -279,6 +318,7 @@ function createWindow() {
   applyWindowNavigationPolicy(mainWindow.webContents, mainAllowedUrlPrefixes);
 
   mainWindow.webContents.on('did-finish-load', () => {
+    mark('renderer-did-finish-load');
     mainWindow?.setMenuBarVisibility(false);
     mainWindow?.setMenu(null);
   });
@@ -292,35 +332,60 @@ function createWindow() {
   if (lifecycleWiring) lifecycleWiring.wireWindow(mainWindow);
 }
 
+let trainerCatalogBootstrapStarted = false;
+function runDeferredTrainerCatalogBootstrap(): Promise<void> {
+  if (trainerCatalogBootstrapStarted) return Promise.resolve();
+  trainerCatalogBootstrapStarted = true;
+  mark('trainer-catalog-bootstrap-start');
+  return (async () => {
+    try {
+      await bootstrapTrainerCatalog();
+      await reconcileCommunitySyncPolling();
+      await startCatalogProcessWatch();
+      mark('trainer-catalog-bootstrap-done');
+    } catch (error) {
+      console.error('Trainer catalog bootstrap failed:', error);
+    }
+  })();
+}
+
 app.whenReady().then(async () => {
+  mark('app-ready');
   registerSolithAssetProtocol();
 
   try {
+    mark('gamebar-transport-start');
     gameBarTransport = await startGameBarTransport({
       discoveryPath: resolveGameBarDiscoveryPath(),
     });
+    mark('gamebar-transport-done');
   } catch (error) {
+    mark('gamebar-transport-failed');
     console.error('[GameBar Transport] Startup failed; transport remains unavailable:', error);
   }
 
   try {
+    mark('db-init-start');
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
+    mark('db-init-done');
 
     const { unlockTrainerCapabilities } = await import('../src/core/settings/unlock-trainer-capabilities.js');
     unlockTrainerCapabilities();
     registerTrainerHotkeys();
 
-    try {
-      await bootstrapTrainerCatalog();
-      await reconcileCommunitySyncPolling();
-      await startCatalogProcessWatch();
-    } catch (error) {
-      console.error('Trainer catalog bootstrap failed:', error);
-    }
+    // Non-critical and network-bound (remote catalog sync): measured at
+    // 1.3s-12.3s across repeated launches, versus <200ms combined for every
+    // other startup step. Kicked off from showOnce() (in createWindow, once
+    // the window is actually being shown) instead of here, so it neither
+    // gates window creation nor competes with the renderer's own startup
+    // work for first paint. Same operations, same try/catch/console.error
+    // handling as before — only the kick-off point moved.
 
+    mark('crash-recovery-start');
     const operationsModule = await import('../src/core/safety/operations.js');
     await operationsModule.recoverInterruptedOperations();
+    mark('crash-recovery-done');
   } catch (error) {
     console.error('Failed to run crash recovery on startup:', error);
   }
@@ -335,6 +400,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('Failed to initialise V2 lifecycle wiring:', error);
   }
+  mark('lifecycle-wiring-done');
 
   Menu.setApplicationMenu(null);
   createWindow();
