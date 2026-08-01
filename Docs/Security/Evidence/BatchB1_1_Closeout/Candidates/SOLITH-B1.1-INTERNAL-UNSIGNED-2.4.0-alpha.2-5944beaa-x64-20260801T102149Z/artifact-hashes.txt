@@ -1,0 +1,10 @@
+SHA-256 (Get-FileHash -Algorithm SHA256), computed 2026-08-01
+
+BB880D6F4A0D375FB294626B4FADD2B2AA687BD18A81A54D8A66EDA335A72B58  dist\Solith Setup 2.4.0-alpha.2.exe
+B60C36DCE2F9AD757792B9B7A0B838F06BDC1BF83F5DAB106B2430281AB1978C  dist\Solith Setup 2.4.0-alpha.2.exe.blockmap
+3B7A6CD1894444FE81909D5B165B0442894EE7D34BECD9BCD3A1500635CEB4C6  dist\win-unpacked\Solith.exe
+
+Re-verified post-install (%LOCALAPPDATA%\Programs\solith\Solith.exe), both install and reinstall:
+3B7A6CD1894444FE81909D5B165B0442894EE7D34BECD9BCD3A1500635CEB4C6  (matches unpacked build exactly)
+
+Signing status: NotSigned (Get-AuthenticodeSignature), confirmed on installer, unpacked exe, and installed exe.
