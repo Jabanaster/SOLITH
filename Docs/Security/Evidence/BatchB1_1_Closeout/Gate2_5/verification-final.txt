@@ -43,3 +43,95 @@ Final live packaged results:
 No unresolved exploitable Gate 2.5 defect remains in the tested Windows x64 candidate. B1.1 is not promoted to unconditional PASS because the verdict rules require explicit owner disposition of the remaining documented conditions, including the Electron TypeScript and GameLibrary diff-check baselines. Gate 2.4's aggregate status is not rewritten as VERIFIED; only individually reproduced claims use VERIFIED COMPLETE in the evidence matrices.
 
 No commit, push, merge, reset, clean, stash, restore, checkout, tag, upload, publication, or release occurred.
+
+---
+
+## Addendum: independent reconfirmation by a second, separate session (Claude Sonnet)
+
+Everything above (lines 1-46) was authored by a **prior, different agent
+session** — its own model field says "Codex", committed to this branch as
+`317baf0` ("chore: preserve Gate 2.5 closeout state for audit") **before this
+session began**. This session discovered that prior work by reading this
+branch's git history and this evidence directory's pre-existing scaffolding,
+not because the operator disclosed it directly in this turn's prompt.
+
+**This session (repository root: G:\ACTIVE_PROJECTS\SOLITH; branch:
+`review/gate2-5-doc-audit`, not `master` as stated above — the branch name
+itself indicates this is an audit/review branch) is Claude Sonnet**, run
+independently against a **freshly rebuilt** packaged candidate
+(exeSHA256=3d23858497ff75f56edacc726a29752feb0e27c0f4f7a80b227354f040565e68),
+using a **new test file**
+(`tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts`, distinct from
+the prior session's `tests/gate2-5-frame-overlay-closeout.e2e.test.ts`, which
+is not present in the current working tree) rather than accepting the above
+report on faith.
+
+### Independent findings (this session)
+
+- **The freeze-stop/freeze-status fix (line 18 above) is confirmed present**
+  in the current source (`electron/live-memory-ipc.ts:797-818`, read
+  directly this cycle) and its behavior was independently reproduced with a
+  new live test against the real overlay (`Phase 3 addendum`, 1/1 pass).
+  This session did **not** discover or fix this defect — it was already
+  fixed before this session started.
+- Child-frame, stale-frame, DevTools, and overlay-recreation boundaries: all
+  independently reproduced this cycle with new tests (6/6 pass, rerun
+  twice). One architectural correction from this session's own source read:
+  `toggleWispOverlay()` only hides an existing overlay
+  (`hideWispOverlay()` → `.hide()`), not destroy+recreate — `destroyWispOverlay()`
+  is only reachable from the `'will-quit'` handler. This session's Phase 7
+  test therefore had the harness call the real `BrowserWindow.destroy()` API
+  directly on its own harness-launched overlay instance to construct the
+  destroy+recreate cycle (consistent with this gate's explicit authorization
+  to destroy/recreate harness-launched windows and overlays), rather than
+  relying on the toggle alone. See remaining-risks.md R-2.5-001.
+- SOLITH_TEST_BUILD environment-variant matrix: this session tested 8
+  variants (absent, 0, false, true, 01, whitespace-padded, trailing-newline,
+  exact-1 control) — an overlapping but not identical set to the prior
+  session's "nine non-1 variants" claim, for which this session did not
+  independently find raw evidence. All 7 non-control variants correctly
+  exposed no hooks; the exact-1 control correctly did.
+- Full regression rerun by this session against its own fresh candidate:
+  packaged smoke 23/23, Gate 2.4 rerun 5/5, Gate 2.3 rerun 3/3, Gate 2.2
+  Resume rerun 10/10 (one transient stall on the first attempt, isolated and
+  confirmed as a flake, not a regression, by an isolated rerun then a clean
+  full rerun), Gate 2.2A.1 write proof rerun 1/1, this session's own new
+  suite 6/6 — 48/48 packaged total. npm test 1040/1040, test:live-memory
+  257/257, main TypeScript 0 diagnostics, Electron TypeScript 31
+  diagnostics/13 files (unchanged baseline), git diff --check exit 0 with
+  zero whitespace errors (GameLibrary.tsx's baseline issue is now inside
+  HEAD's committed history on this branch, not the unstaged diff, since the
+  entire prior Gate 2.5 attempt was already committed before this session
+  began).
+- No leftover Solith.exe processes after any of this session's own suites
+  (confirmed via `tasklist` after each run). Four orphaned Solith.exe
+  processes were found mid-session after a transient stall during the first
+  Gate 2.2 Resume rerun attempt; confirmed harness-created via their
+  `--user-data-dir` command-line arguments matching this session's own
+  temp-directory naming pattern, and terminated.
+- No production code was modified by this session (confirmed via SHA256
+  hash comparison of every security-relevant tracked file against the git
+  index this cycle — all clean/unmodified).
+
+### Corrected verdict (this session)
+
+Repository root: G:\ACTIVE_PROJECTS\SOLITH
+Branch: `review/gate2-5-doc-audit` (disclosed correction — not `master`)
+Model: **Claude Sonnet**
+
+Gate 2.4 functional status: **REPORTED COMPLETE — VERIFY** (unchanged,
+per the operator's own wording correction this cycle).
+Gate 2.4 scope integrity: **CONDITIONALLY RECONCILED** (unchanged).
+Gate 2.5: **REPORTED COMPLETE — VERIFY** (this session's own claims above
+are individually reproduced and marked VERIFIED COMPLETE in their respective
+matrices; the aggregate Gate 2.5 label is not promoted past REPORTED
+COMPLETE — VERIFY, consistent with how Gate 2.4's aggregate label is
+handled, since not every prior session's claim was independently
+re-examined line-by-line — e.g. the prior session's exact "nine non-1
+variants" count was not independently reproduced by this session).
+Batch B1.1: **CONDITIONAL PASS** (unchanged — no exploitable defect found
+or introduced by either session).
+Release: **DENIED** (unchanged).
+
+No commit, push, merge, reset, clean, stash, restore, checkout, tag, upload,
+publication, or release occurred during this session.

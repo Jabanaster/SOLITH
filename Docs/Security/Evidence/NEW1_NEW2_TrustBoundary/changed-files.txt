@@ -1,0 +1,116 @@
+electron/live-memory-ipc.ts
+  Reason: NEW-1 — add requireTrustedSender(event) check to the 6 destructive
+  write/injector channels named in the audit scope.
+  Runtime behavior change: those 6 channels now return
+  { success:false, error:"sender_rejected:<reason>" } for a non-trusted
+  sender (unregistered window, child/devtools frame, destroyed sender,
+  navigated-away sender, wrong window type) before reaching any existing
+  logic. Legitimate trusted main-frame callers see no behavior change.
+  Security impact: closes NEW-1 for these 6 channels.
+  Tests: tests/new1-new2-sender-validation.test.ts (unit),
+  tests/new1-new2-trust-boundary.e2e.test.ts (real Electron wiring proof).
+
+electron/main.ts
+  Reason: NEW-1 — harden trainer-host-approve-and-write (same destructive-
+  write gap class, flagged as an extra finding beyond the audit's named
+  handlers). NEW-2 — wire applyWindowNavigationPolicy into the main window
+  right after registerTrustedSolithWindow.
+  Runtime behavior change: trainer-host-approve-and-write now sender-checked
+  identically to the live-memory-ipc.ts handlers. The main BrowserWindow now
+  rejects same-window navigation outside its registered origin and denies
+  all window.open()/target=_blank popups.
+  Security impact: closes the extra NEW-1 finding; closes NEW-2 for the main
+  window.
+  Tests: same two files as above.
+
+electron/sender-validation.ts
+  Reason: NEW-2 — add applyWindowNavigationPolicy(), the shared nav/popup
+  guard helper used by all three windows.
+  Runtime behavior change: none by itself (new exported function; existing
+  validateIpcSender/registerTrustedSolithWindow unchanged).
+  Security impact: provides the NEW-2 fix mechanism.
+  Tests: tests/new1-new2-sender-validation.test.ts (unit, faked WebContents).
+
+electron/wisp-overlay.ts
+  Reason: NEW-2 — wire applyWindowNavigationPolicy into the Wisp overlay
+  window's creation call site only.
+  Runtime behavior change: the Wisp overlay window now rejects unexpected
+  same-window navigation and denies popups. No Wisp reducer, state, or
+  visual behavior touched — src/core/companion/wisp.ts and
+  tests/companion-wisp.test.ts are untouched (verified via git diff).
+  Security impact: closes NEW-2 for the Wisp overlay window.
+  Tests: tests/new1-new2-trust-boundary.e2e.test.ts (real Electron, toggles
+  the overlay via the production wisp-overlay-toggle IPC channel).
+
+electron/trainer-overlay.ts
+  Reason: NEW-2 — wire applyWindowNavigationPolicy into the trainer overlay
+  window's creation call site.
+  Runtime behavior change: same as Wisp overlay, for the trainer overlay
+  window.
+  Security impact: closes NEW-2 for the trainer overlay window.
+  Tests: tests/new1-new2-trust-boundary.e2e.test.ts.
+
+src/core/security/trusted-sender-registry.ts
+  Reason: NEW-2 — export the previously-module-private isApprovedUrl() so
+  the navigation guard reuses the EXACT SAME origin/path matcher already
+  used for IPC sender trust, instead of a second, possibly-drifting
+  implementation.
+  Runtime behavior change: none (function body unchanged, only visibility).
+  Security impact: keeps the IPC-trust allowed-URL policy and the
+  navigation-guard allowed-URL policy from diverging.
+  Tests: existing tests/trusted-sender-registry.test.ts already covers
+  isApprovedUrl() behavior; tests/new1-new2-sender-validation.test.ts
+  exercises it indirectly via applyWindowNavigationPolicy.
+
+tests/new1-new2-sender-validation.test.ts (new)
+  Reason: unit coverage of validateIpcSender/applyWindowNavigationPolicy
+  against faked Electron shapes (both functions are electron-import
+  type-only, so real production code, no Electron runtime needed).
+
+tests/new1-new2-trust-boundary.e2e.test.ts (new)
+  Reason: real-Electron wiring proof (dist-electron/main.js, no packaging)
+  that the 7 hardened channels and 3 windows behave correctly end-to-end.
+
+package.json
+  Reason: add tests/new1-new2-sender-validation.test.ts to the main `test`
+  script; add a dedicated `test:new1-new2-trust-boundary` playwright script
+  for the e2e file, matching the existing gate-test convention.
+
+--- Corrective pass (after independent review — see independent-review.md) ---
+
+electron/main.ts, electron/wisp-overlay.ts, electron/trainer-overlay.ts
+  Reason: independent review found `http://localhost:3000` was trusted
+  unconditionally, including in packaged builds, for both IPC sender trust
+  and the new navigation guard.
+  Runtime behavior change: each window's `allowedUrlPrefixes` is now gated
+  by the existing `isDev` flag — dev builds trust only localhost:3000,
+  packaged builds trust only the packaged file:// route, never both.
+  Security impact: closes an attacker-bindable-origin gap in shipped builds.
+  Tests: tests/new1-new2-sender-validation.test.ts already covered both
+  branches of isApprovedUrl(); no new test needed, existing suite re-passed.
+
+electron/sender-validation.ts
+  Reason: denying all popups silently broke a real, pre-existing
+  target="_blank" external link in the UI (ExternalTrainerResearchLab.tsx).
+  Runtime behavior change: a strictly https: popup request is now handed to
+  shell.openExternal (dynamically imported, so the file stays plain-Node
+  testable) instead of being silently dropped; every other scheme is still
+  denied with no handoff; in-app BrowserWindow creation is still always
+  denied for every popup regardless of scheme.
+  Security impact: closes a functional regression from the first pass while
+  preserving the "no in-app popup gets privileged preload access" property.
+  Tests: tests/new1-new2-sender-validation.test.ts's "denies every
+  window.open / popup request by default" test still passes (return value
+  unchanged); the openExternal side effect is a fire-and-forget best-effort
+  call not asserted directly (would require a real Electron process check —
+  out of scope for this pass).
+
+tests/new1-new2-trust-boundary.e2e.test.ts
+  Reason: independent review found the original 7 NEW-1 tests only proved
+  non-regression for a legitimate caller — they would still pass if the new
+  trusted-sender check were deleted entirely.
+  Change: added a negative-control test calling all 7 hardened channels
+  from the real Wisp overlay window (registered windowType 'wisp-overlay',
+  same preload as main) and asserting genuine
+  sender_rejected:unauthorized_window_type — this fails if the check is
+  ever removed. 16 tests → 17 tests, all passing.

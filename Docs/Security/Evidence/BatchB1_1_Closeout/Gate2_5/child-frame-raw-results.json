@@ -1,0 +1,17 @@
+[
+  {
+    "label": "data-url-same-origin-doc",
+    "hadElectronAPI": false,
+    "callResult": "electronAPI undefined in child frame (no preload bridge)"
+  },
+  {
+    "label": "untrusted-local-file-child",
+    "hadElectronAPI": false,
+    "callResult": "electronAPI undefined in child frame (no preload bridge)"
+  },
+  {
+    "label": "about-blank-child",
+    "hadElectronAPI": false,
+    "callResult": "electronAPI undefined in child frame (no preload bridge)"
+  }
+]

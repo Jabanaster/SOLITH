@@ -41,6 +41,13 @@ Support matrix reports are evidence-based. They describe what was inspected, wha
 
 ## Certification levels
 
+> **Not the same system as security-gate certification.** The L0–L4 levels
+> below describe per-target *feature maturity* (how well a specific game
+> executable's live-memory support has been verified). They are unrelated to
+> the project's security-gate certification (Gate 2.x, Batch B1.1), which is
+> tracked in `SOLITH_SECURITY_ROADMAP.md` and describes the *security posture
+> of the application itself*, not any one game profile's feature maturity.
+
 - **L0** — discovery or metadata only. Values may be session-local, unverified, or imported from CT/community metadata. User discovery is required.
 - **L1/L2** — locally observed evidence exists, but restart stability or executable/build matching is incomplete.
 - **L3** — restart-stable pointer/signature evidence exists for a specific executable/build.
@@ -57,6 +64,10 @@ Certification is per target metadata entry, not per game title. A Steam L3 execu
 ## Not supported
 
 Solith does not support online/multiplayer targeting, anti-cheat bypass, stealth, debugger bypass, kernel drivers, packet capture, remote trainer-binary execution, or unverified third-party executable cheats.
+
+This is a user-facing summary only. `PROJECT_SPEC.md §3.2 "STRICTLY PROHIBITED
+(The Safety Firewall)"` is the authoritative source — if wording ever differs,
+`PROJECT_SPEC.md` controls.
 
 ## Prerequisites
 

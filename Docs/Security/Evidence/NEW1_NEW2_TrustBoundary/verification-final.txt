@@ -1,0 +1,132 @@
+NEW-1 / NEW-2 verification summary — branch security/new-1-new-2-trust-boundary
+
+Base:        integration/b1-1-closeout @ a63e9f57bc608e70212da1b09fb578f40eab889a
+Worktree:    G:\ACTIVE_PROJECTS\solith-new1-new2 (dedicated, verified clean before any edit)
+Final HEAD (pre-review): commit "test: cover NEW-1 and NEW-2 trust boundaries" (3rd of the 4 planned commits;
+             4th commit — this evidence — follows immediately, independent review comes after)
+
+Checks (see tests-run.txt for full detail):
+  [PASS] tsc -p tsconfig.electron.json --noEmit          exit 0
+  [PASS] tsc -p tsconfig.json --noEmit                   exit 0
+  [PASS] new1-new2 unit tests                            16/16
+  [PASS] new1-new2 real-Electron e2e tests                16/16
+  [PASS] npm run test:live-memory                        257/257
+  [PASS] full `npm test` equivalent (see env note)        1056/1056
+  [PASS] npm run build:vite                               exit 0
+  [PASS] npm run build:electron (29-point verifier)       29/29
+  [PASS] git diff --check                                 clean
+  [SKIP] packaging (electron-builder)                     not authorized for this pass
+  [SKIP] gate2-5 packaged frame/devtools/overlay e2e       requires packaging; not run
+
+Wisp isolation check:
+  git diff a63e9f5 -- src/core/companion/wisp.ts tests/companion-wisp.test.ts   → empty (no changes)
+  git diff (this branch) -- src/core/companion/wisp.ts tests/companion-wisp.test.ts → empty (no changes)
+  electron/wisp-overlay.ts diff is limited to two lines: the import statement
+  and the window-creation call site (hoist allowed-URL array to a const, add
+  applyWindowNavigationPolicy call). No reducer/state/message/lifecycle code touched.
+
+Independent review (Phase 8) verdict: VERIFIED WITH CONDITIONS. Of 8
+findings, 6 were within this patch's own scope and were fixed and
+re-verified in the first corrective pass (all totals unchanged or improved,
+e2e suite 17/17). 2 findings (HIGH: in-process-confirm-hook/rollback-hook;
+MEDIUM: trainer-host-rollback) were real but not in the explicitly
+authorized channel list at that time — recorded as open pending a scope
+decision, not silently closed.
+
+Second corrective pass (this commit range): the task owner explicitly
+authorized hardening exactly those two remaining findings.
+in-process-confirm-hook, in-process-rollback-hook (electron/live-memory-ipc.ts),
+and trainer-host-rollback (electron/main.ts) now all run
+requireTrustedSender(event) -> validateIpcSender(event, ['main']) as the
+first statement in the handler, identical to the other 7 already-hardened
+channels. Re-verified: both tsc checks, 59/59 focused trusted-sender/
+frame-security/rollback-freeze tests, 20/20 e2e tests (up from 17 — 3 new
+positive-control tests plus all 3 new handlers added to the shared
+negative-control test), 257/257 test:live-memory, 1056/1056 full-suite
+equivalent (unchanged from the first pass — no regression), build:vite
+clean, build:electron 29/29, git diff --check clean. See tests-run.txt item
+15 for exact commands and the Node-version note (still Node 24 in this
+environment; literal `npm test` still blocked by the repo's own Node-22
+pretest gate, same substitution as before, reconfirmed rather than assumed).
+
+The original VERIFIED WITH CONDITIONS verdict from the first review is
+preserved as the historical record (see independent-review.md); this
+section documents that both of its open conditions were subsequently
+closed and re-verified.
+
+Second, narrowly-scoped independent review (scope: exactly
+in-process-confirm-hook, in-process-rollback-hook, trainer-host-rollback,
+and their tests/evidence): verdict VERIFIED WITH CONDITIONS. The reviewer
+mutation-tested all 3 handlers (deleted each check individually against the
+built app, confirmed the negative-control test fails each time, restored
+the build bit-for-bit) — real proof the fix is genuinely wired, not just
+present in source. Its one substantive condition was evidence accuracy: an
+overclaim in remaining-risks.md ("no further NEW-1 gaps are open") that
+didn't account for two V1-era save-editor handlers with zero sender check
+(restore-backup, apply-proposal) and the TrainerHost lifecycle handlers
+being liveness-only. No code or test change was required by this review.
+
+Final same-class destructive-handler audit (this pass, independent of and
+in addition to the reviewer's own check): every ipcMain.handle in
+electron/live-memory-ipc.ts (42) and electron/main.ts (44) was
+re-enumerated and classified. Zero entries within the NEW-1 subsystem (V2
+live-memory / injector-launch / in-process-hook / TrainerHost) are
+classified REMAINING DEFECT. restore-backup, apply-proposal, delete-game,
+delete-recipe, revoke-save-location (V1 legacy save-editor, a distinct
+feature area never in Batch B1.1/NEW-1/NEW-2 scope) are classified OUTSIDE
+NEW-1 CLASS — JUSTIFIED, with the zero-sender-check gap explicitly
+documented rather than implied closed — see remaining-risks.md's "Final
+same-class destructive-handler audit" section for the complete ledger.
+
+Re-verification this pass (see tests-run.txt item 16): both tsc checks
+clean, 62/62 focused tests, 20/20 e2e (one transient worker-process crash
+on a single run investigated and confirmed a flake — isolated rerun and
+full-suite rerun both clean, matching the reviewer's own clean run),
+257/257 test:live-memory, 1056/1056 full-suite equivalent (unchanged — no
+regression), build:vite clean, build:electron 29/29, git diff --check
+clean, working tree clean.
+
+Third, full-scope independent review (scope: all NEW-1/NEW-2 production
+changes a63e9f5..HEAD, all tests, an independently-built complete
+destructive-handler ledger, Wisp isolation, evidence accuracy): verdict
+VERIFIED WITH CONDITIONS. Explicitly answered the required question — "Is
+there any renderer-triggered destructive IPC handler in the reviewed NEW-1
+class that lacks the established trusted main-window/main-frame/URL
+boundary?" — No. Built its own ledger from scratch (42 + 44 ipcMain.handle
+registrations, cross-checked against 66 more across 10 other electron/*.ts
+files for any missed NEW-1-class primitive, zero found), independently
+reran every check (both tsc, 59/59 unit, 20/20 e2e on first run with no
+flake, 257/257 live-memory, 1056/1056 full suite), and inspected the built
+dist-electron/main.js artifact directly to confirm source and tested bundle
+agree. All 6 findings were evidence-accuracy only (handler-count off-by-one
+in both files; an inconsistent "10 vs 16" hardened-channel denominator; a
+mislabeled trainer-host-start; and a factually-imprecise OUTSIDE NEW-1
+CLASS justification framed as "file vs memory" when TrainerHost's own
+hardened handlers also do file writes) — zero code defects, explicitly
+confirmed by the reviewer: "No code change is required." All 5 in-scope
+findings corrected in evidence-only commit 1bfe1f3; see independent-review.md.
+
+Fourth review (narrow — confirm the 1bfe1f3 corrections and give the final
+closure verdict): verdict VERIFIED COMPLETE. Independently reproduced every
+corrected figure (42/44 handler counts, the 16=6+10 breakdown, the
+trainer-host-start spawn-call analysis), judged the reframed provenance
+justification "structurally immune to the old failure mode", independently
+enumerated all 86 ipcMain.handle registrations across both files and
+reconciled every one against the ledger with zero omissions, confirmed
+commit 1bfe1f3 touches only the 3 evidence files (zero code/test files),
+reran both tsc checks (exit 0/0) and git diff --check (clean), and
+reconfirmed Wisp isolation. Two LOW-severity informational notes raised
+(evidence traceability of the "never audited" phrasing; a pre-existing,
+non-privilege-escalating trainer-host-start ownership-claim race) — neither
+blocking, no action required, no code change made.
+
+NEW-1: VERIFIED COMPLETE AT SOURCE/TEST LEVEL
+NEW-2: VERIFIED COMPLETE AT SOURCE/TEST LEVEL
+
+Packaged verification: NOT PERFORMED
+Clean-machine acceptance: NOT PERFORMED — EXTERNAL ENVIRONMENT REQUIRED
+Merge authorization: NOT GRANTED
+Master verification: NOT PERFORMED
+B1.1 promotion: NOT AUTHORIZED
+Release authorization: DENIED
+B2/B2A: NOT AUTHORIZED

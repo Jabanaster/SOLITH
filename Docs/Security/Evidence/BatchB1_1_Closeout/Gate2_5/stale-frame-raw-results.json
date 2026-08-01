@@ -1,0 +1,10 @@
+{
+  "staleInvokeThrew": true,
+  "staleInvokeResult": {
+    "threw": "Error: frame.evaluate: Frame was detached"
+  },
+  "postReloadConsent": {
+    "success": false,
+    "error": "not_attached"
+  }
+}

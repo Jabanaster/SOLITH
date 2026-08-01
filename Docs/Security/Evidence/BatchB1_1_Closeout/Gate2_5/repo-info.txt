@@ -1,0 +1,3 @@
+RepoRoot: G:/ACTIVE_PROJECTS/SOLITH
+Branch: review/gate2-5-doc-audit
+HEAD: 317baf0ea573992dfa1a0cec2a30d6529b6ecee0

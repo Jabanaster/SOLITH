@@ -9,3 +9,21 @@
 9. Electron TypeScript — baseline reproduced, 31 diagnostics across 13 files, exit 2; no new Gate 2.5 diagnostic.
 10. git diff --check — baseline reproduced, GameLibrary.tsx lines 286 and 303 only, exit 2; no new Gate 2.5 whitespace issue.
 11. No manual UI certification was claimed; this gate uses live packaged automation authorized by the owner.
+
+--- Addendum: independent rerun by THIS session (Claude Sonnet) ---
+Lines 1-11 above were recorded by a prior, different agent session (Codex,
+committed as 317baf0 before this session began). This session independently
+rebuilt a fresh packaged candidate and reran the full set:
+12. Packaged build (build:vite/build:electron/dist:dir) — PASS, 29/29 electron output verifier checks. New exeSHA256=3d23858497ff75f56edacc726a29752feb0e27c0f4f7a80b227354f040565e68.
+13. New test file tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts, 6 tests (child-frame, stale-frame, DevTools, overlay recreation, env-variant matrix, freeze-stop/status addendum) — 6/6 PASS, rerun twice for stability.
+14. packaged-smoke.test.ts — 23/23 PASS.
+15. gate2-4-final-certification.e2e.test.ts (rerun) — 5/5 PASS.
+16. gate2-3-freeze-authorization-security.e2e.test.ts (rerun) — 3/3 PASS.
+17. gate2-2-resume-packaged-lifecycle.e2e.test.ts (rerun) — 10/10 PASS (one transient environment stall on the first attempt, isolated and confirmed as a flake by rerunning the stalled test alone, then the full suite cleanly — not a regression).
+18. gate2-2a1-packaged-real-process-write-proof.e2e.test.ts (rerun) — 1/1 PASS.
+19. npm test (Node 22, correct PATH resolution required a POSIX-style `/g/...` path prefix, not `G:/...`, for Git Bash to resolve the pinned Node 22 binary) — 1040/1040 PASS.
+20. npm run test:live-memory (Node 22) — 257/257 PASS.
+21. Main TypeScript (tsc --noEmit) — 0 diagnostics.
+22. Electron TypeScript (tsc -p tsconfig.electron.json --noEmit) — 31 diagnostics/13 files, unchanged baseline.
+23. git diff --check — exit 0, zero whitespace errors (GameLibrary.tsx's known baseline issue is now inside HEAD's committed history on this branch, not in the unstaged diff, since the whole prior Gate 2.5 attempt was committed as 317baf0 before this session began).
+24. No leftover Solith.exe processes after any suite (confirmed via tasklist after each run); 4 orphaned Solith.exe processes were found and terminated mid-session after a transient stall during item 17's first attempt — confirmed harness-created via their --user-data-dir command-line arguments matching this session's own temp-dir naming pattern.

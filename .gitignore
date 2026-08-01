@@ -62,6 +62,8 @@ temp/
 test-results/
 playwright-report/
 coverage/
+/tests/fixtures/gate2-2-memory-fixture/bin/
+/tests/fixtures/gate2-2-memory-fixture/obj/
 
 # ── IDE and tool directories ──────────────────────────────────────────────────
 .vscode/settings.json

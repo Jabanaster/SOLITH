@@ -6,6 +6,7 @@
  * load-catalog-definition.ts (Electron / Node only).
  */
 import { IN_PROCESS_SCRIPT_MILESTONE } from '../in-process-script/charter.js';
+import { isValidMemoryFeatureResolution } from './schema.v1.js';
 import type { MemoryFeatureV1, SolithDefinitionV1 } from './schema.v1.js';
 
 export type SaveEditCapability = 'none' | 'metadata' | 'executable';
@@ -28,7 +29,12 @@ export interface CatalogDefinitionCapabilities {
 
 function featureHasResolvablePath(feature: MemoryFeatureV1): boolean {
   if (feature.type === 'scan_unknown' || feature.type === 'scan_first') return false;
-  const r = feature.resolution ?? {};
+  // `resolution` is required by the MemoryFeatureV1 interface, but persisted,
+  // legacy, or manually constructed payloads are not guaranteed to satisfy
+  // that shape at runtime — validate it explicitly rather than trusting the
+  // static type, and treat an invalid/missing resolution as unresolvable.
+  const r: unknown = feature.resolution;
+  if (!isValidMemoryFeatureResolution(r)) return false;
   return Boolean(
     r.moduleName &&
       (Boolean(r.baseOffset) || Boolean(r.signature) || (r.pointerChain?.length ?? 0) > 0),

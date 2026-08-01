@@ -53,7 +53,7 @@ function catalogEntryFromDefinition(definition: SolithDefinitionV1, cheatCount: 
  */
 export function importDefinitionYaml(yamlText: string): ImportYamlOutcome {
   const compiled = compileYamlToDefinition(yamlText);
-  if (!compiled.success) {
+  if (compiled.success === false) {
     return { success: false, errors: compiled.errors };
   }
 

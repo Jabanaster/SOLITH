@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol, type IpcMainInvokeEvent } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
@@ -50,7 +50,7 @@ import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
-import { registerTrustedSolithWindow } from './sender-validation.js';
+import { registerTrustedSolithWindow, applyWindowNavigationPolicy, validateIpcSender } from './sender-validation.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
@@ -64,6 +64,14 @@ import {
   installLocalCrashHandlers,
   installElectronAppCrashHooks,
 } from '../src/core/crash/local-crash-reporter.js';
+import {
+  resolveGameBarDiscoveryPath,
+  startGameBarTransport,
+  type GameBarTransport,
+} from './gamebar-transport.js';
+import { mark } from './startup-timing.js';
+
+mark('module-loaded');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -94,6 +102,14 @@ registerWispOverlayIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
+
+// Bound for the ready-to-show fallback (see createWindow()). Overridable
+// only for deterministic test timing; falls back to the 10s default on any
+// unset/invalid value.
+const READY_TO_SHOW_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.SOLITH_READY_TO_SHOW_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 10_000;
+})();
 
 // ── Isolated userData for test runs ─────────────────────────────────────────
 // Must run before app.requestSingleInstanceLock() and app.whenReady().
@@ -133,6 +149,8 @@ app.on('second-instance', () => {
 });
 
 let mainWindow: BrowserWindow | null = null;
+let gameBarTransport: GameBarTransport | null = null;
+let quittingAfterGameBarTransportStop = false;
 
 // V2 lifecycle wiring — initialised once in app.whenReady(), after the session
 // monitor is available. Null until then so IPC handlers can detect unready state.
@@ -142,6 +160,16 @@ let lifecycleWiring: LifecycleWiring | null = null;
 let trainerHostSupervisor: TrainerHostSupervisor | null = null;
 // Tracks the webContentsId that owns the current TrainerHost session.
 let trainerHostOwner: number | null = null;
+
+// Real sender identity validation for the destructive TrainerHost write path —
+// mirrors requireTrustedSender() in electron/live-memory-ipc.ts. Beyond
+// isDestroyed()/ownership, this confirms the sender is a registered Solith
+// window, in its own main frame, still showing an allowed URL.
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
 
 function isPathInside(candidatePath: string, rootPath: string): boolean {
   const relative = path.relative(rootPath, candidatePath);
@@ -211,6 +239,7 @@ function resolveWindowIconPath(): string | undefined {
 }
 
 function createWindow() {
+  mark('create-window-start');
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -230,9 +259,36 @@ function createWindow() {
     },
     backgroundColor: '#080b12',
     titleBarStyle: 'hiddenInset',
-    frame: true
+    frame: true,
+    show: false
   });
 
+  mark('browserwindow-constructed');
+  const readyToShowWindow = mainWindow;
+  let shown = false;
+  const showOnce = (reason: string) => {
+    if (shown || readyToShowWindow.isDestroyed()) return;
+    shown = true;
+    mark(reason);
+    readyToShowWindow.show();
+    // Kick off deferred, non-critical catalog bootstrap only once the
+    // window is actually being shown (real ready-to-show signal, or the
+    // fallback timeout if the renderer never signals). Starting it earlier
+    // (e.g. right after window construction) let it compete with the
+    // renderer's own startup work for the same process's I/O, which showed
+    // up as a several-second ready-to-show delay in measurement. Same
+    // operations and error handling as before — only the kick-off point
+    // moved.
+    void runDeferredTrainerCatalogBootstrap();
+  };
+  readyToShowWindow.once('ready-to-show', () => showOnce('ready-to-show'));
+  // Fallback: if the renderer never signals ready (crash, hang, missing
+  // asset), still show the window instead of leaving the app invisible with
+  // no window at all — a controlled, visible failure beats a silent one.
+  // Bound is explicit and overridable (test-only) via
+  // SOLITH_READY_TO_SHOW_TIMEOUT_MS; defaults to 10s in normal operation.
+  const readyToShowFallback = setTimeout(() => showOnce('ready-to-show-fallback-timeout'), READY_TO_SHOW_TIMEOUT_MS);
+  readyToShowWindow.once('closed', () => clearTimeout(readyToShowFallback));
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setMenu(null);
 
@@ -252,12 +308,17 @@ function createWindow() {
     mainWindow.loadFile(path.join(moduleDirectory, 'dist/index.html'));
   }
 
-  registerTrustedSolithWindow(mainWindow.webContents, 'main', [
-    'http://localhost:3000',
-    pathToFileURL(path.join(moduleDirectory, 'dist/index.html')).href,
-  ]);
+  // Packaged builds must only trust the packaged file:// route — the dev-server
+  // origin is attacker-bindable on any machine and must never be trusted once
+  // shipped (isDev is the same flag already used to choose what to load above).
+  const mainAllowedUrlPrefixes = isDev
+    ? ['http://localhost:3000']
+    : [pathToFileURL(path.join(moduleDirectory, 'dist/index.html')).href];
+  registerTrustedSolithWindow(mainWindow.webContents, 'main', mainAllowedUrlPrefixes);
+  applyWindowNavigationPolicy(mainWindow.webContents, mainAllowedUrlPrefixes);
 
   mainWindow.webContents.on('did-finish-load', () => {
+    mark('renderer-did-finish-load');
     mainWindow?.setMenuBarVisibility(false);
     mainWindow?.setMenu(null);
   });
@@ -271,27 +332,60 @@ function createWindow() {
   if (lifecycleWiring) lifecycleWiring.wireWindow(mainWindow);
 }
 
+let trainerCatalogBootstrapStarted = false;
+function runDeferredTrainerCatalogBootstrap(): Promise<void> {
+  if (trainerCatalogBootstrapStarted) return Promise.resolve();
+  trainerCatalogBootstrapStarted = true;
+  mark('trainer-catalog-bootstrap-start');
+  return (async () => {
+    try {
+      await bootstrapTrainerCatalog();
+      await reconcileCommunitySyncPolling();
+      await startCatalogProcessWatch();
+      mark('trainer-catalog-bootstrap-done');
+    } catch (error) {
+      console.error('Trainer catalog bootstrap failed:', error);
+    }
+  })();
+}
+
 app.whenReady().then(async () => {
+  mark('app-ready');
   registerSolithAssetProtocol();
 
   try {
+    mark('gamebar-transport-start');
+    gameBarTransport = await startGameBarTransport({
+      discoveryPath: resolveGameBarDiscoveryPath(),
+    });
+    mark('gamebar-transport-done');
+  } catch (error) {
+    mark('gamebar-transport-failed');
+    console.error('[GameBar Transport] Startup failed; transport remains unavailable:', error);
+  }
+
+  try {
+    mark('db-init-start');
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
+    mark('db-init-done');
 
     const { unlockTrainerCapabilities } = await import('../src/core/settings/unlock-trainer-capabilities.js');
     unlockTrainerCapabilities();
     registerTrainerHotkeys();
 
-    try {
-      await bootstrapTrainerCatalog();
-      await reconcileCommunitySyncPolling();
-      await startCatalogProcessWatch();
-    } catch (error) {
-      console.error('Trainer catalog bootstrap failed:', error);
-    }
+    // Non-critical and network-bound (remote catalog sync): measured at
+    // 1.3s-12.3s across repeated launches, versus <200ms combined for every
+    // other startup step. Kicked off from showOnce() (in createWindow, once
+    // the window is actually being shown) instead of here, so it neither
+    // gates window creation nor competes with the renderer's own startup
+    // work for first paint. Same operations, same try/catch/console.error
+    // handling as before — only the kick-off point moved.
 
+    mark('crash-recovery-start');
     const operationsModule = await import('../src/core/safety/operations.js');
     await operationsModule.recoverInterruptedOperations();
+    mark('crash-recovery-done');
   } catch (error) {
     console.error('Failed to run crash recovery on startup:', error);
   }
@@ -306,6 +400,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('Failed to initialise V2 lifecycle wiring:', error);
   }
+  mark('lifecycle-wiring-done');
 
   Menu.setApplicationMenu(null);
   createWindow();
@@ -318,6 +413,21 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', (event) => {
+  if (!gameBarTransport || quittingAfterGameBarTransportStop) return;
+  event.preventDefault();
+  const transport = gameBarTransport;
+  gameBarTransport = null;
+  void transport.stop()
+    .catch((error) => {
+      console.error('[GameBar Transport] Shutdown failed:', error);
+    })
+    .finally(() => {
+      quittingAfterGameBarTransportStop = true;
+      app.quit();
+    });
 });
 
 app.on('will-quit', () => {
@@ -1177,7 +1287,8 @@ ipcMain.handle('trainer-host-propose-write', async (event, payload: unknown) => 
 // pending-proposal map — consuming it is the approval gate.
 ipcMain.handle('trainer-host-approve-and-write', async (event, payload: unknown) => {
   try {
-    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
       return { success: false, error: 'not_owner' };
     }
@@ -1193,7 +1304,8 @@ ipcMain.handle('trainer-host-approve-and-write', async (event, payload: unknown)
 // Roll back a completed write using the backup created during execute.
 ipcMain.handle('trainer-host-rollback', async (event, payload: unknown) => {
   try {
-    if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
       return { success: false, error: 'not_owner' };
     }

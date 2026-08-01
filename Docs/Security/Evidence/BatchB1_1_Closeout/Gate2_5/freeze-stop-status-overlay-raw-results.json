@@ -1,0 +1,10 @@
+{
+  "overlayStatus": {
+    "success": false,
+    "error": "sender_rejected:unauthorized_window_type"
+  },
+  "overlayStop": {
+    "success": false,
+    "error": "sender_rejected:unauthorized_window_type"
+  }
+}

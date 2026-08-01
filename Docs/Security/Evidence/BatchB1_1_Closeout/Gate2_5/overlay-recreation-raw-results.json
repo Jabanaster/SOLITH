@@ -1,0 +1,8 @@
+{
+  "firstOverlayId": 2,
+  "secondOverlayId": 3,
+  "preDestroyOverlayConsent": {
+    "success": false,
+    "error": "sender_rejected:unauthorized_window_type"
+  }
+}
