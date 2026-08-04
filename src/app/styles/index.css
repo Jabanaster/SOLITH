@@ -561,7 +561,10 @@ button, input, select, textarea {
 .solith-top-banner {
   flex-shrink: 0;
   width: 100%;
-  height: clamp(112px, 13vw, 220px);
+  /* Was clamp(112px, 13vw, 220px) — at 1440p+ that maxed out at 220px,
+     pushing filters/results below the fold on short windows. Same min,
+     gentler scale, lower cap: branding stays visible without dominating. */
+  height: clamp(96px, 8vw, 150px);
   border-bottom: 1px solid var(--border-accent);
   background: #050b18;
   overflow: hidden;

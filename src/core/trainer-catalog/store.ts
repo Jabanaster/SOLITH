@@ -7,6 +7,8 @@ import {
   solithDefinitionToModPack,
 } from '../definitions/mod-pack-adapter.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
+import { decodeHtmlEntities } from './sync/decode-html-entities.js';
+import { placeholderTitleLiterals } from './sync/placeholder-titles.js';
 
 export type HubCertificationLevel = 'L0_Community' | 'L3_Certified';
 
@@ -21,7 +23,10 @@ function parseModPackPayload(payloadJson: string): ModPack {
 function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
   return {
     catalogGameId: String(row.catalogGameId),
-    displayName: String(row.displayName),
+    // Self-heals rows persisted before entity decoding was added at the sync
+    // boundary (src/core/trainer-catalog/sync/parse-html.ts) — idempotent on
+    // already-clean text, so this does not double-decode current writes.
+    displayName: decodeHtmlEntities(String(row.displayName)),
     steamAppId: row.steamAppId != null ? Number(row.steamAppId) : undefined,
     executables: JSON.parse(String(row.executablesJson || '[]')) as string[],
     categories: JSON.parse(String(row.categoriesJson || '[]')) as string[],
@@ -230,6 +235,17 @@ function buildCatalogSearchWhere(
 ): { whereSql: string; params: Array<string | number> } {
   const clauses: string[] = [];
   const params: Array<string | number> = [];
+
+  // Hides already-persisted placeholder rows (e.g. "[REDACTED]") without
+  // deleting them. Exact-match only, so legitimate bracketed titles like
+  // "[NINJA GAIDEN - Master Collection] NINJA GAIDEN 3" are unaffected —
+  // only rows whose ENTIRE trimmed displayName is one of these literals.
+  clauses.push(
+    `TRIM(displayName) != '' AND LOWER(TRIM(displayName)) NOT IN (${placeholderTitleLiterals()
+      .map(() => '?')
+      .join(', ')})`,
+  );
+  params.push(...placeholderTitleLiterals());
 
   const q = query.trim().toLowerCase();
   if (q) {
