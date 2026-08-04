@@ -116,12 +116,12 @@ FollowUp: Separate baseline cleanup, not Gate 2.5, and not part of the Electron 
 
 ID: OD-2.5-003
 Control: Final B1.1 promotion
-Status: **NOT AUTHORIZED.** OD-2.5-001 closed (owner-accepted 2026-08-04); OD-2.5-004 verified complete locally (2026-08-04) but not pushed to `origin/master`. This item still requires its own separate owner decision.
+Status: **NOT AUTHORIZED.** OD-2.5-001 closed (owner-accepted 2026-08-04); OD-2.5-004 closed (verified complete and pushed to `origin/master`, 2026-08-04). This item still requires its own separate owner decision.
 CurrentEvidence: All Gate 2.5 supported live packaged scenarios pass; the discovered overlay stop/status defect is fixed; 48/48 packaged (this session's suite/candidate) and separately 49/49 packaged (the prior session's suite/candidate) both pass; 1,040/1,040 npm; 257/257 live-memory.
 WhatWasNotTested: Other architectures and natural PID reuse outside the controlled fixture.
 Exploitability: No unresolved exploitable B1.1 defect found in the tested Windows x64 candidate.
 CurrentMitigation: Fail-closed sender validation, owner cleanup, exact test guard, full regression.
-RecommendedDisposition: Retain BATCH B1.1 CONDITIONAL PASS until the owner explicitly disposes of this item, informed by OD-2.5-001 (closed) and OD-2.5-004 (locally verified, not pushed) together.
+RecommendedDisposition: Retain BATCH B1.1 CONDITIONAL PASS until the owner explicitly disposes of this item, informed by OD-2.5-001 (closed) and OD-2.5-004 (closed, pushed to `origin/master`) together.
 Options: Accept specific residual conditions and promote; or keep conditional and run the exact next milestone (see the final-decision checklist (post-cleanup) in `SOLITH_SECURITY_ROADMAP.md`).
 Consequences: Promotion without explicit acceptance would violate the verdict rules.
 AcceptanceRequired: OWNER DECISION REQUIRED.
@@ -131,34 +131,32 @@ FollowUp: Owner disposition of remaining B1.1 conditions; then final independent
 
 ID: OD-2.5-004
 Control: Branch merge and release-line verification
-Status: **VERIFIED COMPLETE — LOCAL MASTER** (reconciled 2026-08-04, owner direction).
+Status: **VERIFIED COMPLETE — ORIGIN/MASTER** (reconciled 2026-08-04, owner-authorized push executed 2026-08-04).
 
 Basis:
-- `integration/b1-1-closeout` was merged into local `master`.
-- Merge commit: `a3165e50d8d8a6f256b548980c8d34aadd826903`.
-- Post-master verification completed successfully as documented in `post-master-verification.md`
-  (tsc 0/0 both projects, `npm test` 1055/1055 + 10/10, `test:startup-visibility` 10/10,
-  `test:live-memory` 257/257, builds 29/29, `git diff --check` clean).
+- `integration/b1-1-closeout` was merged into local `master` (merge commit
+  `a3165e50d8d8a6f256b548980c8d34aadd826903`), then post-master verification completed successfully
+  as documented in `post-master-verification.md` (tsc 0/0 both projects, `npm test` 1055/1055 + 10/10,
+  `test:startup-visibility` 10/10, `test:live-memory` 257/257, builds 29/29, `git diff --check` clean).
+- A dedicated read-only push-readiness audit (2026-08-04) reviewed the full 43-commit local-ahead
+  range: fast-forward eligible, no conflicts, no secrets/keys/certificates, no packaged binaries, all
+  new test files in range already covered by the `post-master-verification.md` run, every commit after
+  the merge commit docs-only.
+- Owner explicitly authorized a direct fast-forward push (scope: through commit `3fd402b`, no force,
+  no tag, no release, no signing, no publishing, no deployment, no additional commits, OD-2.5-003 not
+  implied). Push executed: `git push origin master` → `acef7dc..3fd402b master -> master`. Verified
+  post-push: `git rev-parse HEAD` = `git rev-parse origin/master` = `3fd402b2d6f448244bd29576d6daed1030fc5b41`,
+  `git rev-list --left-right --count origin/master...HEAD` = `0 0`, working tree clean.
 
-Important limitation:
-- Local `master` remains ahead of `origin/master` (42 commits as of 2026-08-04, reconfirmed via
-  `git fetch origin master`).
-- The merge and subsequent evidence are not yet pushed. This limits remote durability and external
-  auditability — nothing outside this local worktree can currently observe or audit this merge or
-  verification — but does **not** invalidate the completed local merge and verification themselves.
-- Do not describe OD-2.5-004 as NOT STARTED. Do not equate this local completion with remote
-  publication on `origin/master`/GitHub. This status does not authorize push, release, signing,
-  tagging, or promotion.
-
-CurrentEvidence: `post-master-verification.md` (merge + full re-verification against the merged commit); `git log`/`git rev-list --left-right --count origin/master...HEAD` confirming local-only status.
-WhatWasNotTested: Whether `origin/master`'s actual tip reflects any of this work — it does not, as of 2026-08-04. The 41 commits made on local `master` after the merge commit itself have not each been individually re-verified against `post-master-verification.md`'s checklist; see the pending push-readiness audit.
+CurrentEvidence: `post-master-verification.md` (merge + full re-verification); the 2026-08-04 push-readiness audit (commit classification, secret/binary scan, fast-forward confirmation); the post-push verification above (`origin/master` == local `HEAD` == `3fd402b`).
+WhatWasNotTested: No source code changed between the merge commit and the push — nothing further to re-verify. Out of scope for OD-2.5-004: production signing, publication, deployment, promotion.
 Exploitability: N/A — this is a scope/durability condition, not a technical defect.
-CurrentMitigation: All evidence and roadmap language states the verified branch/commit explicitly; this entry itself now distinguishes "verified locally" from "published to origin."
-RecommendedDisposition: Local merge and verification are complete and stand as-is. Before any push to `origin/master`, complete a dedicated push-readiness audit of the full local-ahead commit range and re-verify against the actual final local HEAD proposed for push, not just the original merge commit.
-Options: Treat local completion as sufficient for OD-2.5-004 itself (recommended — matches this control's literal definition); require additionally pushing to origin before calling this control satisfied (a stricter reading, available to the owner, not adopted here without explicit instruction).
-Consequences: Until pushed, `origin/master` and any GitHub-based review cannot observe this merge or verification — treat OD-2.5-004 as locally satisfied but not remotely durable.
-AcceptanceRequired: Ledger reconciled 2026-08-04 per explicit owner direction; no further owner action required to close this specific ledger-accuracy gap. Push authorization remains a separate, unresolved owner decision (see the pending push-readiness audit).
-FollowUp: Push-readiness audit of the 42 local-ahead commits, then a separate owner decision on pushing to `origin/master`. See the 10-step final-decision checklist (post-cleanup) appended to `SOLITH_SECURITY_ROADMAP.md`.
+CurrentMitigation: `origin/master` now reflects the exact, independently-audited local state; no divergence remains.
+RecommendedDisposition: OD-2.5-004 is closed. `origin/master` can now be treated as the verified, current B1.1-integrated state for any further GitHub-based review.
+Options: N/A — closed.
+Consequences: None outstanding for this control. Does not by itself authorize OD-2.5-003, signing, publishing, or release.
+AcceptanceRequired: Closed 2026-08-04 per explicit owner authorization and verified push. No further owner action required for OD-2.5-004 itself.
+FollowUp: OD-2.5-003 (final B1.1 promotion) remains the sole outstanding owner decision for this candidate — see its entry above and the decision packet at the top of this document.
 
 ## OD-2.5-005 (new — Canonical Documentation Reconciliation, this session)
 
