@@ -1,14 +1,32 @@
 # Clean-Machine Acceptance Plan
 
-Date: 2026-08-01
+Date: 2026-08-01 (status updated 2026-08-04 — evidenced functional/uninstall/reinstall run added)
 Status:
 
 ```
 CLEAN-MACHINE ACCEPTANCE:
-NOT PERFORMED — EXTERNAL ENVIRONMENT REQUIRED
+SUBSTANTIALLY VERIFIED — IDENTITY GATE, ENVIRONMENT, FUNCTIONAL LAUNCH, AND UNINSTALL/REINSTALL ARE
+TRANSCRIPT-VERIFIED. POST-REINSTALL USABILITY AND FINAL-CLOSE CLEANUP REMAIN OWNER-CONFIRMED PASS ONLY.
+GAME BAR TRANSPORT AND TRAINER HOTKEY REGISTRATION (INCLUDING AN F12 FAILURE) ARE OWNER-REPORTED, NOT
+EVIDENCED IN THE AVAILABLE TRANSCRIPTS.
 ```
 
-No clean external machine or VM is available in this environment. This document is preparation only — nothing below has been executed, and this status must not be locally simulated.
+A clean-machine run was executed on 2026-08-02 against a VirtualBox Windows 11 VM. The candidate-identity
+gate (SHA-256, size, Authenticode status) and the clean-environment setup/snapshot discipline were
+independently captured by the orchestrating session and are VERIFIED. The 2026-08-02 report's
+install/launch/functional/uninstall/reinstall steps were relayed by the human operator without
+independently captured commands, screenshots, or logs, and were USER-REPORTED PASS only.
+
+A follow-up run on 2026-08-04 produced two PowerShell transcripts
+(`functional-evidence-corrected-20260804-002655.log`,
+`uninstall-reinstall-evidence-20260804-004542.log`) that independently capture process state,
+filesystem state, and registry state across launch, smoke-check, close, uninstall, and reinstall. See
+`Candidates/SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z/clean-machine-run-20260804-evidenced.md`
+for the full item-by-item VERIFIED / OWNER-CONFIRMED / NOT-EVIDENCED breakdown, which supersedes the
+2026-08-02 report's USER-REPORTED-ONLY classification for the specific items it directly evidences. The
+2026-08-02 report (`clean-machine-run-20260802.md`) is retained for the identity-gate and
+environment-setup findings, which are unchanged. This plan document is retained below for reference; treat
+the two linked run reports as the current status, not the "NOT PERFORMED" text further down.
 
 ## Environment requirements
 
@@ -63,4 +81,7 @@ No clean external machine or VM is available in this environment. This document 
 - Pass: install, launch, all security scenarios, upgrade, uninstall, reinstall all complete with no crash, no security-boundary bypass, no orphaned process/file, and match packaged (non-clean-machine) behavior already verified in Phase 11.
 - Fail: any crash, any security scenario allowing an untrusted sender/navigation/popup, any orphaned process after uninstall, or any divergence from Phase 11 packaged results not explained by the clean environment itself.
 
-This plan does not authorize execution. Execution requires an actual external clean environment, which is not available to this session.
+This plan did not itself authorize execution and originally required an external clean environment not
+available to the session that wrote it. That environment has since become available and the run was
+executed 2026-08-02 — see the status block at the top of this document and the linked run report for the
+result, including the parts that remain user-reported and unverified.

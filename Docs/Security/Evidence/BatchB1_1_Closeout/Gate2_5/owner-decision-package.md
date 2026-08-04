@@ -1,10 +1,80 @@
 # Gate 2.5 Owner Decision Package
 
+## Owner decision packet — OD-2.5-001 and OD-2.5-003 (added 2026-08-04, Claude Sonnet)
+
+This packet consolidates the two live owner decisions into the exact-question/options/consequences
+format requested for B1.1 closeout. It does not alter the underlying OD-2.5-001/OD-2.5-003 entries below;
+it summarizes them alongside the 2026-08-04 clean-machine evidence update.
+
+### OD-2.5-001 — Electron TypeScript baseline cleanup
+
+**Exact question:** Does the owner accept the Electron TypeScript baseline cleanup (31-diagnostic/13-file
+baseline resolved to 0 diagnostics) as complete, given two independent fresh-context reviewer sessions each
+returned VERIFIED WITH CONDITIONS and all conditions from both reviews were subsequently addressed and
+rechecked?
+
+**Available options:**
+1. **Accept** the technical resolution as closing OD-2.5-001.
+2. **Reject / request further changes** — identify a specific gap not covered by either independent review.
+
+**Consequence of each option:**
+1. Accept: OD-2.5-001 closes. B1.1 still cannot be promoted (OD-2.5-003) or represented as unconditional
+   until OD-2.5-003 is separately resolved — this acceptance alone does not authorize promotion.
+2. Reject: cleanup work reopens; a third review cycle would be required; B1.1 promotion (OD-2.5-003)
+   remains blocked at least as long as OD-2.5-001 does.
+
+**Recommended decision:** Accept. The evidence chain (implementation → independent review #1 → corrective
+pass → independent review #2, both reviews VERIFIED WITH CONDITIONS with all conditions subsequently
+resolved and rechecked) meets the same evidentiary bar this project applies elsewhere. No unresolved
+technical gap is currently known.
+
+**OWNER DECISION RECORDED, 2026-08-04: ACCEPTED.** See the full entry under "OD-2.5-001" below for the
+verbatim decision text. OD-2.5-001 is now closed.
+
+**Blocks B1.1 promotion:** Yes, directly — OD-2.5-003's `RecommendedDisposition` explicitly retains
+conditional status "until the owner explicitly disposes of OD-2.5-001, OD-2.5-004, and this item together."
+
+### OD-2.5-003 — Final B1.1 promotion
+
+**Exact question:** Does the owner authorize promoting this candidate
+(`SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z`) past its current BATCH B1.1
+CONDITIONAL PASS status, given the state of all dependent conditions as of 2026-08-04?
+
+**Available options:**
+1. **Authorize promotion**, accepting the current residual conditions as-is (OD-2.5-001 pending owner
+   acceptance above; unsigned/internal status; no upgrade-path baseline; post-reinstall usability and
+   final-close cleanup owner-confirmed only; Game Bar/trainer-hotkey status including a reported F12
+   failure not evidenced by the available transcripts).
+2. **Hold conditional** — do not promote yet; require OD-2.5-001 acceptance (and optionally further
+   evidence capture for the residual clean-machine items) before revisiting.
+3. **Reject** — identify a specific defect that disqualifies the candidate outright (none is currently
+   known; all 44/44 candidate-specific packaged security tests pass, 0 bypass).
+
+**Consequence of each option:**
+1. Authorize: candidate becomes eligible for the next gate (signing review or independent review, per the
+   owner's chosen path) with the disclosed residual conditions carried forward as documented risk, not as
+   silently-resolved items. Promotion still does not authorize signing, publication, or public release —
+   those remain separate, unauthorized steps.
+2. Hold: no candidate-level change; OD-2.5-001 acceptance becomes the next actionable step; residual
+   clean-machine items may be closed by a further targeted capture if the owner wants them independently
+   verified rather than owner-confirmed.
+3. Reject: candidate is disqualified; would require identifying the specific defect, which is not
+   supported by any evidence currently in this package.
+
+**Recommended decision:** Hold conditional pending OD-2.5-001 owner acceptance (option 2). The clean-machine
+functional-evidence gap that most recently justified holding is now substantially closed (18 transcript-
+verified items, 2026-08-04). The remaining residual items (post-reinstall usability, final-close cleanup,
+Game Bar/F12) are disclosed, narrower, and — in this document's assessment — not independently
+disqualifying, but OD-2.5-001 has not yet received explicit owner acceptance and OD-2.5-003's own
+`RecommendedDisposition` ties it to OD-2.5-001 by name.
+
+**Blocks B1.1 promotion:** This is the promotion decision itself.
+
 ## OD-2.5-001
 
 ID: OD-2.5-001
 Control: Electron TypeScript baseline
-Status: **TECHNICALLY RESOLVED — INDEPENDENT REVIEW COMPLETED; CONDITIONS ADDRESSED.** This status covers only the technical resolution of the Electron TypeScript baseline (0 diagnostics, independently reproduced and re-reviewed twice — see below). It does NOT constitute owner acceptance, and it does NOT authorize OD-2.5-003 (B1.1 promotion), OD-2.5-004 (merge/`master` verification), unconditional B1.1, or release. The owner explicitly reassigned this control to a Claude Sonnet session, superseding the "owned by separate Codex cleanup workstream" / "prohibited for Claude" language previously recorded here — Codex's assignment is limited to the separate Wisp workstream only (`src/core/companion/wisp.ts` and related files). A Claude Sonnet session performed the cleanup; a separate independent (fresh-context) Claude reviewer session verified it and returned **VERIFIED WITH CONDITIONS**; a corrective pass then addressed every condition raised; a second, separate independent (fresh-context) Claude reviewer session then reviewed the corrective pass specifically and also returned **VERIFIED WITH CONDITIONS**, confirming all three original conditions resolved with no new defect found. See the provenance addendum below (points 1-6) for the full chain.
+Status: **OWNER-ACCEPTED, 2026-08-04 — CLOSED.** Technical resolution (0 diagnostics, independently reproduced and re-reviewed twice — see below) plus explicit owner acceptance (verbatim decision text below, under AcceptanceRequired) together close this item. Owner acceptance of OD-2.5-001 alone does NOT authorize OD-2.5-003 (B1.1 promotion), OD-2.5-004 (merge/`master` verification), unconditional B1.1, or release — each remains a separate, unresolved owner decision. The owner explicitly reassigned this control to a Claude Sonnet session, superseding the "owned by separate Codex cleanup workstream" / "prohibited for Claude" language previously recorded here — Codex's assignment is limited to the separate Wisp workstream only (`src/core/companion/wisp.ts` and related files). A Claude Sonnet session performed the cleanup; a separate independent (fresh-context) Claude reviewer session verified it and returned **VERIFIED WITH CONDITIONS**; a corrective pass then addressed every condition raised; a second, separate independent (fresh-context) Claude reviewer session then reviewed the corrective pass specifically and also returned **VERIFIED WITH CONDITIONS**, confirming all three original conditions resolved with no new defect found. See the provenance addendum below (points 1-6) for the full chain.
 CurrentEvidence: `tsc -p tsconfig.electron.json --noEmit --pretty false` went from the accepted 31-diagnostic/13-file baseline to 0 diagnostics, reproduced independently by the implementing session, the first independent reviewer session, and the second independent reviewer session (corrective-pass review), and reconfirmed again in the subsequent B1.1 integration-readiness review. Main TypeScript (`tsconfig.json`) remains at 0 diagnostics throughout. Full suite 1043/1043, live-memory 257/257, and the focused suites covering every touched file all pass. Independent review: corrective-pass conditions resolved (compat-test-main.ts UNPROVEN status resolved via tsconfig exclusion of the orphaned `run-compat-test.ts`; both `?? {}` defense-in-depth regressions resolved via `isValidMemoryFeatureResolution`; stale ownership language resolved).
 WhatWasNotTested: A broader structural-validation redesign of `isSolithDefinitionPayload` (beyond the narrow guard added at the two `resolution`-reading call sites) was explicitly out of scope for this cleanup and is not implemented. A fresh packaged-executable rebuild against the current working tree has not been performed as part of this technical-resolution claim (packaged verification is a separate OD-2.5-004/integration-stage requirement, not part of OD-2.5-001).
 Exploitability: Not classified by Gate 2.5; no new diagnostic was introduced, and no security-sensitive behavior (consent, write-authorization, freeze/rollback, sender validation) was changed anywhere in the cleanup or the corrective pass.
@@ -12,8 +82,20 @@ CurrentMitigation: Main TypeScript passes and packaged regression is green.
 RecommendedDisposition: Technical resolution and independent re-review are both complete; bring the complete package (original cleanup + first independent review + corrective pass + second independent review) to the owner for acceptance, alongside OD-2.5-003/004, which remain separate decisions this status does not resolve.
 Options: Accept the technical result as resolving OD-2.5-001; or request further changes if the owner identifies a gap not covered by either independent review.
 Consequences: B1.1 cannot be represented as unconditional while owner disposition of this item remains outstanding, even though the technical substance is now resolved and independent review of that resolution is complete.
-AcceptanceRequired: OWNER DECISION REQUIRED.
-FollowUp: None outstanding for technical resolution. Remaining follow-up is owner acceptance of this item, then OD-2.5-003/OD-2.5-004 disposition — see the final-decision checklist (post-cleanup) in `SOLITH_SECURITY_ROADMAP.md`.
+AcceptanceRequired: **OWNER DECISION RECORDED — ACCEPTED, 2026-08-04.** Verbatim owner decision:
+
+> I ACCEPT OD-2.5-001.
+>
+> I accept the documented Electron TypeScript baseline disposition and the completed technical and
+> independent-review evidence as sufficient for B1.1.
+>
+> This acceptance does not waive future TypeScript cleanup or quality work. It does not authorize
+> signing, publishing, tagging, branch promotion, release promotion, or production release.
+
+This closes OD-2.5-001. It does not by itself authorize OD-2.5-003 (final B1.1 promotion) or
+OD-2.5-004 (branch merge/master verification), both of which remain separate, unresolved owner
+decisions — see their entries below.
+FollowUp: OD-2.5-001 closed. Remaining follow-up is OD-2.5-004 disposition, then OD-2.5-003 — see the final-decision checklist (post-cleanup) in `SOLITH_SECURITY_ROADMAP.md`.
 
 ## OD-2.5-002
 
@@ -34,12 +116,12 @@ FollowUp: Separate baseline cleanup, not Gate 2.5, and not part of the Electron 
 
 ID: OD-2.5-003
 Control: Final B1.1 promotion
-Status: **NOT AUTHORIZED.** Pending the necessary technical (OD-2.5-001), branch/merge (OD-2.5-004), and owner conditions.
+Status: **NOT AUTHORIZED.** OD-2.5-001 closed (owner-accepted 2026-08-04); OD-2.5-004 verified complete locally (2026-08-04) but not pushed to `origin/master`. This item still requires its own separate owner decision.
 CurrentEvidence: All Gate 2.5 supported live packaged scenarios pass; the discovered overlay stop/status defect is fixed; 48/48 packaged (this session's suite/candidate) and separately 49/49 packaged (the prior session's suite/candidate) both pass; 1,040/1,040 npm; 257/257 live-memory.
 WhatWasNotTested: Other architectures and natural PID reuse outside the controlled fixture.
 Exploitability: No unresolved exploitable B1.1 defect found in the tested Windows x64 candidate.
 CurrentMitigation: Fail-closed sender validation, owner cleanup, exact test guard, full regression.
-RecommendedDisposition: Retain BATCH B1.1 CONDITIONAL PASS until the owner explicitly disposes of OD-2.5-001, OD-2.5-004, and this item together.
+RecommendedDisposition: Retain BATCH B1.1 CONDITIONAL PASS until the owner explicitly disposes of this item, informed by OD-2.5-001 (closed) and OD-2.5-004 (locally verified, not pushed) together.
 Options: Accept specific residual conditions and promote; or keep conditional and run the exact next milestone (see the final-decision checklist (post-cleanup) in `SOLITH_SECURITY_ROADMAP.md`).
 Consequences: Promotion without explicit acceptance would violate the verdict rules.
 AcceptanceRequired: OWNER DECISION REQUIRED.
@@ -49,16 +131,34 @@ FollowUp: Owner disposition of remaining B1.1 conditions; then final independent
 
 ID: OD-2.5-004
 Control: Branch merge and release-line verification
-Status: **NOT STARTED.** Merging is explicitly not part of any Gate 2.5 or documentation-reconciliation task.
-CurrentEvidence: All current verification (Gate 2.4/2.4A/2.5 and this reconciliation) applies only to `review/gate2-5-doc-audit` @ `317baf0ea573992dfa1a0cec2a30d6529b6ecee0`. `master` has not been rechecked against any of this work.
-WhatWasNotTested: Whether `master`'s actual tip passes any Gate 2.4/2.5 scenario — it was never run against `master`.
-Exploitability: N/A — this is a scope/authority condition, not a technical defect.
-CurrentMitigation: All evidence and roadmap language now explicitly states the verified branch and commit rather than implying `master`.
-RecommendedDisposition: Do not merge until OD-2.5-001 and OD-2.5-003 are resolved; after an authorized merge, identify the resulting `master` commit and re-run the required final checks against that exact commit before any claim transfers to `master`.
-Options: Merge now and re-verify after (not recommended — risks a `master` state that has never been checked); or hold merge until upstream conditions clear (recommended).
-Consequences: Until merged and rechecked, `master` cannot be described as having passed Gate 2.4, Gate 2.5, or Batch B1.1.
-AcceptanceRequired: OWNER DECISION REQUIRED.
-FollowUp: See the 10-step final-decision checklist (post-cleanup) appended to `SOLITH_SECURITY_ROADMAP.md`.
+Status: **VERIFIED COMPLETE — LOCAL MASTER** (reconciled 2026-08-04, owner direction).
+
+Basis:
+- `integration/b1-1-closeout` was merged into local `master`.
+- Merge commit: `a3165e50d8d8a6f256b548980c8d34aadd826903`.
+- Post-master verification completed successfully as documented in `post-master-verification.md`
+  (tsc 0/0 both projects, `npm test` 1055/1055 + 10/10, `test:startup-visibility` 10/10,
+  `test:live-memory` 257/257, builds 29/29, `git diff --check` clean).
+
+Important limitation:
+- Local `master` remains ahead of `origin/master` (42 commits as of 2026-08-04, reconfirmed via
+  `git fetch origin master`).
+- The merge and subsequent evidence are not yet pushed. This limits remote durability and external
+  auditability — nothing outside this local worktree can currently observe or audit this merge or
+  verification — but does **not** invalidate the completed local merge and verification themselves.
+- Do not describe OD-2.5-004 as NOT STARTED. Do not equate this local completion with remote
+  publication on `origin/master`/GitHub. This status does not authorize push, release, signing,
+  tagging, or promotion.
+
+CurrentEvidence: `post-master-verification.md` (merge + full re-verification against the merged commit); `git log`/`git rev-list --left-right --count origin/master...HEAD` confirming local-only status.
+WhatWasNotTested: Whether `origin/master`'s actual tip reflects any of this work — it does not, as of 2026-08-04. The 41 commits made on local `master` after the merge commit itself have not each been individually re-verified against `post-master-verification.md`'s checklist; see the pending push-readiness audit.
+Exploitability: N/A — this is a scope/durability condition, not a technical defect.
+CurrentMitigation: All evidence and roadmap language states the verified branch/commit explicitly; this entry itself now distinguishes "verified locally" from "published to origin."
+RecommendedDisposition: Local merge and verification are complete and stand as-is. Before any push to `origin/master`, complete a dedicated push-readiness audit of the full local-ahead commit range and re-verify against the actual final local HEAD proposed for push, not just the original merge commit.
+Options: Treat local completion as sufficient for OD-2.5-004 itself (recommended — matches this control's literal definition); require additionally pushing to origin before calling this control satisfied (a stricter reading, available to the owner, not adopted here without explicit instruction).
+Consequences: Until pushed, `origin/master` and any GitHub-based review cannot observe this merge or verification — treat OD-2.5-004 as locally satisfied but not remotely durable.
+AcceptanceRequired: Ledger reconciled 2026-08-04 per explicit owner direction; no further owner action required to close this specific ledger-accuracy gap. Push authorization remains a separate, unresolved owner decision (see the pending push-readiness audit).
+FollowUp: Push-readiness audit of the 42 local-ahead commits, then a separate owner decision on pushing to `origin/master`. See the 10-step final-decision checklist (post-cleanup) appended to `SOLITH_SECURITY_ROADMAP.md`.
 
 ## OD-2.5-005 (new — Canonical Documentation Reconciliation, this session)
 

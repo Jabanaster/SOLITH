@@ -1,0 +1,373 @@
+**********************
+Windows PowerShell transcript start
+Start time: 20260804004543
+Username: SOLITH-TEST\chase
+RunAs User: SOLITH-TEST\chase
+Configuration Name:
+Machine: SOLITH-TEST (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 3076
+PSVersion: 5.1.26100.7920
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.7920
+BuildVersion: 10.0.26100.7920
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\SOLITH-ACCEPTANCE\uninstall-reinstall-evidence-20260804-004542.log
+PS C:\Users\chase> $installer = "C:\SOLITH-ACCEPTANCE\Solith Setup 2.4.0-alpha.2.exe"
+PS C:\Users\chase> $installPath = "$env:LOCALAPPDATA\Programs\solith"
+PS C:\Users\chase> $exe = "$installPath\Solith.exe"
+PS C:\Users\chase> $uninstaller = "$installPath\Uninstall Solith.exe"
+PS C:\Users\chase> Write-Host "`n=== UNINSTALL / REINSTALL EVIDENCE RUN ===" -ForegroundColor Cyan
+
+=== UNINSTALL / REINSTALL EVIDENCE RUN ===
+PS C:\Users\chase> Get-Date
+
+Tuesday, August 4, 2026 12:45:46 AM
+
+
+PS C:\Users\chase> Write-Host "`n=== PRE-UNINSTALL STATE ===" -ForegroundColor Cyan
+
+=== PRE-UNINSTALL STATE ===
+PS C:\Users\chase> Get-Process -Name "Solith*" -ErrorAction SilentlyContinue |
+    Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path |
+    Format-Table -AutoSize
+PS C:\Users\chase> Get-Item $exe -ErrorAction SilentlyContinue |
+    Select-Object FullName, Length, VersionInfo |
+    Format-List
+
+
+FullName    : C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+Length      : 232375296
+VersionInfo : File:
+              C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+              InternalName:     Solith
+              OriginalFilename:
+              FileVersion:      2.4.0-alpha.2
+              FileDescription:  Solith
+              Product:          Solith
+              ProductVersion:   2.4.0.0
+              Debug:            False
+              Patched:          False
+              PreRelease:       False
+              PrivateBuild:     False
+              SpecialBuild:     False
+              Language:         English (United States)
+
+
+
+
+PS C:\Users\chase> Get-ItemProperty `
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+    -ErrorAction SilentlyContinue |
+    Where-Object DisplayName -Like "*Solith*" |
+    Select-Object DisplayName, DisplayVersion, InstallLocation, UninstallString |
+    Format-List
+
+
+DisplayName     : Solith
+DisplayVersion  : 2.4.0-alpha.2
+InstallLocation :
+UninstallString : "C:\Users\chase\AppData\Local\Programs\solith\Uninstall
+                  Solith.exe" /currentuser
+
+
+
+PS C:\Users\chase> Write-Host "`n=== UNINSTALL ===" -ForegroundColor Cyan
+
+=== UNINSTALL ===
+PS C:\Users\chase> Write-Host "The SOLITH uninstaller will now open." -ForegroundColor Yellow
+The SOLITH uninstaller will now open.
+PS C:\Users\chase> Start-Process $uninstaller
+PS C:\Users\chase> Read-Host "Press Enter only after the uninstaller reports completion"
+
+PS C:\Users\chase> Write-Host "`n=== POST-UNINSTALL INSPECTION ===" -ForegroundColor Cyan
+
+=== POST-UNINSTALL INSPECTION ===
+PS C:\Users\chase> Get-Date
+
+Tuesday, August 4, 2026 12:49:40 AM
+
+
+PS C:\Users\chase> $installExists = Test-Path $installPath
+PS C:\Users\chase> $exeExists = Test-Path $exe
+PS C:\Users\chase> $desktopShortcut = Test-Path "$env:USERPROFILE\Desktop\Solith.lnk"
+PS C:\Users\chase> $startMenuShortcut = Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Solith.lnk"
+PS C:\Users\chase> $roamingData = Test-Path "$env:APPDATA\solith"
+PS C:\Users\chase> $localData = Test-Path "$env:LOCALAPPDATA\solith"
+PS C:\Users\chase> $processes = Get-Process -Name "Solith*" -ErrorAction SilentlyContinue
+PS C:\Users\chase> $uninstallEntry = Get-ItemProperty `
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+    -ErrorAction SilentlyContinue |
+    Where-Object DisplayName -Like "*Solith*"
+PS C:\Users\chase> Write-Host "Install directory exists: $installExists"
+Install directory exists: False
+PS C:\Users\chase> Write-Host "Main executable exists: $exeExists"
+Main executable exists: False
+PS C:\Users\chase> Write-Host "Desktop shortcut exists: $desktopShortcut"
+Desktop shortcut exists: False
+PS C:\Users\chase> Write-Host "Start-menu shortcut exists: $startMenuShortcut"
+Start-menu shortcut exists: False
+PS C:\Users\chase> Write-Host "Roaming AppData exists: $roamingData"
+Roaming AppData exists: False
+PS C:\Users\chase> Write-Host "Local AppData exists: $localData"
+Local AppData exists: False
+PS C:\Users\chase> if ($processes) {
+    Write-Host "FAIL: SOLITH processes remain after uninstall." -ForegroundColor Red
+    $processes |
+        Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path |
+        Format-Table -AutoSize
+}
+PS C:\Users\chase> else {
+    Write-Host "PASS: No SOLITH processes remain after uninstall." -ForegroundColor Green
+}
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+else : The term 'else' is not recognized as the name of a cmdlet, function, script
+file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundExce
+   ption
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\chase> if ($uninstallEntry) {
+    Write-Host "FAIL: SOLITH uninstall registration still exists." -ForegroundColor Red
+    $uninstallEntry |
+        Select-Object DisplayName, DisplayVersion, InstallLocation, UninstallString |
+        Format-List
+}
+PS C:\Users\chase> else {
+    Write-Host "PASS: SOLITH uninstall registration was removed." -ForegroundColor Green
+}
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+else : The term 'else' is not recognized as the name of a cmdlet, function, script
+file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundExce
+   ption
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\chase> Write-Host ""
+
+PS C:\Users\chase> Write-Host "Do not manually delete retained AppData." -ForegroundColor Yellow
+Do not manually delete retained AppData.
+PS C:\Users\chase> Write-Host "Retained AppData may be expected user data and must remain recorded." -ForegroundColor Yellow
+Retained AppData may be expected user data and must remain recorded.
+PS C:\Users\chase> Write-Host "`n=== INSTALLER IDENTITY RECHECK ===" -ForegroundColor Cyan
+
+=== INSTALLER IDENTITY RECHECK ===
+PS C:\Users\chase> Get-Item $installer |
+    Select-Object FullName, Length |
+    Format-List
+
+
+FullName : C:\SOLITH-ACCEPTANCE\Solith Setup 2.4.0-alpha.2.exe
+Length   : 167639765
+
+
+
+PS C:\Users\chase> Get-FileHash -Algorithm SHA256 $installer |
+    Format-List
+
+
+Algorithm : SHA256
+Hash      : BB880D6F4A0D375FB294626B4FADD2B2AA687BD18A81A54D8A66EDA335A72B58
+Path      : C:\SOLITH-ACCEPTANCE\Solith Setup 2.4.0-alpha.2.exe
+
+
+
+PS C:\Users\chase> Get-AuthenticodeSignature $installer |
+    Select-Object Status, StatusMessage, SignerCertificate |
+    Format-List
+
+
+Status            : NotSigned
+StatusMessage     : The file C:\SOLITH-ACCEPTANCE\Solith Setup 2.4.0-alpha.2.exe is
+                    not digitally signed. You cannot run this script on the current
+                    system. For more information about running scripts and setting
+                    execution policy, see about_Execution_Policies at
+                    https:/go.microsoft.com/fwlink/?LinkID=135170
+SignerCertificate :
+
+
+
+PS C:\Users\chase> Write-Host "`n=== REINSTALL ===" -ForegroundColor Cyan
+
+=== REINSTALL ===
+PS C:\Users\chase> Write-Host "The exact frozen installer will now open." -ForegroundColor Yellow
+The exact frozen installer will now open.
+PS C:\Users\chase> Start-Process $installer
+PS C:\Users\chase> Read-Host "Press Enter only after reinstall reports completion"
+
+PS C:\Users\chase> Write-Host "`n=== POST-REINSTALL STATE ===" -ForegroundColor Cyan
+
+=== POST-REINSTALL STATE ===
+PS C:\Users\chase> Get-Date
+
+Tuesday, August 4, 2026 12:56:46 AM
+
+
+PS C:\Users\chase> $reinstallPathExists = Test-Path $installPath
+PS C:\Users\chase> $reinstallExeExists = Test-Path $exe
+PS C:\Users\chase> Write-Host "Install directory exists after reinstall: $reinstallPathExists"
+Install directory exists after reinstall: True
+PS C:\Users\chase> Write-Host "Main executable exists after reinstall: $reinstallExeExists"
+Main executable exists after reinstall: True
+PS C:\Users\chase> Get-Item $exe -ErrorAction SilentlyContinue |
+    Select-Object FullName, Length, VersionInfo |
+    Format-List
+
+
+FullName    : C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+Length      : 232375296
+VersionInfo : File:
+              C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+              InternalName:     Solith
+              OriginalFilename:
+              FileVersion:      2.4.0-alpha.2
+              FileDescription:  Solith
+              Product:          Solith
+              ProductVersion:   2.4.0.0
+              Debug:            False
+              Patched:          False
+              PreRelease:       False
+              PrivateBuild:     False
+              SpecialBuild:     False
+              Language:         English (United States)
+
+
+
+
+PS C:\Users\chase> Get-ItemProperty `
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+    -ErrorAction SilentlyContinue |
+    Where-Object DisplayName -Like "*Solith*" |
+    Select-Object DisplayName, DisplayVersion, InstallLocation, UninstallString |
+    Format-List
+
+
+DisplayName     : Solith
+DisplayVersion  : 2.4.0-alpha.2
+InstallLocation :
+UninstallString : "C:\Users\chase\AppData\Local\Programs\solith\Uninstall
+                  Solith.exe" /currentuser
+
+
+
+PS C:\Users\chase> Write-Host "`n=== FINAL LAUNCH AFTER REINSTALL ===" -ForegroundColor Cyan
+
+=== FINAL LAUNCH AFTER REINSTALL ===
+PS C:\Users\chase> Start-Process $exe
+PS C:\Users\chase> Read-Host "Press Enter only after SOLITH is visible and usable"
+
+PS C:\Users\chase> $running = Get-Process -Name "Solith*" -ErrorAction SilentlyContinue |
+    Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path
+PS C:\Users\chase> $running | Format-Table -AutoSize
+
+   Id ProcessName StartTime            MainWindowTitle Path
+   -- ----------- ---------            --------------- ----
+ 3716 Solith      8/4/2026 12:54:09 AM                 C:\Users\chase\AppData\Loc...
+ 5132 Solith      8/4/2026 12:54:08 AM                 C:\Users\chase\AppData\Loc...
+ 8148 Solith      8/4/2026 12:54:08 AM                 C:\Users\chase\AppData\Loc...
+10508 Solith      8/4/2026 12:54:04 AM Solith          C:\Users\chase\AppData\Loc...
+10848 Solith      8/4/2026 12:54:14 AM                 C:\Users\chase\AppData\Loc...
+
+
+PS C:\Users\chase> if ($running) {
+    Write-Host "PASS: SOLITH launched successfully after reinstall." -ForegroundColor Green
+}
+PASS: SOLITH launched successfully after reinstall.
+PS C:\Users\chase> else {
+    Write-Host "FAIL: No SOLITH process detected after reinstall launch." -ForegroundColor Red
+}
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+else : The term 'else' is not recognized as the name of a cmdlet, function, script
+file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundExce
+   ption
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\chase> $finalNotes = Read-Host "Describe what worked after reinstall"
+PS C:\Users\chase> $finalResult = Read-Host "Type PASS or FAIL"
+PS C:\Users\chase> Write-Host "Final launch result: $finalResult"
+Final launch result: PASS
+PS C:\Users\chase> Write-Host "Final launch notes: $finalNotes"
+Final launch notes: All functions work
+PS C:\Users\chase> Write-Host "`n=== FINAL NORMAL CLOSE ===" -ForegroundColor Cyan
+
+=== FINAL NORMAL CLOSE ===
+PS C:\Users\chase> Write-Host "Close SOLITH normally now." -ForegroundColor Yellow
+Close SOLITH normally now.
+PS C:\Users\chase> Read-Host "Press Enter only after SOLITH is fully closed"
+
+PS C:\Users\chase> Start-Sleep -Seconds 5
+PS C:\Users\chase> $remainingAfterFinalClose = Get-Process -Name "Solith*" -ErrorAction SilentlyContinue
+PS C:\Users\chase> if ($remainingAfterFinalClose) {
+    Write-Host "FAIL: SOLITH processes remain after final close." -ForegroundColor Red
+    $remainingAfterFinalClose |
+        Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path |
+        Format-Table -AutoSize
+}
+PS C:\Users\chase> else {
+    Write-Host "PASS: No SOLITH processes remain after final close." -ForegroundColor Green
+}
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+else : The term 'else' is not recognized as the name of a cmdlet, function, script
+file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundExce
+   ption
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\chase> Write-Host "`n=== EVIDENCE RUN COMPLETE ===" -ForegroundColor Green
+
+=== EVIDENCE RUN COMPLETE ===
+PS C:\Users\chase> Get-Date
+
+Tuesday, August 4, 2026 12:57:21 AM
+
+
+PS C:\Users\chase> Stop-Transcript
+**********************
+Windows PowerShell transcript end
+End time: 20260804005721
+**********************

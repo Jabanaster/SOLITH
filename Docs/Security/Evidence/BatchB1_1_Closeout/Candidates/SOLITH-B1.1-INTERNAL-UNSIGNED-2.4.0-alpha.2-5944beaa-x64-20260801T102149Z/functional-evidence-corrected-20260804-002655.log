@@ -1,0 +1,196 @@
+**********************
+Windows PowerShell transcript start
+Start time: 20260804002656
+Username: SOLITH-TEST\chase
+RunAs User: SOLITH-TEST\chase
+Configuration Name:
+Machine: SOLITH-TEST (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 1236
+PSVersion: 5.1.26100.7920
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.7920
+BuildVersion: 10.0.26100.7920
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\SOLITH-ACCEPTANCE\functional-evidence-corrected-20260804-002655.log
+PS C:\WINDOWS\system32> $exe = "$env:LOCALAPPDATA\Programs\solith\Solith.exe"
+PS C:\WINDOWS\system32> Write-Host "`n=== CORRECTED FUNCTIONAL EVIDENCE RUN ===" -ForegroundColor Cyan
+
+=== CORRECTED FUNCTIONAL EVIDENCE RUN ===
+PS C:\WINDOWS\system32> Get-Date
+
+Tuesday, August 4, 2026 12:26:56 AM
+
+
+PS C:\WINDOWS\system32> Write-Host "`n=== PRE-LAUNCH PROCESS CHECK ===" -ForegroundColor Cyan
+
+=== PRE-LAUNCH PROCESS CHECK ===
+PS C:\WINDOWS\system32> Get-Process -Name "Solith*" -ErrorAction SilentlyContinue |
+    Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path
+PS C:\WINDOWS\system32> if (-not (Get-Process -Name "Solith*" -ErrorAction SilentlyContinue)) {
+    Write-Host "PASS: No SOLITH processes before launch." -ForegroundColor Green
+}
+PASS: No SOLITH processes before launch.
+PS C:\WINDOWS\system32> Write-Host "`n=== LAUNCHING SOLITH ===" -ForegroundColor Cyan
+
+=== LAUNCHING SOLITH ===
+PS C:\WINDOWS\system32> Get-Date
+
+Tuesday, August 4, 2026 12:26:58 AM
+
+
+PS C:\WINDOWS\system32> Start-Process $exe
+PS C:\WINDOWS\system32> Write-Host "Wait until SOLITH is fully visible and usable."
+Wait until SOLITH is fully visible and usable.
+PS C:\WINDOWS\system32> Read-Host "Press Enter only after SOLITH is open and usable"
+
+PS C:\WINDOWS\system32> Write-Host "`n=== PROCESS STATE AFTER LAUNCH ===" -ForegroundColor Cyan
+
+=== PROCESS STATE AFTER LAUNCH ===
+PS C:\WINDOWS\system32> Get-Date
+
+Tuesday, August 4, 2026 12:29:06 AM
+
+
+PS C:\WINDOWS\system32> $running = Get-Process -Name "Solith*" -ErrorAction SilentlyContinue |
+    Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path
+PS C:\WINDOWS\system32> $running | Format-Table -AutoSize
+
+  Id ProcessName StartTime            MainWindowTitle Path
+  -- ----------- ---------            --------------- ----
+ 316 Solith      8/4/2026 12:26:58 AM Solith          C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+2584 Solith      8/4/2026 12:27:01 AM                 C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+4060 Solith      8/4/2026 12:27:02 AM                 C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+6092 Solith      8/4/2026 12:27:01 AM                 C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+8780 Solith      8/4/2026 12:27:12 AM                 C:\Users\chase\AppData\Local\Programs\solith\Solith.exe
+
+
+PS C:\WINDOWS\system32> if ($running) {
+    Write-Host "PASS: SOLITH process detected after launch." -ForegroundColor Green
+}
+PASS: SOLITH process detected after launch.
+PS C:\WINDOWS\system32> else {
+    Write-Host "FAIL: No SOLITH process detected after launch." -ForegroundColor Red
+}
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable
+program. Check the spelling of the name, or if a path was included, verify that the path is correct and try
+again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable
+program. Check the spelling of the name, or if a path was included, verify that the path is correct and try
+again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\WINDOWS\system32> Write-Host "`n=== MANUAL SMOKE CHECKS ===" -ForegroundColor Cyan
+
+=== MANUAL SMOKE CHECKS ===
+PS C:\WINDOWS\system32> Write-Host "Perform these checks inside SOLITH:"
+Perform these checks inside SOLITH:
+PS C:\WINDOWS\system32> Write-Host "1. Main window renders correctly."
+1. Main window renders correctly.
+PS C:\WINDOWS\system32> Write-Host "2. Wisp/companion is visible and responsive."
+2. Wisp/companion is visible and responsive.
+PS C:\WINDOWS\system32> Write-Host "3. Open Settings."
+3. Open Settings.
+PS C:\WINDOWS\system32> Write-Host "4. Move between at least two Settings sections."
+4. Move between at least two Settings sections.
+PS C:\WINDOWS\system32> Write-Host "5. Close Settings."
+5. Close Settings.
+PS C:\WINDOWS\system32> Write-Host "6. Open and close another normal interface element."
+6. Open and close another normal interface element.
+PS C:\WINDOWS\system32> Write-Host "7. Confirm no crash, blank screen, freeze, or error dialog."
+7. Confirm no crash, blank screen, freeze, or error dialog.
+PS C:\WINDOWS\system32> Read-Host "Press Enter only after completing those checks"
+
+PS C:\WINDOWS\system32> $notes = Read-Host "Describe exactly what worked"
+PS C:\WINDOWS\system32> $result = Read-Host "Type PASS or FAIL"
+PS C:\WINDOWS\system32> Write-Host "Smoke result: $result"
+Smoke result: PASS
+PS C:\WINDOWS\system32> Write-Host "Smoke notes: $notes"
+Smoke notes: pass
+PS C:\WINDOWS\system32> Get-Date
+
+Tuesday, August 4, 2026 12:32:38 AM
+
+
+PS C:\WINDOWS\system32> Write-Host "`n=== NORMAL CLOSE ===" -ForegroundColor Cyan
+
+=== NORMAL CLOSE ===
+PS C:\WINDOWS\system32> Write-Host "Close SOLITH normally now using the X button or Alt+F4."
+Close SOLITH normally now using the X button or Alt+F4.
+PS C:\WINDOWS\system32> Read-Host "Press Enter only after the SOLITH window is fully closed"
+
+PS C:\WINDOWS\system32> Start-Sleep -Seconds 5
+PS C:\WINDOWS\system32> Write-Host "`n=== PROCESS CLEANUP CHECK ===" -ForegroundColor Cyan
+
+=== PROCESS CLEANUP CHECK ===
+PS C:\WINDOWS\system32> Get-Date
+
+Tuesday, August 4, 2026 12:34:05 AM
+
+
+PS C:\WINDOWS\system32> $remaining = Get-Process -Name "Solith*" -ErrorAction SilentlyContinue |
+    Select-Object Id, ProcessName, StartTime, MainWindowTitle, Path
+PS C:\WINDOWS\system32> if ($remaining) {
+    Write-Host "FAIL: Lingering SOLITH processes remain." -ForegroundColor Red
+    $remaining | Format-Table -AutoSize
+}
+PS C:\WINDOWS\system32> else {
+    Write-Host "PASS: No lingering SOLITH processes." -ForegroundColor Green
+}
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable
+program. Check the spelling of the name, or if a path was included, verify that the path is correct and try
+again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+else : The term 'else' is not recognized as the name of a cmdlet, function, script file, or operable
+program. Check the spelling of the name, or if a path was included, verify that the path is correct and try
+again.
+At line:1 char:1
++ else {
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (else:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\WINDOWS\system32> Write-Host "`n=== CORRECTED RUN COMPLETE ===" -ForegroundColor Green
+
+=== CORRECTED RUN COMPLETE ===
+PS C:\WINDOWS\system32> Get-Date
+
+Tuesday, August 4, 2026 12:34:06 AM
+
+
+PS C:\WINDOWS\system32> Stop-Transcript
+**********************
+Windows PowerShell transcript end
+End time: 20260804003406
+**********************
+
+SUPPLEMENTAL SMOKE NOTES:
+Main window rendered correctly.
+Wisp was visible and responsive.
+Settings opened successfully.
+Multiple settings sections were navigated.
+Settings closed normally.
+Another normal interface element opened and closed.
+No crash, blank screen, freeze, or error dialog was observed.
+
+SUPPLEMENTAL PROCESS CLEANUP CHECK:
+Timestamp: 2026-08-04T00:37:44.7245475-07:00
+RESULT: PASS - No lingering SOLITH processes were present.
+RESULT: PASS - No lingering SOLITH processes were present.
