@@ -5,7 +5,12 @@
 import { after as afterAll, before as beforeAll, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resetForTesting } from '../src/core/database/index.ts';
-import { upsertCatalogEntry, searchCatalog } from '../src/core/trainer-catalog/store.ts';
+import {
+  upsertCatalogEntry,
+  searchCatalog,
+  getCatalogEntry,
+  getCatalogEntryForDisplay,
+} from '../src/core/trainer-catalog/store.ts';
 import type { TrainerCatalogEntry } from '../src/core/trainer-catalog/types.ts';
 import { buildSearchableText } from '../src/core/trainer-catalog/types.ts';
 
@@ -125,5 +130,32 @@ describe('trainer catalog search — placeholder title filtering', () => {
     const result = searchCatalog('', 50, 0);
     assert.equal(result.total, 2);
     assert.equal(result.entries.length, 2);
+  });
+
+  test('getCatalogEntry (raw/internal) still returns placeholder rows', () => {
+    assert.equal(getCatalogEntry('redacted')?.displayName, '[REDACTED]');
+    assert.equal(getCatalogEntry('hidden')?.displayName, 'hidden');
+  });
+
+  test('getCatalogEntryForDisplay hides placeholder rows via direct lookup', () => {
+    assert.equal(getCatalogEntryForDisplay('redacted'), null);
+    assert.equal(getCatalogEntryForDisplay('redacted-mixed-case'), null);
+    assert.equal(getCatalogEntryForDisplay('hidden'), null);
+    assert.equal(getCatalogEntryForDisplay('empty-name'), null);
+  });
+
+  test('getCatalogEntryForDisplay returns legitimate bracketed titles unchanged', () => {
+    const entry = getCatalogEntryForDisplay('ninja-gaiden-legit');
+    assert.ok(entry);
+    assert.equal(
+      entry?.displayName,
+      '[NINJA GAIDEN - Master Collection] NINJA GAIDEN 3 - Razor’s Edge',
+    );
+    assert.ok(getCatalogEntryForDisplay('redacted-zone'));
+  });
+
+  test('getCatalogEntryForDisplay returns null for an unknown ID (same as getCatalogEntry)', () => {
+    assert.equal(getCatalogEntryForDisplay('does-not-exist'), null);
+    assert.equal(getCatalogEntry('does-not-exist'), null);
   });
 });

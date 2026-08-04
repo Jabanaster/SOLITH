@@ -10,11 +10,16 @@ function readSource(relativePath: string): string {
 }
 
 test('trainer library labels scan-required community entries as Community Scan', () => {
-  const source = readSource('src/app/pages/TrainerLibraryPage.tsx');
+  const pageSource = readSource('src/app/pages/TrainerLibraryPage.tsx');
+  // isCommunityScanEntry/tierHint moved to a CSS-free module so they can be
+  // unit-tested directly (see tests/trainer-library-card-states.test.tsx) —
+  // the page now imports rather than defines them.
+  const stateSource = readSource('src/app/pages/trainer-library-verification-state.ts');
 
-  assert.match(source, /function isCommunityScanEntry/);
-  assert.match(source, /Community Scan/);
-  assert.match(source, /requiresCommunityExecutionApproval\(entry\.certLevel\)/);
+  assert.match(pageSource, /import \{ isCommunityScanEntry, tierHint \} from '\.\/trainer-library-verification-state\.js'/);
+  assert.match(stateSource, /export function isCommunityScanEntry/);
+  assert.match(pageSource, /Community Scan/);
+  assert.match(stateSource, /requiresCommunityExecutionApproval\(entry\.certLevel\)/);
 });
 
 test('trainer library exposes smoother catalog scrolling and back-to-top control', () => {

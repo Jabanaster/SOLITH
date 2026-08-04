@@ -8,10 +8,8 @@ import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
-import {
-  COMMUNITY_WARNING_LABEL,
-  requiresCommunityExecutionApproval,
-} from '../../core/trainer-catalog/community-trust.js';
+import { COMMUNITY_WARNING_LABEL } from '../../core/trainer-catalog/community-trust.js';
+import { isCommunityScanEntry, tierHint } from './trainer-library-verification-state.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
 import { solithBranding } from '../assets/branding/index.js';
@@ -123,23 +121,8 @@ function newImportJobId(): string {
   return `ct-import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function isCommunityScanEntry(entry: TrainerCatalogEntry): boolean {
-  return entry.hasModPack && (
-    requiresCommunityExecutionApproval(entry.certLevel) ||
-    entry.verificationStatus === 'community'
-  );
-}
 
-function tierHint(entry: TrainerCatalogEntry): string {
-  if (isCommunityScanEntry(entry)) {
-    return 'Community definition — opens Discovery first; explicit approval is required before any live attach';
-  }
-  if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
-  if (entry.verificationStatus === 'community') return 'First session scan may be required';
-  return 'Metadata only — sync or import a definition';
-}
-
-function CatalogCard({
+export function CatalogCard({
   entry,
   trust,
   installed,
@@ -197,11 +180,10 @@ function CatalogCard({
           {entry.verificationStatus}
         </span>
         {isCommunityScanEntry(entry) && (
-          <span
-            className={styles.communityBadge}
-            aria-label={COMMUNITY_WARNING_LABEL}
-          >
-            <span aria-hidden="true">⚠ </span>
+          // Expected state for most community-tier definitions, not a
+          // failure — kept visually quiet so it doesn't read as a warning.
+          // Actual problems (quarantine/drift) use .staleBadge below instead.
+          <span className={styles.communityBadge} aria-label={COMMUNITY_WARNING_LABEL}>
             {COMMUNITY_WARNING_LABEL}
           </span>
         )}
@@ -274,7 +256,8 @@ function CatalogCard({
             {communityScan ? 'Run Community Scan' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
           {entry.hasModPack && (
-            <>
+            <details className={styles.moreActions}>
+              <summary>More actions</summary>
               <button type="button" className={styles.secondaryBtn} onClick={() => void onExport(entry)}>
                 Export YAML
               </button>
@@ -298,7 +281,7 @@ function CatalogCard({
                   Notify when verified
                 </button>
               )}
-            </>
+            </details>
           )}
         </div>
       </div>

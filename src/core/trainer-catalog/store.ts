@@ -8,7 +8,7 @@ import {
 } from '../definitions/mod-pack-adapter.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { decodeHtmlEntities } from './sync/decode-html-entities.js';
-import { placeholderTitleLiterals } from './sync/placeholder-titles.js';
+import { isPlaceholderTitle, placeholderTitleLiterals } from './sync/placeholder-titles.js';
 
 export type HubCertificationLevel = 'L0_Community' | 'L3_Certified';
 
@@ -324,6 +324,22 @@ export function getCatalogEntry(catalogGameId: string): TrainerCatalogEntry | nu
     | Record<string, unknown>
     | undefined;
   return row ? rowToEntry(row) : null;
+}
+
+/**
+ * User-facing single-entry lookup: same as getCatalogEntry(), but hides
+ * exact placeholder titles (e.g. "[REDACTED]") the same way the browse/search
+ * listing does. Use this from renderer-exposed IPC handlers. getCatalogEntry()
+ * itself stays raw/internal — quarantine, promotion, hub sync, discovery, and
+ * health-check logic all need to see placeholder rows to manage them, and
+ * none of them render displayName to the user.
+ */
+export function getCatalogEntryForDisplay(catalogGameId: string): TrainerCatalogEntry | null {
+  const entry = getCatalogEntry(catalogGameId);
+  if (!entry || isPlaceholderTitle(entry.displayName) || entry.displayName.trim() === '') {
+    return null;
+  }
+  return entry;
 }
 
 export function getDefinitionCertificationForGame(
