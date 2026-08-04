@@ -1,6 +1,6 @@
 # B1.1 Promotion Decision Package
 
-Date: 2026-08-01 (updated 2026-08-04 — evidenced clean-machine functional/uninstall/reinstall run added)
+Date: 2026-08-01 (updated 2026-08-04 — OD-2.5-003 closed, B1.1 promoted conditional)
 Master SHA: `5944beaa16607a4a96359676d05436bbf3568d19`
 Candidate ID: `SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z`
 Artifact hashes: installer `BB880D6F4A0D375FB294626B4FADD2B2AA687BD18A81A54D8A66EDA335A72B58`, unpacked `Solith.exe` `3B7A6CD1894444FE81909D5B165B0442894EE7D34BECD9BCD3A1500635CEB4C6`. Unsigned (confirmed via `Get-AuthenticodeSignature`).
@@ -32,7 +32,7 @@ Artifact hashes: installer `BB880D6F4A0D375FB294626B4FADD2B2AA687BD18A81A54D8A66
 
 - **OD-2.5-001** (Electron TypeScript baseline): technically resolved, independently reviewed multiple times, **OWNER-ACCEPTED 2026-08-04 — CLOSED** (see `Gate2_5/owner-decision-package.md`). Does not by itself authorize OD-2.5-003 or OD-2.5-004.
 - **OD-2.5-002** (GameLibrary whitespace baseline): named, documented, not cleaned up — still conditional.
-- **OD-2.5-003** (final B1.1 promotion): **NOT AUTHORIZED**.
+- **OD-2.5-003** (final B1.1 promotion): **CLOSED — OWNER-AUTHORIZED, 2026-08-04.** B1.1 promoted, conditional on the disclosed residual items (see Recommendation below). Does not authorize signing, release, deployment, or publishing.
 - **OD-2.5-004** (branch merge / master verification): **CLOSED** — master integration and post-merge verification complete, reviewed via a dedicated push-readiness audit, and owner-authorized push executed 2026-08-04 (`origin/master` now `3fd402b`).
 - **OD-2.5-005** (documentation reconciliation): scoped edits applied in a prior session, explicitly not marked complete, informational/non-blocking.
 
@@ -66,7 +66,7 @@ None observed or reported in any suite run this session (all runs single-pass; o
 ## Remaining risks
 
 - Renderer first-paint variance (OPEN, unresolved, not release-blocking per prior documented status but should be disclosed).
-- OD-2.5-001 — CLOSED (owner-accepted 2026-08-04). OD-2.5-004 — CLOSED (verified complete, pushed to `origin/master` as `3fd402b`, 2026-08-04). OD-2.5-003 remains open and is not resolved by either acceptance.
+- OD-2.5-001 — CLOSED (owner-accepted 2026-08-04). OD-2.5-004 — CLOSED (verified complete, pushed to `origin/master` as `3fd402b`, 2026-08-04). OD-2.5-003 — CLOSED (owner-authorized 2026-08-04, B1.1 promoted conditional). Signing, release, deployment, and publishing remain separate, unauthorized future decisions.
 - OD-2.5-002 whitespace baseline still conditional.
 - Unsigned internal status — expected for this candidate profile, not a defect, but must not be represented as a public release candidate.
 - Clean-machine functional evidence is now substantially transcript-verified (18 items, see evidence index above), narrowing but not eliminating the gap: post-reinstall usability and final close/cleanup remain OWNER-CONFIRMED PASS only, and Game Bar transport / trainer hotkey registration (including a reported F12 accelerator failure) are owner-reported, not evidenced in either 2026-08-04 transcript.
@@ -77,9 +77,11 @@ None observed or reported in any suite run this session (all runs single-pass; o
 ## Recommendation
 
 ```
-DO NOT PROMOTE
+B1.1 PROMOTED — CONDITIONAL
 ```
 
-Source, master, and packaged-candidate verification are all clean (44/44 candidate-specific security tests pass, 0 bypass, unsigned status confirmed empirically). The candidate's identity was independently re-verified inside an isolated clean Windows 11 VM (exact SHA-256/size/Authenticode match, pre- and post-transfer), the clean-machine environment itself is independently verified, and — as of 2026-08-04 — the clean-machine functional result (launch, itemized smoke-check, normal shutdown/cleanup, uninstall, reinstall) is now independently transcript-verified for 18 discrete items rather than resting on an unelaborated operator report. This closes the specific evidentiary gap that previously blocked independent review of the functional steps. OD-2.5-001 is now owner-accepted and closed; OD-2.5-004 is now verified complete and pushed to `origin/master` (`3fd402b`). However, OD-2.5-003 remains an outstanding owner decision, no upgrade-path baseline exists, post-reinstall usability and final-close cleanup remain owner-confirmed rather than independently verified, and the reported F12 accelerator failure and Game Bar transport status are not evidenced by the available transcripts. Promotion is not authorized by this document and was not performed.
+Source, master, and packaged-candidate verification are all clean (44/44 candidate-specific security tests pass, 0 bypass, unsigned status confirmed empirically). The candidate's identity was independently re-verified inside an isolated clean Windows 11 VM (exact SHA-256/size/Authenticode match, pre- and post-transfer), the clean-machine environment itself is independently verified, and the clean-machine functional result (launch, itemized smoke-check, normal shutdown/cleanup, uninstall, reinstall) is independently transcript-verified for 18 discrete items rather than resting on an unelaborated operator report. OD-2.5-001 (Electron TypeScript baseline) is owner-accepted and closed. OD-2.5-004 (branch merge/master verification) is verified complete and pushed to `origin/master` (`3fd402b`). OD-2.5-003 (this promotion decision) was explicitly authorized by the owner on 2026-08-04 — see the verbatim decision in `Gate2_5/owner-decision-package.md`.
 
-AcceptanceRequired: OD-2.5-001 is OWNER-ACCEPTED (2026-08-04) and closed. OD-2.5-004 is CLOSED (branch merge, push-readiness audit, and owner-authorized push all complete, 2026-08-04 — see `Gate2_5/owner-decision-package.md`). OWNER DECISION STILL REQUIRED for OD-2.5-003 (final promotion) alone now — its own disposition was tied to OD-2.5-001 and OD-2.5-004 together, and both are now closed, but OD-2.5-003 still requires its own separate, explicit authorization statement, not an automatic inference from the other two closing. The clean-machine functional-evidence gap that previously required either a re-run or an explicit owner acceptance is now substantially closed by the 2026-08-04 transcripts; the residual clean-machine items (post-reinstall usability, final-close cleanup, Game Bar/hotkey status) are narrower and may be accepted by the owner as-is or closed by a further targeted capture, at the owner's discretion.
+Promotion is **conditional**: it does not waive or silently resolve the disclosed residual items — no upgrade-path baseline (first candidate, nothing to upgrade from), post-reinstall usability and final-close cleanup remain owner-confirmed rather than independently transcript-verified, the reported F12 accelerator failure and Game Bar transport status remain owner-reported and not evidenced by either 2026-08-04 transcript, renderer first-paint variance remains OPEN, OD-2.5-002 (GameLibrary whitespace baseline) remains conditional, and the candidate remains explicitly unsigned/internal. This document's authorization is limited exactly to updating the promotion disposition, committing the closure documentation, and pushing the resulting documentation commits after verification — it does **not** authorize production signing, public release, deployment, publishing installers, creating a GitHub release, creating release tags, uploading artifacts, or any implementation change. Each of those remains a separate, unauthorized, future owner decision.
+
+AcceptanceRequired: OD-2.5-001, OD-2.5-004, and OD-2.5-003 are all now closed. No further owner action is required to close B1.1 promotion itself. The next gate — signing/release review — requires its own separate, explicit owner authorization and is not implied by anything in this document.

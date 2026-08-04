@@ -70,6 +70,13 @@ disqualifying, but OD-2.5-001 has not yet received explicit owner acceptance and
 
 **Blocks B1.1 promotion:** This is the promotion decision itself.
 
+**OWNER DECISION RECORDED, 2026-08-04: OPTION 1, AUTHORIZE PROMOTION (CONDITIONAL).** With OD-2.5-001
+accepted and OD-2.5-004 verified complete and pushed to `origin/master` (`3fd402b`), the owner authorized
+OD-2.5-003 closure with the residual conditions listed in option 1 carried forward as documented risk, not
+silently resolved. See the full verbatim decision under "OD-2.5-003" below. OD-2.5-003 is now closed; B1.1
+is promoted, conditional. This does not authorize signing, release, deployment, publishing, tagging, or
+artifact upload — each requires its own separate, explicit owner authorization.
+
 ## OD-2.5-001
 
 ID: OD-2.5-001
@@ -116,16 +123,50 @@ FollowUp: Separate baseline cleanup, not Gate 2.5, and not part of the Electron 
 
 ID: OD-2.5-003
 Control: Final B1.1 promotion
-Status: **NOT AUTHORIZED.** OD-2.5-001 closed (owner-accepted 2026-08-04); OD-2.5-004 closed (verified complete and pushed to `origin/master`, 2026-08-04). This item still requires its own separate owner decision.
-CurrentEvidence: All Gate 2.5 supported live packaged scenarios pass; the discovered overlay stop/status defect is fixed; 48/48 packaged (this session's suite/candidate) and separately 49/49 packaged (the prior session's suite/candidate) both pass; 1,040/1,040 npm; 257/257 live-memory.
-WhatWasNotTested: Other architectures and natural PID reuse outside the controlled fixture.
+Status: **CLOSED — B1.1 PROMOTED, CONDITIONAL.** Owner-authorized 2026-08-04. Verbatim owner decision:
+
+> I AUTHORIZE OD-2.5-003 B1.1 PROMOTION CLOSURE.
+>
+> Basis:
+> - OD-2.5-001 is CLOSED — OWNER ACCEPTED
+> - OD-2.5-004 is CLOSED — VERIFIED COMPLETE ON ORIGIN/MASTER
+> - Clean-machine identity, functional, uninstall, and reinstall evidence has passed review
+> - The final documentation reconciliation exists locally in commit d78c4e0
+>
+> Authorized scope:
+> - Update the documented B1.1 promotion disposition
+> - Commit the OD-2.5-003 closure documentation
+> - Push only the resulting documentation commits to origin/master after verification
+>
+> Not authorized:
+> - Production signing
+> - Public release
+> - Deployment
+> - Publishing installers
+> - Creating a GitHub release
+> - Creating release tags
+> - Uploading artifacts
+> - Changing implementation code
+
+This closes OD-2.5-003 and promotes the candidate (`SOLITH-B1.1-INTERNAL-UNSIGNED-2.4.0-alpha.2-5944beaa-x64-20260801T102149Z`)
+past BATCH B1.1 CONDITIONAL PASS. It does **not** authorize signing, public release, deployment,
+publishing, GitHub release/tag creation, artifact upload, or any implementation change. The following
+residual conditions were disclosed to the owner prior to this authorization and are **carried forward
+as documented risk, not silently resolved** by this promotion: no upgrade-path baseline (first
+candidate, nothing to upgrade from); post-reinstall usability and final-close cleanup remain
+OWNER-CONFIRMED PASS, not independently transcript-verified; Game Bar transport and trainer hotkey
+registration (including a reported F12 accelerator failure) remain owner-reported, not evidenced by
+either 2026-08-04 transcript; renderer first-paint variance remains OPEN; OD-2.5-002 (GameLibrary
+whitespace baseline) remains conditional; the candidate remains explicitly unsigned/internal.
+CurrentEvidence: All Gate 2.5 supported live packaged scenarios pass; the discovered overlay stop/status defect is fixed; 48/48 packaged (this session's suite/candidate) and separately 49/49 packaged (the prior session's suite/candidate) both pass; 1,040/1,040 npm; 257/257 live-memory. Clean-machine identity/environment VERIFIED (`clean-machine-run-20260802.md`); clean-machine functional/uninstall/reinstall independently transcript-verified for 18 discrete items (`clean-machine-run-20260804-evidenced.md`). OD-2.5-001 owner-accepted; OD-2.5-004 verified complete and pushed to `origin/master` (`3fd402b`).
+WhatWasNotTested: Other architectures and natural PID reuse outside the controlled fixture. Post-reinstall usability, final-close cleanup, Game Bar/hotkey behavior beyond what's disclosed above.
 Exploitability: No unresolved exploitable B1.1 defect found in the tested Windows x64 candidate.
 CurrentMitigation: Fail-closed sender validation, owner cleanup, exact test guard, full regression.
-RecommendedDisposition: Retain BATCH B1.1 CONDITIONAL PASS until the owner explicitly disposes of this item, informed by OD-2.5-001 (closed) and OD-2.5-004 (closed, pushed to `origin/master`) together.
-Options: Accept specific residual conditions and promote; or keep conditional and run the exact next milestone (see the final-decision checklist (post-cleanup) in `SOLITH_SECURITY_ROADMAP.md`).
-Consequences: Promotion without explicit acceptance would violate the verdict rules.
-AcceptanceRequired: OWNER DECISION REQUIRED.
-FollowUp: Owner disposition of remaining B1.1 conditions; then final independent re-verification of the Electron TypeScript baseline cleanup (see OD-2.5-001), branch reconciliation, and merge, in that order.
+RecommendedDisposition: Closed. B1.1 is promoted, conditional on the disclosed residual items above. Next gate is a separate, explicit owner/production decision on signing and release — not implied by this closure.
+Options: N/A — closed.
+Consequences: The candidate may now be referred to as B1.1-promoted (conditional) rather than BATCH B1.1 CONDITIONAL PASS. This confers no signing, release, publication, deployment, or tagging authorization whatsoever — those require their own separate, explicit owner authorizations.
+AcceptanceRequired: Closed 2026-08-04 per the verbatim owner decision above. No further owner action required to close OD-2.5-003 itself.
+FollowUp: A separate owner decision is required before any signing, release, publication, deployment, tagging, or artifact upload. See `SOLITH_SECURITY_ROADMAP.md`'s final-decision checklist for what remains after B1.1 promotion.
 
 ## OD-2.5-004 (new — Residual-Risk Review, this session)
 
