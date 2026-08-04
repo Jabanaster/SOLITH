@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { isCommunityScanEntry, tierHint } from '../src/app/pages/trainer-library-verification-state.ts';
+import { fallbackArtworkTreatment } from '../src/app/pages/trainer-card-fallback-artwork.ts';
 import type { TrainerCatalogEntry } from '../src/core/trainer-catalog/types.ts';
 
 const ROOT = path.resolve(import.meta.dirname ?? '.', '..');
@@ -75,10 +76,13 @@ describe('verification-state model — isCommunityScanEntry / tierHint (real sta
 });
 
 describe('card markup — badge separation and action hierarchy (source-level, matching this repo\'s existing test style for this file)', () => {
-  test('the scan-required badge is rendered separately from installed/running/stale badges — each is its own conditional, not merged', () => {
-    assert.match(PAGE_SOURCE, /isCommunityScanEntry\(entry\) && \(/);
-    assert.match(PAGE_SOURCE, /\{installed && \(/);
-    assert.match(PAGE_SOURCE, /\{running && \(/);
+  test('the tier/status row and the presence indicator are distinct card regions, not merged into one badge', () => {
+    // Card redesign: stale/community/tier badges moved into a compact status
+    // row in the card body; installed/running collapsed into a single cover
+    // presence indicator instead of two separate absolute-positioned pills.
+    assert.match(PAGE_SOURCE, /className=\{styles\.statusRow\}/);
+    assert.match(PAGE_SOURCE, /!isStale && communityScan && \(/);
+    assert.match(PAGE_SOURCE, /\{\(installed \|\| running\) && \(/);
     assert.match(PAGE_SOURCE, /healthStatus === 'stale' \|\| healthStatus === 'quarantined'/);
   });
 
@@ -107,5 +111,117 @@ describe('card markup — badge separation and action hierarchy (source-level, m
     for (const handler of ['onLaunch', 'onExport', 'onThumbUp', 'onRequestVerification', 'onNotify', 'onPublish']) {
       assert.match(PAGE_SOURCE, new RegExp(`void ${handler}\\(entry\\)`));
     }
+  });
+});
+
+describe('card redesign — hierarchy, fallback artwork, and compact status (round 3)', () => {
+  test('primary action button appears before the More actions disclosure in source order', () => {
+    const primaryIndex = PAGE_SOURCE.indexOf('styles.communityScanBtn : styles.launchBtn');
+    const detailsIndex = PAGE_SOURCE.indexOf('<details className={styles.moreActions}>');
+    assert.ok(primaryIndex >= 0 && detailsIndex >= 0);
+    assert.ok(primaryIndex < detailsIndex, 'primary action must render before the secondary-actions disclosure');
+  });
+
+  test('contributor/verification actions (Export YAML, Publish to Hub) only appear inside the More actions disclosure, never on the default card surface', () => {
+    const detailsBlockMatch = PAGE_SOURCE.match(/<details className=\{styles\.moreActions\}>[\s\S]*?<\/details>/);
+    assert.ok(detailsBlockMatch);
+    const outsideDetails = PAGE_SOURCE.replace(detailsBlockMatch![0], '');
+    assert.ok(!outsideDetails.includes('Export YAML'));
+    assert.ok(!outsideDetails.includes('Publish to Hub'));
+    assert.ok(!outsideDetails.includes('Confirm works'));
+    assert.ok(!outsideDetails.includes('Request verification'));
+  });
+
+  test('internal schema/capability jargon (schema.v1, capBadge, "Injection pilot") no longer renders on the default card surface', () => {
+    assert.ok(!PAGE_SOURCE.includes('schema.v1 definition'));
+    assert.ok(!PAGE_SOURCE.includes('capabilityRow'));
+    assert.ok(!PAGE_SOURCE.includes('Injection pilot'));
+  });
+
+  test('title and supporting line use single-line clamp classes, not free-flowing paragraphs', () => {
+    assert.match(PAGE_SOURCE, /className=\{styles\.title\}/);
+    assert.match(PAGE_SOURCE, /className=\{styles\.supportingLine\}/);
+    const cssSource = fs.readFileSync(path.join(ROOT, 'src/app/pages/TrainerLibraryPage.module.css'), 'utf8');
+    assert.match(cssSource, /\.title\s*\{[^}]*-webkit-line-clamp:\s*1/s);
+    assert.match(cssSource, /\.supportingLine\s*\{[^}]*-webkit-line-clamp:\s*1/s);
+  });
+
+  test('the full display name remains available via a title attribute even when the heading is clamped', () => {
+    assert.match(PAGE_SOURCE, /<h2 className=\{styles\.title\} title=\{entry\.displayName\}>/);
+  });
+
+  test('the stale/quarantine badge stays visually louder than the community-scan badge in CSS (real failure > expected incomplete state)', () => {
+    const cssSource = fs.readFileSync(path.join(ROOT, 'src/app/pages/TrainerLibraryPage.module.css'), 'utf8');
+    const staleBlock = cssSource.match(/\.staleBadge\s*\{[^}]*\}/s)![0];
+    const communityBlock = cssSource.match(/(?<!\.tier)\.communityBadge\s*\{[^}]*\}/s)![0];
+    assert.match(staleBlock, /font-weight:\s*700/);
+    assert.doesNotMatch(communityBlock, /font-weight:\s*700/);
+  });
+
+  test('presence indicator (installed/running) is a single cover badge with real text, not color-only meaning', () => {
+    assert.match(PAGE_SOURCE, /className=\{styles\.presenceBadge\}/);
+    assert.match(PAGE_SOURCE, /installed && running \? 'Installed · Running' : running \? 'Running' : 'Installed'/);
+  });
+});
+
+describe('fallbackArtworkTreatment — deterministic per-title fallback (no guessed/remote artwork)', () => {
+  test('same title always produces the same treatment', () => {
+    const a = fallbackArtworkTreatment('Elden Ring');
+    const b = fallbackArtworkTreatment('Elden Ring');
+    assert.deepEqual(a, b);
+  });
+
+  test('different titles usually produce different hues', () => {
+    const a = fallbackArtworkTreatment('Elden Ring');
+    const b = fallbackArtworkTreatment('Stardew Valley');
+    assert.notEqual(a.hueA, b.hueA);
+  });
+
+  test('initial is the uppercased first character of the title', () => {
+    assert.equal(fallbackArtworkTreatment('palworld').initial, 'P');
+    assert.equal(fallbackArtworkTreatment('7 Days to Die').initial, '7');
+  });
+
+  test('skips leading bracket/paren/punctuation wrappers to find a real letter or digit', () => {
+    // Real catalog titles like "[NINJA GAIDEN - Master Collection]" or
+    // "(the) Gnorp Apologue" would otherwise render a near-blank "[" or "("
+    // as the fallback initial instead of a readable letter.
+    assert.equal(fallbackArtworkTreatment('[NINJA GAIDEN - Master Collection]').initial, 'N');
+    assert.equal(fallbackArtworkTreatment('(the) Gnorp Apologue').initial, 'T');
+    assert.equal(fallbackArtworkTreatment('.hack G.U. Last Recode').initial, 'H');
+  });
+
+  test('empty or whitespace-only title falls back to a safe placeholder initial, not a crash', () => {
+    assert.equal(fallbackArtworkTreatment('   ').initial, '?');
+    assert.equal(fallbackArtworkTreatment('').initial, '?');
+  });
+
+  test('hues stay within a valid 0-359 range', () => {
+    const treatment = fallbackArtworkTreatment('Some Game Title');
+    assert.ok(treatment.hueA >= 0 && treatment.hueA < 360);
+    assert.ok(treatment.hueB >= 0 && treatment.hueB < 360);
+  });
+
+  test('Unicode and surrogate-pair titles resolve safely without crashing', () => {
+    // codePointAt/fromCodePoint (not charAt/[0]) handles astral-plane
+    // characters like emoji as one glyph instead of splitting a surrogate
+    // pair and rendering a broken half-character.
+    assert.doesNotThrow(() => fallbackArtworkTreatment('日本語のゲーム'));
+    assert.doesNotThrow(() => fallbackArtworkTreatment('🎮 Game Title'));
+    assert.doesNotThrow(() => fallbackArtworkTreatment('Übercharge'));
+    const jp = fallbackArtworkTreatment('日本語のゲーム');
+    assert.equal(jp.initial, '日');
+    // Emoji is a decorative Symbol, not a Letter/Number, so the same
+    // "skip to the first real letter/digit" rule that handles bracket
+    // prefixes applies here too — lands on 'G' from "Game", not a
+    // half-rendered surrogate pair.
+    const emoji = fallbackArtworkTreatment('🎮 Game Title');
+    assert.equal(emoji.initial, 'G');
+  });
+
+  test('a title with no letters/digits at all (e.g. pure emoji) still resolves one whole glyph, not a broken surrogate half', () => {
+    const treatment = fallbackArtworkTreatment('🎮🕹️');
+    assert.doesNotThrow(() => fallbackArtworkTreatment('🎮🕹️'));
+    assert.equal(treatment.initial, '🎮'.toUpperCase());
   });
 });

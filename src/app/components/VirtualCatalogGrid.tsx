@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const CARD_MIN_WIDTH = 180;
-const CARD_HEIGHT = 390;
+// Measured from rendered card geometry (pixel-scanned production screenshots
+// at 1280x720/1920x1080/2560x1440), not estimated — the column-width algorithm
+// below keeps per-column width in a narrow band regardless of viewport, so a
+// single constant tracks real card height closely across breakpoints. An
+// earlier guess (390, carried over from the pre-redesign card) undershot by
+// ~26px/row, which would drift the absolute row positioning below further
+// into the list on long scrolls.
+const CARD_HEIGHT = 416;
 const GRID_GAP = 16;
 const OVERSCAN_ROWS = 2;
 

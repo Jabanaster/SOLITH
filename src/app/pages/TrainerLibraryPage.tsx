@@ -3,16 +3,16 @@ import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
-import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
+import { getCuratedTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
 import { COMMUNITY_WARNING_LABEL } from '../../core/trainer-catalog/community-trust.js';
 import { isCommunityScanEntry, tierHint } from './trainer-library-verification-state.js';
+import { fallbackArtworkTreatment } from './trainer-card-fallback-artwork.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
-import { solithBranding } from '../assets/branding/index.js';
 import {
   ctImportUiReducer,
   friendlyCtImportError,
@@ -147,9 +147,25 @@ export function CatalogCard({
   onNotify: (entry: TrainerCatalogEntry) => void;
   onPublish: (entry: TrainerCatalogEntry) => void;
 }) {
-  const tagline = getCatalogTagline(entry);
+  const tagline = getCuratedTagline(entry);
   const coverUrl = resolveCatalogCoverUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
+  const fallback = fallbackArtworkTreatment(entry.displayName);
+  const isStale = healthStatus === 'stale' || healthStatus === 'quarantined';
+  const capabilitySummary = entry.capabilities ? describeCapabilityLanes(entry.capabilities) : undefined;
+  const supportingLine = [
+    entry.categories.slice(0, 2).join(' · ') || null,
+    entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const trustSuffix = [
+    trust?.positive ? `${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : null,
+    trust?.quarantined ? 'needs re-verify' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <article className={styles.card}>
       <div className={styles.coverWrap}>
@@ -161,91 +177,56 @@ export function CatalogCard({
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               img.style.display = 'none';
-              const fallback = img.nextElementSibling;
-              if (fallback) (fallback as HTMLElement).style.display = 'flex';
+              const fallbackEl = img.nextElementSibling;
+              if (fallbackEl) (fallbackEl as HTMLElement).style.display = 'flex';
             }}
           />
         ) : null}
-        <div className={styles.coverFallback} style={coverUrl ? { display: 'none' } : undefined}>
-          <img
-            src={solithBranding.gameLibraryControllerMonitors}
-            alt=""
-            aria-hidden="true"
-            className={styles.coverFallbackArtwork}
-          />
-          <span>{entry.displayName}</span>
-          <small>No cover metadata yet</small>
+        <div
+          className={styles.coverFallback}
+          style={{
+            ...(coverUrl ? { display: 'none' } : undefined),
+            ['--fallback-hue-a' as string]: fallback.hueA,
+            ['--fallback-hue-b' as string]: fallback.hueB,
+          }}
+        >
+          <span className={styles.coverFallbackInitial} aria-hidden="true">
+            {fallback.initial}
+          </span>
+          <small>Artwork unavailable</small>
         </div>
-        <span className={styles.badge} title={tierHint(entry)}>
-          {entry.verificationStatus}
-        </span>
-        {isCommunityScanEntry(entry) && (
-          // Expected state for most community-tier definitions, not a
-          // failure — kept visually quiet so it doesn't read as a warning.
-          // Actual problems (quarantine/drift) use .staleBadge below instead.
-          <span className={styles.communityBadge} aria-label={COMMUNITY_WARNING_LABEL}>
-            {COMMUNITY_WARNING_LABEL}
-          </span>
-        )}
-        {installed && (
-          <span className={styles.installedBadge} title="Detected on this PC">
-            Installed
-          </span>
-        )}
-        {running && (
-          <span className={styles.runningBadge} title="Process detected on this PC">
-            Running
-          </span>
-        )}
-        {(healthStatus === 'stale' || healthStatus === 'quarantined') && (
-          <span className={styles.staleBadge} title="Executable drift or quarantine">
-            Stale
+        {(installed || running) && (
+          <span className={styles.presenceBadge}>
+            {installed && running ? 'Installed · Running' : running ? 'Running' : 'Installed'}
           </span>
         )}
       </div>
       <div className={styles.cardBody}>
-        <h2>{entry.displayName}</h2>
-        <p className={styles.tagline}>{tagline}</p>
-        <p>{entry.categories.slice(0, 2).join(' · ')}</p>
-        <p className={styles.meta}>
-          {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
-          {trust?.positive ? ` · ${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : ''}
-          {trust?.quarantined ? ' · needs re-verify' : ''}
+        <h2 className={styles.title} title={entry.displayName}>
+          {entry.displayName}
+        </h2>
+        {tagline && <p className={styles.tagline}>{tagline}</p>}
+        <p className={styles.supportingLine} title={capabilitySummary}>
+          {supportingLine}
+          {trustSuffix ? ` · ${trustSuffix}` : ''}
         </p>
-        {entry.capabilities ? (
-          <p className={styles.capabilityRow} title={describeCapabilityLanes(entry.capabilities)}>
-            {entry.capabilities.saveEdit !== 'none' && (
-              <span className={styles.capBadge} data-lane="save">
-                Save
-              </span>
-            )}
-            {entry.capabilities.liveMemory === 'scan-required' && (
-              <span className={styles.capBadge} data-lane="live-scan">
-                Live · Discovery
-              </span>
-            )}
-            {entry.capabilities.liveMemory === 'executable' && (
-              <span className={styles.capBadge} data-lane="live-exec">
-                Live · Resolved
-              </span>
-            )}
-            {entry.capabilities.injection === 'pilot-gated' && (
-              <span className={styles.capBadge} data-lane="inject">
-                Injection pilot
-              </span>
-            )}
-            {entry.capabilities.saveEdit === 'none' &&
-              entry.capabilities.liveMemory === 'none' &&
-              entry.capabilities.injection === 'forbidden' && (
-                <span className={styles.capBadge} data-lane="meta">
-                  Metadata
-                </span>
-              )}
-          </p>
-        ) : (
-          <p className={styles.meta}>No schema.v1 definition — metadata only</p>
-        )}
-        <p className={styles.meta}>{tierHint(entry)}</p>
+        <div className={styles.statusRow}>
+          <span
+            className={isStale ? styles.staleBadge : styles.tierBadge}
+            data-tier={entry.verificationStatus}
+            title={tierHint(entry)}
+          >
+            {isStale ? 'Needs re-verify' : entry.verificationStatus}
+          </span>
+          {!isStale && communityScan && (
+            // Expected state for most community-tier definitions, not a
+            // failure — kept visually quiet so it doesn't compete with an
+            // actual problem (quarantine/drift), which uses .staleBadge.
+            <span className={styles.communityBadge} aria-label={COMMUNITY_WARNING_LABEL} title={tierHint(entry)}>
+              Scan required
+            </span>
+          )}
+        </div>
         <div className={styles.cardActions}>
           <button
             type="button"

@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getCatalogTagline } from '../src/core/trainer-catalog/game-taglines.ts';
+import { getCatalogTagline, getCuratedTagline } from '../src/core/trainer-catalog/game-taglines.ts';
 import type { TrainerCatalogEntry } from '../src/core/trainer-catalog/types.ts';
 
 function entry(partial: Partial<TrainerCatalogEntry> & Pick<TrainerCatalogEntry, 'catalogGameId' | 'displayName'>): TrainerCatalogEntry {
@@ -32,5 +32,25 @@ describe('catalog taglines', () => {
     );
     assert.match(tagline, /Horror/);
     assert.match(tagline, /single-player/i);
+  });
+});
+
+describe('getCuratedTagline — curated-only, no synthesized fallback', () => {
+  test('returns curated copy for bundled games', () => {
+    const tagline = getCuratedTagline(entry({ catalogGameId: 'palworld', displayName: 'Palworld' }));
+    assert.match(tagline ?? '', /survival/i);
+  });
+
+  test('returns undefined for uncurated entries instead of restating categories', () => {
+    // The card's supporting-metadata line already shows categories + cheat
+    // count; a synthesized tagline here would just duplicate that text.
+    const tagline = getCuratedTagline(
+      entry({
+        catalogGameId: 'legend-of-darkness-remastered',
+        displayName: 'Legend of Darkness Remastered',
+        categories: ['Horror', 'Indie'],
+      }),
+    );
+    assert.equal(tagline, undefined);
   });
 });

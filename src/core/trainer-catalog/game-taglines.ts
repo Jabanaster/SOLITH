@@ -52,6 +52,17 @@ export const CURATED_GAME_TAGLINES: Record<string, string> = {
   'guilty-gear-strive': 'Anime fighting with roman cancel system.',
 };
 
+/**
+ * Curated tagline only — no synthesized fallback. The catalog's supporting
+ * metadata line (categories + cheat count) already covers uncurated entries;
+ * a synthesized tagline like "Action · Adventure single-player title" just
+ * restated that line in different words, so cards for the ~5,900 games
+ * without a curated blurb showed the same information twice.
+ */
+export function getCuratedTagline(entry: TrainerCatalogEntry): string | undefined {
+  return CURATED_GAME_TAGLINES[entry.catalogGameId];
+}
+
 export function getCatalogTagline(entry: TrainerCatalogEntry): string {
   const curated = CURATED_GAME_TAGLINES[entry.catalogGameId];
   if (curated) return curated;

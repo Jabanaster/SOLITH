@@ -365,6 +365,14 @@
   width: 100%;
 }
 
+/* VirtualCatalogGrid wraps each rendered card in an unclassed div with an
+   inline minHeight; making that wrapper a flex container lets .card stretch
+   to fill it (default cross-axis stretch), so action footers align across
+   a row even when one card's title/status content is shorter than another's. */
+.grid > div {
+  display: flex;
+}
+
 .virtualScroll {
   max-height: calc(100vh - 280px);
   min-height: 420px;
@@ -397,23 +405,36 @@
 
 .tagline {
   color: #9eb6dc !important;
-  font-size: 0.72rem !important;
+  font-size: 0.74rem !important;
   line-height: 1.3 !important;
-  margin-top: 0.15rem !important;
-  margin-bottom: 0.25rem !important;
+  margin-top: 0.2rem !important;
+  margin-bottom: 0 !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   border: 1px solid rgba(120, 180, 255, 0.15);
   border-radius: 10px;
   overflow: hidden;
   background: rgba(12, 18, 30, 0.95);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.card:hover {
+  border-color: rgba(120, 180, 255, 0.32);
 }
 
 .coverWrap {
   position: relative;
   aspect-ratio: 2 / 3;
   background: #111827;
+  flex-shrink: 0;
 }
 
 .coverWrap img {
@@ -422,6 +443,10 @@
   object-fit: cover;
 }
 
+/* Deterministic-per-title gradient + initial, not a repeated stock image —
+   so a catalog full of unresolved artwork doesn't look duplicated. Hue
+   values come from trainer-card-fallback-artwork.ts via inline custom
+   properties (CSS modules can't compute per-item values). */
 .coverFallback {
   width: 100%;
   height: 100%;
@@ -429,183 +454,170 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 1rem;
   text-align: center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #6b8cc7;
-  background: linear-gradient(145deg, #1a2740, #0d1424);
+  background: linear-gradient(
+    145deg,
+    hsl(var(--fallback-hue-a) 42% 20%),
+    hsl(var(--fallback-hue-b) 38% 12%)
+  );
+}
+
+.coverFallbackInitial {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1;
 }
 
 .coverFallback small {
-  display: block;
-  max-width: 100%;
-  padding: 0.18rem 0.4rem;
-  border: 1px solid rgba(120, 180, 255, 0.2);
-  border-radius: 999px;
-  color: #9eb6dc;
-  background: rgba(5, 10, 18, 0.45);
+  color: rgba(255, 255, 255, 0.4);
   font-size: 0.62rem;
   font-weight: 600;
-}
-
-.coverFallbackArtwork {
-  width: min(72%, 7rem);
-  height: auto;
-  object-fit: contain;
-  opacity: 0.9;
-  filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.28));
-}
-
-.badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 0.65rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  padding: 0.2rem 0.45rem;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.65);
-  color: #cde0ff;
 }
 
-/* Deliberately quieter than .staleBadge: "scan required" is the expected,
-   normal state for community-tier content, not a warning — it shouldn't
-   compete visually with an actual problem (quarantine/drift). */
-.communityBadge {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  max-width: calc(100% - 16px);
-  padding: 0.25rem 0.5rem;
-  border: 1px solid rgba(120, 180, 255, 0.25);
-  border-radius: 6px;
-  background: rgba(10, 18, 32, 0.85);
-  color: #a8bcdc;
-  font-size: 0.68rem;
-  font-weight: 500;
-  line-height: 1.2;
-  text-transform: none;
-}
-
-.installedBadge {
+/* Single combined presence indicator instead of separate installed/running
+   pills — keeps the artwork region free of competing badge clutter. */
+.presenceBadge {
   position: absolute;
   top: 8px;
   left: 8px;
   font-size: 0.65rem;
-  text-transform: uppercase;
+  font-weight: 600;
   padding: 0.2rem 0.45rem;
   border-radius: 4px;
-  background: rgba(20, 80, 50, 0.85);
+  background: rgba(15, 70, 55, 0.9);
   color: #b8f0c8;
   border: 1px solid rgba(100, 200, 130, 0.45);
 }
 
-.runningBadge {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  padding: 0.2rem 0.45rem;
-  border-radius: 4px;
-  background: rgba(15, 70, 55, 0.9);
-  color: #7ef0c0;
-  border: 1px solid rgba(60, 220, 160, 0.55);
-  box-shadow: 0 0 8px rgba(60, 220, 160, 0.25);
-}
-
-/* An actual problem (executable drift or quarantine), not an expected
-   incomplete state — kept louder than .communityBadge on purpose. */
-.staleBadge {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(92, 30, 15, 0.95);
-  color: #ffd9b0;
-  border: 1px solid rgba(245, 130, 60, 0.65);
-  box-shadow: 0 0 10px rgba(245, 130, 60, 0.15);
-}
-
 .cardBody {
-  padding: 0.65rem 0.75rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 0.65rem 0.75rem 0.75rem;
 }
 
-.cardBody h2 {
-  margin: 0 0 0.25rem;
-  font-size: 0.92rem;
-  line-height: 1.25;
-}
-
-.cardBody p {
+.title {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #f2f6ff;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.supportingLine {
+  margin: 0.3rem 0 0;
+  font-size: 0.72rem;
   color: #8fa3c7;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.meta {
-  margin-top: 0.35rem !important;
-}
-
-.capabilityRow {
+.statusRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.28rem;
-  margin-top: 0.4rem !important;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
 }
 
-.capBadge {
+.tierBadge {
   display: inline-block;
-  padding: 0.12rem 0.4rem;
+  padding: 0.18rem 0.45rem;
   border-radius: 4px;
   font-size: 0.65rem;
-  letter-spacing: 0.02em;
-  border: 1px solid rgba(140, 170, 210, 0.35);
+  font-weight: 600;
+  text-transform: capitalize;
+  border: 1px solid rgba(140, 170, 210, 0.3);
   color: #c8d7ef;
   background: rgba(24, 40, 64, 0.85);
 }
 
-.capBadge[data-lane='save'] {
-  border-color: rgba(90, 180, 140, 0.45);
-  color: #b6f0d0;
+.tierBadge[data-tier='verified'] {
+  border-color: rgba(90, 200, 140, 0.4);
+  color: #a8f0c4;
 }
 
-.capBadge[data-lane='live-scan'] {
-  border-color: rgba(220, 180, 90, 0.45);
-  color: #f5dfb0;
+.tierBadge[data-tier='community'] {
+  border-color: rgba(120, 180, 255, 0.35);
+  color: #a8bcdc;
 }
 
-.capBadge[data-lane='live-exec'] {
-  border-color: rgba(100, 190, 255, 0.5);
-  color: #b8e0ff;
+.tierBadge[data-tier='metadata-only'] {
+  border-color: rgba(140, 170, 210, 0.25);
+  color: #8fa3c7;
 }
 
-.capBadge[data-lane='inject'] {
-  border-color: rgba(220, 120, 100, 0.5);
-  color: #f0c0b4;
+/* Deliberately quiet: "scan required" is the expected, normal state for
+   community-tier content, not a warning — it shouldn't compete visually
+   with an actual problem (quarantine/drift), which uses .staleBadge. */
+.communityBadge {
+  display: inline-block;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(10, 18, 32, 0.85);
+  color: #a8bcdc;
+  font-size: 0.65rem;
+  font-weight: 500;
 }
 
-.capBadge[data-lane='meta'] {
-  opacity: 0.85;
+/* An actual problem (executable drift or quarantine), not an expected
+   incomplete state — kept louder than the tier/community badges on purpose. */
+.staleBadge {
+  display: inline-block;
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(92, 30, 15, 0.95);
+  color: #ffd9b0;
+  border: 1px solid rgba(245, 130, 60, 0.65);
+  box-shadow: 0 0 8px rgba(245, 130, 60, 0.15);
+}
+
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.55rem;
 }
 
 .launchBtn,
 .communityScanBtn {
-  margin-top: 0.55rem;
   width: 100%;
-  padding: 0.45rem;
+  padding: 0.5rem;
   border-radius: 6px;
   border: 1px solid rgba(120, 180, 255, 0.3);
   background: rgba(30, 55, 90, 0.9);
   color: #e8f0ff;
   cursor: pointer;
   font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.launchBtn:hover {
+  background: rgba(40, 75, 120, 0.95);
+  border-color: rgba(120, 180, 255, 0.5);
+}
+
+.launchBtn:focus-visible,
+.communityScanBtn:focus-visible,
+.secondaryBtn:focus-visible,
+.moreActions summary:focus-visible {
+  outline: 2px solid rgba(80, 220, 255, 0.65);
+  outline-offset: 2px;
 }
 
 .communityScanBtn {
@@ -614,18 +626,6 @@
   color: #fff3c4;
   font-weight: 800;
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.18), 0 0 18px rgba(245, 158, 11, 0.1);
-}
-
-.cardActions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.55rem;
-}
-
-.cardActions .launchBtn,
-.cardActions .communityScanBtn {
-  margin-top: 0;
 }
 
 .secondaryBtn {
