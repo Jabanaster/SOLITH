@@ -7,12 +7,18 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('security overrides pin fixed postcss and brace-expansion', () => {
+test('security overrides pin fixed postcss, brace-expansion, fast-uri, and undici', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
-    overrides?: Record<string, string>;
+    overrides?: Record<string, unknown>;
   };
   assert.equal(pkg.overrides?.postcss, '8.5.23');
-  assert.equal(pkg.overrides?.['brace-expansion'], '5.0.8');
+  assert.equal(pkg.overrides?.['brace-expansion'], '5.0.9');
+  assert.equal(pkg.overrides?.['fast-uri'], '3.1.5');
+  assert.equal(pkg.overrides?.undici, '7.29.0');
+  assert.equal(
+    (pkg.overrides?.['@electron/rebuild'] as Record<string, string> | undefined)?.undici,
+    '6.28.0',
+  );
 });
 
 test('npm audit reports zero vulnerabilities under the locked tree', () => {
