@@ -81,9 +81,22 @@ describe('card markup — badge separation and action hierarchy (source-level, m
     // row in the card body; installed/running collapsed into a single cover
     // presence indicator instead of two separate absolute-positioned pills.
     assert.match(PAGE_SOURCE, /className=\{styles\.statusRow\}/);
-    assert.match(PAGE_SOURCE, /!isStale && communityScan && \(/);
+    assert.match(PAGE_SOURCE, /!isStale && communityScan \? COMMUNITY_WARNING_LABEL : undefined/);
     assert.match(PAGE_SOURCE, /\{\(installed \|\| running\) && \(/);
     assert.match(PAGE_SOURCE, /healthStatus === 'stale' \|\| healthStatus === 'quarantined'/);
+  });
+
+  test('corrective pass: status row renders exactly one badge per card, not a tier badge plus a separate scan-required chip', () => {
+    // The original redesign still paired a tier badge with a second
+    // "Scan required" chip — two chips saying overlapping things. The
+    // scan-required signal now lives in this one badge's title tooltip
+    // (tierHint) and in the primary action's own label, not a second chip.
+    const detailsBlockMatch = PAGE_SOURCE.match(/<div className=\{styles\.statusRow\}>[\s\S]*?<\/div>/);
+    assert.ok(detailsBlockMatch, 'expected a statusRow block');
+    const block = detailsBlockMatch[0];
+    const badgeCount = (block.match(/<span/g) ?? []).length;
+    assert.equal(badgeCount, 1, 'statusRow should render exactly one <span> badge');
+    assert.ok(!PAGE_SOURCE.includes('Scan required</span>'), 'no separate "Scan required" chip should remain');
   });
 
   test('scan-required badge no longer renders a warning icon (softened, not a failure state)', () => {
@@ -150,12 +163,16 @@ describe('card redesign — hierarchy, fallback artwork, and compact status (rou
     assert.match(PAGE_SOURCE, /<h2 className=\{styles\.title\} title=\{entry\.displayName\}>/);
   });
 
-  test('the stale/quarantine badge stays visually louder than the community-scan badge in CSS (real failure > expected incomplete state)', () => {
+  test('the stale/quarantine badge stays visually louder than the default tier badge in CSS (real failure > expected incomplete state)', () => {
+    // Corrective pass removed the separate .communityBadge chip entirely
+    // (see the "exactly one badge" test above) — the comparison now is
+    // staleBadge vs. the single tierBadge that replaces it in the default
+    // (non-stale) case.
     const cssSource = fs.readFileSync(path.join(ROOT, 'src/app/pages/TrainerLibraryPage.module.css'), 'utf8');
     const staleBlock = cssSource.match(/\.staleBadge\s*\{[^}]*\}/s)![0];
-    const communityBlock = cssSource.match(/(?<!\.tier)\.communityBadge\s*\{[^}]*\}/s)![0];
+    const tierBlock = cssSource.match(/(?<!\[data-tier='verified'\]\s)(?<!\[data-tier='community'\]\s)(?<!\[data-tier='metadata-only'\]\s)\.tierBadge\s*\{[^}]*\}/s)![0];
     assert.match(staleBlock, /font-weight:\s*700/);
-    assert.doesNotMatch(communityBlock, /font-weight:\s*700/);
+    assert.doesNotMatch(tierBlock, /font-weight:\s*700/);
   });
 
   test('presence indicator (installed/running) is a single cover badge with real text, not color-only meaning', () => {
@@ -178,6 +195,25 @@ describe('round 4 — truthful labeling for generic/templated remote-sync entrie
     assert.match(
       PAGE_SOURCE,
       /const supportingLine = isGeneric\s*\n\s*\? 'Community-sourced · details incomplete'\s*\n\s*: \[/,
+    );
+  });
+
+  test('primary action label is neutral for generic entries too, without changing the click handler or button className', () => {
+    assert.match(PAGE_SOURCE, /className=\{communityScan \? styles\.communityScanBtn : styles\.launchBtn\}/);
+    assert.match(PAGE_SOURCE, /onClick=\{\(\) => void onLaunch\(entry\)\}/);
+    assert.match(PAGE_SOURCE, /\{communityScan \|\| isGeneric \? 'View Details' : entry\.hasModPack \? 'Open Trainer Deck' : 'View'\}/);
+  });
+});
+
+describe('round 5 — generic cards drop the redundant monogram and the contradictory category tag', () => {
+  test('the cover fallback monogram only renders when the entry is not generic', () => {
+    assert.match(PAGE_SOURCE, /\{!isGeneric && \(\s*\n\s*<span className=\{styles\.coverFallbackInitial\}/);
+  });
+
+  test('the cover category tag only renders when the entry is not generic', () => {
+    assert.match(
+      PAGE_SOURCE,
+      /\{!isGeneric && entry\.categories\[0\] && \(\s*\n\s*<span className=\{styles\.coverCategoryTag\}/,
     );
   });
 });

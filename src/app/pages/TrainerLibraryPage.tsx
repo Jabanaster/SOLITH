@@ -3,7 +3,6 @@ import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
-import { getCuratedTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
@@ -149,7 +148,6 @@ export function CatalogCard({
   onNotify: (entry: TrainerCatalogEntry) => void;
   onPublish: (entry: TrainerCatalogEntry) => void;
 }) {
-  const tagline = getCuratedTagline(entry);
   const coverUrl = resolveCatalogCoverUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
   const fallback = fallbackArtworkTreatment(entry.displayName);
@@ -200,10 +198,26 @@ export function CatalogCard({
             ['--fallback-hue-b' as string]: fallback.hueB,
           }}
         >
-          <span className={styles.coverFallbackInitial} aria-hidden="true">
-            {fallback.initial}
-          </span>
-          <small>Artwork unavailable</small>
+          {/* Generic entries: no monogram. The letter is always the same
+              character the title already leads with directly below — pure
+              redundancy, not identity. And the category tag here was
+              literally the same fabricated fallback categories now labeled
+              "details incomplete" in the supporting line; showing "ACTION"
+              on the banner while the body says the details are incomplete
+              contradicted itself. Curated entries keep both — their
+              category is real, and their monogram/title rarely share a
+              cover-banner strip this way (curated entries have varied
+              content below, not a one-line truthful-label placeholder). */}
+          {!isGeneric && (
+            <span className={styles.coverFallbackInitial} aria-hidden="true">
+              {fallback.initial}
+            </span>
+          )}
+          {!isGeneric && entry.categories[0] && (
+            <span className={styles.coverCategoryTag} aria-hidden="true">
+              {entry.categories[0]}
+            </span>
+          )}
         </div>
         {(installed || running) && (
           <span className={styles.presenceBadge}>
@@ -215,36 +229,42 @@ export function CatalogCard({
         <h2 className={styles.title} title={entry.displayName}>
           {entry.displayName}
         </h2>
-        {tagline && <p className={styles.tagline}>{tagline}</p>}
         <p className={styles.supportingLine} title={capabilitySummary}>
           {supportingLine}
           {trustSuffix ? ` · ${trustSuffix}` : ''}
         </p>
         <div className={styles.statusRow}>
-          <span
-            className={isStale ? styles.staleBadge : styles.tierBadge}
-            data-tier={entry.verificationStatus}
-            title={tierHint(entry)}
-          >
-            {isStale ? 'Needs re-verify' : entry.verificationStatus}
-          </span>
-          {!isStale && communityScan && (
-            // Expected state for most community-tier definitions, not a
-            // failure — kept visually quiet so it doesn't compete with an
-            // actual problem (quarantine/drift), which uses .staleBadge.
-            <span className={styles.communityBadge} aria-label={COMMUNITY_WARNING_LABEL} title={tierHint(entry)}>
-              Scan required
+          {/* "community" and "metadata-only" are the expected default for
+              most of the catalog, not a state worth a badge on every single
+              card — that repetition is what made the badge read as vague
+              filler. Only render it for a state actually worth flagging: a
+              real problem (stale/quarantined) or the earned "verified" tier.
+              The scan-required signal still lives in tierHint's tooltip and
+              in the primary action's own (now neutral) label. */}
+          {(isStale || entry.verificationStatus === 'verified') && (
+            <span
+              className={isStale ? styles.staleBadge : styles.tierBadge}
+              data-tier={entry.verificationStatus}
+              aria-label={!isStale && communityScan ? COMMUNITY_WARNING_LABEL : undefined}
+              title={tierHint(entry)}
+            >
+              {isStale ? 'Needs re-verify' : entry.verificationStatus}
             </span>
           )}
         </div>
         <div className={styles.cardActions}>
+          {/* Scan-required entries still open the same community discovery
+              deck on click (behavior unchanged) — only the label changed,
+              from a shouted "RUN COMMUNITY SCAN" repeated on nearly every
+              card to a neutral, truthful "View Details". The scan step
+              itself is what the deck opens into, not a separate action. */}
           <button
             type="button"
             className={communityScan ? styles.communityScanBtn : styles.launchBtn}
             onClick={() => void onLaunch(entry)}
-            title={communityScan ? 'Open the scan-required community discovery deck; no memory writes run from this card.' : undefined}
+            title={communityScan ? 'Opens trainer details; a community scan runs before any memory attach.' : undefined}
           >
-            {communityScan ? 'Run Community Scan' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
+            {communityScan || isGeneric ? 'View Details' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
           {entry.hasModPack && (
             <details className={styles.moreActions}>

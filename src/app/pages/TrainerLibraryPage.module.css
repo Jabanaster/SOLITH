@@ -1,6 +1,6 @@
 .page {
   width: 100%;
-  padding: 1rem 1.25rem 2rem;
+  padding: 0.65rem 1.25rem 2rem;
 }
 
 .pageDragOver {
@@ -313,19 +313,21 @@
 
 .genreChip,
 .genreChipActive {
-  padding: 0.3rem 0.65rem;
+  padding: 0.5rem 0.95rem;
   border-radius: 999px;
-  border: 1px solid rgba(120, 180, 255, 0.2);
+  border: 1px solid rgba(120, 180, 255, 0.22);
   background: rgba(12, 18, 30, 0.85);
   color: #b8c8e6;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 
 .genreChipActive {
-  background: rgba(80, 130, 200, 0.35);
-  border-color: rgba(120, 180, 255, 0.45);
+  background: rgba(80, 130, 200, 0.45);
+  border-color: rgba(140, 195, 255, 0.75);
   color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(140, 195, 255, 0.2);
 }
 
 .clearGenresBtn {
@@ -340,18 +342,21 @@
 
 .filterBtn,
 .filterActive {
-  padding: 0.35rem 0.7rem;
+  padding: 0.5rem 0.95rem;
   border-radius: 999px;
-  border: 1px solid rgba(120, 180, 255, 0.2);
+  border: 1px solid rgba(120, 180, 255, 0.22);
   background: transparent;
   color: #b8c8e6;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
 }
 
 .filterActive {
-  background: rgba(60, 120, 200, 0.35);
+  background: rgba(60, 120, 200, 0.45);
+  border-color: rgba(140, 195, 255, 0.75);
   color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(140, 195, 255, 0.2);
 }
 
 .message,
@@ -403,21 +408,10 @@
   border-radius: 999px;
 }
 
-.tagline {
-  color: #9eb6dc !important;
-  font-size: 0.74rem !important;
-  line-height: 1.3 !important;
-  margin-top: 0.2rem !important;
-  margin-bottom: 0 !important;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .card {
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100%;
   border: 1px solid rgba(120, 180, 255, 0.15);
   border-radius: 10px;
@@ -430,11 +424,17 @@
   border-color: rgba(120, 180, 255, 0.32);
 }
 
+/* Round 3: a width-relative aspect-ratio still scaled the cover taller as
+   cards got wider (169px+ at 300px+ card widths) — still roughly half the
+   card. A fixed-height compact banner stays a banner at every breakpoint,
+   and removes the row-to-row height variance a ratio-based band was prone
+   to once real vs. fallback covers mixed on the same virtualized row. */
 .coverWrap {
   position: relative;
-  aspect-ratio: 2 / 3;
+  height: 96px;
   background: #111827;
   flex-shrink: 0;
+  border-bottom: 1px solid rgba(120, 180, 255, 0.12);
 }
 
 .coverWrap img {
@@ -446,37 +446,58 @@
 /* Deterministic-per-title gradient + initial, not a repeated stock image —
    so a catalog full of unresolved artwork doesn't look duplicated. Hue
    values come from trainer-card-fallback-artwork.ts via inline custom
-   properties (CSS modules can't compute per-item values). */
+   properties (CSS modules can't compute per-item values). A faint diagonal
+   stripe texture breaks up the flat-color-block look the owner flagged
+   ("wall of colored placeholders") without adding any per-title asset. */
 .coverFallback {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 1rem;
   text-align: center;
-  background: linear-gradient(
-    145deg,
-    hsl(var(--fallback-hue-a) 42% 20%),
-    hsl(var(--fallback-hue-b) 38% 12%)
-  );
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 2px,
+      transparent 2px,
+      transparent 14px
+    ),
+    linear-gradient(
+      145deg,
+      hsl(var(--fallback-hue-a) 26% 15%),
+      hsl(var(--fallback-hue-b) 22% 8%)
+    );
 }
 
+/* A restrained monogram, not a headline — this is a "no cover art yet"
+   placeholder, and should read as one at a glance rather than as the card's
+   main visual content. No "artwork unavailable" caption underneath: the
+   muted glyph already reads as generic, and a literal error-style label
+   made the whole grid look like a broken/administrative listing. */
 .coverFallbackInitial {
-  font-size: 2.6rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.34);
   line-height: 1;
 }
 
-.coverFallback small {
-  color: rgba(255, 255, 255, 0.4);
+/* Uses data already on the entry (its own category list) instead of a
+   guessed/fetched genre icon — gives the fallback banner a second, more
+   concrete identity signal than a bare letter, per the owner's "use more
+   useful existing data" direction. Quiet by design: it must not compete
+   with the monogram or the presence badge. */
+.coverCategoryTag {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* Single combined presence indicator instead of separate installed/running
@@ -498,12 +519,12 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 0.65rem 0.75rem 0.75rem;
+  padding: 0.85rem 1rem 1rem;
 }
 
 .title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   font-weight: 700;
   line-height: 1.25;
   color: #f2f6ff;
@@ -513,10 +534,14 @@
   overflow: hidden;
 }
 
+/* Single metadata line (categories + cheat/mod-pack count). The old design
+   also rendered a separate flavor-text tagline above this — two lines of
+   metadata for very little added information. Dropped to keep exactly one
+   supporting line per the owner's required card hierarchy. */
 .supportingLine {
-  margin: 0.3rem 0 0;
-  font-size: 0.72rem;
-  color: #8fa3c7;
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: #a3b8dc;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
@@ -532,9 +557,9 @@
 
 .tierBadge {
   display: inline-block;
-  padding: 0.18rem 0.45rem;
+  padding: 0.22rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: capitalize;
   border: 1px solid rgba(140, 170, 210, 0.3);
@@ -557,27 +582,13 @@
   color: #8fa3c7;
 }
 
-/* Deliberately quiet: "scan required" is the expected, normal state for
-   community-tier content, not a warning — it shouldn't compete visually
-   with an actual problem (quarantine/drift), which uses .staleBadge. */
-.communityBadge {
-  display: inline-block;
-  padding: 0.18rem 0.45rem;
-  border: 1px solid rgba(120, 180, 255, 0.25);
-  border-radius: 4px;
-  background: rgba(10, 18, 32, 0.85);
-  color: #a8bcdc;
-  font-size: 0.65rem;
-  font-weight: 500;
-}
-
 /* An actual problem (executable drift or quarantine), not an expected
    incomplete state — kept louder than the tier/community badges on purpose. */
 .staleBadge {
   display: inline-block;
-  padding: 0.18rem 0.45rem;
+  padding: 0.22rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 700;
   background: rgba(92, 30, 15, 0.95);
   color: #ffd9b0;
@@ -593,21 +604,26 @@
   padding-top: 0.55rem;
 }
 
+/* One calm treatment for both states — the label text ("Open Trainer Deck"
+   vs. "Run Community Scan") already carries the truthful distinction. The
+   prior gold-gradient/glow treatment on the scan-required variant read as a
+   warning and made the button the loudest thing on the card. */
 .launchBtn,
 .communityScanBtn {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.65rem;
   border-radius: 6px;
   border: 1px solid rgba(120, 180, 255, 0.3);
   background: rgba(30, 55, 90, 0.9);
   color: #e8f0ff;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
   transition: background 150ms ease, border-color 150ms ease;
 }
 
-.launchBtn:hover {
+.launchBtn:hover,
+.communityScanBtn:hover {
   background: rgba(40, 75, 120, 0.95);
   border-color: rgba(120, 180, 255, 0.5);
 }
@@ -620,23 +636,15 @@
   outline-offset: 2px;
 }
 
-.communityScanBtn {
-  border-color: rgba(245, 158, 11, 0.68);
-  background: linear-gradient(135deg, rgba(92, 58, 12, 0.98), rgba(30, 55, 90, 0.95));
-  color: #fff3c4;
-  font-weight: 800;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.18), 0 0 18px rgba(245, 158, 11, 0.1);
-}
-
 .secondaryBtn {
   width: 100%;
-  padding: 0.4rem;
+  padding: 0.45rem;
   border-radius: 6px;
   border: 1px solid rgba(120, 180, 255, 0.2);
   background: rgba(18, 28, 45, 0.9);
   color: #b8c8e6;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 /* Contributor/YAML/verification actions, tucked behind a native disclosure so
@@ -647,15 +655,38 @@
   margin-top: 0.35rem;
 }
 
+/* A quiet text link, not a bordered button — a second button-shaped element
+   here made the collapsed card read as an admin panel with two controls
+   instead of a game entry with one obvious action. Round 3: the muted color
+   alone read as disabled rather than secondary, so it's brighter now and
+   carries an explicit chevron so it's legible as an interactive disclosure
+   rather than dead text. */
 .moreActions summary {
   cursor: pointer;
   list-style: none;
-  font-size: 0.72rem;
-  color: #8fa3c7;
-  padding: 0.3rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid rgba(120, 180, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9db3d6;
+  padding: 0.3rem 0;
   text-align: center;
+}
+
+.moreActions summary::after {
+  content: '›';
+  font-size: 0.9rem;
+  transition: transform 150ms ease;
+}
+
+.moreActions[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.moreActions summary:hover {
+  color: #dce8ff;
 }
 
 .moreActions summary::-webkit-details-marker {
@@ -664,7 +695,7 @@
 
 .moreActions[open] summary {
   margin-bottom: 0.35rem;
-  color: #b8c8e6;
+  color: #dce8ff;
 }
 
 .moreActions .secondaryBtn {
