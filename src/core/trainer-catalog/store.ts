@@ -45,7 +45,83 @@ function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
   };
 }
 
+// Higher number wins when incoming artwork (steamAppId/coverUrl/headerUrl/
+// iconUrl) conflicts with artwork already stored from a different provider.
+// Bundled/curated sources are authoritative; generic remote-sync scrapes
+// (mrantifun/fling/plitch/remote-listing) are the lowest tier and must never
+// clobber artwork a higher-precedence source already established.
+const ARTWORK_PRECEDENCE: Record<TrainerCatalogEntry['sources'][number]['provider'], number> = {
+  bundled: 100,
+  'solith-hub': 90,
+  'ct-import': 85,
+  user: 80,
+  community: 60,
+  fearless: 50,
+  mrantifun: 50,
+  fling: 50,
+  plitch: 50,
+  'remote-listing': 40,
+};
+
+function maxArtworkPrecedence(sources: TrainerCatalogEntry['sources']): number {
+  return sources.reduce((max, source) => Math.max(max, ARTWORK_PRECEDENCE[source.provider] ?? 0), 0);
+}
+
+function mergeSources(
+  existing: TrainerCatalogEntry['sources'],
+  incoming: TrainerCatalogEntry['sources'],
+): TrainerCatalogEntry['sources'] {
+  const merged = [...existing];
+  for (const incomingSource of incoming) {
+    const index = merged.findIndex((source) => source.provider === incomingSource.provider);
+    if (index === -1) {
+      merged.push(incomingSource);
+    } else {
+      merged[index] = incomingSource;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Resolves one artwork field (steamAppId/coverUrl/headerUrl/iconUrl) against
+ * whatever is already stored. Null/undefined incoming values never erase an
+ * existing value. A non-empty incoming value fills an empty field. A
+ * non-empty incoming value only replaces an existing non-empty value when
+ * its source's artwork precedence is at least as high as the precedence
+ * that already produced the stored value.
+ */
+function resolveArtworkField<T>(
+  existingValue: T | undefined,
+  incomingValue: T | undefined,
+  existingPrecedence: number,
+  incomingPrecedence: number,
+): T | undefined {
+  if (incomingValue == null) return existingValue;
+  if (existingValue == null) return incomingValue;
+  return incomingPrecedence >= existingPrecedence ? incomingValue : existingValue;
+}
+
 export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
+  const existing = getCatalogEntry(entry.catalogGameId);
+
+  const mergedSources = existing ? mergeSources(existing.sources, entry.sources) : entry.sources;
+  const existingPrecedence = existing ? maxArtworkPrecedence(existing.sources) : 0;
+  const incomingPrecedence = maxArtworkPrecedence(entry.sources);
+
+  const steamAppId = existing
+    ? resolveArtworkField(existing.steamAppId, entry.steamAppId, existingPrecedence, incomingPrecedence)
+    : entry.steamAppId;
+  const headerUrl = existing
+    ? resolveArtworkField(existing.headerUrl, entry.headerUrl, existingPrecedence, incomingPrecedence)
+    : entry.headerUrl;
+  const coverUrl = existing
+    ? resolveArtworkField(existing.coverUrl, entry.coverUrl, existingPrecedence, incomingPrecedence)
+    : entry.coverUrl;
+  const iconUrl = existing
+    ? resolveArtworkField(existing.iconUrl, entry.iconUrl, existingPrecedence, incomingPrecedence)
+    : entry.iconUrl;
+
   const searchableText = entry.searchableText || buildSearchableText(entry);
   db.prepare(
     `INSERT INTO trainer_catalog_games (
@@ -71,14 +147,14 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
   ).run(
     entry.catalogGameId,
     entry.displayName,
-    entry.steamAppId ?? null,
+    steamAppId ?? null,
     JSON.stringify(entry.executables),
     JSON.stringify(entry.categories),
-    entry.headerUrl ?? null,
-    entry.coverUrl ?? null,
-    entry.iconUrl ?? null,
+    headerUrl ?? null,
+    coverUrl ?? null,
+    iconUrl ?? null,
     entry.verificationStatus,
-    JSON.stringify(entry.sources),
+    JSON.stringify(mergedSources),
     entry.hasModPack ? 1 : 0,
     entry.modPackId ?? null,
     entry.cheatCount,
