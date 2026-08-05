@@ -164,6 +164,42 @@ describe('card redesign — hierarchy, fallback artwork, and compact status (rou
   });
 });
 
+describe('round 4 — truthful labeling for generic/templated remote-sync entries', () => {
+  test('the card computes isGeneric via the conservative detector, not an inline heuristic', () => {
+    assert.match(PAGE_SOURCE, /import \{ isGenericTemplateEntry \} from '\.\/trainer-catalog-generic-detection\.js';/);
+    assert.match(PAGE_SOURCE, /const isGeneric = isGenericTemplateEntry\(entry\);/);
+  });
+
+  test('generic entries render a truthful "incomplete/community-sourced" supporting line instead of fabricated categories/cheat-count text', () => {
+    assert.match(PAGE_SOURCE, /'Community-sourced · details incomplete'/);
+  });
+
+  test('curated entries (isGeneric === false) keep the original categories/cheat-count supporting line untouched', () => {
+    assert.match(
+      PAGE_SOURCE,
+      /const supportingLine = isGeneric\s*\n\s*\? 'Community-sourced · details incomplete'\s*\n\s*: \[/,
+    );
+  });
+});
+
+describe('round 4 — default ordering uses the pure orderCatalogDefault helper', () => {
+  test('the page imports and calls orderCatalogDefault for the default sort mode, not an inline installed+alpha comparator', () => {
+    assert.match(PAGE_SOURCE, /import \{ orderCatalogDefault \} from '\.\/trainer-catalog-default-order\.js';/);
+    assert.match(PAGE_SOURCE, /orderCatalogDefault\(filteredEntries, installedIds\)/);
+  });
+
+  test('explicit A-Z mode stays a separate, untouched pure alphabetical branch', () => {
+    assert.match(
+      PAGE_SOURCE,
+      /sortMode === 'a-z'\s*\n\s*\? filteredEntries\.slice\(\)\.sort\(\(a, b\) => a\.displayName\.localeCompare\(b\.displayName\)\)/,
+    );
+  });
+
+  test('filters run before ordering — filteredEntries is computed once and shared by both branches', () => {
+    assert.match(PAGE_SOURCE, /const filteredEntries = entries\.filter\(/);
+  });
+});
+
 describe('fallbackArtworkTreatment — deterministic per-title fallback (no guessed/remote artwork)', () => {
   test('same title always produces the same treatment', () => {
     const a = fallbackArtworkTreatment('Elden Ring');

@@ -11,6 +11,8 @@ import { describeCapabilityLanes } from '../../core/definitions/catalog-definiti
 import { COMMUNITY_WARNING_LABEL } from '../../core/trainer-catalog/community-trust.js';
 import { isCommunityScanEntry, tierHint } from './trainer-library-verification-state.js';
 import { fallbackArtworkTreatment } from './trainer-card-fallback-artwork.js';
+import { isGenericTemplateEntry } from './trainer-catalog-generic-detection.js';
+import { orderCatalogDefault } from './trainer-catalog-default-order.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
 import {
@@ -153,12 +155,20 @@ export function CatalogCard({
   const fallback = fallbackArtworkTreatment(entry.displayName);
   const isStale = healthStatus === 'stale' || healthStatus === 'quarantined';
   const capabilitySummary = entry.capabilities ? describeCapabilityLanes(entry.capabilities) : undefined;
-  const supportingLine = [
-    entry.categories.slice(0, 2).join(' · ') || null,
-    entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only',
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // Remote-sync entries with no curated reference all get the exact same
+  // fallback categories/cheat-count template (see remote-sync.ts) — showing
+  // that as if it were real per-game data is what made the catalog look
+  // like a wall of identical cards. Generic entries get a truthful label
+  // instead; curated entries are completely unaffected.
+  const isGeneric = isGenericTemplateEntry(entry);
+  const supportingLine = isGeneric
+    ? 'Community-sourced · details incomplete'
+    : [
+        entry.categories.slice(0, 2).join(' · ') || null,
+        entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only',
+      ]
+        .filter(Boolean)
+        .join(' · ');
   const trustSuffix = [
     trust?.positive ? `${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : null,
     trust?.quarantined ? 'needs re-verify' : null,
@@ -951,23 +961,20 @@ export default function TrainerLibraryPage({
     );
   };
 
-  const visible = entries
-    .filter((e) => {
-      if (installedOnly && !installedIds.has(e.catalogGameId)) return false;
-      if (runningOnly && !runningIds.has(e.catalogGameId)) return false;
-      if (needsReverifyOnly && !entryNeedsReverify(e.catalogGameId)) return false;
-      return true;
-    })
-    .slice()
-    .sort((a, b) => {
-      if (sortMode === 'a-z') {
-        return a.displayName.localeCompare(b.displayName);
-      }
-      const aInstalled = installedIds.has(a.catalogGameId) ? 1 : 0;
-      const bInstalled = installedIds.has(b.catalogGameId) ? 1 : 0;
-      if (aInstalled !== bInstalled) return bInstalled - aInstalled;
-      return a.displayName.localeCompare(b.displayName);
-    });
+  const filteredEntries = entries.filter((e) => {
+    if (installedOnly && !installedIds.has(e.catalogGameId)) return false;
+    if (runningOnly && !runningIds.has(e.catalogGameId)) return false;
+    if (needsReverifyOnly && !entryNeedsReverify(e.catalogGameId)) return false;
+    return true;
+  });
+  // Explicit A-Z stays pure alphabetical, untouched by tiering/interleaving.
+  // The default ("installed first") mode uses orderCatalogDefault, which
+  // breaks up same-provider/same-initial runs among generic entries instead
+  // of letting them cluster — see trainer-catalog-default-order.ts.
+  const visible =
+    sortMode === 'a-z'
+      ? filteredEntries.slice().sort((a, b) => a.displayName.localeCompare(b.displayName))
+      : orderCatalogDefault(filteredEntries, installedIds);
 
   const activeFilterSummary =
     [
