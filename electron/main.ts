@@ -325,6 +325,11 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    // The trainer overlay is hidden (not destroyed) during normal use so it
+    // reopens instantly. A hidden BrowserWindow still counts toward Electron's
+    // window-all-closed check, so without this the app would never reach
+    // app.quit() after the overlay had ever been shown.
+    destroyTrainerOverlay();
   });
 
   // Wire per-window lifecycle (idempotent — WeakSet guard inside wiring).

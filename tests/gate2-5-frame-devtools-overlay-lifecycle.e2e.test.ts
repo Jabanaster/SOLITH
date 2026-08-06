@@ -576,3 +576,65 @@ test('Phase 3 addendum — overlay cannot reach freeze-stop or freeze-status (in
     await killFixture(f);
   }
 });
+
+// ── Phase 9: overlay-hidden window must not block full app quit ────────────
+test('Phase 9 — closing the main window after the trainer overlay was shown and hidden reaches full app quit (no zombie process)', async () => {
+  let ctx: AppCtx | null = null;
+  let proc: ReturnType<ElectronApplication['process']> | null = null;
+  try {
+    ctx = await launchApp('p9');
+
+    // Show, then hide, the real trainer overlay via the production toggle —
+    // toggleTrainerOverlay()'s hide path calls hideTrainerOverlay(), which
+    // calls BrowserWindow.hide() (not .destroy()). Reproduces the exact
+    // reported sequence: overlay opened once, then hidden, then main window
+    // closed.
+    await ctx.win.evaluate(async () => (window as any).electronAPI.trainerOverlayToggle?.());
+    await sleep(500);
+    const overlayShown = ctx.app.windows().find((w) => w !== ctx!.win) ?? null;
+    expect(overlayShown, 'the real trainer overlay window must be obtainable via the production toggle').not.toBeNull();
+
+    await ctx.win.evaluate(async () => (window as any).electronAPI.trainerOverlayHide?.());
+    await sleep(500);
+
+    proc = ctx.app.process();
+    const exited = new Promise<number | null>((resolve) => {
+      proc.once('exit', (code) => resolve(code));
+    });
+
+    // Close the main window the way a user would (the window's own close
+    // control), not ElectronApplication.close() — that would force-terminate
+    // the app regardless of whether the app's own quit logic ever runs, which
+    // would hide the exact bug this test exists to catch. Closing the
+    // Playwright Page bound to the main BrowserWindow closes that window
+    // specifically (unambiguous — no title/URL matching needed, and it can't
+    // accidentally target the overlay). Fired without awaiting: once the main
+    // process starts tearing down mid-call, the CDP response may never
+    // arrive, and only the process actually exiting matters here.
+    void ctx.win.close().catch(() => { /* expected once the main process is gone */ });
+
+    const result = await Promise.race([
+      exited,
+      sleep(15_000).then(() => 'timeout' as const),
+    ]);
+
+    expect(
+      result,
+      'the app process must exit on its own once the main window closes, even though the trainer overlay was shown and hidden earlier in the session',
+    ).not.toBe('timeout');
+  } finally {
+    if (ctx) {
+      // The process is almost certainly already gone at this point (that's
+      // what the test just proved) — only ask ElectronApplication to close
+      // it if it somehow isn't. Reuse the ChildProcess handle captured
+      // earlier rather than calling ctx.app.process() again here — once the
+      // main process is gone, re-querying the (now-disconnected)
+      // ElectronApplication for it throws instead of returning cleanly.
+      if (proc && proc.exitCode === null) {
+        await ctx.app.close().catch(() => {});
+      }
+      try { fs.rmSync(ctx.userData, { recursive: true, force: true }); } catch { /* best-effort */ }
+      try { fs.rmSync(ctx.appData, { recursive: true, force: true }); } catch { /* best-effort */ }
+    }
+  }
+});
