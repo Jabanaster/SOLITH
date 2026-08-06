@@ -172,6 +172,177 @@ function migrateInstalledGameIdentity(): void {
   console.info(`[database] installed-game identity migration ${boundedReport.slice(0, 512)}`);
 }
 
+export const BG3_ORPHAN_RECONCILIATION_ID = 'bg3-html-entity-orphan-v1';
+
+const BG3_CANONICAL_CATALOG_GAME_ID = 'baldur-s-gate-3';
+const BG3_CANONICAL_STEAM_APP_ID = 1086940;
+const BG3_ORPHAN_CATALOG_GAME_ID = 'baldur-x27-s-gate-3';
+const BG3_ORPHAN_DISPLAY_NAME = "Baldur&#x27;s Gate 3";
+const BG3_ORPHAN_MOD_PACK_ID = 'plitch-baldur-x27-s-gate-3';
+
+export type Bg3OrphanReconciliationResult =
+  | { status: 'applied'; reconciliationId: string }
+  | { status: 'already-clean' }
+  | { status: 'blocked'; reason: string };
+
+let bg3OrphanReconciliationResult: Bg3OrphanReconciliationResult | null = null;
+
+export function getBg3OrphanReconciliationResult(): Bg3OrphanReconciliationResult | null {
+  return bg3OrphanReconciliationResult;
+}
+
+function queryOneRaw(sql: string, params: unknown[] = []): Record<string, unknown> | null {
+  const stmt = rawDb!.prepare(sql);
+  stmt.bind(params);
+  const row = stmt.step() ? stmt.getAsObject() : null;
+  stmt.free();
+  return row;
+}
+
+function queryAllRaw(sql: string, params: unknown[] = []): Record<string, unknown>[] {
+  const stmt = rawDb!.prepare(sql);
+  stmt.bind(params);
+  const rows: Record<string, unknown>[] = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+/**
+ * Narrow, deterministic reconciliation for the confirmed Baldur's Gate 3
+ * HTML-entity-orphan duplicate (catalogGameId = baldur-x27-s-gate-3), found
+ * by live read-only database inspection alongside the canonical
+ * baldur-s-gate-3 row (steamAppId 1086940). Every condition below must hold
+ * before any row is touched; any mismatch blocks with an explicit reason and
+ * leaves the database unchanged. Scoped to this exact orphan only — not a
+ * general HTML-entity cleanup.
+ */
+export function reconcileBg3Orphan(): void {
+  const orphanCatalogRow = queryOneRaw(
+    'SELECT * FROM trainer_catalog_games WHERE catalogGameId = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+
+  if (!orphanCatalogRow) {
+    bg3OrphanReconciliationResult = { status: 'already-clean' };
+    return;
+  }
+
+  const canonicalRow = queryOneRaw(
+    'SELECT catalogGameId, steamAppId FROM trainer_catalog_games WHERE catalogGameId = ?',
+    [BG3_CANONICAL_CATALOG_GAME_ID],
+  );
+  if (!canonicalRow) {
+    bg3OrphanReconciliationResult = { status: 'blocked', reason: 'canonical baldur-s-gate-3 row is missing' };
+    return;
+  }
+  if (Number(canonicalRow.steamAppId) !== BG3_CANONICAL_STEAM_APP_ID) {
+    bg3OrphanReconciliationResult = {
+      status: 'blocked',
+      reason: `canonical row steamAppId is ${String(canonicalRow.steamAppId)}, expected ${BG3_CANONICAL_STEAM_APP_ID}`,
+    };
+    return;
+  }
+
+  if (orphanCatalogRow.steamAppId !== null && orphanCatalogRow.steamAppId !== undefined) {
+    bg3OrphanReconciliationResult = {
+      status: 'blocked',
+      reason: `orphan row steamAppId is ${String(orphanCatalogRow.steamAppId)}, expected NULL`,
+    };
+    return;
+  }
+
+  if (String(orphanCatalogRow.displayName) !== BG3_ORPHAN_DISPLAY_NAME) {
+    bg3OrphanReconciliationResult = {
+      status: 'blocked',
+      reason: `orphan row displayName is "${String(orphanCatalogRow.displayName)}", expected "${BG3_ORPHAN_DISPLAY_NAME}"`,
+    };
+    return;
+  }
+
+  const feedbackCount = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM definition_feedback WHERE catalogGameId = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+  if (Number(feedbackCount?.cnt ?? 0) > 0) {
+    bg3OrphanReconciliationResult = { status: 'blocked', reason: 'orphan has definition_feedback references' };
+    return;
+  }
+
+  const queueCount = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM definition_update_queue WHERE catalogGameId = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+  if (Number(queueCount?.cnt ?? 0) > 0) {
+    bg3OrphanReconciliationResult = { status: 'blocked', reason: 'orphan has definition_update_queue references' };
+    return;
+  }
+
+  const modPackRows = queryAllRaw(
+    'SELECT * FROM trainer_mod_packs WHERE catalogGameId = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+  if (modPackRows.length !== 1 || String(modPackRows[0].packId) !== BG3_ORPHAN_MOD_PACK_ID) {
+    bg3OrphanReconciliationResult = {
+      status: 'blocked',
+      reason: `unexpected trainer_mod_packs references for orphan (found ${modPackRows.length} row(s))`,
+    };
+    return;
+  }
+
+  const installedRefs = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM installed_games WHERE catalog_game_id = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+  if (Number(installedRefs?.cnt ?? 0) > 0) {
+    bg3OrphanReconciliationResult = { status: 'blocked', reason: 'orphan has installed_games references' };
+    return;
+  }
+
+  const healthRefs = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM trainer_health WHERE catalog_game_id = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+  if (Number(healthRefs?.cnt ?? 0) > 0) {
+    bg3OrphanReconciliationResult = { status: 'blocked', reason: 'orphan has trainer_health references' };
+    return;
+  }
+
+  const demandRefs = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM catalog_demand WHERE catalog_game_id = ?',
+    [BG3_ORPHAN_CATALOG_GAME_ID],
+  );
+  if (Number(demandRefs?.cnt ?? 0) > 0) {
+    bg3OrphanReconciliationResult = { status: 'blocked', reason: 'orphan has catalog_demand references' };
+    return;
+  }
+
+  const modPackRow = modPackRows[0];
+
+  try {
+    rawDb!.run('BEGIN TRANSACTION');
+    rawDb!.run(
+      `INSERT INTO catalog_reconciliation_log (
+         reconciliationId, catalogGameId, removedCatalogRowJson, removedModPackRowJson
+       ) VALUES (?, ?, ?, ?)`,
+      [
+        BG3_ORPHAN_RECONCILIATION_ID,
+        BG3_ORPHAN_CATALOG_GAME_ID,
+        JSON.stringify(orphanCatalogRow),
+        JSON.stringify(modPackRow),
+      ],
+    );
+    rawDb!.run('DELETE FROM trainer_mod_packs WHERE packId = ?', [BG3_ORPHAN_MOD_PACK_ID]);
+    rawDb!.run('DELETE FROM trainer_catalog_games WHERE catalogGameId = ?', [BG3_ORPHAN_CATALOG_GAME_ID]);
+    rawDb!.run('COMMIT');
+  } catch (error) {
+    rawDb!.run('ROLLBACK');
+    throw error;
+  }
+
+  bg3OrphanReconciliationResult = { status: 'applied', reconciliationId: BG3_ORPHAN_RECONCILIATION_ID };
+}
+
 function checkTransaction(sql: string) {
   const upper = sql.trim().toUpperCase();
   if (upper.startsWith('BEGIN') || upper.startsWith('SAVEPOINT')) {
@@ -1084,6 +1255,19 @@ function applySchema(): void {
       [c.id, c.provider, c.endpoint, c.model, c.timeout]
     );
   });
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_reconciliation_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reconciliationId TEXT NOT NULL,
+      catalogGameId TEXT NOT NULL,
+      removedCatalogRowJson TEXT NOT NULL,
+      removedModPackRowJson TEXT,
+      appliedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  reconcileBg3Orphan();
 }
 
 async function initDatabaseAtPath(

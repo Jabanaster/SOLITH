@@ -4,7 +4,7 @@ import type { TrainerCatalogEntry } from './types.js';
 export const CURATED_GAME_TAGLINES: Record<string, string> = {
   palworld: 'Open-world survival crafting with creature companions.',
   'stardew-valley': 'Farming life sim with mines, relationships, and seasons.',
-  'baldurs-gate-3': 'Party-based CRPG with tactical turn-based combat.',
+  'baldur-s-gate-3': 'Party-based CRPG with tactical turn-based combat.',
   'cyberpunk-2077': 'Open-world RPG in Night City.',
   'elden-ring': 'Open-world action RPG from FromSoftware.',
   'red-dead-redemption-2': 'Western open-world story and exploration.',

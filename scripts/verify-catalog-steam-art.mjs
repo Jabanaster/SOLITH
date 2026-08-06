@@ -50,9 +50,13 @@ async function main() {
   }
 
   const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
-  const games = Array.isArray(seed.games) ? seed.games : [];
   const issues = [];
   const byId = new Map();
+
+  if (!Array.isArray(seed.games)) {
+    issues.push({ type: 'missing_games_array', received: typeof seed.games });
+  }
+  const games = Array.isArray(seed.games) ? seed.games : [];
 
   for (const game of games) {
     const { name, steamAppId, coverUrl, headerUrl, iconUrl } = game;

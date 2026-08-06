@@ -133,6 +133,15 @@ describe('seed artwork identity verifier', () => {
     });
   }
 
+  function verifyRawSeed(seed: unknown) {
+    const seedPath = path.join(fixtureRoot, `seed-${Math.random().toString(16).slice(2)}.json`);
+    writeFileSync(seedPath, JSON.stringify(seed), 'utf8');
+    return spawnSync(nodeExe, [verifier, '--seed', seedPath], {
+      cwd: path.resolve('.'),
+      encoding: 'utf8',
+    });
+  }
+
   test('accepts a valid Steam ID and unresolved entries with absent, null, or zero IDs', () => {
     const result = verify([
       { name: 'Palworld', steamAppId: 1623730 },
@@ -156,5 +165,21 @@ describe('seed artwork identity verifier', () => {
     }]);
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /synthetic_fake_steam_url/);
+  });
+
+  test('rejects a seed with a missing games property instead of silently passing zero games', () => {
+    const result = verifyRawSeed({ version: 1 });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /missing_games_array/);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.pass, false);
+  });
+
+  test('rejects a seed with a non-array games value instead of silently passing zero games', () => {
+    const result = verifyRawSeed({ version: 1, games: 'not-an-array' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /missing_games_array/);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.pass, false);
   });
 });

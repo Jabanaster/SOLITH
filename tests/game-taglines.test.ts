@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getCatalogTagline, getCuratedTagline } from '../src/core/trainer-catalog/game-taglines.ts';
+import { slugifyGameId } from '../src/core/trainer-catalog/types.ts';
 import type { TrainerCatalogEntry } from '../src/core/trainer-catalog/types.ts';
 
 function entry(partial: Partial<TrainerCatalogEntry> & Pick<TrainerCatalogEntry, 'catalogGameId' | 'displayName'>): TrainerCatalogEntry {
@@ -52,5 +53,22 @@ describe('getCuratedTagline — curated-only, no synthesized fallback', () => {
       }),
     );
     assert.equal(tagline, undefined);
+  });
+});
+
+describe('curated tagline key matches the real catalogGameId', () => {
+  test("Baldur's Gate 3's canonical catalogGameId retrieves its curated tagline", () => {
+    // catalogGameId is always produced by slugifyGameId(displayName) — the
+    // curated key must match that, not a hand-typed guess. This regression
+    // guards the confirmed defect where the key was 'baldurs-gate-3' but
+    // slugifyGameId("Baldur's Gate 3") produces 'baldur-s-gate-3', so the
+    // curated tagline silently never matched.
+    const catalogGameId = slugifyGameId("Baldur's Gate 3");
+    assert.equal(catalogGameId, 'baldur-s-gate-3');
+
+    const tagline = getCuratedTagline(
+      entry({ catalogGameId, displayName: "Baldur's Gate 3", steamAppId: 1086940 }),
+    );
+    assert.equal(tagline, 'Party-based CRPG with tactical turn-based combat.');
   });
 });
