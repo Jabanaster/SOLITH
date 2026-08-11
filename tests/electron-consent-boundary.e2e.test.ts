@@ -17,7 +17,19 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname ?? '.', '..');
-const MAIN_BUNDLE = path.join(ROOT, 'dist-electron', 'main.js');
+const MAIN_BUNDLE = path.join(ROOT, 'dist-electron-test', 'main.js');
+const TEST_MANIFEST = path.join(ROOT, 'dist-electron-test', 'solith-build-manifest.json');
+
+if (!fs.existsSync(MAIN_BUNDLE)) {
+  throw new Error(`[Consent E2E] Required test bundle dist-electron-test/main.js is missing. Run 'npm run build:electron:test' before running this suite.`);
+}
+if (!fs.existsSync(TEST_MANIFEST)) {
+  throw new Error(`[Consent E2E] Required test manifest dist-electron-test/solith-build-manifest.json is missing.`);
+}
+const manifestData = JSON.parse(fs.readFileSync(TEST_MANIFEST, 'utf8'));
+if (manifestData.buildMode !== 'test' || manifestData.consentOverrideEnabled !== true) {
+  throw new Error(`[Consent E2E] Invalid test manifest mode '${manifestData.buildMode}'. Expected buildMode 'test' with consentOverrideEnabled true.`);
+}
 
 type LaunchCtx = {
   app: ElectronApplication;

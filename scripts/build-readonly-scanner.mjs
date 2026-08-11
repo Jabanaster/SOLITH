@@ -5,10 +5,15 @@ import { spawnSync } from 'node:child_process';
 
 const root = resolve(import.meta.dirname, '..');
 const crateDir = join(root, 'native', 'solith-readonly-scanner');
-const outDir = join(root, 'dist-electron');
+const targetArg = process.argv[2] ?? 'dist-electron';
+if (targetArg !== 'dist-electron' && targetArg !== 'dist-electron-test') {
+  console.error(`[Solith Scanner] Invalid output directory "${targetArg}". Must be "dist-electron" or "dist-electron-test".`);
+  process.exit(1);
+}
+const outDir = join(root, targetArg);
 const exeName = process.platform === 'win32' ? 'solith-readonly-scanner.exe' : 'solith-readonly-scanner';
 const builtExe = join(crateDir, 'target', 'release', exeName);
-const targetExe = join(outDir, 'solith-readonly-scanner.exe');
+const targetExe = join(outDir, exeName);
 
 if (process.platform !== 'win32') {
   console.log('[Solith Scanner] Skipping native scanner build: Windows-only helper.');

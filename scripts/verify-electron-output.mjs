@@ -90,8 +90,8 @@ check('headless-verification-worker.js does not import a test runner', !testRunn
 console.log('\n── Security checks');
 check('preload.js uses contextBridge', preloadText.includes('contextBridge'));
 check('preload.js uses exposeInMainWorld', preloadText.includes('exposeInMainWorld'));
-check('main.js has nodeIntegration: false', mainText.includes('nodeIntegration: false') || mainText.includes('nodeIntegration:false'));
-check('main.js has contextIsolation: true', mainText.includes('contextIsolation: true') || mainText.includes('contextIsolation:true'));
+check('main.js has nodeIntegration: false', mainText.includes('nodeIntegration: false') || mainText.includes('nodeIntegration:false') || mainText.includes('nodeIntegration: !1') || mainText.includes('nodeIntegration:!1'));
+check('main.js has contextIsolation: true', mainText.includes('contextIsolation: true') || mainText.includes('contextIsolation:true') || mainText.includes('contextIsolation: !0') || mainText.includes('contextIsolation:!0'));
 check('main.js has single-instance lock', mainText.includes('requestSingleInstanceLock'));
 
 // ── 6. Bundle size sanity ────────────────────────────────────────────────────
