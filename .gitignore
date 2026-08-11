@@ -17,6 +17,7 @@ yarn-error.log*
 # ── Build outputs ────────────────────────────────────────────────────────────
 dist/
 dist-electron/
+dist-electron-test/
 out/
 build/
 *.tsbuildinfo

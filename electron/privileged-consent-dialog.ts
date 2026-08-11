@@ -42,14 +42,18 @@ export function setPrivilegedConsentDialogForTests(impl: DialogImpl | null): voi
   dialogImpl = impl;
 }
 
+declare const __SOLITH_ENABLE_TEST_CONSENT_OVERRIDE__: boolean;
+
 function resolveDialogImpl(): DialogImpl {
   if (dialogImpl) return dialogImpl;
-  const mode = (process.env.SOLITH_PRIVILEGED_CONSENT ?? '').trim().toLowerCase();
-  if (mode === 'auto-approve') {
-    return async () => 'approve';
-  }
-  if (mode === 'auto-deny') {
-    return async () => 'deny';
+  if (__SOLITH_ENABLE_TEST_CONSENT_OVERRIDE__) {
+    const mode = (process.env.SOLITH_PRIVILEGED_CONSENT ?? '').trim().toLowerCase();
+    if (mode === 'auto-approve') {
+      return async () => 'approve';
+    }
+    if (mode === 'auto-deny') {
+      return async () => 'deny';
+    }
   }
   return async ({ parent, summary }) => {
     const expires =
