@@ -140,6 +140,27 @@ export const MemoryFeatureResolutionV1Schema = z.object({
   pointerChain: z.array(z.number().int().nonnegative()).max(32).optional(),
 });
 
+/**
+ * Runtime structural guard for a feature's `resolution` field. The TypeScript
+ * type says this field is always present and well-formed, but that is only
+ * guaranteed for data written through parseSolithDefinitionV1/.parse() — a
+ * persisted, legacy, or manually constructed record may not satisfy it.
+ * Callers reading `resolution` off a definition loaded from storage must use
+ * this guard rather than assuming the interface's static shape.
+ */
+export function isValidMemoryFeatureResolution(
+  value: unknown,
+): value is MemoryFeatureResolutionV1 {
+  return MemoryFeatureResolutionV1Schema.safeParse(value).success;
+}
+
+// Cast to the hand-authored output type: this project's tsconfig.electron.json
+// runs with strictNullChecks disabled, under which zod v4's own optionality
+// inference (`undefined extends Output ? optional : required`) collapses every
+// non-optional object property to optional, since `undefined` is a subtype of
+// every type when strictNullChecks is off. Every field below is still enforced
+// as required at runtime by the schema itself (`.parse()` throws if absent);
+// this only corrects the static type to match that real, enforced contract.
 export const MemoryFeatureV1Schema = z.object({
   id: z.string().min(1).max(128),
   name: z.string().min(1).max(200),
@@ -149,7 +170,7 @@ export const MemoryFeatureV1Schema = z.object({
   defaultValue: z.union([z.number().finite(), z.boolean()]),
   resolution: MemoryFeatureResolutionV1Schema,
   certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
-});
+}) as unknown as z.ZodType<MemoryFeatureV1>;
 
 export const SaveFieldFeatureV1Schema = z.object({
   id: z.string().min(1).max(128),
@@ -212,7 +233,7 @@ export const SolithDefinitionV1Schema = z.object({
   certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
   memoryFeatures: z.array(MemoryFeatureV1Schema).max(500).optional(),
   saveEditor: SaveEditorV1Schema.optional(),
-});
+}) as unknown as z.ZodType<SolithDefinitionV1>;
 
 export function parseSolithDefinitionV1(input: unknown): SolithDefinitionV1 {
   return SolithDefinitionV1Schema.parse(input);

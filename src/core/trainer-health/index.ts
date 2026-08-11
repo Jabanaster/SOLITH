@@ -5,7 +5,7 @@ import { loadCatalogDefinition } from '../definitions/load-catalog-definition.js
 import { getCatalogEntry } from '../trainer-catalog/store.js';
 import { isDefinitionQuarantined } from '../trainer-catalog/definition-quarantine.js';
 import { listInstalledGames } from '../install-discovery/store.js';
-import { validateSolithDefinitionV1 } from '../definitions/schema.v1.js';
+import { isValidMemoryFeatureResolution, validateSolithDefinitionV1 } from '../definitions/schema.v1.js';
 
 export type TrainerHealthStatus =
   | 'working'
@@ -171,8 +171,14 @@ export function runOfflineCertify(catalogGameId: string): OfflineCertifyResult {
   const resolutionOk =
     features.length === 0 ||
     features.every((f) => {
-      const r = f.resolution ?? {};
       if (f.type === 'scan_unknown' || f.type === 'scan_first') return true;
+      // `resolution` is required by the MemoryFeatureV1 interface, but
+      // persisted/legacy/malformed payloads are not guaranteed to satisfy
+      // that shape at runtime — validate explicitly instead of trusting the
+      // static type, and treat an invalid/missing resolution as incomplete
+      // rather than throwing.
+      const r: unknown = f.resolution;
+      if (!isValidMemoryFeatureResolution(r)) return false;
       return (
         Boolean(r.moduleName) &&
         (Boolean(r.baseOffset) || Boolean(r.signature) || (r.pointerChain?.length ?? 0) > 0)
