@@ -284,8 +284,9 @@ export async function confirmInjectorLaunch(
   }
 
   const consent = consumeWriteConsent(input.consentToken, input.consentBinding);
-  if (!consent.ok) {
-    denyConfirm(`consent_denied:${consent.reason}`, {
+  if (consent.ok !== true) {
+    const reason = (consent as { reason?: string }).reason ?? 'invalid_consent';
+    denyConfirm(`consent_denied:${reason}`, {
       proposalId: proposal.proposalId,
       exePath: proposal.exePath,
     });

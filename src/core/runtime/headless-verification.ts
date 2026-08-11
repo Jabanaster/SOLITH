@@ -267,8 +267,11 @@ async function verifyPipelinePointersWithL2Helper(
           timeoutMs: input.timeoutMs,
           scannerPath: input.scannerPath,
         });
-        if (!response.ok) {
-          throw new Error(`${response.error.code}: ${response.error.message}`);
+        if (response.ok !== true) {
+          const err = (response as { error?: { code?: string; message?: string } }).error;
+          const code = err?.code ?? 'SCANNER_ERROR';
+          const message = err?.message ?? 'Scanner process failed or returned a malformed response.';
+          throw new Error(`${code}: ${message}`);
         }
         return response.pointerResults;
       })();
