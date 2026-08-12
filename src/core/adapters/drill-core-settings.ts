@@ -89,7 +89,7 @@ function strictParseObject(raw: string): { ok: true; data: any } | { ok: false; 
  */
 export function findMasterVolumeToken(raw: string): { ok: true; token: MasterVolumeToken } | { ok: false; error: string } {
   const parsed = strictParseObject(raw);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
+  if (parsed.ok !== true) return { ok: false, error: parsed.error };
 
   if (!Object.prototype.hasOwnProperty.call(parsed.data, DRILL_CORE_TARGET)) {
     return { ok: false, error: `Top-level "${DRILL_CORE_TARGET}" key not found.` };
@@ -160,10 +160,10 @@ export function applyMasterVolume(
   expectedOldValue?: number
 ): ApplyMasterVolumeResult {
   const valueCheck = validateMasterVolume(newValue);
-  if (!valueCheck.ok) return { success: false, error: valueCheck.error };
+  if (valueCheck.ok !== true) return { success: false, error: valueCheck.error };
 
   const found = findMasterVolumeToken(raw);
-  if (!found.ok) return { success: false, error: found.error };
+  if (found.ok !== true) return { success: false, error: found.error };
   const token = found.token;
 
   if (expectedOldValue !== undefined && token.value !== expectedOldValue) {
@@ -222,7 +222,7 @@ export class DrillCoreSettingsAdapter implements TrainerAdapter {
       }
       const raw = fs.readFileSync(filePath, 'utf-8');
       const found = findMasterVolumeToken(raw);
-      if (!found.ok) return { success: false, value: null, error: found.error };
+      if (found.ok !== true) return { success: false, value: null, error: found.error };
       return { success: true, value: found.token.value };
     } catch (e) {
       return { success: false, value: null, error: String(e) };
@@ -251,7 +251,7 @@ export class DrillCoreSettingsAdapter implements TrainerAdapter {
       }
       const raw = fs.readFileSync(filePath, 'utf-8');
       const current = findMasterVolumeToken(raw);
-      if (!current.ok) return { success: false, content: '', error: current.error };
+      if (current.ok !== true) return { success: false, content: '', error: current.error };
 
       const result = applyMasterVolume(raw, Number(newValue), current.token.value);
       if (!result.success || result.content === undefined) {
@@ -268,7 +268,7 @@ export class DrillCoreSettingsAdapter implements TrainerAdapter {
 
   async validateContent(content: string, _filePath: string): Promise<ValidationResult> {
     const parsed = strictParseObject(content);
-    if (!parsed.ok) return { valid: false, error: parsed.error };
+    if (parsed.ok !== true) return { valid: false, error: parsed.error };
     return { valid: true };
   }
 
