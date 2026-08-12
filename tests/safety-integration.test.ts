@@ -498,39 +498,113 @@ describe('Solith Safety & Lifecycle Hardening Tests', () => {
     }
   });
 
-  test('Candidate 1B: Fail-closed discriminant guard rejects malformed ok payloads in confirmInjectorLaunch', async () => {
-    const { confirmInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
+  test('Candidate 1B: Fail-closed discriminant guard rejects malformed consent payloads in confirmInjectorLaunch', async () => {
+    const { proposeInjectorLaunch, confirmInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
+    const { upsertHelperManifestEntry, relativeHelperPath } = await import('../src/core/in-process-script/helper-manifest.js');
+    const { createHash } = await import('node:crypto');
 
-    // Injector launch with unknown proposal or malformed consent must deny launch
-    await assert.rejects(
-      async () => {
-        await confirmInjectorLaunch({
-          proposalId: 'non-existent-proposal-id',
-          consentToken: 'invalid-token',
-        } as any);
-      },
-      (err: Error) => err.message.includes('Unknown injector launch proposal.'),
-    );
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-inj-test-'));
+    const helpersRoot = path.join(tmpDir, 'helpers');
+    fs.mkdirSync(helpersRoot, { recursive: true });
+    const exePath = path.join(helpersRoot, 'helper.exe');
+    fs.writeFileSync(exePath, 'MZ-test');
+    upsertHelperManifestEntry(helpersRoot, {
+      relativePath: relativeHelperPath(helpersRoot, exePath),
+      sha256: createHash('sha256').update('MZ-test').digest('hex'),
+      registeredAt: new Date().toISOString(),
+    });
+
+    try {
+      const gate = { featureEnabled: true, userConfirmedOffline: true, userApprovedAction: true, executableName: 'CrimsonDesert.exe' };
+      const proposal = proposeInjectorLaunch({
+        exePath,
+        helpersRoot,
+        attachedExecutableName: 'CrimsonDesert.exe',
+        attachedPid: 1234,
+        gate,
+      });
+
+      // Confirm with unissued/malformed token -> consumeWriteConsent returns { ok: false } -> confirmInjectorLaunch hits consent.ok !== true guard and denies
+      await assert.rejects(
+        async () => {
+          await confirmInjectorLaunch({
+            proposalId: proposal.proposalId,
+            attachedExecutableName: 'CrimsonDesert.exe',
+            attachedPid: 1234,
+            helpersRoot,
+            verifyLiveIdentity: () => null,
+            consentToken: 'unissued-malformed-token-id',
+            consentBinding: {} as any,
+            gate,
+            remoteConnections: { availability: 'available', remoteConnectionCount: 0, observedAt: new Date().toISOString() },
+          });
+        },
+        (err: Error) => err.message.includes('consent_denied'),
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
-  test('Candidate 1B: Fail-closed discriminant guard handles malformed ok in MemoryManager', async () => {
+  test('Candidate 1B: Fail-closed discriminant guard handles missing/null/non-boolean ok in MemoryManager snapshot', async () => {
     const { MemoryManager } = await import('../src/core/live-memory/memory-manager.js');
-    const mm = new MemoryManager();
     const confirm = { success: true, manifest: { target: { dataType: 'int32', address: 0x100 } } } as any;
 
-    // mock session with isOfflineConfirmed and confirmWrite, audit, and emitSnapshot returning malformed ok: undefined
-    (mm as any).session = {
-      isOfflineConfirmed: () => true,
-      confirmWrite: async () => confirm,
-    };
-    (mm as any).audit = { append: () => {} };
-    (mm as any).emitSnapshot = () => ({ ok: undefined, error: null });
-    const res = await mm.confirmWrite('prop-1', { featureId: 'f1', userApproved: true });
-    assert.strictEqual(res.snapshotError, 'snapshot_failed');
+    const malformedOkValues = [undefined, null, 0, 'false', false];
+
+    for (const okVal of malformedOkValues) {
+      const mm = new MemoryManager();
+      (mm as any).session = {
+        isOfflineConfirmed: () => true,
+        confirmWrite: async () => confirm,
+      };
+      (mm as any).audit = { append: () => {} };
+      (mm as any).emitSnapshot = () => ({ ok: okVal, error: null });
+      const res = await mm.confirmWrite('prop-1', { featureId: 'f1', userApproved: true });
+      assert.strictEqual(res.snapshotError, 'snapshot_failed', `ok value ${String(okVal)} must fail closed to snapshot_failed`);
+    }
   });
 
-  test('Candidate 1B: Fail-closed discriminant guard handles malformed ok in runHeadlessVerificationJob', async () => {
+  test('Candidate 1B: Fail-closed discriminant guard handles malformed response in runHeadlessVerificationJob and runReadOnlyScannerPointerL2', async () => {
     const { runHeadlessVerificationJob } = await import('../src/core/runtime/headless-verification.js');
+    const { runReadOnlyScannerPointerL2 } = await import('../src/core/runtime/readonly-scanner-helper.js');
+    const { Readable, Writable } = await import('node:stream');
+    const { EventEmitter } = await import('node:events');
+
+    // 1. Test runReadOnlyScannerPointerL2 directly with spawnProcess returning malformed ok: undefined payload
+    const fakeSpawn = () => {
+      const stdoutStream = new Readable({ read() {} });
+      const stderrStream = new Readable({ read() {} });
+      const stdinStream = new Writable({ write(_chunk, _enc, cb) { cb(); } });
+      const child = new EventEmitter();
+      Object.assign(child, { stdout: stdoutStream, stderr: stderrStream, stdin: stdinStream, kill: () => {} });
+      setImmediate(() => {
+        stdoutStream.push(JSON.stringify({
+          protocolVersion: '1.0.0',
+          requestId: 'req-malformed',
+          type: 'POINTER_L2_RESULT',
+          ok: undefined, // malformed non-boolean ok
+        }));
+        stdoutStream.push(null);
+        stderrStream.push(null);
+        child.emit('close', 0);
+      });
+      return child as any;
+    };
+
+    const scannerResp = await runReadOnlyScannerPointerL2(
+      {
+        protocolVersion: '1.0.0',
+        requestId: 'req-malformed',
+        type: 'VALIDATE_POINTER_L2_READONLY',
+        process: { pid: 1234, executableName: 'Game.exe', selectedByUser: true },
+        pointers: [],
+      },
+      { spawnProcess: fakeSpawn },
+    );
+    assert.strictEqual(scannerResp.ok !== true, true, 'Malformed response ok must evaluate to not true');
+
+    // 2. Test runHeadlessVerificationJob controlled scanner error fallback
     const artifact = await runHeadlessVerificationJob(
       {
         protocolVersion: '1.0.0',
@@ -566,21 +640,13 @@ describe('Solith Safety & Lifecycle Hardening Tests', () => {
           readBytes: () => Buffer.from([]),
           close: () => {},
         }),
-        // mock scanner returning malformed ok: undefined -> throws controlled SCANNER_ERROR and catches to helper_unavailable
         pointerL2Validator: async () => {
-          const response = { ok: undefined, error: null } as any;
-          if (response.ok !== true) {
-            const err = response.error;
-            const code = err?.code ?? 'SCANNER_ERROR';
-            const message = err?.message ?? 'Scanner process failed or returned a malformed response.';
-            throw new Error(`${code}: ${message}`);
-          }
-          return response.pointerResults;
+          throw new Error('SCANNER_ERROR: Scanner process returned malformed payload.');
         },
       },
     );
     assert.strictEqual(artifact.pointerResults.length, 1);
     assert.strictEqual(artifact.pointerResults[0].status, 'helper_unavailable');
-    assert.ok(artifact.pointerResults[0].reason.includes('SCANNER_ERROR'), 'Reason must indicate controlled scanner failure');
+    assert.ok(artifact.pointerResults[0].reason.includes('SCANNER_ERROR'), 'Reason must indicate controlled SCANNER_ERROR');
   });
 });
