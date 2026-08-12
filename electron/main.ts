@@ -46,7 +46,6 @@ import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemoryS
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
-import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
@@ -90,7 +89,6 @@ registerInstallDiscoveryIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();
 registerLocalOcrIpc();
-registerWispOverlayIpc();
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -308,6 +306,18 @@ app.whenReady().then(async () => {
   }
 
   Menu.setApplicationMenu(null);
+
+  if (typeof __SOLITH_ENABLE_WISP_OVERLAY__ !== 'undefined' && __SOLITH_ENABLE_WISP_OVERLAY__) {
+    try {
+      const { registerWispOverlayIpc, destroyWispOverlay } = await import('./wisp-overlay.js');
+      registerWispOverlayIpc();
+      app.on('will-quit', () => destroyWispOverlay());
+    } catch (error) {
+      console.error('[WispOverlay] Failed to initialize experimental overlay:', error);
+      throw error;
+    }
+  }
+
   createWindow();
 });
 
@@ -323,7 +333,6 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   unregisterTrainerHotkeys();
   destroyTrainerOverlay();
-  destroyWispOverlay();
   stopCommunitySyncPolling();
   const cleanupResults = disposeAllLiveMemorySessions();
   const failures = cleanupResults.filter((result) => !result.success).length;

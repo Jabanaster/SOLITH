@@ -291,8 +291,8 @@ interface Window {
 
     trainerOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
     trainerOverlayHide: () => Promise<{ success: boolean; error?: string }>;
-    wispOverlayToggle: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
-    wispOverlayHide: () => Promise<{ success: boolean; error?: string }>;
+    wispOverlayToggle?: () => Promise<{ success: boolean; visible?: boolean; error?: string }>;
+    wispOverlayHide?: () => Promise<{ success: boolean; error?: string }>;
     wispOverlaySetExpanded?: (payload: { expanded: boolean }) => Promise<{
       success: boolean;
       expanded?: boolean;

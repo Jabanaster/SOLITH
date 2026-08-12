@@ -212,14 +212,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   trainerOverlayToggle: () => ipcRenderer.invoke('trainer-overlay-toggle'),
   trainerOverlayHide: () => ipcRenderer.invoke('trainer-overlay-hide'),
-  wispOverlayToggle: () => ipcRenderer.invoke('wisp-overlay-toggle'),
-  wispOverlayHide: () => ipcRenderer.invoke('wisp-overlay-hide'),
-  wispOverlaySetExpanded: (payload: { expanded: boolean }) =>
-    ipcRenderer.invoke('wisp-overlay-set-expanded', payload),
-  wispOverlayMoveBy: (payload: { deltaX: number; deltaY: number }) =>
-    ipcRenderer.invoke('wisp-overlay-move-by', payload),
-  wispOverlaySetInteractive: (payload: { interactive: boolean }) =>
-    ipcRenderer.invoke('wisp-overlay-set-interactive', payload),
+  ...(typeof __SOLITH_ENABLE_WISP_OVERLAY__ !== 'undefined' && __SOLITH_ENABLE_WISP_OVERLAY__ ? {
+    wispOverlayToggle: () => ipcRenderer.invoke('wisp-overlay-toggle'),
+    wispOverlayHide: () => ipcRenderer.invoke('wisp-overlay-hide'),
+    wispOverlaySetExpanded: (payload: { expanded: boolean }) =>
+      ipcRenderer.invoke('wisp-overlay-set-expanded', payload),
+    wispOverlayMoveBy: (payload: { deltaX: number; deltaY: number }) =>
+      ipcRenderer.invoke('wisp-overlay-move-by', payload),
+    wispOverlaySetInteractive: (payload: { interactive: boolean }) =>
+      ipcRenderer.invoke('wisp-overlay-set-interactive', payload),
+  } : {}),
   trainerHotkeysGetDefaults: () => ipcRenderer.invoke('trainer-hotkeys-get-defaults'),
   trainerHotkeysGetBindings: () => ipcRenderer.invoke('trainer-hotkeys-get-bindings'),
   trainerHotkeysSetBindings: (payload: { hotkeys: Record<string, string> }) =>

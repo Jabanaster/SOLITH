@@ -22,6 +22,7 @@ export function createTsupConfig(config: SolithBuildConfig): ReturnType<typeof d
       {
         buildMode: config.mode,
         consentOverrideEnabled: isTestBuild,
+        wispOverlayEnabled: isTestBuild,
         outputDirectory: config.outDir,
         timestamp: new Date().toISOString(),
       },
@@ -50,6 +51,7 @@ export function createTsupConfig(config: SolithBuildConfig): ReturnType<typeof d
         options.define = {
           ...options.define,
           '__SOLITH_ENABLE_TEST_CONSENT_OVERRIDE__': isTestBuild ? 'true' : 'false',
+          '__SOLITH_ENABLE_WISP_OVERLAY__': isTestBuild ? 'true' : 'false',
           '__SOLITH_BUILD_MARKER__': JSON.stringify(testMarker),
         };
       },
@@ -123,6 +125,16 @@ const __dirname = _pathDirname(__filename);
       dts: false,
       bundle: true,
       external: ['electron'],
+      esbuildOptions(options) {
+        options.treeShaking = true;
+        options.minifySyntax = true;
+        options.define = {
+          ...options.define,
+          '__SOLITH_ENABLE_TEST_CONSENT_OVERRIDE__': isTestBuild ? 'true' : 'false',
+          '__SOLITH_ENABLE_WISP_OVERLAY__': isTestBuild ? 'true' : 'false',
+          '__SOLITH_BUILD_MARKER__': JSON.stringify(testMarker),
+        };
+      },
     },
   ]);
 }
