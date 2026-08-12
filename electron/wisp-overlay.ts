@@ -4,6 +4,7 @@ import path from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerTrustedSolithWindow } from './sender-validation.js';
+import { getWispOverlayUrl } from './wisp-overlay-url.js';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -23,10 +24,7 @@ let wispOverlayInteractive = false;
 
 function wispOverlayUrl(): string {
   const isDev = process.argv.includes('--dev') || process.env.SOLITH_DEV === '1';
-  if (isDev) {
-    return 'http://localhost:3000/#wisp-overlay';
-  }
-  return `file://${path.join(moduleDirectory, 'dist/index.html')}#wisp-overlay`;
+  return getWispOverlayUrl(moduleDirectory, isDev);
 }
 
 function positionFilePath(): string {
