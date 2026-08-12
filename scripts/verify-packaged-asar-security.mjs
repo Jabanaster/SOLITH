@@ -109,7 +109,7 @@ try {
       unpackedFileCount = unpackedFiles.length;
       for (const file of unpackedFiles) {
         const content = fs.readFileSync(file, 'utf8');
-        for (const pattern of forbidden) {
+        for (const pattern of forbiddenGeneral) {
           if (content.includes(pattern)) {
             console.error(`[asar-verify] REJECTED: Forbidden string "${pattern}" found in app.asar.unpacked: ${path.relative(unpackedDir, file)}`);
             exitCode = 1;
@@ -122,7 +122,7 @@ try {
     const adjacentFiles = scanFiles(resourcesDir).filter((f) => !f.startsWith(unpackedDir) && !f.endsWith('app.asar'));
     for (const file of adjacentFiles) {
       const content = fs.readFileSync(file, 'utf8');
-      for (const pattern of forbidden) {
+      for (const pattern of forbiddenGeneral) {
         if (content.includes(pattern)) {
           console.error(`[asar-verify] REJECTED: Forbidden string "${pattern}" found in adjacent resource: ${path.relative(winUnpackedDir, file)}`);
           exitCode = 1;
