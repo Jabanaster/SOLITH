@@ -498,7 +498,7 @@ describe('Solith Safety & Lifecycle Hardening Tests', () => {
     }
   });
 
-  test('Candidate 1B: Fail-closed discriminant guard rejects malformed consent payloads in confirmInjectorLaunch', async () => {
+  test('Candidate 1B: consent guard denies confirmInjectorLaunch on an invalid consent token', async () => {
     const { proposeInjectorLaunch, confirmInjectorLaunch } = await import('../src/core/in-process-script/injector-launcher.js');
     const { upsertHelperManifestEntry, relativeHelperPath } = await import('../src/core/in-process-script/helper-manifest.js');
     const { createHash } = await import('node:crypto');
@@ -565,7 +565,7 @@ describe('Solith Safety & Lifecycle Hardening Tests', () => {
     }
   });
 
-  test('Candidate 1B: Fail-closed discriminant guard handles malformed response in runHeadlessVerificationJob and runReadOnlyScannerPointerL2', async () => {
+  test('Candidate 1B: scanner transport parser and job fallback fail closed on non-success results', async () => {
     const { runHeadlessVerificationJob } = await import('../src/core/runtime/headless-verification.js');
     const { runReadOnlyScannerPointerL2 } = await import('../src/core/runtime/readonly-scanner-helper.js');
     const { Readable, Writable } = await import('node:stream');
