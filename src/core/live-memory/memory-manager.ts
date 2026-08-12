@@ -179,8 +179,8 @@ export class MemoryManager {
     const intent = options.writeIntent ?? 'stage';
     const userApproved = options.userApproved === true;
     const gate = this.enforceWritePolicy(options.reason ?? 'propose', userApproved, intent);
-    if (gate.ok === false) {
-      throw new Error(gate.error);
+    if (gate.ok !== true) {
+      throw new Error((gate as { ok: false; error: string; code: string }).error);
     }
     const proposal = this.session.proposeWrite(address, requestedValue);
     this.audit.append({
@@ -206,7 +206,7 @@ export class MemoryManager {
         return { success: false, error: 'consent_binding_required' };
       }
       const consumed = consumeWriteConsent(options.consentToken, options.consentBinding);
-      if (consumed.ok === false) {
+      if (consumed.ok !== true) {
         this.audit.append({
           op: 'abort',
           featureId: options.featureId,
@@ -218,7 +218,7 @@ export class MemoryManager {
       userApproved = true;
     }
     const gate = this.enforceWritePolicy(options.reason ?? 'confirm', userApproved, 'commit');
-    if (gate.ok === false) {
+    if (gate.ok !== true) {
       return { success: false, error: gate.error };
     }
     const confirm = await this.session.confirmWrite(proposalId);
@@ -381,7 +381,7 @@ export class MemoryManager {
     options: { consentToken: string; consentBinding: WriteConsentBinding; featureId?: string },
   ): Promise<StartFreezeResult> {
     const consumed = consumeWriteConsent(options.consentToken, options.consentBinding);
-    if (consumed.ok === false) {
+    if (consumed.ok !== true) {
       this.audit.append({
         op: 'abort',
         featureId: options.featureId,
