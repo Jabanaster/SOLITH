@@ -254,43 +254,17 @@ test('packaged DevTools context has no preload bridge, renderer Node access, or 
   }
 });
 
-test('real Wisp overlay destruction and recreation yields a new identity and preserves main-only channel boundaries', async () => {
+test('real Wisp overlay is excluded from production release build', async () => {
   let ctx: AppContext | null = null;
   try {
     ctx = await launchApp('overlay');
-    await ctx.win.evaluate(() => (window as any).electronAPI.wispOverlayToggle());
-    await expect.poll(() => ctx!.app.windows().length, { timeout: 15_000 }).toBe(2);
-    const firstOverlay = ctx.app.windows().find((page) => page !== ctx!.win);
-    expect(firstOverlay).toBeTruthy();
-    const firstId = await ctx.app.evaluate(({ BrowserWindow }) => {
-      const overlay = BrowserWindow.getAllWindows().find((window) => window.webContents.getURL().endsWith('#wisp-overlay'));
-      if (!overlay) throw new Error('first Wisp overlay not found');
-      return overlay.webContents.id;
-    });
-    expectOverlayRejection(await invokePrivilegedMatrix(firstOverlay!), 'first Wisp overlay');
-
-    await ctx.app.evaluate(({ BrowserWindow }) => {
-      const overlay = BrowserWindow.getAllWindows().find((window) => window.webContents.getURL().endsWith('#wisp-overlay'));
-      if (!overlay) throw new Error('Wisp overlay not found for destruction');
-      overlay.destroy();
-    });
-    await expect.poll(() => ctx!.app.windows().length, { timeout: 15_000 }).toBe(1);
-    await expect(firstOverlay!.evaluate(() => (window as any).electronAPI?.liveMemoryFreezeStatus?.()))
-      .rejects.toThrow();
-
-    await ctx.win.evaluate(() => (window as any).electronAPI.wispOverlayToggle());
-    await expect.poll(() => ctx!.app.windows().length, { timeout: 15_000 }).toBe(2);
-    const secondOverlay = ctx.app.windows().find((page) => page !== ctx!.win);
-    expect(secondOverlay).toBeTruthy();
-    const secondId = await ctx.app.evaluate(({ BrowserWindow }) => {
-      const overlay = BrowserWindow.getAllWindows().find((window) => window.webContents.getURL().endsWith('#wisp-overlay'));
-      if (!overlay) throw new Error('recreated Wisp overlay not found');
-      return overlay.webContents.id;
-    });
-    expect(secondId).not.toBe(firstId);
-    expectOverlayRejection(await invokePrivilegedMatrix(secondOverlay!), 'recreated Wisp overlay');
+    const toggleType = await ctx.win.evaluate(() => typeof (window as any).electronAPI?.wispOverlayToggle);
+    expect(toggleType).toBe('undefined');
+    const windows = ctx.app.windows();
+    const overlayWins = windows.filter((page) => page.url().includes('#wisp-overlay'));
+    expect(overlayWins.length).toBe(0);
   } finally {
-    await cleanupApp(ctx);
+    if (ctx) await cleanupApp(ctx);
   }
 });
 

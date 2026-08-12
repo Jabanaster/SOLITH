@@ -18,8 +18,8 @@ if (!fs.existsSync(manifestPath)) {
 }
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-if (manifest.buildMode !== 'test' || manifest.consentOverrideEnabled !== true) {
-  console.error(`[test-verify] REJECTED: Test build manifest is invalid (found mode: ${manifest.buildMode}).`);
+if (manifest.buildMode !== 'test' || manifest.consentOverrideEnabled !== true || manifest.wispOverlayEnabled !== true) {
+  console.error(`[test-verify] REJECTED: Test build manifest is invalid (found mode: ${manifest.buildMode}, wispOverlayEnabled: ${manifest.wispOverlayEnabled}).`);
   process.exit(1);
 }
 

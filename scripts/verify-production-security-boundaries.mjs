@@ -19,8 +19,8 @@ if (!fs.existsSync(manifestPath)) {
 }
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-if (manifest.buildMode !== 'production' || manifest.consentOverrideEnabled !== false) {
-  console.error(`[security-verify] REJECTED: Build manifest is not production mode (found mode: ${manifest.buildMode}).`);
+if (manifest.buildMode !== 'production' || manifest.consentOverrideEnabled !== false || manifest.wispOverlayEnabled !== false) {
+  console.error(`[security-verify] REJECTED: Build manifest is not production mode (found mode: ${manifest.buildMode}, wispOverlayEnabled: ${manifest.wispOverlayEnabled}).`);
   process.exit(1);
 }
 
@@ -63,23 +63,45 @@ if (scannedFiles.length < 5) {
   process.exit(1);
 }
 
-const forbidden = [
+const forbiddenGeneral = [
   '__SOLITH_TEST_BUILD_MARKER__',
   'SOLITH_PRIVILEGED_CONSENT',
   'auto-approve',
   'auto-deny',
 ];
 
+const forbiddenOverlayChannels = [
+  'wisp-overlay-toggle',
+  'wisp-overlay-hide',
+  'wisp-overlay-set-expanded',
+  'wisp-overlay-move-by',
+  'wisp-overlay-set-interactive',
+  'registerWispOverlayIpc',
+  'showWispOverlay',
+];
+
 let failed = false;
 for (const file of scannedFiles) {
   const content = fs.readFileSync(file, 'utf8');
-  for (const pattern of forbidden) {
+  const relPath = path.relative(root, file);
+
+  for (const pattern of forbiddenGeneral) {
     if (content.includes(pattern)) {
-      console.error(`[security-verify] REJECTED: Forbidden string "${pattern}" found in ${path.relative(root, file)}`);
+      console.error(`[security-verify] REJECTED: Forbidden string "${pattern}" found in ${relPath}`);
       failed = true;
+    }
+  }
+
+  // Overlay executable authority channels must be ABSENT from main.js and preload.cjs
+  if (relPath.includes('main.js') || relPath.includes('preload.cjs')) {
+    for (const channel of forbiddenOverlayChannels) {
+      if (content.includes(channel)) {
+        console.error(`[security-verify] REJECTED: Executable overlay authority channel "${channel}" found in production bundle ${relPath}`);
+        failed = true;
+      }
     }
   }
 }
 
 if (failed) process.exit(1);
-console.log(`[security-verify] PASS: Verified ${scannedFiles.length} production artifacts (including renderer and manifests). Zero test markers or bypass strings found.`);
+console.log(`[security-verify] PASS: Verified ${scannedFiles.length} production artifacts (including renderer, main, preload, and manifests). Zero test markers or overlay authority strings found.`);

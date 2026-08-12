@@ -41,17 +41,27 @@ try {
       exitCode = 1;
     } else {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      if (manifest.buildMode !== 'production' || manifest.consentOverrideEnabled !== false) {
-        console.error(`[asar-verify] REJECTED: ASAR contains non-production manifest: ${manifest.buildMode}`);
+      if (manifest.buildMode !== 'production' || manifest.consentOverrideEnabled !== false || manifest.wispOverlayEnabled !== false) {
+        console.error(`[asar-verify] REJECTED: ASAR contains non-production manifest: mode=${manifest.buildMode}, wispOverlayEnabled=${manifest.wispOverlayEnabled}`);
         exitCode = 1;
       }
     }
 
-    const forbidden = [
+    const forbiddenGeneral = [
       '__SOLITH_TEST_BUILD_MARKER__',
       'SOLITH_PRIVILEGED_CONSENT',
       'auto-approve',
       'auto-deny',
+    ];
+
+    const forbiddenOverlayChannels = [
+      'wisp-overlay-toggle',
+      'wisp-overlay-hide',
+      'wisp-overlay-set-expanded',
+      'wisp-overlay-move-by',
+      'wisp-overlay-set-interactive',
+      'registerWispOverlayIpc',
+      'showWispOverlay',
     ];
 
     function scanFiles(dir) {
@@ -75,10 +85,19 @@ try {
 
     for (const file of asarFiles) {
       const content = fs.readFileSync(file, 'utf8');
-      for (const pattern of forbidden) {
+      const relPath = path.relative(tmpDir, file);
+      for (const pattern of forbiddenGeneral) {
         if (content.includes(pattern)) {
-          console.error(`[asar-verify] REJECTED: Forbidden string "${pattern}" found in app.asar: ${path.relative(tmpDir, file)}`);
+          console.error(`[asar-verify] REJECTED: Forbidden string "${pattern}" found in app.asar: ${relPath}`);
           exitCode = 1;
+        }
+      }
+      if (relPath.includes('main.js') || relPath.includes('preload.cjs')) {
+        for (const channel of forbiddenOverlayChannels) {
+          if (content.includes(channel)) {
+            console.error(`[asar-verify] REJECTED: Forbidden executable overlay channel "${channel}" found in ASAR ${relPath}`);
+            exitCode = 1;
+          }
         }
       }
     }
