@@ -237,7 +237,7 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
         ...state,
         visible: true,
         form: state.message ? getWispFormForMessage(state.message) : state.preferredForm,
-        mood: state.message ? getWispMoodForMessage(state.message) : 'curious',
+        mood: state.message ? getWispMoodForMessage(state.message) : state.quietMode ? 'sleepy' : 'curious',
       };
     case 'openInteraction':
       return {
@@ -252,7 +252,7 @@ export function wispReducer(state: WispState, event: WispEvent): WispState {
         ...state,
         interactionOpen: false,
         form: state.message ? getWispFormForMessage(state.message) : state.preferredForm,
-        mood: state.message ? getWispMoodForMessage(state.message) : 'curious',
+        mood: state.quietMode ? 'sleepy' : state.message ? getWispMoodForMessage(state.message) : 'curious',
       };
     case 'toggleInteraction':
       return wispReducer(state, { type: state.interactionOpen ? 'closeInteraction' : 'openInteraction' });

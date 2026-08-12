@@ -130,4 +130,39 @@ describe('Solith Wisp companion safety model', () => {
     const closed = wispReducer(scanning, { type: 'closeBubble', id: message.id });
     assert.equal(closed.form, 'phoenix');
   });
+
+  test('quiet mode survives hide and show without an active message', () => {
+    const quiet = wispReducer(DEFAULT_WISP_STATE, { type: 'setQuietMode', quietMode: true });
+    const hidden = wispReducer(quiet, { type: 'hide' });
+    const shown = wispReducer(hidden, { type: 'show' });
+
+    assert.equal(shown.visible, true);
+    assert.equal(shown.quietMode, true);
+    assert.equal(shown.mood, 'sleepy');
+  });
+
+  test('quiet mode survives closing an interaction', () => {
+    const message = createWispMessage({
+      title: 'Guard blocked',
+      body: 'The requested action is unavailable.',
+      source: 'write-policy',
+      severity: 'guard',
+    });
+    const withMessage = wispReducer(DEFAULT_WISP_STATE, { type: 'message', message });
+    const quiet = wispReducer(withMessage, { type: 'setQuietMode', quietMode: true });
+    const opened = wispReducer(quiet, { type: 'openInteraction' });
+    const closed = wispReducer(opened, { type: 'closeInteraction' });
+
+    assert.equal(closed.interactionOpen, false);
+    assert.equal(closed.quietMode, true);
+    assert.equal(closed.mood, 'sleepy');
+  });
+
+  test('non-quiet show and interaction-close retain the normal curious mood', () => {
+    const shown = wispReducer(wispReducer(DEFAULT_WISP_STATE, { type: 'hide' }), { type: 'show' });
+    const closed = wispReducer(wispReducer(shown, { type: 'openInteraction' }), { type: 'closeInteraction' });
+
+    assert.equal(shown.mood, 'curious');
+    assert.equal(closed.mood, 'curious');
+  });
 });
