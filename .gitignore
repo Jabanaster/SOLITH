@@ -20,8 +20,8 @@ dist-electron/
 dist-electron-test/
 out/
 build/
-[Bb]in/
-[Oo]bj/
+/tests/fixtures/**/[Bb]in/
+/tests/fixtures/**/[Oo]bj/
 *.tsbuildinfo
 native/**/target/
 
