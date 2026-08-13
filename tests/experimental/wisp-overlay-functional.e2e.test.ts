@@ -122,6 +122,7 @@ async function launchTestApp(logger: DiagnosticLogger): Promise<AppContext> {
         NODE_ENV: 'test',
         SOLITH_TEST_BUILD: '1',
         SOLITH_ENABLE_WISP_OVERLAY: '1',
+        ELECTRON_USER_DATA_PATH: userData,
         APPDATA: appData,
         LOCALAPPDATA: userData,
         USERPROFILE: userData,
