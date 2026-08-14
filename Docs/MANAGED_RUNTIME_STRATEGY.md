@@ -76,4 +76,4 @@ MONO_ROOT_ENUMERATION       = spike_only — no production toggle until L3 proof
 - `src/core/live-memory/feature-resolver.ts` — resolution order (static → AOB → scan)
 - `src/core/definitions/schema.v1.ts` — `certificationLevel`, forbidden inject types
 - `scripts/verify-pointer-path.mjs` — restart ritual (native games)
-- `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` — Milestone Z
+- `Docs/Archive/PriorPlans/OLD_SOLITH_PINNACLE_MASTER_PLAN.md` — Milestone Z (historical, archived)

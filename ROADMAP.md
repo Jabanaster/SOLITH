@@ -1,769 +1,1123 @@
-﻿# Solith / Solith Roadmap
+# SOLITH — FINAL PRODUCT ROADMAP
 
-## Current Baseline (Solith 2.4.0-alpha.2)
+> **Purpose:** This is the active product roadmap for SOLITH.
+>
+> **Authority model**
+>
+> - `PROJECT_SPEC.md` owns the product specification and safety firewall.
+> - `SOLITH_SECURITY_ROADMAP.md` owns security-gate status and release-security verdicts.
+> - Current repository code, current git state, and reproducible runtime/test evidence outrank stale roadmap claims.
+> - Historical roadmap material is not active sequencing.
+>
+> **Status vocabulary**
+>
+> - `PROPOSED`
+> - `IMPLEMENTED — UNVERIFIED`
+> - `REPORTED COMPLETE — VERIFY`
+> - `VERIFIED COMPLETE`
+> - `BLOCKED`
+> - `DEFERRED / POST-V1`
+> - `REGRESSED`
 
-Product UI: **Solith** · package `solith@2.4.0-alpha.2`
+---
 
-* Authoritative version is **`2.4.0-alpha.2`** from `package.json` — not a release candidate. Historical tags such as `v2.4.0-rc.3` remain in git history only and must not be treated as the live product line.
-* Remote **`origin/master`** — current offline-polish tip on the alpha.2 line. Includes the audit-clean hub backend, D1 health validation, automatic multi-type/multi-mode live-memory scan matrix, inert AOB repair candidate analysis tooling, the AL read-only correlation watcher, and the AM local OCR verification fallback.
-* Historical tag **`v2.4.0-rc.3`** — OCR verification fallback baseline (superseded as a version claim by alpha.2 SoT). OCR is local-only, explicitly window-selected, ROI-scoped, and feeds the read-only correlation watcher as tie-break evidence only.
-* Research Lab lock: `v1-milestone-l-research-lab-accepted` → `cdd8c51`
-* In-process pilot lock: `v1-milestone-m-in-process-pilot-accepted` → `97326d7`
-* Shell polish tag: `v2.1-shell-polish` → `0928d29`
-* Adoption tag: `v2.2-wemod-adoption` → `6ddefb8`
-* Pre-alpha lock branch: `cursor/offline-sweep-after-v2-2` (historical)
+## 1. Product Direction
 
-### God-Tier Technical Audit — Alpha release blockers
+SOLITH is a local-first Windows game trainer, save/resource editor, discovery system, and trainer-building platform.
 
-| Blocker | Status |
-|---------|--------|
-| Schema v1 unified (Phases 0→5, execute-path SoT, CI import bans) | **RESOLVED** — on `master` @ `5e190cd`+ |
-| CI pipeline green (`tsc` / `npm test` / Electron output verifier) | **RESOLVED LOCALLY** — `npx tsc --noEmit` exits 0; full root suite passes `853/853` plus isolated SQL suite `10/10`; Electron output verifier passes `29/29` |
-| Dual-Core Engine Authorized | **RESOLVED** — Internal (Win32 VEH/Hooks) and External (WinGDK RPM) mainstream paths fully authorized per updated AGENTS.md |
-| L3 live-memory baseline (Atomfall ammo, restart-stable) | **RESOLVED** — `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`; feature `certificationLevel: L3` |
-| Renderer/native boundary warnings | **RESOLVED** — Vite build is silent after Electron-safe module split and renderer boundary enforcement |
+The product must feel like a premium trainer first, while keeping advanced technical workflows available in Workshop Mode.
 
-### Stability lock
-
-| Gate | Status |
-|------|--------|
-| Offline sweep + CI/honesty on `master` | **Merged** `6ddefb8..ac43ec6` |
-| Local `npx tsc --noEmit` (post-RC tip) | **PASS** — zero TypeScript errors |
-| Focused live-memory scanner/session/AOB tests (post-RC tip) | **PASS** — `183/183` including live correlation watcher + OCR tie-break regression |
-| Local `npm test` (RC baseline) | **PASS** — `853/853` plus isolated SQL suite `10/10` |
-| Local `npm run build:vite` (Alpha tip) | **PASS** — silent renderer build after renderer/native boundary cleanup |
-| Local `npm run build:electron` (Alpha tip) | **PASS** — Electron output verifier passed `29/29` after safety-hardening |
-| Catalog unification / schema.v1 SoT | **Merged to `master`** (Phase 5 + Atomfall L3) |
-| Atomfall L3 live cert branch | **Merged** `cursor/atomfall-l3-live-cert` → `master` |
-
-### Accepted capability stack
+The core experience is:
 
 ```text
-schema.v1.yml → compile → SQLite payloadJson
-         ↑ export                    ↓ lazy load
-   Discovery Lab              Trainer Library
-                                    ├─ memoryFeatures → LiveMemorySession
-                                    ├─ Trainer Deck / install discovery / health
-                                    └─ saveEditor.saveFields → TrainerHost (catalog save controls)
-Trainer Research Lab → PE / memory diff / Script Analyzer / Dumpspace (Milestone L)
-Dual-Core Live Engine → Internal (Win32 VEH/Injection) + External (WinGDK RPM) actively routing based on target environment.
+Choose or detect a game
+→ open its trainer/profile
+→ inspect support and compatibility
+→ discover or select a value
+→ preview the requested change
+→ approve
+→ apply safely
+→ validate
+→ disable / restore / roll back
 ```
 
-### Milestone map (recent)
+SOLITH remains restricted to authorized local/offline use.
 
-| Milestone | Theme | Status |
-|-----------|--------|--------|
-| **L** | Research Lab — PE, memory diff, script analyzer, Dumpspace | **Accepted** (tag + remote) |
-| **M** | In-process pilot — Crimson Desert hooks / trainer spawn | **Accepted** (tag + remote); user charter + default OFF |
-| **M–Q** *(legacy lettering)* | Live trainer parity, schema.v1, catalog routing, hotkeys | **Accepted** |
-| **R** | Brand neutrality, Advanced Scan Mode naming | **Done** |
-| **S** | Connection baselines + restart-stable pointers | **Partial** — Atomfall ammo L3 done; Avowed L0 packaging Done (live L0→L2+ still next); Dredge / Crimson Desert live-blocked |
-| **T** | 50 bundled + 1000 catalog seed | **Done** |
-| **U** | Certification L1–L4 (`certificationLevel`, scripts) | **Partial** — offline L0/L1 + Atomfall L3; Avowed remains L0 until SOP evidence (`AVOWED_LIVE_VALIDATION_SOP.md`) |
-| **V** | Feedback, promotion, rating prompt | **Done** |
-| **W** | CT import, pointer scan, watch-list, speedhack | **Done** |
-| **X** | Binary save router + research stubs | **Partial** — demo/stub only; **immediate next** after Avowed live: Terraria `.plr` wave 1 `canWrite` |
-| **Y** | Overlay presets, hotkey rebind, onboarding | **Done** |
-| **Z** | Managed runtime (.NET/Mono) | **Not started** |
-| **AA** | Install discovery (Steam/Epic/GOG) | **Done** |
-| **AB** | Library installed/running badges + filters/sort/drag-exe | **Done** (on `master`) |
-| **AC** | Per-game Trainer Deck | **Done** |
-| **AD** | Stale / version health engine | **Done** |
-| **AE** | Process-detect quick attach | **Done** |
-| **AF** | Local demand + repair pipeline | **Done** |
-| **AG** | Adoption polish + smoke alignment | **Done** — tag `v2.2-wemod-adoption` |
-| **AH** | schema.v1 catalog unification (capability SoT) | **Done** — merged to `master` (Phases 0→5) |
-| **AI** *(Alpha)* | Verified Alpha cut — installer + `v2.3.0-alpha.1` | **Done** — NSIS `dist/Solith Setup 2.3.0-alpha.1.exe`; await push/tag lock |
-| **AJ** | Offline L2→L3 delta comparison engine | **Done** — `7b21120`; compares saved read-only verification artifacts, ignores ASLR absolute drift, and promotes only stable structural evidence |
-| **AK** | Auto memory scan matrix | **Done** — `d4aa8a4`; manual scan now fans out across exact / between / greater-than / less-than plus all supported value types, while capturing an unknown-value baseline |
-| **AL** | Live correlation watcher | **Done** — `9c70631`; read-only watcher tracks candidate deltas in real time, scores declared player events, throttles UI telemetry, and preserves recent-delta lookback evidence |
-| **AM** | Screen/OCR verification fallback | **Done** — `eac6b37`; local Tesseract OCR captures only explicitly selected window regions and feeds observed numbers back as read-only tie-break evidence |
-
-### Shell polish / evidence (2026-07)
-
-| Item | Commit / artifact |
-|------|-------------------|
-| Layered HTML banner + sharper background | `405dcc6` |
-| Compact sidebar header (no duplicate slogan) | `b21856b` |
-| Sidebar icon mapping + nav readability | `c56711b` |
-| A11y axe gate + contrast fixes | `0a655d3` |
-| Catalog seed 1000 entries | `e25b896` |
-| Binary save research stubs (read-only) | `56b8487` |
-| Research Lab (L) | `cdd8c51` / tag `v1-milestone-l-research-lab-accepted` |
-| In-process pilot (M) | `97326d7` / tag `v1-milestone-m-in-process-pilot-accepted` |
-| Save UX + live-memory/catalog harden | `a9483f6` |
-| Shell polish acceptance | tag `v2.1-shell-polish` → `0928d29` |
-| AG smoke + matrix + overlay bounds | `6ddefb8` / tag `v2.2-wemod-adoption` |
-| Atomfall L3 live evidence + harness | captured before current `774ff7e` baseline / `Docs/Baselines/ATOMFALL_L3_EVIDENCE.md` |
-| Offline sweep + CI/honesty lock | `20739f5` + `ac43ec6` → **`master`** |
-
-### Post-Alpha architecture — Done (branch tip)
-
-Shipped on `master` before the current `774ff7e` baseline. These close product/architecture gaps; they do **not** fake live L2+ certs.
-
-| Item | Status | Evidence |
-|------|--------|----------|
-| Zero-Input detect → prepare → resolve loop | **Done** | `process-watcher` / feature resolver / memory audit IPC; blueprint `Docs/Architecture/SOLITH_ZERO_INPUT_BLUEPRINT.md` |
-| Avowed WinGDK executable packaging (L0) | **Done** | `AVOWED_L0_DEFINITION` + aliases `Avowed-WinGDK-Shipping.exe`; deck stays `scan_unknown` / L0 |
-| WinGDK `wgs` save + Alabama config backup watchers | **Done** | `electron/avowed-wingdk-backup-watch.ts` + `src/core/backups/avowed-wingdk.ts` (READ + COPY only) |
-| Phase 3 Hub Sync Orchestrator & Trust UI | **Done** | Opt-in community sync polling, Catalog trust UI, PII sanitization / L0 quarantine |
-| Core engine hardening | **Done** | Fuzzy AOB drift recovery, local crash reporter, local sandbox scaffold |
-| Solith rebrand + opening cinematic | **Done** | Product rename + UI cinematic integration |
-| Phase 9 Address/Data Research Tools | **Done** | Read-only viewer/hex/pointer/snapshot — `Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md` |
-| Phase 10 Gated Write Architecture | **Done** | `WritePolicyGate` + MemoryManager enforce; researchWriteMode default OFF; Trust Shift waiver replaces connection-count write blocks — `Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md` |
-| Inert CT Registry Framework (Phases 1–10) | **Done** | Query/schema/CLI/UI + static research + read-only runtime + gated writes — `Docs/Architecture/INERT_CT_REGISTRY_BLUEPRINT.md` |
-| Trust Shift + CT→Live Phases 2–4 | **Done** | Waiver consent; `CtLiveResolution`; toggle cards; pointer table / What-Changed; local pack export — `Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md` |
-
-Honest stance unchanged: Avowed memory features remain **L0 `scan_unknown`** until live AOB/pointer evidence. Live elevation playbook: `Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`.
-
-### Updated discovery roadmap — Auto scan → watcher → OCR fallback
-
-This is the current Solith-grade discovery hierarchy for live-memory research. It is intentionally read-only until the separate L4 write gate is satisfied.
-
-| Layer | Purpose | Status | Certification impact |
-|-------|---------|--------|----------------------|
-| **1. Auto scan matrix** | One user scan fans out across exact / between / greater-than / less-than and all supported value types (`byte`, `int32`, `uint32`, `float`, `double`, `int64`). It also captures an unknown-value baseline. | **Implemented** — `d4aa8a4` | Produces L0/L1 session-local candidates only |
-| **2. Live correlation watcher** | Polls candidates in real time, keeps them separated by value type / scan mode / source, and scores changes against player-declared events such as damage, XP gain, spending gold, consuming items, or collecting loot. | **Implemented** — `9c70631` | Can raise confidence to L2-style session evidence, not L3 by itself |
-| **3. Event prompt layer** | Lets the user provide lightweight signals (`spent gold`, `took damage`, `used potion`, `picked up loot`) instead of typing every value manually. | **Implemented with watcher** | Improves correlation quality without adding write capability |
-| **4. Screen/OCR verification fallback** | If memory-only correlation is weak or noisy, asks the user to briefly open a relevant menu so Solith can read visible values locally. | **Implemented** — `eac6b37`; drag/saved-region polish continues post-RC | Verification aid only; OCR results must show confidence and user-visible preview |
-| **5. Manual confirmation** | Final fallback when OCR fails or confidence is low; user types/approves the visible value. | **Existing pattern / to polish** | Human-confirmed session evidence only |
-| **6. Restart validation** | Compares structural evidence across process restarts while ignoring ASLR absolute address drift. | **Implemented offline; live runs required per title/build** | Required for L3 stability claims |
-
-Design rule: OCR/screen watching is **not** the primary scanner. It is a failover and verification assist when the live watcher cannot isolate substantial candidates. Solith should not force repeated menu swapping during normal play.
-
-### Ordered safety build — Active sequence
-
-| Order | Item | Current status |
-|-------|------|----------------|
-| 1 | Security hardening | **Active / strengthened** — renderer boundary has a static test; Vite remains the enforcement smoke |
-| 2 | Anti-cheat / protected-target blocking | **Active / strengthened** — read-only process adapter fails closed on known protected indicators before returning a session |
-| 3 | Harmless-process smoke tests | **Available** — `npm run smoke:runtime-readonly -- --pid <pid> --name <process.exe>` uses explicit PID selection and bounded module reads |
-| 4 | Offline/single-player support | **Standing rule** — live features require explicit offline/private-play confirmation and guard evidence |
-| 5 | Restart validation + L0–L4 certification | **Active / strengthened** — restart artifact comparison can classify unique stable signatures and pointer-chain telemetry as L3 candidates only when evidence stays stable |
-| 6 | Metadata-only CT import + inert script preservation | **Done / strengthened** — CT scripts remain `executable=false`; rejection reasons are preserved for review |
-| 7 | Read-only process/module scanning + AOB extraction | **Done / active** — AOB extraction and read-only signature resolution exist; live game validation still requires explicit process selection |
-| 8 | Safe save editing with backup/rollback | **Implemented for accepted save-field paths** — proposal/backup/rollback remains the preferred route where file-backed support exists |
-| 9 | CT Library Explorer + rejection reports | **Active / strengthened** — CT Library detail now surfaces rejection reasons, not just counts |
-| 10 | Multi-launcher target metadata | **Active / strengthened** — one game profile can map Steam/GOG/Epic/Xbox/EA/etc. executable targets; certification remains per executable hash/build and restricted packages fail closed without elevation |
-| 11 | Automatic scan matrix | **Done / strengthened** — player-facing scan uses all supported value types and compatible first-pass modes in one read-only action; narrowing preserves each candidate's discovered type |
-| 12 | Live correlation watcher | **Done** — read-only polling layer compares candidate changes against player-declared events like damage, spending, XP gain, item pickup, healing, or stamina use |
-| 13 | Screen/OCR verification fallback | **Done** — only asks the user to open menus when memory correlation is weak/noisy; OCR assists verification but never replaces restart validation |
-
-### Bundled schema.v1 definitions
-
-All seven curated games (`games.ts`) ship as `schema.v1` payloads via `bundled-definition-seed.ts`:
-Stardew Valley (save-field controls) plus six live-memory titles. Atomfall includes verified
-`atomfall-current-weapon-ammo` at **L3**; other pinned live cheats remain `scan_unknown` until certified.
-Avowed ships Steam + WinGDK executables at **L0** only (no `signature` / `baseOffset` / `pointerChain` yet).
-
-### Remaining live-session work (do not fake)
-
-**Immediate next targets (priority order):**
-
-1. **Avowed WinGDK read-only validation + repair loop** — Current restart scan evidence: 12 / 28 AOB signatures restart-stable unique across WinGDK sessions; 16 / 28 remain no-match and require WinGDK-specific repair. `aobInvItemTaker` has inert candidate patterns from the repair analyzer and still needs restart validation before any registry promotion.
-2. **Milestone X — Terraria `.plr` binary save write path (wave 1)** — commercial binary writes beyond sandbox fixtures (`canWrite` still blocked until certified)
-
-**Still required (after the two above, or when sessions allow):**
-
-3. Connection baselines — Dredge, Crimson Desert (`measure-connection-baseline.mjs`)
-4. Restart-verify pointer paths for remaining bundled memory games (beyond Atomfall ammo)
-5. Additional L2–L4 certification runs with in-game evidence for non-Atomfall / non-elevated-Avowed titles
-6. Managed-runtime live memory spike (Milestone Z) — research only when authorized
-
-### Can continue offline (post-merge)
-
-- ~~Offline sweep AB / cert docs / watch-confidence / Epic/GOG fixtures~~ — **on master**
-- ~~Catalog search test isolation (`:memory:`) + CI fresh-clone~~ — **on master**
-- ~~README L0 honesty + in-process user charter~~ — **on master**
-- ~~schema.v1 Phase 0→5~~ — **on master**
-- ~~Atomfall L3 live baseline~~ — **on master** (`Docs/Baselines/ATOMFALL_L3_EVIDENCE.md`)
-- ~~Zero-Input loop / Avowed L0 + WinGDK backups / Hub sync+trust / engine harden / Solith rebrand~~ — **on `master`**
-- ~~Phase 9 address/data research tools (view/hex/pointer report/session snapshot, read-only)~~ — **on `master`** (`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`)
-- ~~Phase 10 gated write architecture (policy scaffold; researchWriteMode default OFF)~~ — **on `master`** (`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`)
-- ~~Trust Shift + CT→Live Phases 2–4 (waiver, promote/toggles, research UX, local packs)~~ — **on `master`** (`Docs/Plans/PHASE2_4_CT_LIVE_BRIDGE.md`)
-- ~~Inert CT Registry Framework (Phases 1–10)~~ — **on `master`** via PR #4 (`Docs/Architecture/INERT_CT_REGISTRY_BLUEPRINT.md`)
-- Remaining S / U live titles still require game sessions (Avowed first)
-
-See **`Docs/Plans/SCHEMA_V1_UNIFICATION_PLAN.md`** + **`SCHEMA_V1_PHASE0_CONSUMER_INVENTORY.md`**.
-Run **`npm run verify:schema-v1-boundaries`** and **`npm run orphan-check`** before merge.  
-See **`Docs/Plans/WEMOD_ADOPTION_PLAN.md`** for the WeMod-style adoption track (milestones AA–AG).  
-See **`Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md`** for the full R→Z roadmap.  
-See **`Docs/Plans/AVOWED_LIVE_VALIDATION_SOP.md`** for Avowed L0 → L2/L3 live elevation.  
-See **`Docs/Plans/PHASE9_ADDRESS_DATA_RESEARCH_TOOLS.md`** for read-only research IPC/UI.  
-See **`Docs/Plans/PHASE10_GATED_WRITE_ARCHITECTURE.md`** for write policy gate + residual risks.
+The project must never expand into online/multiplayer cheating, anti-cheat bypass, DRM/license bypass, kernel bypass, stealth, credential access, or unverified executable payload execution.
 
 ---
 
-## Historical: v1.0.2 baseline
+## 2. V1 Scope Resolution
 
-Solith v1.0.2 remains the prior save-editor / Stardew-controls release baseline.
+The repository already contains live-memory, trainer, CT-library, save-editor, launcher-discovery, overlay, and research functionality.
 
-* Tag: `v1.0.2`
-* Commit: `d84b155a8f6729f8428b5c777f0784853c65d419`
+Therefore the active roadmap does **not** require deleting existing working live-memory systems merely because older specification text placed broader live-memory work in V2.
 
-Older milestone tags (`v1-milestone-f` through `v1-milestone-j`) are unchanged on the legacy branch history.
+For V1:
+
+### Included if already implemented and verified
+
+- local/offline trainer workflows
+- supported live-memory discovery, read/write/freeze flows already present in the repository
+- fail-closed protected-target handling
+- supported `.CT` metadata/import workflows
+- trainer profiles
+- save-field editing
+- backup/rollback
+- game detection
+- launcher-aware executable metadata
+- Workshop/Discovery tooling
+- overlays/hotkeys already in the product
+- packaged Windows operation
+
+### Still post-V1 unless explicitly promoted
+
+- major expansion of injection/hook capability
+- new broad Auto Assembler/Lua execution
+- unrestricted `.CT` compatibility
+- new kernel/debugger-style systems
+- production 3D Wisp
+- Xbox Game Bar Wisp expansion
+- major companion redesign
+- broad managed-runtime expansion
+- speculative reverse-engineering systems that do not block release
+
+This roadmap preserves existing verified capability while preventing new scope from silently expanding V1.
 
 ---
 
-## Historical: v1.1 development notes
+# PHASE 0 — STABILIZE THE CURRENT BUILD AND MAKE THE GATES TRUSTWORTHY
 
-The sections below document earlier v1.1 bite work. They are retained for audit trail only.
+**Status: ACTIVE**
+
+This phase outranks all feature work.
+
+## 0.1 Phase 0 fixes already pushed
+
+Reported current pushed checkpoint:
+
+```text
+master
+1a5c3ec1bc3430653df9cc42dac826da978b8203
+```
+
+Reported completed work:
+
+- slot-12 default accelerator changed to `CommandOrControl+Shift+F12`
+- slots 1–11 preserved
+- overlay-hidden-window shutdown bug fixed
+- packaged shutdown regression added
+- working tree clean after push
+
+### Slot-12 residual
+
+Owner accepted a documented residual risk:
+
+- live attached-trainer physical slot-12 callback remains for final hands-on acceptance
+- explicit persisted bare-F12 override through packaged UI remains for final hands-on acceptance
+
+Do not reopen this unless a regression appears.
+
+## 0.2 Gate 2.5 Phase 6 timing repair
+
+**Status: IMPLEMENTED — UNVERIFIED**
+
+Reported:
+
+- fixed `sleep(1500)` race replaced by bounded polling
+- Phase 6 passed 7/7 across seven full-file attempts
+- product security boundary remained correct
+
+Do not commit this repair alone until the Gate 2.5 file is stable.
+
+## 0.3 Gate 2.5 Phase 7 Wisp-overlay timing race
+
+**Status: BLOCKED**
+
+Observed:
+
+- intermittent `overlayWin` null
+- intermittent execution-context destruction
+- fixed-time lifecycle assumption in Phase 7
+
+Required:
+
+1. reproduce read-only
+2. prove test race vs. real product defect
+3. if test race, replace fixed timing with bounded readiness conditions
+4. Phase 7 isolated PASS ×3
+5. Phase 6 isolated PASS
+6. full Gate 2.5 file 7/7 PASS ×3 consecutive
+7. review combined Phase 6/7 diff
+8. commit and push the single test-file repair
+
+## 0.4 Node environment
+
+Project requirement:
+
+```text
+Node.js 22.x
+```
+
+Node 24 results must not be represented as Node 22 verification.
+
+## 0.5 Phase 0 exit gate
+
+Phase 0 closes only when:
+
+- Gate 2.5 is deterministic
+- no unexplained automated release/security gate remains red
+- current branch and origin match
+- working tree is clean or intentionally documented
+- current security status is reconciled with `SOLITH_SECURITY_ROADMAP.md`
 
 ---
 
-# Historical Roadmap (archive)
+# PHASE 1 — QUICK RELEASE POLISH: SHELL, SETTINGS, NOTIFICATIONS, BANNER, GRID, TITLE HYGIENE
 
-## Current Development State
+**Status: PROPOSED**
 
-### Trainer Toggle Persistence & Live-Watch Migration (2026-07-09)
+This is the first feature phase after stabilization.
 
-Status: **Accepted locally, not pushed, not tagged.**
+## 1.1 Sidebar/app-shell header
 
-Commit: `806ba568c9ea9c11d1484e879849983074e76afd`
+Top-left on every page:
 
-This is a UI-wiring migration, not a scope expansion. It removed obsolete trainer components
-and replaced ad hoc cheat-toggle component state with a persisted store.
+```text
+[Solith icon] [SOLITH] [bell] [gear] [collapse]
+```
 
-Removed as obsolete: `LiveTrainer.tsx`/`.module.css`/`.test.tsx`, `PalworldCheatMenu.tsx`/
-`.module.css`/`.test.tsx`, `PalworldTrainerPage.tsx`/`.module.css`, `useFreezeValue.ts`,
-`useLiveTrainerWorkflow.ts`.
+Requirements:
 
-Added: `LiveWatchPanel.tsx`/`.module.css` (active live-watch UI), `electron/cheat-toggle-ipc.ts`,
-`src/core/cheat-system/cheat-toggle-store.ts` (persists cheat toggle state to a new
-`cheat_toggle_state` database table).
+- notification bell top-left
+- Settings gear top-left
+- collapse control beside them
+- sidebar starts expanded on first install
+- preference persists afterward
 
-Verification passed:
+## 1.2 Collapsible sidebar groups
 
-* `npx tsc --noEmit`: PASS
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:live-memory`: PASS, 72/72
-* `npm run test:trainer-host`: PASS, 80/80
-* `npm test`: PASS, 508/508
+Groups:
 
-Scope boundaries preserved:
+- Library
+- Recovery
+- Save Tools
+- Specialized
+- Advanced
 
-* No new process/memory capability beyond what already existed.
-* No previously-blocked control was enabled.
-* No deleted files were restored.
-* Existing per-game cheat catalog (`src/core/cheat-system/games.ts`) unchanged.
+Settings:
 
-Known gap: `cheat-toggle-ipc.ts`, `cheat-toggle-store.ts`, and `LiveWatchPanel.tsx` have no
-dedicated tests yet. Existing suites (trainer-schema, live-memory, trainer-host, standard)
-cover the surrounding modified files but not these three directly ΓÇö open item, not hidden.
+- Remember my sidebar sections
+- Always expand all sections
+- Always collapse inactive sections
+- Compact sidebar mode
+- Show/hide section labels
 
-V1.1 development has started from the locked `v1.0.2` baseline.
+Whole-sidebar collapsed mode:
 
-Current local development state:
+- keep a visible rail
+- use larger icons
+- do not make navigation disappear
 
-* Latest accepted local V1.1 bite: **V1.1 Bite 2**
-* Commit: `5f6d1ad590ece1cf38eeb19b158488372d348fc2`
-* Status: accepted locally and fresh local-clone verified.
-* Not tagged.
-* Not pushed as a release.
-* Working tree after verification: clean.
+## 1.3 Settings foundation
 
-Fresh local-clone verification for Bite 2 passed from:
+Create real submenu navigation:
 
-`G:\SOLITH_V11_BITE2_VERIFY`
+- General
+- Appearance
+- Navigation
+- Game Library
+- Trainer Library
+- Launchers & Accounts
+- Catalog Updates
+- Artwork & Cache
+- Notifications
+- Privacy & Network
+- Advanced
+- About
 
-Bite 2 verification results:
+No single giant settings page.
 
-* `npm ci`: PASS
-* `npx tsc --noEmit`: PASS
-* `npm run test:game-profile`: PASS, 33/33
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, 73/73
-* `npm run test:milestone-e`: PASS, 15/15
-* `npm run test:milestone-j`: PASS, 5/5
-* `npm test`: PASS, 381/381
-* Final fresh-clone `git status --short`: clean
-* Final `git diff --quiet`: PASS
+## 1.4 Notification center
 
-## Release History
+Add:
 
-### v1.0.0 - Original Release Lock
+- bell
+- unread badge
+- toast
+- persistent history
+- mark read
+- clear
 
-`v1.0.0` remains published and unchanged.
+Initial event types:
 
-It is no longer the recommended baseline because later fresh-clone verification found reproducibility issues that depended on leftover local artifacts.
+- catalog update
+- artwork fetch failure/completion
+- trainer/profile update
+- maintenance/recovery notice
 
-### v1.0.1 - Fresh Clone Reproducibility Patch
+Do not show a catalog-update notification during first catalog initialization.
 
-`v1.0.1` fixed fresh-clone artifact dependency issues.
+## 1.5 Banner correction
 
-Fixes included:
+Fix fullscreen/maximized banner behavior.
 
-* Ignored `.junie/` assistant metadata through `.gitignore`.
-* Added self-contained trainer-host test prerequisites.
+Required:
 
-  * `npm run test:trainer-host` builds required Electron host output first.
-  * Prevents clean clones from failing on missing `dist-electron/host-entry.js`.
-* Added self-contained Milestone E packaged-app prerequisites.
+- preserve aspect ratio
+- eliminate bad crop/zoom behavior
+- verify narrow, desktop, maximized, and ultrawide layouts
 
-  * `npm run test:milestone-e` builds the packaged app first.
-  * Prevents clean clones from failing on missing `dist/win-unpacked/Solith.exe`.
+## 1.6 Trainer Library grid
 
-Known note:
+Reproduce before changing.
 
-* Remote-tag `v1.0.1` verification passed all gates, but final status showed parser fixture line-ending noise.
-* No content diff existed.
-* This was corrected in `v1.0.2`.
+Measure:
 
-### v1.0.2 - Line-Ending Hygiene Patch
+- container width
+- computed column count
+- card width constraints
+- ResizeObserver behavior
+- expanded/collapsed sidebar interaction
+- virtualization
 
-`v1.0.2` is the current pushed release baseline.
+Then fix only the proven cause.
 
-Fixes included:
+## 1.7 Catalog title-ingestion hygiene
 
-* Added `.gitattributes`.
-* Stabilized parser fixture line endings.
-* Prevented fresh-clone verification from ending with phantom modified parser fixture files.
-* Preserved existing app behavior.
-* Preserved parser logic.
-* Preserved test expectations.
+Prevent malformed HTML/entity titles from entering the catalog.
 
-Final state:
+Required:
 
-* Accepted.
-* Tagged locally.
-* Pushed.
-* Remote verified.
-* Clean baseline for V1.1.
+- decode at every confirmed ingestion path
+- clean-title precedence
+- payload/title consistency
+- no global slug rewrite
+- separately reviewed legacy-row migration
+- manual review path for collisions/ambiguous identities
 
-## V1.1 Status
+**Exit gate:** UI shell is stable, Settings exists, notifications work, banner/grid are responsive, and new malformed titles cannot be introduced.
 
-V1.1 is focused on safe save-format expansion and compatibility pilot readiness.
+---
 
-V1.1 must remain:
+# PHASE 2 — CANONICAL GAME MODEL + GAME LIBRARY REBUILD
 
-* Local-only.
-* Offline-first.
-* Single-player only.
-* Save/data-file focused.
-* Backup/rollback protected.
-* Explicitly guarded against unsafe trainer behavior.
+**Status: PROPOSED / EXTEND EXISTING SYSTEMS**
 
-V1.1 must not add:
+The existing install-discovery and launcher metadata should be reused rather than replaced.
 
-* Online game cheating.
-* Multiplayer manipulation.
-* Anti-cheat bypass.
-* Process injection.
-* Live memory writing.
-* Memory scanning.
-* Debugger attachment.
-* Unsafe shipped profile placeholders.
-* New executable game controls unless separately scoped and verified.
+## 2.1 Canonical identity
 
-## V1.1 Bite 1 - Save Format Capability Layer
+One game, many launcher releases.
 
-Status: **Accepted locally and fresh local-clone verified**
+Supported launcher-release identities:
 
-Commit:
+- Steam
+- GOG
+- Epic Games Store
+- Ubisoft Connect
+- EA app
+- Xbox / Microsoft Store
+- Battle.net
+- Standalone
 
-`da5c67f819c0cf81ccb97f88d9878af58e1009b8`
+Do not create duplicate canonical game cards just because launcher differs.
 
-Bite 1 added:
+## 2.2 Canonical game record
 
-* Save-format capability/error model.
-* Explicit `UnsupportedSaveFormatError`.
-* Unsupported-format guards in TrainerHost save-field read/write paths.
-* Focused save-format tests.
-* TrainerHost unsupported-format rejection tests.
-* `package.json` test coverage updates.
+Fields should include:
 
-Verification passed:
+- canonical game ID
+- official title
+- aliases
+- developer
+- publisher
+- release date
+- genres
+- supported play modes
+- eligibility
+- SOLITH support state
+- artwork identity
+- popularity metadata
 
-* `npx tsc --noEmit`: PASS
-* `npm run test:game-profile`: PASS, 33/33
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, 66/66
-* `npm run test:milestone-e`: PASS, 15/15
-* `npm run test:milestone-j`: PASS, 5/5
-* `npm test`: PASS, 373/373
+## 2.3 Launcher release record
 
-Fresh local-clone verification also passed.
+Fields:
 
-Behavior preserved:
+- canonical game ID
+- launcher
+- store/product ID
+- edition
+- executable identities
+- install-discovery metadata
+- launch URI/command
+- build/version
+- trainer/profile compatibility
 
-* Existing Stardew XML controls unchanged.
-* Existing XML read/write/rollback behavior unchanged.
-* No JSON or INI write expansion added.
+## 2.4 Installed game record
 
-## V1.1 Bite 2 - JSON Read-Only Save-Field Support
+Fields:
 
-Status: **Accepted locally and fresh local-clone verified**
+- launcher release
+- install path
+- executable
+- detected build/version
+- detection source
+- last verified
+- save locations
+- manually added vs. automatically detected
 
-Commit:
+## 2.5 Game Library UX
 
-`5f6d1ad590ece1cf38eeb19b158488372d348fc2`
+Game Library becomes the installed-game hub.
 
-Bite 2 added:
+Default:
 
-* JSON read-only save-field support.
-* Simple dot-path JSON field reads.
-* JSON proposal validation/preview.
-* Malformed JSON handling.
-* Missing JSON field handling.
-* Oversized JSON safety coverage.
-* JSON write execution rejection through `UnsupportedSaveFormatError`.
+```text
+Installed
+```
 
-Scope boundaries preserved:
+Show:
 
-* JSON writes are still not allowed.
-* JSON execution/mutation is still rejected.
-* Existing XML/Stardew read/write/rollback behavior remains unchanged.
-* No new shipped game controls were added.
-* No INI support was added yet.
-* No memory writing or process scanning was added.
+- detected installed games
+- manually added games/folders
+- launcher
+- edition
+- install path
+- launch button
+- rescan
+- save locations
+- trainer availability
+- verification status
+- artwork
+- ownership when actually proven
 
-Verification passed:
+Current folder scanning becomes an action/detail inside a game record.
 
-* `npx tsc --noEmit`: PASS
-* `npm run test:game-profile`: PASS, 33/33
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, 73/73
-* `npm run test:milestone-e`: PASS, 15/15
-* `npm run test:milestone-j`: PASS, 5/5
-* `npm test`: PASS, 381/381
+## 2.6 Launcher settings
 
-Fresh local-clone verification also passed:
+For every supported launcher show:
 
-* `npm ci`: PASS
-* `npx tsc --noEmit`: PASS
-* `npm run test:game-profile`: PASS, 33/33
-* `npm run test:trainer-schema`: PASS, 35/35
-* `npm run test:trainer-host`: PASS, 73/73
-* `npm run test:milestone-e`: PASS, 15/15
-* `npm run test:milestone-j`: PASS, 5/5
-* `npm test`: PASS, 381/381
-* Final clone status: clean
+- Detected
+- Connected
+- Last scanned
+- Games found
+- Rescan
+- Disconnect
+- Privacy details
 
-## Next Bite - V1.1 Bite 3
+Do not ask users for launcher passwords.
 
-Recommended next scope:
+Owned games remain a filter/view, not a higher default priority than Installed.
 
-**JSON write proposal hardening only**
+**Exit gate:** canonical identities prevent launcher duplicates and the Game Library behaves like a real installed-game hub.
 
-Bite 3 must not add actual JSON write execution.
+---
 
-Goals:
+# PHASE 3 — TRAINER LIBRARY: POPULAR, ALL GAMES, SORTING, FILTERS, SUPPORT STATES
 
-* Strengthen JSON proposed-edit previews.
-* Validate proposed JSON edits without mutating files.
-* Confirm current value before previewing a change.
-* Preserve type compatibility where possible.
-* Reject unsafe type changes unless explicitly allowed.
-* Reject unsupported paths clearly.
-* Keep JSON write execution blocked.
-* Keep XML write execution unchanged.
+**Status: PROPOSED**
+
+## 3.1 Support states
+
+Use:
+
+- Eligible
+- Listed
+- Community / Unverified
+- Verified
+- Unsupported
+- Excluded
+
+Popularity never implies verification.
+
+## 3.2 Catalog exclusion rules
+
+Exclude:
+
+- MMOs
+- competitive-online-only games
+- games without meaningful offline play
+- anti-cheat-only relevant execution paths
+- cloud-only titles
+- dedicated servers
+- demos
+- soundtracks
+- editors/tools
+- DLC-only products
+- unsupported delisted products
+
+For mixed offline/anti-cheat multiplayer titles, use the owner-selected strict policy: exclude the entire title when protected multiplayer materially conflicts with SOLITH’s safety boundary.
+
+## 3.3 Default Trainer Library
+
+Default:
+
+```text
+Popular
+```
+
+Initial curated list:
+
+```text
+500 games
+```
+
+Ranking priority:
+
+1. Installed
+2. Verified SOLITH support
+3. Popular now
+4. Recently released
+5. Enduring favorites
+6. Other eligible catalog
+
+## 3.4 All Games
+
+All Games exposes the full eligible catalog, including niche/deep-catalog titles.
+
+First-use notice:
+
+> All Games includes SOLITH’s full eligible catalog, including niche and less widely played titles. Use filters or search to narrow the list.
+
+## 3.5 Sorting
+
+- Recommended
+- Popular now
+- All-time popular
+- Newest release
+- Recently added to SOLITH
+- Recently updated
+- A–Z
+- Installed first
+- Verified first
+- Most trainer options
+
+## 3.6 Filters
+
+### Availability
+- Installed
+- Not installed
+- Has trainer/profile
+- Verified
+- Community/unverified
+- Owned
+
+### Mode
+- Single-player
+- Offline co-op
+- Local multiplayer
+- Online features present
+- Offline-only support
+
+### Catalog
+- Popular
+- New release
+- All-time classic
+- Niche/deep catalog
+- Recently added
+
+### Launcher
+- Steam
+- GOG
+- Epic Games Store
+- Ubisoft Connect
+- EA app
+- Xbox / Microsoft Store
+- Battle.net
+- Standalone
+
+### Genre
+- RPG
+- Action
+- Strategy
+- Simulation
+- Adventure
+- Shooter
+- Survival
+- Racing
+- Sports
+- Puzzle
+
+UX requirements:
+
+- multi-select
+- visible chips
+- result count
+- Reset
+- remembered filter state where appropriate
+- predictable back navigation
+- no hidden active filters
+
+**Exit gate:** Trainer Library discovery is useful by default and still supports full-catalog exploration.
+
+---
+
+# PHASE 4 — ARTWORK IDENTITY, CACHE, LEGAL SOURCING, AND BACKGROUND FETCHING
+
+**Status: PROPOSED**
+
+## 4.1 Identity-safe artwork
+
+Never match artwork by fuzzy title alone.
+
+Priority:
+
+1. exact store/launcher ID
+2. Steam App ID
+3. provider-native ID
+4. verified canonical game identity
+5. reviewed manual mapping
+6. SOLITH fallback
+
+Track provenance.
+
+## 4.2 Pre-shipped artwork
+
+Bundle only artwork with documented redistribution permission.
 
 Allowed:
 
-* Proposal preview logic.
-* Validation-only JSON edit model.
-* Type-safety checks.
-* Better user-safe error messages.
-* Tests for rejected proposal cases.
+- SOLITH-created
+- commissioned
+- properly licensed
+- explicit publisher/developer redistribution
+- provider agreement
 
-Not allowed:
+For everything else:
 
-* Actual JSON file mutation.
-* JSON rollback workflow.
-* New shipped JSON game profiles.
-* New executable controls.
-* INI support.
-* Array mutation.
-* JSONPath support.
-* Automatic profile inference.
+- ship metadata
+- show fallback
+- fetch after install where permitted
+- cache locally
 
-Bite 3 acceptance should require:
+## 4.3 Managed local cache
 
-* JSON proposal validation tests.
-* JSON write execution rejection tests.
-* Existing JSON read-only tests.
-* Existing XML/Stardew tests.
-* TrainerHost tests.
-* Milestone E/J tests.
-* Full `npm test`.
-* Fresh local-clone verification after commit.
+Use SOLITH-owned cache under Electron `userData`.
 
-## V1.1 Future Bite Plan
+Requirements:
 
-### Bite 3 - JSON Write Proposal Hardening
+- deterministic keys
+- HTTPS approved sources
+- redirect/size caps
+- media validation
+- reject unsafe SVG or rasterize safely
+- atomic writes
+- retain old image on failed refresh
+- offline reuse
+- provenance
+- cross-game overwrite prevention
 
-Status: pending
+Do not rely solely on Chromium cache.
 
-Purpose:
+## 4.4 Artwork controls
 
-Make JSON proposed-edit previews safer before any future write support is considered.
+Exactly:
 
-Scope:
+- Refresh artwork
+- Retry missing artwork
+- Check for catalog updates
 
-* Validate proposed value type.
-* Validate simple object dot paths.
-* Reject arrays unless explicitly supported later.
-* Reject missing parent objects.
-* Reject unsupported write execution.
-* Keep preview-only semantics.
+## 4.5 Background fetch
 
-### Bite 4 - XML Hardening Review
+Priority:
 
-Status: pending
+1. visible cards
+2. installed games
+3. favorites
+4. Popular
+5. deep catalog
 
-Purpose:
+Default concurrency:
 
-Strengthen XML safety without changing accepted Stardew behavior.
+```text
+6
+```
 
-Scope:
+Adaptive maximum:
 
-* Review hostile XML handling.
-* Preserve existing Stardew field paths.
-* Preserve write/rollback behavior.
-* Add missing malformed XML tests if gaps exist.
-* Ensure XML errors are user-safe.
+```text
+10
+```
 
-Non-goals:
+Add:
 
-* No profile expansion.
-* No new controls.
-* No behavior drift in accepted Stardew controls.
+- progress
+- pause
+- cancel
+- no redundant successful re-fetch
 
-### Bite 5 - INI/Config Read-Only Support
+**Exit gate:** artwork is identity-correct, legally handled, locally cached, non-blocking, and refreshable.
 
-Status: pending
+---
 
-Purpose:
+# PHASE 5 — POPULARITY PIPELINE + CURATED CATALOG + SIGNED CATALOG UPDATES
 
-Add conservative read-only support for simple INI/config save files.
+**Status: PROPOSED**
 
-Scope:
+## 5.1 Ranking sources
 
-* Flat section/key reads.
-* User-safe malformed INI errors.
-* Unsupported ambiguous formats rejected.
-* Proposal preview only if safe.
+Preferred research inputs:
 
-Non-goals:
+1. Metacritic
+2. SteamDB
+3. GameFAQs
+4. IGN
+5. OpenCritic
+6. IGDB
+7. Steam250
+8. official launcher/store sources
 
-* No INI write execution.
-* No nested or custom parser magic.
-* No shipped game profile expansion.
+## 5.2 Curated populations
 
-### Bite 6 - Runtime Save-Location Binding
+Build:
 
-Status: pending
+- ~Top 200 relevant games of the current year
+- ~Top 1,000 relevant PC games of all time
+- ~Top 1,000 relevant Steam games by transparent public popularity proxies
 
-Purpose:
+Never label public Steam proxies as exact downloads/owners.
 
-Bind runtime save locations through approved local paths only.
+## 5.3 Ranking signals
 
-Scope:
+Use combinations of:
 
-* Validate resolved paths.
-* Require approved game root or registered save path.
-* Reject traversal.
-* Reject developer-machine absolute paths in shipped profiles.
-* Keep backup/rollback ownership intact.
+- critic reception
+- user reception
+- current player activity
+- sustained player activity
+- 24-hour peak
+- all-time peak
+- review volume
+- recent review activity
+- credible sales/chart evidence
+- release recency
+- major publisher/developer relevance
+- SOLITH relevance
 
-### Bite 7 - Profile Authoring Safety
+A score around 70 can help qualify a game but is not a hard cutoff.
 
-Status: pending
+## 5.4 Major publisher/developer list
 
-Purpose:
+Maintain a reviewed allowlist/reference list for major release sources.
 
-Make profile creation safer and more deterministic.
+Do not infer “AAA” from price or marketing copy.
 
-Scope:
+## 5.5 Signed catalog updates
 
-* Profile validation UI or CLI helper.
-* Format declaration checks.
-* Fixture-backed profile validation.
-* Reject unsupported executable controls.
-* Reject placeholder/future controls.
-* Reject unsafe paths.
+Support:
 
-### Bite 8 - Compatibility Pilot Readiness
+- bundled baseline
+- versioned signed deltas
+- new games
+- corrected titles/IDs
+- launcher-release additions
+- eligibility changes
+- trainer/profile availability
+- artwork metadata
+- merges/aliases
+- blocked/revoked records
 
-Status: pending
+Client behavior:
 
-Purpose:
+- check in background
+- do not block startup
+- skip redundant automatic check if last success < ~24h
+- manual check available
+- rollback bad update
+- preserve bundled offline baseline
 
-Prepare pilot validation for real offline single-player games without shipping unsafe controls.
+Notification example:
 
-Scope:
+> Catalog updated — 12 games added, 4 records corrected.
 
-* Pilot report format.
-* Fixture capture process.
-* Read-only compatibility checks.
-* Manual approval checklist.
-* No executable controls enabled by default.
+No update notice on first initialization.
 
-## Compatibility Pilot
+## 5.6 Catalog network settings
 
-The compatibility pilot should only begin after V1.1 safety infrastructure is stable.
+Allow:
 
-Pilot rules:
+- automatic updates on/off
+- Check now
+- current catalog version
+- last successful update
+- history
+- rollback
+- bundled snapshot only
+- separate artwork network opt-out
 
-* Offline games only.
-* Single-player games only.
-* Save/data-file workflows only.
-* No process memory manipulation.
-* No anti-cheat interaction.
-* No online-mode support.
-* No default executable controls for unverified games.
-* Backup/rollback required before any future write path.
-* Every profile must have test coverage before being treated as supported.
+**Exit gate:** catalog can grow safely without requiring a full app update and without becoming a required cloud dependency.
 
-Suggested pilot order:
+---
 
-1. Demo game fixture.
-2. Stardew Valley existing XML save profile.
-3. One simple JSON-save game.
-4. One simple XML-save game.
-5. One simple INI/config-style game.
+# PHASE 6 — V1 CORE TRAINER/SAVE/DISCOVERY GAP AUDIT AND CLOSEOUT
 
-## V1.3 Compatibility Pilot Process
+**Status: REPORTED COMPLETE — VERIFY CAPABILITY BY CAPABILITY**
 
-V1.3 makes Solith safer for limited compatibility pilots without enabling new executable game controls by default.
+Do not rewrite working systems.
 
-V1.3 scope:
+Audit current repository against the actual required V1 workflows and close only real gaps.
 
-* Fixture-backed profile authoring validation.
-* Read-only JSON/INI/XML compatibility reporting.
-* Pilot readiness reports for offline single-player candidate games.
-* Manual review workflow before any profile is treated as supported.
-* Documentation of blocked operations and required manual checks.
+## 6.1 Trainer Mode
 
-V1.3 does not add:
+Verify:
 
-* Online or multiplayer support.
-* Memory writing, memory scanning, process injection, debugger attachment, or anti-cheat interaction.
-* Automatic writes for candidate pilot games.
-* Shipped executable controls for unverified pilots.
-* Fake disabled or future controls in shipped profiles.
+- game selection
+- trainer/profile loading
+- controls
+- current/target values
+- source/risk/status
+- preview/apply
+- hotkeys where current V1 implementation supports them
+- process/session state
+- disable/detach
 
-Compatibility pilot workflow:
+## 6.2 Workshop Mode
 
-1. Gather a safe sample or fixture from a user-owned offline single-player game.
-2. Classify the save/config format and reject unsupported or ambiguous formats.
-3. Run read-only validation against the fixture and profile declaration.
-4. Generate a pilot report with sample evidence, format support, cloud-sync risk, supported operations, blocked operations, and required manual checks.
-5. Manually approve any proposed profile only after fixture-backed validation passes.
-6. Consider write support only in a separate scoped bite with explicit approval, backup/rollback verification, and fresh-clone evidence.
+Verify:
 
-Pilot reports must keep executable controls disabled until separately accepted. A report alone cannot enable writes, rollback execution, runtime patching, or new shipped controls.
+- Resource Browser
+- Save Editor
+- Data Editor
+- Discovery Lab
+- Trainer Builder
+- Recipe Editor
+- Proposal Inspector
+- Backup/Rollback
+- Journal
+- diagnostics
 
-## Fresh Clone Verification Policy
+## 6.3 `.CT` compatibility
 
-Every accepted bite that changes source, tests, package scripts, or build behavior should receive fresh local-clone verification before the next bite begins.
+V1 must accurately document the supported subset.
 
-Every release candidate must pass from a fresh clone with no prior `node_modules`, `dist`, or `dist-electron` artifacts.
+Required:
 
-Standard gate order:
+- defensive parser
+- metadata/hierarchy preservation
+- compatibility classification
+- no silent unsupported-feature loss
+- inert/untrusted script handling
+- no automatic Auto Assembler/Lua execution
+- target identity/build checks
 
-1. `npm ci`
-2. `npx tsc --noEmit`
-3. `npm run test:game-profile`
-4. `npm run test:trainer-schema`
-5. `npm run test:trainer-host`
-6. `npm run test:milestone-e`
-7. `npm run test:milestone-j`
-8. `npm test`
-9. `npm run build:electron`
-10. `npm run build`
-11. `node scripts/verify-electron-output.mjs`
-12. `node scripts/validate-packaged-host.mjs`
-13. `node scripts/orphan-check.mjs`
-14. `git status --short`
-15. `git diff --quiet`
+Full Cheat Engine compatibility is not required for V1.
 
-A release candidate is not cleanly reproducible unless both the gate commands pass and the final working tree is clean.
+## 6.4 Save/resource workflow
 
-## Release Gate Policy
+Verify:
 
-Every milestone must preserve:
+- scanner
+- fingerprint
+- save detection
+- parser adapters
+- proposal
+- preview
+- dry run
+- backup
+- atomic apply
+- validation
+- rollback
+- journal
 
-* TypeScript correctness.
-* Existing profile tests.
-* Existing trainer schema tests.
-* Existing trainer-host tests.
-* Milestone E acceptance.
-* Milestone J acceptance.
-* Full test suite.
-* Electron build.
-* Packaged build.
-* Packaged host validation.
-* Orphan process check.
-* Fresh clone clean-tree check.
+## 6.5 Local AI
 
-No roadmap item is complete unless verified by live commands.
+Verify:
 
-## Files Likely Affected During V1.1
+- None
+- Ollama
+- LM Studio
+- test connection
+- strict structured output
+- rule-based fallback
+- no privileged AI bridge
 
-Likely source areas:
+## 6.6 Demo/onboarding
 
-* `src/core/saves/*`
-* `src/core/trainer-host/*`
-* `src/core/game-profiles/*`
-* `src/core/trainer-control-schema/*`
-* `electron/ipc-validation.ts`, only if runtime binding requires IPC validation changes
-* `electron/main.ts`, only if runtime binding requires IPC changes
-* `src/types/global.d.ts`, only if exposed APIs change
+Verify:
 
-Likely test areas:
+- first-run safety acknowledgement
+- optional local AI
+- demo game
+- guided discovery
+- proposal
+- apply
+- rollback
+- reset demo
 
-* `tests/save-format.test.ts`
-* `tests/parsers.test.ts`
-* `tests/trainer-host/read-save-field.test.ts`
-* `tests/trainer-host/write-save-field.test.ts`
-* `tests/game-profile.test.ts`
-* `tests/trainer-control-schema.test.ts`
-* New focused tests for JSON/XML/INI behavior if needed
+**Exit gate:** core packaged player and creator loops are verified and accurately documented.
 
-Package files:
+---
 
-* `package.json` only if test scripts need explicit inclusion.
-* `package-lock.json` should not change unless dependencies are intentionally added.
+# PHASE 7 — SECURITY, PACKAGING, SUPPLY CHAIN, FAILURE INJECTION, RELEASE QA
 
-## Must Remain Unchanged Unless Explicitly Scoped
+**Status: REQUIRED**
 
-The following must not be altered casually:
+Security verdicts stay in `SOLITH_SECURITY_ROADMAP.md`.
 
-* Existing Stardew accepted controls.
-* Existing Stardew field paths.
-* Existing XML write/rollback path.
-* `v1.0.0`, `v1.0.1`, and `v1.0.2` tags.
-* Local-only/offline/single-player safety model.
-* No-memory-write V1 policy.
-* No online/multiplayer policy.
-* No anti-cheat interaction policy.
+This phase is product scheduling only.
 
-## Explicit Non-Goals
+## 7.1 Electron boundary
 
-Solith should not support:
+Verify:
 
-* Online game cheating.
-* Multiplayer manipulation.
-* Anti-cheat bypass.
-* Process injection.
-* Live memory writing in V1.
-* Memory scanning in V1.
-* Debugger attachment.
-* Hidden cloud dependency.
-* Unsafe arbitrary file patching.
-* Fake disabled/future controls in shipped profiles.
-* Release gates that depend on stale local build artifacts.
+- nodeIntegration false
+- contextIsolation true
+- renderer sandboxing where compatible
+- narrow preload
+- allowlisted IPC
+- request/response validation
+- sender/frame authorization
+- restricted navigation/new windows
+- sanitized errors
 
-## V2 Direction
+## 7.2 Filesystem safety
 
-Only after V1 is stable:
+Verify:
 
-* Broader profile library.
-* Community profile format.
-* Local-only profile import/export.
-* Richer discovery workflows.
-* Optional local AI assistance for explaining save fields.
-* More advanced trainer workflows only if safety boundaries remain enforceable.
+- canonicalization
+- path containment
+- unsafe-root blocking
+- traversal
+- symlink/junction/reparse escape
+- approved roots only
+- containment rechecked before mutation
 
-V2 must still exclude online-game cheating, multiplayer manipulation, anti-cheat bypass, and unsafe memory editing.
+## 7.3 Failure injection
+
+Required:
+
+- permission disappears after dry run
+- file changes before apply
+- temp write fails
+- atomic replacement fails
+- DB write fails after file replacement
+- interruption during operation
+- backup corruption
+- rollback target locked
+
+Invariant:
+
+```text
+Either the original remains unchanged,
+or a verified backup exists with a recorded recovery state.
+```
+
+## 7.4 Packaging
+
+Verify:
+
+- Node 22 clean setup
+- Electron Builder
+- installer
+- sql.js/WASM packaging
+- packaged DB
+- packaged demo
+- native memory module packaging
+- clean exit
+- no dev-only privilege path
+
+## 7.5 Dependency/license closeout
+
+Current vendored third-party inventory includes:
+
+- IBM Plex Sans — OFL 1.1
+- JetBrains Mono — OFL 1.1
+- Tabler icon subset — MIT
+- patched memoryjs — MIT
+
+Before release:
+
+- reconcile npm dependencies
+- reconcile vendored binaries/assets
+- confirm licenses/notices
+- confirm no prohibited redistribution in artwork or trainer assets
+- disposition vulnerabilities
+
+**Exit gate:** security/release gates green, package reproducible, dependencies/licensing resolved.
+
+---
+
+# PHASE 8 — CUSTOMIZATION
+
+**Status: PROPOSED**
+
+Add reasonable customization after core product systems are stable:
+
+- sidebar state
+- section expansion behavior
+- compact mode
+- section labels
+- startup page
+- default Game Library view
+- default Trainer Library view
+- default sort
+- remembered filters
+- card density
+- card size
+- metadata visibility
+- artwork behavior
+- notifications
+- theme
+- accent
+- reduced animation
+
+No arbitrary freeform layout editor.
+
+---
+
+# PHASE 9 — FINAL HANDS-ON ACCEPTANCE
+
+**Status: DEFERRED UNTIL AUTOMATED WORK IS COMPLETE**
+
+Collect owner-interactive testing here.
+
+Include:
+
+- real trainer attachment
+- physical hotkeys
+- slot-12 real-session callback
+- stored F12 override
+- launcher account authorization
+- owned-game library checks
+- manual external-save approvals
+- real-game save/rollback
+- visual acceptance on multiple displays
+- accessibility walkthrough
+- installer/uninstaller hands-on check
+
+Do not claim these passed until actually performed.
+
+---
+
+# PHASE 10 — V1 RELEASE
+
+**Status: PROPOSED**
+
+Require:
+
+- final version decision
+- release notes
+- README accuracy
+- user guide
+- safety policy
+- troubleshooting
+- compatibility matrix
+- third-party license inventory
+- installer
+- diagnostic export
+- current automated verification
+- final manual acceptance
+- exact commit/build provenance
+- no unresolved critical/high security finding
+- shipped behavior matches product claims
+
+---
+
+# POST-V1 — WISP
+
+**Status: DEFERRED / POST-V1**
+
+SOLITH Wisp visual and behavior work remains important.
+
+Post-V1 work:
+
+- major visual redesign
+- production 3D Wisp
+- rigging/animation
+- contextual reactions
+- Game Bar integration
+- personalization
+- broader companion behavior
+
+A narrow existing Wisp behavior may be fixed earlier when it breaks a V1 gate, but the broader creative workstream must not block V1.
+
+---
+
+# POST-V1 — LIVE-MEMORY / CREATOR EXPANSION
+
+**Status: DEFERRED / INCREMENTAL**
+
+Potential work:
+
+- broader pointer/signature systems
+- managed-runtime support
+- richer profile creator
+- more `.CT` compatibility
+- bounded script/patch support
+- additional live-memory engines
+- creator debugging/research tooling
+
+Every expansion requires its own threat model, tests, and explicit authorization.
+
+Never weaken the safety firewall.
+
+---
+
+# ACTIVE EXECUTION ORDER
+
+1. Fix Gate 2.5 Phase 7 timing/lifecycle instability.
+2. Verify Gate 2.5 7/7 ×3.
+3. Commit/push combined Phase 6 + Phase 7 test-harness repairs.
+4. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene.
+5. Phase 2 — canonical game model + Game Library.
+6. Phase 3 — Trainer Library Popular/All Games/sorting/filtering.
+7. Phase 4 — artwork identity/cache/legal sourcing/background fetch.
+8. Phase 5 — popularity pipeline + signed catalog updates.
+9. Phase 6 — V1 trainer/save/discovery/CT capability gap audit and closeout.
+10. Phase 7 — security/package/supply-chain/failure-injection QA.
+11. Phase 8 — customization.
+12. Phase 9 — final owner-interactive acceptance.
+13. Phase 10 — V1 release.
+14. Post-V1 — Wisp and advanced creator/live-memory expansion.
+
+---
+
+# DEFINITION OF DONE
+
+A phase is complete only when:
+
+- exact scope is defined
+- relevant source is inspected
+- no correct working system is rewritten unnecessarily
+- tests pass
+- type checking passes
+- production build passes
+- packaged behavior is tested where applicable
+- no security control was weakened
+- failure states are handled
+- database migrations are idempotent
+- restart behavior is correct
+- no unrelated user data is removed
+- known limitations are recorded
+- manual checks are completed or explicitly deferred to Phase 9
+- repository state is reviewed
+- exact commands/results are recorded
+- completion is not inferred from stale documentation
+
+For file/resource editing additionally require:
+
+- approved target containment
+- proposal
+- preview
+- dry run
+- explicit approval
+- verified backup
+- atomic apply
+- validation
+- rollback/recovery evidence
+- journal/state persistence
+
+---
+
+# ROADMAP MAINTENANCE
+
+After every significant implementation or verification cycle:
+
+1. update only the statuses actually affected
+2. use current repository evidence
+3. remove stale active test counts/baseline claims
+4. keep historical claims in git history or an archive, not active sequencing
+5. do not duplicate security verdicts from `SOLITH_SECURITY_ROADMAP.md`
+6. preserve explicit owner decisions
+7. recalculate the single highest-priority next action

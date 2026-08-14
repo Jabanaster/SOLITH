@@ -1,6 +1,6 @@
 # Next Actions
 
-> **ARCHIVED working notes** — See `ROADMAP.md` and `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` for current priorities.
+> **ARCHIVED working notes** — See `ROADMAP.md` and `Docs/Archive/PriorPlans/OLD_SOLITH_PINNACLE_MASTER_PLAN.md` (historical) for current priorities.
 
 **Updated:** 2026-07-07 — Trainer accessibility polish: `aria-disabled`/`aria-describedby` completed on all `TrainerCard.tsx` controls; confirmed `prefers-reduced-motion` already covers all animation code paths (CSS-only, no JS rAF loops exist)
 
