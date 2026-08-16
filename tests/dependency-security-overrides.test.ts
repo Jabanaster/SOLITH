@@ -12,7 +12,7 @@ test('security overrides pin fixed postcss and brace-expansion', () => {
     overrides?: Record<string, string>;
   };
   assert.equal(pkg.overrides?.postcss, '8.5.23');
-  assert.equal(pkg.overrides?.['brace-expansion'], '5.0.8');
+  assert.equal(pkg.overrides?.['brace-expansion'], '5.0.9');
 });
 
 test('npm audit reports zero vulnerabilities under the locked tree', () => {

@@ -146,7 +146,7 @@
     "@types/yazl": "^2.4.5",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^9.2.4",
-    "electron": "^42.4.1",
+    "electron": "^42.5.1",
     "electron-builder": "^26.15.3",
     "patch-package": "^8.0.1",
     "sharp": "^0.35.3",
@@ -171,6 +171,13 @@
   "overrides": {
     "esbuild": "0.28.1",
     "postcss": "8.5.23",
-    "brace-expansion": "5.0.8"
+    "brace-expansion": "5.0.9",
+    "fast-uri": "3.1.5",
+    "js-yaml": "4.3.1",
+    "nanoid": "3.3.18",
+    "undici": "7.29.0",
+    "node-gyp": {
+      "undici": "6.28.0"
+    }
   }
 }
