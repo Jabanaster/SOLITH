@@ -21,6 +21,12 @@
 
 ---
 
+## Current Baseline (Solith 2.4.0-alpha.2)
+
+`package.json` (`solith@2.4.0-alpha.2`) remains the single authoritative version source for this repository. This roadmap does not restate release/version detail beyond this line — see `package.json`, `package-lock.json`, `README.md`, and `CHANGELOG.md` for the full version-consistency contract.
+
+---
+
 ## 1. Product Direction
 
 SOLITH is a local-first Windows game trainer, save/resource editor, discovery system, and trainer-building platform.
@@ -120,36 +126,27 @@ Do not reopen this unless a regression appears.
 
 ## 0.2 Gate 2.5 Phase 6 timing repair
 
-**Status: IMPLEMENTED — UNVERIFIED**
+**Status: NOT IMPLEMENTED — Phase 6 currently passes as-is**
 
-Reported:
+Current source (`tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:320`) still contains a fixed `await sleep(1500)`; it was not replaced by bounded polling. No repair exists in code. Do not claim otherwise until bounded-polling code is actually present.
 
-- fixed `sleep(1500)` race replaced by bounded polling
-- Phase 6 passed 7/7 across seven full-file attempts
+Reported (fresh Node 22 packaged verification):
+
+- Phase 6 passed in every current full Gate 2.5 run, including 3 consecutive full-file runs
 - product security boundary remained correct
-
-Do not commit this repair alone until the Gate 2.5 file is stable.
 
 ## 0.3 Gate 2.5 Phase 7 Wisp-overlay timing race
 
-**Status: BLOCKED**
+**Status: VERIFIED COMPLETE — no code/test repair required**
 
-Observed:
+The current `tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts` suite contains **6 tests** (Phase 4, 5, 6, 7, 8, and "Phase 3 addendum"), not 7.
 
-- intermittent `overlayWin` null
-- intermittent execution-context destruction
-- fixed-time lifecycle assumption in Phase 7
+Fresh Node 22 verification against a rebuilt packaged candidate:
 
-Required:
-
-1. reproduce read-only
-2. prove test race vs. real product defect
-3. if test race, replace fixed timing with bounded readiness conditions
-4. Phase 7 isolated PASS ×3
-5. Phase 6 isolated PASS
-6. full Gate 2.5 file 7/7 PASS ×3 consecutive
-7. review combined Phase 6/7 diff
-8. commit and push the single test-file repair
+- root cause of the previously reported `overlayWin` null / execution-context-destruction instability: the packaged `dist/win-unpacked/Solith.exe` under test was **stale** (built before uncommitted changes to `src/core/companion/wisp.ts`, `electron/preload.ts`, and other source files) — not a test race and not a real product defect
+- after rebuilding (`build:vite` → `build:electron` → `dist:dir`, 0 stale source files confirmed), Phase 7 isolated: **PASS ×5**
+- full Gate 2.5 file: **6/6 PASS ×3 consecutive**
+- no test-harness or product code was changed to reach this result
 
 ## 0.4 Node environment
 
@@ -1056,20 +1053,18 @@ Never weaken the safety firewall.
 
 # ACTIVE EXECUTION ORDER
 
-1. Fix Gate 2.5 Phase 7 timing/lifecycle instability.
-2. Verify Gate 2.5 7/7 ×3.
-3. Commit/push combined Phase 6 + Phase 7 test-harness repairs.
-4. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene.
-5. Phase 2 — canonical game model + Game Library.
-6. Phase 3 — Trainer Library Popular/All Games/sorting/filtering.
-7. Phase 4 — artwork identity/cache/legal sourcing/background fetch.
-8. Phase 5 — popularity pipeline + signed catalog updates.
-9. Phase 6 — V1 trainer/save/discovery/CT capability gap audit and closeout.
-10. Phase 7 — security/package/supply-chain/failure-injection QA.
-11. Phase 8 — customization.
-12. Phase 9 — final owner-interactive acceptance.
-13. Phase 10 — V1 release.
-14. Post-V1 — Wisp and advanced creator/live-memory expansion.
+1. Gate 2.5 Phase 7 verified stable (6/6 PASS ×3 consecutive, fresh packaged candidate); root cause was a stale packaged binary, not a test or product defect — no repair to commit.
+2. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene.
+3. Phase 2 — canonical game model + Game Library.
+4. Phase 3 — Trainer Library Popular/All Games/sorting/filtering.
+5. Phase 4 — artwork identity/cache/legal sourcing/background fetch.
+6. Phase 5 — popularity pipeline + signed catalog updates.
+7. Phase 6 — V1 trainer/save/discovery/CT capability gap audit and closeout.
+8. Phase 7 — security/package/supply-chain/failure-injection QA.
+9. Phase 8 — customization.
+10. Phase 9 — final owner-interactive acceptance.
+11. Phase 10 — V1 release.
+12. Post-V1 — Wisp and advanced creator/live-memory expansion.
 
 ---
 
