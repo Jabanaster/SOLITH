@@ -4,11 +4,12 @@ import {
   remoteTrainerToModPack,
   syncTrainerSource,
 } from './remote-sync.js';
-import { logTrainerSync, upsertCatalogEntry, upsertModPack } from '../store.js';
+import { logTrainerSync, pruneInvalidCommunityCatalogTitles, upsertCatalogEntry, upsertModPack } from '../store.js';
 
 export interface TrainerCatalogSyncReport {
   totalImported: number;
   providers: Array<{ provider: string; imported: number; errors: string[] }>;
+  prunedInvalidTitles: number;
 }
 
 export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport> {
@@ -32,5 +33,7 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
     providers.push({ provider: source.id, imported, errors: result.errors });
   }
 
-  return { totalImported, providers };
+  const prunedInvalidTitles = pruneInvalidCommunityCatalogTitles().length;
+
+  return { totalImported, providers, prunedInvalidTitles };
 }

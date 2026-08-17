@@ -1,3 +1,5 @@
+import { normalizeCatalogTitle } from '../normalize-title.js';
+
 const TRAINER_TITLE_RE = /(?:title="|>)([^<]{3,120}?\s+Trainer)\s*</gi;
 const HREF_RE = /href="(\/[^"]+)"/gi;
 
@@ -15,8 +17,9 @@ export function parseTrainerListHtml(baseUrl: string, html: string): ParsedRemot
   const titleRegex = /([^<>]{3,120})\s+Trainer/gi;
   while ((match = titleRegex.exec(html)) !== null) {
     const rawTitle = match[0].trim();
-    const gameName = rawTitle.replace(/\s+Trainer$/i, '').trim();
-    if (!gameName || gameName.length < 2) continue;
+    const rawGameName = rawTitle.replace(/\s+Trainer$/i, '').trim();
+    const gameName = normalizeCatalogTitle(rawGameName);
+    if (!gameName) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -32,7 +35,7 @@ export function parseTrainerListHtml(baseUrl: string, html: string): ParsedRemot
   while ((match = anchorRegex.exec(html)) !== null) {
     const href = match[1];
     const rawTitle = match[2].trim();
-    const gameName = rawTitle.replace(/\s+Trainer$/i, '').trim();
+    const gameName = normalizeCatalogTitle(rawTitle.replace(/\s+Trainer$/i, '').trim());
     if (!gameName) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
@@ -53,8 +56,8 @@ export function parseRemoteTrainerIndexHtml(html: string): ParsedRemoteTrainer[]
     const href = match[1];
     const label = match[2].trim();
     if (!/trainer/i.test(label) && !/\/trainer\//i.test(href)) continue;
-    const gameName = label.replace(/\s+trainer.*$/i, '').trim();
-    if (!gameName || gameName.length < 2) continue;
+    const gameName = normalizeCatalogTitle(label.replace(/\s+trainer.*$/i, '').trim());
+    if (!gameName) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -74,8 +77,8 @@ export function parseRemoteGameCatalogHtml(html: string): ParsedRemoteTrainer[] 
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null) {
     const href = match[1];
-    const gameName = match[2].trim();
-    if (!gameName || gameName.length < 2) continue;
+    const gameName = normalizeCatalogTitle(match[2].trim());
+    if (!gameName) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

@@ -2,6 +2,7 @@ import db from '../database/index.js';
 import type { ModPack, TrainerCatalogEntry, TrainerCatalogSearchResult, VerificationStatus } from './types.js';
 import { buildSearchableText } from './types.js';
 import { categoryJsonLikePattern, normalizeGenreFilterList } from './catalog-genres.js';
+import { normalizeCatalogTitle } from './normalize-title.js';
 import {
   isSolithDefinitionPayload,
   solithDefinitionToModPack,
@@ -327,6 +328,32 @@ export function getDefinitionCertificationForGame(
 
 export function countCatalogEntries(): number {
   return (db.prepare('SELECT COUNT(*) as c FROM trainer_catalog_games').get() as { c: number }).c;
+}
+
+/**
+ * Idempotent cleanup for community-sourced catalog rows whose displayName
+ * would be rejected by the current title-validation rules (e.g. rows
+ * ingested before normalizeCatalogTitle() was applied at parse time).
+ * Bundled/curated entries are never touched. Safe to run repeatedly.
+ */
+export function pruneInvalidCommunityCatalogTitles(): string[] {
+  const rows = db
+    .prepare(
+      `SELECT catalogGameId, displayName, modPackId FROM trainer_catalog_games
+       WHERE verificationStatus = 'community'`,
+    )
+    .all() as { catalogGameId: string; displayName: string; modPackId: string | null }[];
+
+  const removed: string[] = [];
+  for (const row of rows) {
+    if (normalizeCatalogTitle(row.displayName) !== null) continue;
+    db.prepare('DELETE FROM trainer_catalog_games WHERE catalogGameId = ?').run(row.catalogGameId);
+    if (row.modPackId) {
+      db.prepare('DELETE FROM trainer_mod_packs WHERE packId = ?').run(row.modPackId);
+    }
+    removed.push(row.catalogGameId);
+  }
+  return removed;
 }
 
 export function logTrainerSync(provider: string, status: string, detail: string, imported = 0): void {
