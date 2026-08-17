@@ -1041,6 +1041,67 @@ function applySchema(): void {
   `);
 
   rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS canonical_games (
+      id TEXT PRIMARY KEY,
+      displayName TEXT NOT NULL,
+      normalizedTitle TEXT NOT NULL,
+      aliasesJson TEXT NOT NULL DEFAULT '[]',
+      developer TEXT,
+      publisher TEXT,
+      releaseDate TEXT,
+      genresJson TEXT NOT NULL DEFAULT '[]',
+      playModesJson TEXT NOT NULL DEFAULT '[]',
+      eligibility TEXT NOT NULL DEFAULT 'listed',
+      supportState TEXT NOT NULL DEFAULT 'unknown',
+      artworkIdentityJson TEXT,
+      popularityMetadataJson TEXT,
+      catalogGameId TEXT,
+      identityStatus TEXT NOT NULL DEFAULT 'backfilled',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_catalog ON canonical_games(catalogGameId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_normalized ON canonical_games(normalizedTitle)');
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS game_installations (
+      id TEXT PRIMARY KEY,
+      canonicalGameId TEXT NOT NULL,
+      launcher TEXT NOT NULL,
+      launcherGameId TEXT,
+      installPath TEXT,
+      executablePath TEXT,
+      processNamesJson TEXT,
+      edition TEXT,
+      buildVersion TEXT,
+      launchUri TEXT,
+      trainerProfileCompatible INTEGER,
+      installIdentity TEXT NOT NULL,
+      sourceInstalledGameId TEXT,
+      detectedAt TEXT NOT NULL,
+      lastSeenAt TEXT NOT NULL,
+      FOREIGN KEY (canonicalGameId) REFERENCES canonical_games(id)
+    )
+  `);
+  rawDb!.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_game_installations_identity ON game_installations(installIdentity)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_game_installations_canonical ON game_installations(canonicalGameId)');
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS canonical_identity_review (
+      id TEXT PRIMARY KEY,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      evidenceJson TEXT NOT NULL,
+      resolution TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      resolvedAt TEXT
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_identity_review_status ON canonical_identity_review(status, createdAt)');
+
+  rawDb!.run(`
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
       category TEXT NOT NULL,
