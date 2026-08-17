@@ -4,6 +4,16 @@ import { buildSearchableText } from './types.js';
 import { categoryJsonLikePattern, normalizeGenreFilterList } from './catalog-genres.js';
 import { normalizeCatalogTitle } from './normalize-title.js';
 import {
+  buildIdentityReviewRecords,
+  buildSeparateIdentityCatalogGameId,
+  detectIdentityCollision,
+  type IdentityReviewItem,
+  type IdentityReviewReason,
+  type IdentityReviewRecordSummary,
+  type IdentityReviewResolution,
+  type IncomingCatalogWrite,
+} from './identity-review.js';
+import {
   isSolithDefinitionPayload,
   solithDefinitionToModPack,
 } from '../definitions/mod-pack-adapter.js';
@@ -367,4 +377,147 @@ export function getRecentSyncLogs(limit = 20): Array<{ provider: string; status:
   return db
     .prepare('SELECT provider, status, detail, importedCount, syncedAt FROM trainer_sync_log ORDER BY syncedAt DESC LIMIT ?')
     .all(limit) as Array<{ provider: string; status: string; detail: string; importedCount: number; syncedAt: string }>;
+}
+
+/** Returns null instead of throwing on a corrupted leftRecordJson/rightRecordJson cell. */
+function parseIdentityReviewRow(row: Record<string, unknown>): IdentityReviewItem | null {
+  try {
+    return {
+      id: String(row.id),
+      reason: String(row.reason) as IdentityReviewReason,
+      status: String(row.status) as IdentityReviewItem['status'],
+      leftRecord: JSON.parse(String(row.leftRecordJson)) as IdentityReviewRecordSummary,
+      rightRecord: JSON.parse(String(row.rightRecordJson)) as IdentityReviewRecordSummary,
+      resolution: row.resolution ? (String(row.resolution) as IdentityReviewResolution) : undefined,
+      createdAt: String(row.createdAt),
+      updatedAt: String(row.updatedAt),
+      resolvedAt: row.resolvedAt ? String(row.resolvedAt) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getIdentityReviewItem(id: string): IdentityReviewItem | null {
+  const row = db.prepare('SELECT * FROM catalog_identity_review WHERE id = ?').get(id) as
+    | Record<string, unknown>
+    | undefined;
+  return row ? parseIdentityReviewRow(row) : null;
+}
+
+/**
+ * Creates a pending review row if this exact collision fingerprint hasn't been seen
+ * before; otherwise returns the existing row untouched (never resets an already
+ * resolved/ignored decision back to pending).
+ */
+function createOrReuseIdentityReviewItem(
+  id: string,
+  reason: IdentityReviewReason,
+  leftRecord: IdentityReviewRecordSummary,
+  rightRecord: IdentityReviewRecordSummary,
+): IdentityReviewItem {
+  db.prepare(
+    `INSERT INTO catalog_identity_review (id, reason, status, leftRecordJson, rightRecordJson)
+     VALUES (?, ?, 'pending', ?, ?)
+     ON CONFLICT(id) DO NOTHING`,
+  ).run(id, reason, JSON.stringify(leftRecord), JSON.stringify(rightRecord));
+  const item = getIdentityReviewItem(id);
+  if (!item) throw new Error(`Failed to persist identity review item ${id}`);
+  return item;
+}
+
+export function listPendingIdentityReviewItems(): IdentityReviewItem[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM catalog_identity_review WHERE status = 'pending' ORDER BY createdAt ASC, id ASC`,
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map(parseIdentityReviewRow).filter((item): item is IdentityReviewItem => item !== null);
+}
+
+export function getPendingIdentityReviewCount(): number {
+  return (
+    db.prepare(`SELECT COUNT(*) as c FROM catalog_identity_review WHERE status = 'pending'`).get() as {
+      c: number;
+    }
+  ).c;
+}
+
+/**
+ * Applies a human resolution decision to a pending review item.
+ *
+ * - keep-existing / ignore: mark resolved, write nothing (existing row is left intact).
+ * - accept-incoming: write the deferred incoming entry over the existing catalogGameId.
+ * - treat-separate: write the deferred incoming entry under a new, deterministic
+ *   catalogGameId (`${original}--${provider}`) instead of colliding with the existing one.
+ *
+ * Returns null if the review item does not exist or is no longer pending.
+ */
+export function resolveIdentityReviewItem(
+  id: string,
+  resolution: IdentityReviewResolution,
+): IdentityReviewItem | null {
+  const item = getIdentityReviewItem(id);
+  if (!item || item.status !== 'pending') return null;
+
+  if (resolution === 'accept-incoming') {
+    upsertCatalogEntry({ ...item.rightRecord.entry, catalogGameId: item.leftRecord.entry.catalogGameId });
+  } else if (resolution === 'treat-separate') {
+    const separateId = buildSeparateIdentityCatalogGameId(
+      item.leftRecord.entry.catalogGameId,
+      item.rightRecord.provider,
+    );
+    upsertCatalogEntry({ ...item.rightRecord.entry, catalogGameId: separateId });
+  }
+  // keep-existing / ignore: no catalog write — existing record stays exactly as-is.
+
+  const status: IdentityReviewItem['status'] = resolution === 'ignore' ? 'ignored' : 'resolved';
+  db.prepare(
+    `UPDATE catalog_identity_review
+        SET status = ?, resolution = ?, updatedAt = datetime('now'), resolvedAt = datetime('now')
+      WHERE id = ?`,
+  ).run(status, resolution, id);
+
+  return getIdentityReviewItem(id);
+}
+
+/**
+ * Safe write boundary for community catalog sync (Step 5/6 of Phase 1.7): upserts
+ * normally when there is no existing row, when the write is provably the same
+ * identity, or when this exact collision was already resolved by a human. Otherwise
+ * defers the write, preserving the existing record, and files/reuses a review item.
+ */
+export function upsertCatalogEntryWithIdentityReview(
+  incoming: IncomingCatalogWrite,
+): { deferred: boolean; reviewId?: string; writtenCatalogGameId?: string } {
+  const existing = getCatalogEntry(incoming.entry.catalogGameId);
+  if (!existing) {
+    upsertCatalogEntry(incoming.entry);
+    return { deferred: false, writtenCatalogGameId: incoming.entry.catalogGameId };
+  }
+
+  const collision = detectIdentityCollision(existing, incoming);
+  if (!collision) {
+    upsertCatalogEntry(incoming.entry);
+    return { deferred: false, writtenCatalogGameId: incoming.entry.catalogGameId };
+  }
+
+  const existingReview = getIdentityReviewItem(collision.fingerprint);
+  if (existingReview && existingReview.status !== 'pending') {
+    if (existingReview.resolution === 'accept-incoming') {
+      upsertCatalogEntry(incoming.entry);
+      return { deferred: false, writtenCatalogGameId: incoming.entry.catalogGameId };
+    }
+    if (existingReview.resolution === 'treat-separate') {
+      const separateId = buildSeparateIdentityCatalogGameId(existing.catalogGameId, incoming.provider);
+      upsertCatalogEntry({ ...incoming.entry, catalogGameId: separateId });
+      return { deferred: false, writtenCatalogGameId: separateId };
+    }
+    // keep-existing / ignore: honor the human decision, skip the write again.
+    return { deferred: true, reviewId: existingReview.id };
+  }
+
+  const { leftRecord, rightRecord } = buildIdentityReviewRecords(existing, incoming);
+  const item = createOrReuseIdentityReviewItem(collision.fingerprint, collision.reason, leftRecord, rightRecord);
+  return { deferred: true, reviewId: item.id };
 }

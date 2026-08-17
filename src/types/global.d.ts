@@ -432,6 +432,24 @@ interface Window {
       errors?: string[];
       error?: string;
     }>;
+    trainerCatalogIdentityReviewList: () => Promise<{
+      success: boolean;
+      items?: import('../core/trainer-catalog/identity-review.js').IdentityReviewItem[];
+      error?: string;
+    }>;
+    trainerCatalogIdentityReviewCount: () => Promise<{
+      success: boolean;
+      count?: number;
+      error?: string;
+    }>;
+    trainerCatalogIdentityReviewResolve: (payload: {
+      id: string;
+      resolution: 'keep-existing' | 'accept-incoming' | 'treat-separate' | 'ignore';
+    }) => Promise<{
+      success: boolean;
+      item?: import('../core/trainer-catalog/identity-review.js').IdentityReviewItem;
+      error?: string;
+    }>;
     trainerCatalogPickCt: () => Promise<{
       success: boolean;
       canceled?: boolean;

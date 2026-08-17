@@ -4033,6 +4033,132 @@ code, .mono {
   opacity: 0.8;
 }
 
+.settings-section:has(.identity-review-list),
+.settings-section:has(.identity-review-empty) {
+  max-width: 900px;
+}
+
+.identity-review-error {
+  color: var(--danger, #e5484d);
+  font-size: 13px;
+}
+
+.identity-review-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.identity-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.identity-review-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.identity-review-item-header {
+  margin-bottom: 10px;
+}
+
+.identity-review-reason {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+
+.identity-review-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .identity-review-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.identity-review-record {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.identity-review-record h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.identity-review-record dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.identity-review-record dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.identity-review-record dd {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.identity-review-id {
+  font-family: var(--font-mono, monospace);
+}
+
+.identity-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.identity-review-actions button {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.identity-review-actions button:hover:not(:disabled) {
+  background: var(--bg-active, var(--border));
+}
+
+.identity-review-actions button:focus-visible {
+  outline: 2px solid var(--accent, #4f8cff);
+  outline-offset: 2px;
+}
+
+.identity-review-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .settings-categories {
     width: 160px;

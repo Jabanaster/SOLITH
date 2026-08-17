@@ -284,6 +284,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-catalog-approve-save-path', payload),
   trainerCatalogImportYaml: (payload: { yamlText: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
+  trainerCatalogIdentityReviewList: () => ipcRenderer.invoke('trainer-catalog-identity-review-list'),
+  trainerCatalogIdentityReviewCount: () => ipcRenderer.invoke('trainer-catalog-identity-review-count'),
+  trainerCatalogIdentityReviewResolve: (payload: {
+    id: string;
+    resolution: 'keep-existing' | 'accept-incoming' | 'treat-separate' | 'ignore';
+  }) => ipcRenderer.invoke('trainer-catalog-identity-review-resolve', payload),
   trainerCatalogPickCt: () => ipcRenderer.invoke('trainer-catalog-pick-ct'),
   trainerCatalogPreviewCt: (payload: { filePath: string; xmlText: string; title: string; sha256: string }) =>
     ipcRenderer.invoke('trainer-catalog-preview-ct', payload),

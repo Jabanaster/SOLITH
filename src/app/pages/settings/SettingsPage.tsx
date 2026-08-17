@@ -6,6 +6,7 @@ import { AppearanceSection } from './sections/AppearanceSection.js';
 import { NavigationSection } from './sections/NavigationSection.js';
 import { NotificationsSection } from './sections/NotificationsSection.js';
 import { AboutSection } from './sections/AboutSection.js';
+import { AdvancedSection } from './sections/AdvancedSection.js';
 
 type Props = {
   settings: Settings | null;
@@ -56,6 +57,8 @@ export const SettingsPage: React.FC<Props> = ({ settings, onUpdateSetting, sideb
         return <NotificationsSection settings={settings} onUpdate={onUpdateSetting} />;
       case 'about':
         return <AboutSection />;
+      case 'advanced':
+        return <AdvancedSection />;
       default:
         return <EmptyCategorySection categoryLabel={activeCategoryLabel} />;
     }

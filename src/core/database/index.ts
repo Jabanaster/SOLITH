@@ -926,6 +926,24 @@ function applySchema(): void {
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_catalog_search ON trainer_catalog_games(searchableText)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_mod_packs_game ON trainer_mod_packs(catalogGameId)');
 
+  // Manual review queue for catalog identity collisions/ambiguity (Phase 1.7).
+  // id is a deterministic collision fingerprint so re-syncing an unresolved
+  // pair reuses the same row instead of creating duplicate review items.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_identity_review (
+      id TEXT PRIMARY KEY,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      leftRecordJson TEXT NOT NULL,
+      rightRecordJson TEXT NOT NULL,
+      resolution TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      resolvedAt TEXT
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_catalog_identity_review_status ON catalog_identity_review(status, createdAt)');
+
   // Persisted cheat toggle state (Multi-Game Live Trainer) — remembers which cheats were
   // enabled and their confirmed address so a Solith restart (not a game restart) can
   // re-arm them automatically instead of forcing the user to redo discovery from scratch.

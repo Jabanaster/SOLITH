@@ -11,6 +11,9 @@ import {
   getDefinitionPayload,
   getRecentSyncLogs,
   hasUserAuthoredDefinition,
+  listPendingIdentityReviewItems,
+  getPendingIdentityReviewCount,
+  resolveIdentityReviewItem,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
 import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.js';
@@ -82,6 +85,11 @@ const PublishToCommunitySchema = z.object({
 
 const SyncHubSchema = z.object({
   overwriteUserDefinitions: z.boolean().optional().default(false),
+}).strict();
+
+const ResolveIdentityReviewSchema = z.object({
+  id: z.string().min(1).max(64),
+  resolution: z.enum(['keep-existing', 'accept-incoming', 'treat-separate', 'ignore']),
 }).strict();
 
 const moduleFilename = fileURLToPath(import.meta.url);
@@ -305,7 +313,7 @@ export function registerTrainerCatalogIpc(): void {
         return { success: false, errors: ['source_hash_changed_before_preview'] };
       }
       const result = await previewDefinitionCt(parsed.xmlText, { title: parsed.title });
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors, rejected: result.rejected };
       }
       return {
@@ -333,7 +341,7 @@ export function registerTrainerCatalogIpc(): void {
     try {
       const parsed = ImportCtSchema.parse(payload);
       const result = await importDefinitionCt(parsed.xmlText, { title: parsed.title });
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors, rejected: result.rejected };
       }
       return {
@@ -355,7 +363,11 @@ export function registerTrainerCatalogIpc(): void {
   ipcMain.handle('trainer-catalog-feedback-record', async (_event, payload: unknown) => {
     try {
       const parsed = DefinitionFeedbackSchema.parse(payload);
-      recordDefinitionFeedback(parsed);
+      // `rating` is a required z.union of literals in DefinitionFeedbackSchema
+      // and always present after a successful .parse(); tsconfig.electron.json
+      // runs with strictNullChecks disabled, under which zod's own optionality
+      // inference loosens every required object property to optional.
+      recordDefinitionFeedback({ ...parsed, rating: parsed.rating as -1 | 0 | 1 });
       const summary = getDefinitionFeedbackSummary(parsed.catalogGameId, parsed.featureId);
       return { success: true, summary };
     } catch (error) {
@@ -426,11 +438,40 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
+  ipcMain.handle('trainer-catalog-identity-review-list', async () => {
+    try {
+      const items = listPendingIdentityReviewItems();
+      return { success: true, items };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-identity-review-count', async () => {
+    try {
+      const count = getPendingIdentityReviewCount();
+      return { success: true, count };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-identity-review-resolve', async (_event, payload: unknown) => {
+    try {
+      const parsed = ResolveIdentityReviewSchema.parse(payload);
+      const item = resolveIdentityReviewItem(parsed.id, parsed.resolution);
+      if (!item) return { success: false, error: 'review_item_not_found_or_not_pending' };
+      return { success: true, item };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
   ipcMain.handle('trainer-catalog-import-yaml', async (_event, payload: unknown) => {
     try {
       const parsed = ImportYamlSchema.parse(payload);
       const result = importDefinitionYaml(parsed.yamlText);
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors };
       }
       return {
