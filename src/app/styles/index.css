@@ -1140,6 +1140,7 @@ button, input, select, textarea {
   overflow-y: auto;
   padding-bottom: 24px;
   background: rgba(4, 7, 14, 0.72);
+  container-type: inline-size;
 }
 
 /* ─── Glass Card ────────────────────────────────────────── */
@@ -1675,7 +1676,7 @@ button, input, select, textarea {
   box-shadow: 0 0 0 6px rgba(89, 204, 255, 0.16) !important;
 }
 
-@media (max-width: 980px) {
+@container (max-width: 900px) {
   .page-module-header {
     flex-direction: column;
   }
@@ -1693,6 +1694,32 @@ button, input, select, textarea {
   .page-walkthrough__panel {
     position: static;
     width: 100%;
+  }
+}
+
+/* Fallback for browsers without container query support: falls back to the
+   previous window-width-based breakpoint so the header never silently loses
+   its responsive behavior. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 980px) {
+    .page-module-header {
+      flex-direction: column;
+    }
+
+    .page-module-header__side {
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .page-walkthrough {
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .page-walkthrough__panel {
+      position: static;
+      width: 100%;
+    }
   }
 }
 
