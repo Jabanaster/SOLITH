@@ -56,10 +56,14 @@ import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { registerLocalOcrIpc } from './local-ocr-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
+import { registerNotificationsIpc, broadcastNotificationCreated } from './notifications-ipc.js';
 import {
   reconcileCommunitySyncPolling,
   stopCommunitySyncPolling,
+  configureCommunitySyncOrchestrator,
 } from './community-sync-orchestrator.js';
+import { createNotification } from '../src/core/notifications/index.js';
+import { getNotificationsCategoryEnabled } from '../src/core/settings/index.js';
 import {
   installLocalCrashHandlers,
   installElectronAppCrashHooks,
@@ -89,6 +93,25 @@ registerRegistryVerificationIpc();
 registerInstallDiscoveryIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();
+registerNotificationsIpc();
+
+configureCommunitySyncOrchestrator({
+  notifyCatalogUpdate: (importedCount) => {
+    try {
+      if (!getNotificationsCategoryEnabled('catalog-update')) return;
+      const record = createNotification({
+        category: 'catalog-update',
+        title: 'Catalog updated',
+        message: `${importedCount} trainer definition${importedCount === 1 ? '' : 's'} added or refreshed from the community catalog.`,
+        severity: 'info',
+        action: { type: 'open-view', view: 'trainer-library' },
+      });
+      broadcastNotificationCreated(record);
+    } catch (error) {
+      console.error('notifyCatalogUpdate error:', error);
+    }
+  },
+});
 registerLocalOcrIpc();
 registerWispOverlayIpc();
 

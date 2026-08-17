@@ -21,6 +21,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSetting: (key: string, value: any) => ipcRenderer.invoke('set-setting', key, value),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  listNotifications: () => ipcRenderer.invoke('list-notifications'),
+  getUnreadNotificationCount: () => ipcRenderer.invoke('get-unread-notification-count'),
+  createNotification: (payload: {
+    category: string;
+    title: string;
+    message: string;
+    severity?: string;
+    action?: { type: 'open-view'; view: string };
+  }) => ipcRenderer.invoke('create-notification', payload),
+  markNotificationRead: (id: string) => ipcRenderer.invoke('mark-notification-read', { id }),
+  markAllNotificationsRead: () => ipcRenderer.invoke('mark-all-notifications-read'),
+  clearNotificationHistory: () => ipcRenderer.invoke('clear-notification-history'),
+  onNotificationCreated: (callback: (record: {
+    id: string;
+    category: string;
+    title: string;
+    message: string;
+    severity: string;
+    createdAt: string;
+    read: boolean;
+    action?: { type: 'open-view'; view: string };
+  }) => void) => {
+    const listener = (_event: unknown, record: any) => callback(record);
+    ipcRenderer.on('notification-created', listener);
+    return () => ipcRenderer.removeListener('notification-created', listener);
+  },
   deleteRecipe: (recipeId: string) => ipcRenderer.invoke('delete-recipe', recipeId),
   getBackups: (gameId: string) => ipcRenderer.invoke('get-backups', gameId),
   restoreBackup: (backupId: string) => ipcRenderer.invoke('restore-backup', backupId),

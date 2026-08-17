@@ -31,7 +31,11 @@ import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
 import { WalkthroughOwner } from './components/PageWalkthrough.js';
 import { SettingsPage } from './pages/settings/SettingsPage.js';
 import { useNavSectionState } from './hooks/useNavSectionState.js';
-import type { Settings } from '../shared/types/index.js';
+import { useNotifications } from './hooks/useNotifications.js';
+import { NotificationBell } from './components/NotificationBell.js';
+import { NotificationCenter } from './components/NotificationCenter.js';
+import { ToastHost } from './components/ToastHost.js';
+import type { Settings, NotificationAction } from '../shared/types/index.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -336,6 +340,24 @@ const App: React.FC = () => {
     });
   const navCompactMode = settings?.navCompactMode ?? false;
   const navShowSectionLabels = settings?.navShowSectionLabels ?? true;
+  const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
+  const { notifications, unreadCount, toasts, markRead, markAllRead, clearHistory, dismissToast } =
+    useNotifications({ toastsEnabled: settings?.notificationsToastEnabled ?? true });
+  const handleNotificationAction = (action: NotificationAction) => {
+    setNotificationCenterOpen(false);
+    if (action.type === 'open-view') {
+      setCurrentView(action.view as View);
+    }
+  };
+
+  useEffect(() => {
+    if (!notificationCenterOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNotificationCenterOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [notificationCenterOpen]);
   const walkthroughOwnerKey = [
     currentView,
     selectedGame?.id ?? '',
@@ -431,6 +453,25 @@ const App: React.FC = () => {
             </div>
             {!sidebarCollapsed && (
               <span className="sidebar-header__label">Solith</span>
+            )}
+          </div>
+          <div className="sidebar-notification-anchor">
+            <NotificationBell
+              unreadCount={unreadCount}
+              showBadge={settings?.notificationsShowUnreadBadge ?? true}
+              isOpen={notificationCenterOpen}
+              onToggle={() => setNotificationCenterOpen((prev) => !prev)}
+            />
+            {notificationCenterOpen && (
+              <NotificationCenter
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onClose={() => setNotificationCenterOpen(false)}
+                onMarkRead={markRead}
+                onMarkAllRead={markAllRead}
+                onClearHistory={clearHistory}
+                onAction={handleNotificationAction}
+              />
             )}
           </div>
           <button
@@ -601,6 +642,8 @@ const App: React.FC = () => {
           onDismiss={() => setProcessToast(null)}
         />
       )}
+
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
 
       {showOpeningCinematic && (
         <OpeningCinematic

@@ -24,6 +24,10 @@ export function getSettings(): Settings {
     'inProcessScriptExecutionEnabled',
     'navSectionBehaviorMode', 'navCompactMode', 'navShowSectionLabels',
     'navRememberedSectionState',
+    'notificationsToastEnabled', 'notificationsCatalogUpdateEnabled',
+    'notificationsArtworkEnabled', 'notificationsTrainerProfileEnabled',
+    'notificationsMaintenanceEnabled', 'notificationsShowUnreadBadge',
+    'communitySyncEverSucceeded',
   ];
   
   keys.forEach(key => {
@@ -72,6 +76,13 @@ export function getSettings(): Settings {
     navRememberedSectionState: typeof settings.navRememberedSectionState === 'string'
       ? settings.navRememberedSectionState
       : '{}',
+    notificationsToastEnabled: settings.notificationsToastEnabled !== false,
+    notificationsCatalogUpdateEnabled: settings.notificationsCatalogUpdateEnabled !== false,
+    notificationsArtworkEnabled: settings.notificationsArtworkEnabled !== false,
+    notificationsTrainerProfileEnabled: settings.notificationsTrainerProfileEnabled !== false,
+    notificationsMaintenanceEnabled: settings.notificationsMaintenanceEnabled !== false,
+    notificationsShowUnreadBadge: settings.notificationsShowUnreadBadge !== false,
+    communitySyncEverSucceeded: settings.communitySyncEverSucceeded === true,
   };
 
   if (process.env.NODE_ENV === 'test' || process.env.SOLITH_SKIP_ONBOARDING === '1') {
@@ -193,4 +204,42 @@ export function getNavRememberedSectionState(): string {
 
 export function setNavRememberedSectionState(json: string): void {
   setSetting('navRememberedSectionState', json);
+}
+
+export function getNotificationsToastEnabled(): boolean {
+  return getSetting('notificationsToastEnabled') !== false;
+}
+
+export function setNotificationsToastEnabled(enabled: boolean): void {
+  setSetting('notificationsToastEnabled', enabled);
+}
+
+const NOTIFICATION_CATEGORY_SETTING_KEYS: Record<
+  'catalog-update' | 'artwork' | 'trainer-profile' | 'maintenance',
+  keyof Settings
+> = {
+  'catalog-update': 'notificationsCatalogUpdateEnabled',
+  artwork: 'notificationsArtworkEnabled',
+  'trainer-profile': 'notificationsTrainerProfileEnabled',
+  maintenance: 'notificationsMaintenanceEnabled',
+};
+
+export function getNotificationsCategoryEnabled(category: 'catalog-update' | 'artwork' | 'trainer-profile' | 'maintenance'): boolean {
+  return getSetting(NOTIFICATION_CATEGORY_SETTING_KEYS[category]) !== false;
+}
+
+export function setNotificationsShowUnreadBadge(enabled: boolean): void {
+  setSetting('notificationsShowUnreadBadge', enabled);
+}
+
+export function getNotificationsShowUnreadBadge(): boolean {
+  return getSetting('notificationsShowUnreadBadge') !== false;
+}
+
+export function getCommunitySyncEverSucceeded(): boolean {
+  return getSetting('communitySyncEverSucceeded') === true;
+}
+
+export function setCommunitySyncEverSucceeded(value: boolean): void {
+  setSetting('communitySyncEverSucceeded', value);
 }

@@ -34,6 +34,30 @@ interface Window {
     // Settings
     getSettings: () => Promise<any>;
     setSetting: (key: string, value: any) => Promise<any>;
+    getAppVersion: () => Promise<string>;
+    // Notifications
+    listNotifications: () => Promise<any[]>;
+    getUnreadNotificationCount: () => Promise<number>;
+    createNotification: (payload: {
+      category: string;
+      title: string;
+      message: string;
+      severity?: string;
+      action?: { type: 'open-view'; view: string };
+    }) => Promise<any>;
+    markNotificationRead: (id: string) => Promise<any>;
+    markAllNotificationsRead: () => Promise<any>;
+    clearNotificationHistory: () => Promise<any>;
+    onNotificationCreated?: (callback: (record: {
+      id: string;
+      category: string;
+      title: string;
+      message: string;
+      severity: string;
+      createdAt: string;
+      read: boolean;
+      action?: { type: 'open-view'; view: string };
+    }) => void) => () => void;
     // Backups
     getBackups: (gameId: string) => Promise<any[]>;
     restoreBackup: (backupId: string) => Promise<any>;

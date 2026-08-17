@@ -1022,6 +1022,20 @@ function applySchema(): void {
     )
   `);
 
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      createdAt TEXT DEFAULT (datetime('now')),
+      read INTEGER DEFAULT 0,
+      actionType TEXT,
+      actionView TEXT
+    )
+  `);
+
   // Indexes
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_games_path ON games(path)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_scans_gameId ON scans(gameId)');

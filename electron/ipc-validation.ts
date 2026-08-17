@@ -127,6 +127,21 @@ export const SetSettingSchema = z.object({
   value: z.union([z.string(), z.number(), z.boolean()])
 });
 
+export const CreateNotificationSchema = z.object({
+  category: z.enum(['catalog-update', 'artwork', 'trainer-profile', 'maintenance', 'recovery', 'general']),
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(1000),
+  severity: z.enum(['info', 'success', 'warning', 'error']).optional(),
+  action: z.object({
+    type: z.literal('open-view'),
+    view: z.string().min(1).max(100),
+  }).optional(),
+});
+
+export const MarkNotificationReadSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export const GetBackupsSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000'))
 });

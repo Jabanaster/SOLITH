@@ -245,9 +245,44 @@ export interface Settings {
   navShowSectionLabels?: boolean;
   /** JSON-encoded map of section title -> manually-collapsed boolean, used only in 'remember' mode. Default: '{}'. */
   navRememberedSectionState?: string;
+  /** Show toast popups for new notifications. Default: true. */
+  notificationsToastEnabled?: boolean;
+  /** Notify on real catalog-update events. Default: true. */
+  notificationsCatalogUpdateEnabled?: boolean;
+  /** Notify on artwork fetch events. Default: true. */
+  notificationsArtworkEnabled?: boolean;
+  /** Notify on trainer/profile update events. Default: true. */
+  notificationsTrainerProfileEnabled?: boolean;
+  /** Notify on maintenance/recovery notices. Default: true. */
+  notificationsMaintenanceEnabled?: boolean;
+  /** Show the unread badge on the notification bell. Default: true. */
+  notificationsShowUnreadBadge?: boolean;
+  /** Tracks whether community catalog sync has ever completed successfully, used to suppress the first-sync notification. Default: false. */
+  communitySyncEverSucceeded?: boolean;
 }
 
 export type NavSectionBehaviorMode = 'remember' | 'always-expand' | 'always-collapse-inactive';
+
+export type NotificationCategory =
+  | 'catalog-update' | 'artwork' | 'trainer-profile' | 'maintenance' | 'recovery' | 'general';
+
+export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
+
+export interface NotificationAction {
+  type: 'open-view';
+  view: string;
+}
+
+export interface NotificationRecord {
+  id: string;
+  category: NotificationCategory;
+  title: string;
+  message: string;
+  severity: NotificationSeverity;
+  createdAt: string;
+  read: boolean;
+  action?: NotificationAction;
+}
 
 export interface AIConfig {
   provider: 'None' | 'Ollama' | 'LM Studio';

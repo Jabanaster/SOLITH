@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS_CATEGORY, SETTINGS_CATEGORIES, type SettingsCategoryId
 import { EmptyCategorySection } from './sections/EmptyCategorySection.js';
 import { AppearanceSection } from './sections/AppearanceSection.js';
 import { NavigationSection } from './sections/NavigationSection.js';
+import { NotificationsSection } from './sections/NotificationsSection.js';
 import { AboutSection } from './sections/AboutSection.js';
 
 type Props = {
@@ -51,6 +52,8 @@ export const SettingsPage: React.FC<Props> = ({ settings, onUpdateSetting, sideb
             onToggleSidebar={onToggleSidebar}
           />
         );
+      case 'notifications':
+        return <NotificationsSection settings={settings} onUpdate={onUpdateSetting} />;
       case 'about':
         return <AboutSection />;
       default:
