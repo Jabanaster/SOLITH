@@ -7,6 +7,8 @@ import { NavigationSection } from './sections/NavigationSection.js';
 import { NotificationsSection } from './sections/NotificationsSection.js';
 import { AboutSection } from './sections/AboutSection.js';
 import { AdvancedSection } from './sections/AdvancedSection.js';
+import { GameLibrarySection } from './sections/GameLibrarySection.js';
+import { LaunchersAccountsSection } from './sections/LaunchersAccountsSection.js';
 
 type Props = {
   settings: Settings | null;
@@ -55,6 +57,10 @@ export const SettingsPage: React.FC<Props> = ({ settings, onUpdateSetting, sideb
         );
       case 'notifications':
         return <NotificationsSection settings={settings} onUpdate={onUpdateSetting} />;
+      case 'game-library':
+        return <GameLibrarySection />;
+      case 'launchers-accounts':
+        return <LaunchersAccountsSection />;
       case 'about':
         return <AboutSection />;
       case 'advanced':

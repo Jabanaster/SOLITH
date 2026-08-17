@@ -484,6 +484,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('install-discovery-commit', payload),
   installDiscoveryList: () => ipcRenderer.invoke('install-discovery-list'),
 
+  listGameLibrary: (payload?: { view?: 'installed' | 'all' | 'owned' }) =>
+    ipcRenderer.invoke('list-game-library', payload ?? {}),
+  listCanonicalGames: () => ipcRenderer.invoke('list-canonical-games'),
+  getCanonicalGame: (payload: { canonicalGameId: string }) => ipcRenderer.invoke('get-canonical-game', payload),
+  launchInstallation: (payload: { canonicalGameId: string; installationId: string }) =>
+    ipcRenderer.invoke('launch-installation', payload),
+
   trainerDeckGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-deck-get', payload),
   trainerHealthCheck: (payload?: { catalogGameId?: string }) =>
     ipcRenderer.invoke('trainer-health-check', payload ?? {}),

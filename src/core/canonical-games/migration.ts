@@ -1,6 +1,8 @@
 import { listInstalledGames } from '../install-discovery/store.js';
 import { getCatalogEntry } from '../trainer-catalog/store.js';
+import { getGames } from '../games/index.js';
 import type { InstalledGameRecord } from '../install-discovery/types.js';
+import type { Game } from '../../shared/types/index.js';
 import { resolveCanonicalGrouping } from './dedupe.js';
 import { computeIdentityKey, generateCanonicalGameId, normalizeCanonicalTitle } from './identity.js';
 import { createOrReuseCanonicalIdentityReviewItem, upsertCanonicalGame, upsertGameInstallation } from './store.js';
@@ -9,6 +11,8 @@ import type { CanonicalGame, CanonicalIdentityEvidence, GameInstallation } from 
 
 export interface CanonicalMigrationReport {
   legacyInstalledGameRows: number;
+  /** Rows sourced from the legacy manually-managed `games` table (Game Library), migrated as Standalone installations. */
+  legacyManualGameRows: number;
   canonicalGamesProduced: number;
   installationsProduced: number;
   safeMerges: number;
@@ -52,6 +56,26 @@ export function buildEvidenceFromInstalledGame(record: InstalledGameRecord): Can
     executablePath: record.executablePath,
     detectedAt: record.detectedAt,
     lastSeenAt: record.lastSeenAt,
+  };
+}
+
+/**
+ * Builds identity evidence for one legacy `games` row (the manually-managed Game Library
+ * table — distinct from `installed_games`). Treated as a 'manual' (Standalone) launcher
+ * installation. sourceId is prefixed to keep it in a distinct namespace from
+ * installed_games ids, since both tables use independently-generated string ids.
+ */
+export function buildEvidenceFromLegacyGame(game: Game): CanonicalIdentityEvidence {
+  return {
+    sourceId: `legacy-game:${game.id}`,
+    platform: 'manual',
+    installIdentity: `manual:${game.id}`,
+    canonicalExecutablePath: game.executablePath,
+    displayName: game.name,
+    installPath: game.path,
+    executablePath: game.executablePath,
+    detectedAt: game.dateAdded,
+    lastSeenAt: game.lastScan ?? game.dateAdded,
   };
 }
 
@@ -104,7 +128,11 @@ function buildInstallationForEvidence(canonicalId: string, evidence: CanonicalId
  */
 export function planCanonicalMigration(nowIso: string): CanonicalMigrationPlan {
   const installedGames = listInstalledGames();
-  const evidenceList = installedGames.map(buildEvidenceFromInstalledGame);
+  const legacyGames = getGames();
+  const evidenceList = [
+    ...installedGames.map(buildEvidenceFromInstalledGame),
+    ...legacyGames.map(buildEvidenceFromLegacyGame),
+  ];
   const { groups, ambiguous } = resolveCanonicalGrouping(evidenceList);
 
   const canonicalGames: CanonicalGame[] = [];
@@ -125,6 +153,7 @@ export function planCanonicalMigration(nowIso: string): CanonicalMigrationPlan {
     ambiguous,
     report: {
       legacyInstalledGameRows: installedGames.length,
+      legacyManualGameRows: legacyGames.length,
       canonicalGamesProduced: canonicalGames.length,
       installationsProduced: installations.length,
       safeMerges: installations.length - canonicalGames.length,

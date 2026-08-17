@@ -916,6 +916,47 @@ interface Window {
       error?: string;
     }>;
 
+    listGameLibrary: (payload?: { view?: 'installed' | 'all' | 'owned' }) => Promise<{
+      success: boolean;
+      records?: Array<{
+        canonicalGameId: string;
+        title: string;
+        aliases: string[];
+        artworkUrl?: string;
+        supportState: 'supported' | 'partial' | 'unsupported' | 'unknown';
+        trainerAvailability: 'available' | 'unavailable' | 'unknown';
+        verificationStatus: 'verified' | 'community' | 'metadata-only' | 'unverified' | 'unknown';
+        ownershipStatus?: 'owned';
+        manuallyAdded: boolean;
+        installations: Array<{
+          installationId: string;
+          launcher: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+          edition?: string;
+          installPath?: string;
+          executablePath?: string;
+          buildVersion?: string;
+          launchUri?: string;
+          lastSeenAt: string;
+          detectionSource: 'auto-detected' | 'manual';
+          active: boolean;
+          sourceGameId?: string;
+        }>;
+        saveLocations: string[];
+      }>;
+      error?: string;
+    }>;
+    listCanonicalGames: () => Promise<{ success: boolean; games?: unknown[]; error?: string }>;
+    getCanonicalGame: (payload: { canonicalGameId: string }) => Promise<{
+      success: boolean;
+      game?: unknown;
+      installations?: unknown[];
+      error?: string;
+    }>;
+    launchInstallation: (payload: { canonicalGameId: string; installationId: string }) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+
     trainerDeckGet: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       entry?: import('../core/trainer-catalog/types.js').TrainerCatalogEntry;
