@@ -541,6 +541,7 @@ function applySchema(): void {
     'saveLocations TEXT',
     'notes TEXT',
     'metadataId TEXT',
+    'launcher TEXT',
   ];
   for (const column of optionalGameColumns) {
     const columnName = column.split(' ')[0];

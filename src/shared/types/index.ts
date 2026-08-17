@@ -1,3 +1,5 @@
+export type GameLauncherIdentity = 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
+
 export interface Game {
   id: string;
   name: string;
@@ -13,6 +15,8 @@ export interface Game {
   metadataId?: string;
   fingerprint?: GameFingerprint;
   needsRescan?: boolean;
+  /** Real launcher identity for this manually-managed record (Phase 2C). Defaults to 'manual' (Standalone) when absent. */
+  launcher?: GameLauncherIdentity;
 }
 
 export interface GameFingerprint {

@@ -463,6 +463,7 @@ ipcMain.handle('update-game', async (_event, gameData) => {
       saveLocations: parsed.saveLocations,
       notes: parsed.notes,
       metadataId: parsed.metadataId,
+      launcher: parsed.launcher,
     });
     if (!game) return { success: false, error: 'Game not found' };
     return { success: true, game };

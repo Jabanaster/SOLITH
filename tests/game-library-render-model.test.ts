@@ -348,3 +348,169 @@ describe('game library render model — views and migration activation', () => {
     assert.equal(matches.length, 1, 'renderer search operates over this one record, never per-installation duplicates');
   });
 });
+
+describe('game library render model — launcher identity (Phase 2C)', () => {
+  before(async () => {
+    await initDatabase();
+  });
+
+  test('a manually-added Ubisoft Connect installation retains launcher=ubisoft', () => {
+    const game = addGame({
+      name: 'Render Ubisoft Entry',
+      path: 'C:/Games/RenderUbisoft',
+      launcher: 'ubisoft',
+    });
+
+    const records = buildGameLibraryRecords('all', new Date(0).toISOString());
+    const record = records.find((r) => r.title === 'Render Ubisoft Entry');
+    assert.ok(record);
+    assert.equal(record!.installations[0].launcher, 'ubisoft', 'manual detection must not overwrite the chosen launcher identity with manual');
+
+    deleteGame(game.id);
+  });
+
+  test('a manually-added EA app installation retains launcher=ea', () => {
+    const game = addGame({
+      name: 'Render EA Entry',
+      path: 'C:/Games/RenderEA',
+      launcher: 'ea',
+    });
+
+    const records = buildGameLibraryRecords('all', new Date(0).toISOString());
+    const record = records.find((r) => r.title === 'Render EA Entry');
+    assert.ok(record);
+    assert.equal(record!.installations[0].launcher, 'ea');
+
+    deleteGame(game.id);
+  });
+
+  test('a manually-added Battle.net installation retains launcher=battlenet', () => {
+    const game = addGame({
+      name: 'Render Battlenet Entry',
+      path: 'C:/Games/RenderBattlenet',
+      launcher: 'battlenet',
+    });
+
+    const records = buildGameLibraryRecords('all', new Date(0).toISOString());
+    const record = records.find((r) => r.title === 'Render Battlenet Entry');
+    assert.ok(record);
+    assert.equal(record!.installations[0].launcher, 'battlenet');
+
+    deleteGame(game.id);
+  });
+
+  test('a legacy record added before Phase 2C (no launcher column value) still defaults safely to manual/Standalone', () => {
+    const game = addGame({
+      name: 'Render Legacy Default',
+      path: 'C:/Games/RenderLegacyDefault',
+    });
+
+    const records = buildGameLibraryRecords('all', new Date(0).toISOString());
+    const record = records.find((r) => r.title === 'Render Legacy Default');
+    assert.ok(record);
+    assert.equal(record!.installations[0].launcher, 'manual');
+
+    deleteGame(game.id);
+  });
+
+  test('same canonical game on Steam + Ubisoft merges to one game, two installations, when trusted corroboration exists', () => {
+    const steamRow = makeInstalledGame({
+      id: nextId('launcher-steam-ubi'),
+      platform: 'steam',
+      installPath: 'C:/Games/LauncherSteamUbi',
+      executablePath: 'C:/Games/LauncherSteamUbi/corroborated.exe',
+      displayName: 'Render Corroborated Title',
+    });
+    upsertInstalledGames([steamRow]);
+    const ubisoftGame = addGame({
+      name: 'Render Corroborated Title',
+      path: 'D:/Ubisoft/LauncherUbiCorroborated',
+      executablePath: 'D:/Ubisoft/LauncherUbiCorroborated/corroborated.exe',
+      launcher: 'ubisoft',
+    });
+
+    const records = buildGameLibraryRecords('all', new Date(0).toISOString());
+    const matches = records.filter((r) => r.title === 'Render Corroborated Title');
+    assert.equal(matches.length, 1, 'expected one canonical game (exe basename + exact title is trusted tier-3 evidence)');
+    const launchers = matches[0].installations.map((i) => i.launcher).sort();
+    assert.deepEqual(launchers, ['steam', 'ubisoft']);
+
+    deleteGame(ubisoftGame.id);
+  });
+
+  test('launcher identity alone never causes a false merge — two distinct trusted Ubisoft/EA titles stay separate', () => {
+    // Tier-3 (executable basename + exact title) is trusted evidence, independent of
+    // launcher. Two different games on Ubisoft/EA with different executables must never
+    // merge just because both are unmapped launchers (Step 7/8).
+    const ubisoftGame = addGame({
+      name: 'Render Distinct Launcher Title',
+      path: 'D:/Ubisoft/LauncherDistinctUbi',
+      executablePath: 'D:/Ubisoft/LauncherDistinctUbi/ubititle.exe',
+      launcher: 'ubisoft',
+    });
+    const eaGame = addGame({
+      name: 'Render Distinct Launcher Title',
+      path: 'D:/EA/LauncherDistinctEA',
+      executablePath: 'D:/EA/LauncherDistinctEA/eatitle.exe',
+      launcher: 'ea',
+    });
+
+    const records = buildGameLibraryRecords('all', new Date(0).toISOString());
+    const matches = records.filter((r) => r.title === 'Render Distinct Launcher Title');
+    assert.equal(matches.length, 2, 'different executable basenames under the same title are trusted-but-distinct, not a merge target');
+
+    deleteGame(ubisoftGame.id);
+    deleteGame(eaGame.id);
+  });
+
+  test('a title-only Battle.net entry matching two distinct trusted Ubisoft/EA identities routes to manual review, not a guess', () => {
+    const ubisoftGame = addGame({
+      name: 'Render Conflicting Trusted Title',
+      path: 'D:/Ubisoft/LauncherConflictUbi',
+      executablePath: 'D:/Ubisoft/LauncherConflictUbi/conflict-a.exe',
+      launcher: 'ubisoft',
+    });
+    const eaGame = addGame({
+      name: 'Render Conflicting Trusted Title',
+      path: 'D:/EA/LauncherConflictEA',
+      executablePath: 'D:/EA/LauncherConflictEA/conflict-b.exe',
+      launcher: 'ea',
+    });
+    const battlenetGame = addGame({
+      name: 'Render Conflicting Trusted Title',
+      path: 'D:/Battlenet/LauncherConflictBnet',
+      launcher: 'battlenet',
+    });
+
+    buildGameLibraryRecords('all', new Date(0).toISOString());
+
+    const pending = listPendingCanonicalIdentityReviewItems();
+    const reviewedSourceIds = new Set(pending.flatMap((item) => item.evidence.map((e) => e.sourceId)));
+    assert.ok(
+      reviewedSourceIds.has(`legacy-game:${battlenetGame.id}`),
+      'the untrusted title-only Battle.net row matches two distinct trusted buckets and must not be guessed',
+    );
+
+    deleteGame(ubisoftGame.id);
+    deleteGame(eaGame.id);
+    deleteGame(battlenetGame.id);
+  });
+
+  test('repeated migration with new launcher identities stays idempotent — no duplicate records or installations', () => {
+    const game = addGame({
+      name: 'Render Battlenet Idempotent',
+      path: 'C:/Games/RenderBattlenetIdem',
+      launcher: 'battlenet',
+    });
+
+    buildGameLibraryRecords('all', new Date(0).toISOString());
+    buildGameLibraryRecords('all', new Date(1).toISOString());
+    const records = buildGameLibraryRecords('all', new Date(2).toISOString());
+    const matches = records.filter((r) => r.title === 'Render Battlenet Idempotent');
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].installations.length, 1);
+    assert.equal(matches[0].installations[0].launcher, 'battlenet');
+
+    deleteGame(game.id);
+  });
+});

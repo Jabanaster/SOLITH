@@ -10,6 +10,8 @@ import { isPathApproved } from '../src/core/saves/locations.js';
  * Validates shapes, types, IDs, and path safety constraints at runtime.
  */
 
+const GameLauncherSchema = z.enum(['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea', 'battlenet', 'manual']);
+
 export const AddGameSchema = z.object({
   name: z.string().min(1).max(100),
   path: z.string().min(1),
@@ -19,7 +21,8 @@ export const AddGameSchema = z.object({
   iconPath: z.string().max(1024).optional(),
   saveLocations: z.array(z.string().max(1024)).max(20).optional(),
   notes: z.string().max(2000).optional(),
-  metadataId: z.string().max(200).optional()
+  metadataId: z.string().max(200).optional(),
+  launcher: GameLauncherSchema.optional()
 });
 
 export const UpdateGameSchema = z.object({
@@ -32,7 +35,8 @@ export const UpdateGameSchema = z.object({
   iconPath: z.string().max(1024).optional(),
   saveLocations: z.array(z.string().max(1024)).max(20).optional(),
   notes: z.string().max(2000).optional(),
-  metadataId: z.string().max(200).optional()
+  metadataId: z.string().max(200).optional(),
+  launcher: GameLauncherSchema.optional()
 });
 
 export const ScanGameSchema = z.object({

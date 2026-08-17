@@ -322,6 +322,12 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     epic: raw.filter((g) => g.platform === 'epic').length,
     gog: raw.filter((g) => g.platform === 'gog').length,
     xbox: raw.filter((g) => g.platform === 'xbox').length,
+    // Ubisoft Connect, EA app, and Battle.net have no auto-discovery scanner yet
+    // (Step 11) — always 0 here; manually-known installations for these launchers
+    // are counted separately from the `games` table, not from this scan result.
+    ubisoft: raw.filter((g) => g.platform === 'ubisoft').length,
+    ea: raw.filter((g) => g.platform === 'ea').length,
+    battlenet: raw.filter((g) => g.platform === 'battlenet').length,
     manual: raw.filter((g) => g.platform === 'manual').length,
   };
 

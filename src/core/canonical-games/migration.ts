@@ -1,5 +1,6 @@
 import { listInstalledGames } from '../install-discovery/store.js';
 import { getCatalogEntry } from '../trainer-catalog/store.js';
+import { getCatalogDemand } from '../catalog-demand/store.js';
 import { getGames } from '../games/index.js';
 import type { InstalledGameRecord } from '../install-discovery/types.js';
 import type { Game } from '../../shared/types/index.js';
@@ -61,14 +62,15 @@ export function buildEvidenceFromInstalledGame(record: InstalledGameRecord): Can
 
 /**
  * Builds identity evidence for one legacy `games` row (the manually-managed Game Library
- * table — distinct from `installed_games`). Treated as a 'manual' (Standalone) launcher
- * installation. sourceId is prefixed to keep it in a distinct namespace from
+ * table — distinct from `installed_games`). Uses the record's real launcher identity when
+ * known (Phase 2C), falling back to 'manual' (Standalone) for older rows added before that
+ * field existed. sourceId is prefixed to keep it in a distinct namespace from
  * installed_games ids, since both tables use independently-generated string ids.
  */
 export function buildEvidenceFromLegacyGame(game: Game): CanonicalIdentityEvidence {
   return {
     sourceId: `legacy-game:${game.id}`,
-    platform: 'manual',
+    platform: game.launcher ?? 'manual',
     installIdentity: `manual:${game.id}`,
     canonicalExecutablePath: game.executablePath,
     displayName: game.name,
@@ -85,6 +87,9 @@ function buildCanonicalGameForGroup(canonicalId: string, evidence: CanonicalIden
   const displayName = catalogEntry?.displayName ?? evidence.find((e) => e.displayName)?.displayName ?? evidence[0].sourceId;
   const normalizedTitle = normalizeCanonicalTitle(displayName) ?? displayName.toLowerCase();
   const identityKey = computeIdentityKey(evidence[0]);
+  // Real, already-tracked local demand signal (Step 17) — trivial and lossless to wire,
+  // unlike developer/publisher/releaseDate which have no trusted source in this repo yet.
+  const demand = catalogEntry ? getCatalogDemand(catalogEntry.catalogGameId) : null;
 
   return {
     id: canonicalId,
@@ -97,6 +102,9 @@ function buildCanonicalGameForGroup(canonicalId: string, evidence: CanonicalIden
     supportState: catalogEntry?.hasModPack ? 'supported' : 'unknown',
     artworkIdentity: catalogEntry
       ? { headerUrl: catalogEntry.headerUrl, coverUrl: catalogEntry.coverUrl, iconUrl: catalogEntry.iconUrl }
+      : undefined,
+    popularityMetadata: demand
+      ? { notifyCount: demand.notifyCount, verificationRequests: demand.verificationRequests }
       : undefined,
     catalogGameId: catalogEntry?.catalogGameId,
     identityStatus: identityKey.trusted ? 'verified' : 'backfilled',

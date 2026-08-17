@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { BrandingArtwork } from '../components/BrandingArtwork.js';
 
+type GameLauncherIdentity = 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
+
 interface Game {
   id: string;
   name: string;
@@ -17,6 +19,7 @@ interface Game {
   metadataId?: string;
   fingerprint?: any;
   needsRescan?: boolean;
+  launcher?: GameLauncherIdentity;
 }
 
 interface GameFormPayload {
@@ -29,6 +32,7 @@ interface GameFormPayload {
   saveLocations?: string[];
   notes?: string;
   metadataId?: string;
+  launcher?: GameLauncherIdentity;
 }
 
 interface GameLibraryProps {
@@ -41,7 +45,7 @@ type GameLibraryView = 'installed' | 'all' | 'owned';
 
 type GameLibraryInstallation = {
   installationId: string;
-  launcher: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+  launcher: GameLauncherIdentity;
   edition?: string;
   installPath?: string;
   executablePath?: string;
@@ -72,8 +76,22 @@ const LAUNCHER_LABELS: Record<GameLibraryInstallation['launcher'], string> = {
   epic: 'Epic',
   gog: 'GOG',
   xbox: 'Xbox',
+  ubisoft: 'Ubisoft Connect',
+  ea: 'EA app',
+  battlenet: 'Battle.net',
   manual: 'Standalone',
 };
+
+const LAUNCHER_SELECT_OPTIONS: Array<{ value: GameLauncherIdentity; label: string }> = [
+  { value: 'manual', label: 'Standalone' },
+  { value: 'steam', label: 'Steam' },
+  { value: 'gog', label: 'GOG' },
+  { value: 'epic', label: 'Epic Games Store' },
+  { value: 'xbox', label: 'Xbox / Microsoft Store' },
+  { value: 'ubisoft', label: 'Ubisoft Connect' },
+  { value: 'ea', label: 'EA app' },
+  { value: 'battlenet', label: 'Battle.net' },
+];
 
 const GAME_LIBRARY_VIEW_KEY = 'solith-game-library-view';
 
@@ -102,7 +120,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
   const [newGameName, setNewGameName] = useState('');
   const [newGamePath, setNewGamePath] = useState('');
   const [newGameExecutable, setNewGameExecutable] = useState('');
-  const [newGameLauncher, setNewGameLauncher] = useState('');
+  const [newGameLauncher, setNewGameLauncher] = useState<GameLauncherIdentity>('manual');
   const [newGameSaveLocations, setNewGameSaveLocations] = useState('');
   const [newGameCover, setNewGameCover] = useState('');
   const [newGameIcon, setNewGameIcon] = useState('');
@@ -177,7 +195,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     setNewGameName('');
     setNewGamePath('');
     setNewGameExecutable('');
-    setNewGameLauncher('');
+    setNewGameLauncher('manual');
     setNewGameSaveLocations('');
     setNewGameCover('');
     setNewGameIcon('');
@@ -196,7 +214,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     setNewGameName(game.name);
     setNewGamePath(game.path);
     setNewGameExecutable(game.executablePath ?? '');
-    setNewGameLauncher(game.engine === 'Generic' ? '' : game.engine ?? '');
+    setNewGameLauncher(game.launcher ?? 'manual');
     setNewGameSaveLocations((game.saveLocations ?? []).join('\n'));
     setNewGameCover(game.coverPath ?? '');
     setNewGameIcon(game.iconPath ?? '');
@@ -251,11 +269,9 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       setModalError(`This path is already recorded for ${duplicate.name}.`);
       return;
     }
-    const engine = newGameLauncher.trim() || 'Manual';
     const payload: GameFormPayload = {
       name: nameToSave,
       path: pathToSave,
-      engine,
       executablePath: newGameExecutable.trim() || undefined,
       coverPath: newGameCover.trim() || undefined,
       iconPath: newGameIcon.trim() || undefined,
@@ -265,6 +281,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
         .filter(Boolean),
       notes: newGameNotes.trim() || undefined,
       metadataId: newGameMetadataId.trim() || undefined,
+      launcher: newGameLauncher,
     };
     if (editingGame) {
       const result = await window.electronAPI?.updateGame?.({
@@ -607,13 +624,17 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
               </button>
             </div>
             <div className="input-group">
-              <label>Launcher / Source</label>
-              <input
-                type="text"
-                placeholder="Manual, Steam, GOG, Epic, Xbox"
+              <label>Launcher</label>
+              <select
                 value={newGameLauncher}
-                onChange={(e) => setNewGameLauncher(e.target.value)}
-              />
+                onChange={(e) => setNewGameLauncher(e.target.value as GameLauncherIdentity)}
+              >
+                {LAUNCHER_SELECT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="input-group">
               <label>Save Locations (optional, persisted)</label>

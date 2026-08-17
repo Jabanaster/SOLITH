@@ -19,6 +19,7 @@ interface Window {
       saveLocations?: string[];
       notes?: string;
       metadataId?: string;
+      launcher?: 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
     }) => Promise<any>;
     deleteGame: (gameId: string) => Promise<any>;
     pickGameFolder: () => Promise<{ success: boolean; folderPath?: string; canceled?: boolean; error?: string }>;
@@ -930,7 +931,7 @@ interface Window {
         manuallyAdded: boolean;
         installations: Array<{
           installationId: string;
-          launcher: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+          launcher: 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
           edition?: string;
           installPath?: string;
           executablePath?: string;
