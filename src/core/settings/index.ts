@@ -1,5 +1,13 @@
 import db from '../database';
-import { Settings } from '../../shared/types';
+import { Settings, NavSectionBehaviorMode } from '../../shared/types';
+
+const NAV_SECTION_BEHAVIOR_MODES: NavSectionBehaviorMode[] = [
+  'remember', 'always-expand', 'always-collapse-inactive',
+];
+
+function isValidNavSectionBehaviorMode(value: unknown): value is NavSectionBehaviorMode {
+  return typeof value === 'string' && (NAV_SECTION_BEHAVIOR_MODES as string[]).includes(value);
+}
 
 export function getSettings(): Settings {
   const settings: Partial<Settings> = {};
@@ -14,6 +22,8 @@ export function getSettings(): Settings {
     'communitySyncEnabled',
     'installDiscoveryEnabled', 'installDiscoveryLastScan',
     'inProcessScriptExecutionEnabled',
+    'navSectionBehaviorMode', 'navCompactMode', 'navShowSectionLabels',
+    'navRememberedSectionState',
   ];
   
   keys.forEach(key => {
@@ -52,6 +62,16 @@ export function getSettings(): Settings {
     installDiscoveryEnabled: settings.installDiscoveryEnabled ?? true,
     installDiscoveryLastScan: settings.installDiscoveryLastScan ?? '',
     inProcessScriptExecutionEnabled: settings.inProcessScriptExecutionEnabled ?? false,
+    navSectionBehaviorMode: isValidNavSectionBehaviorMode(settings.navSectionBehaviorMode)
+      ? settings.navSectionBehaviorMode
+      : 'remember',
+    navCompactMode: settings.navCompactMode === true,
+    navShowSectionLabels: typeof settings.navShowSectionLabels === 'boolean'
+      ? settings.navShowSectionLabels
+      : true,
+    navRememberedSectionState: typeof settings.navRememberedSectionState === 'string'
+      ? settings.navRememberedSectionState
+      : '{}',
   };
 
   if (process.env.NODE_ENV === 'test' || process.env.SOLITH_SKIP_ONBOARDING === '1') {
@@ -138,4 +158,39 @@ export function getTheme(): 'dark' | 'light' {
 
 export function setTheme(theme: 'dark' | 'light'): void {
   setSetting('theme', theme);
+}
+
+export function getNavSectionBehaviorMode(): NavSectionBehaviorMode {
+  const value = getSetting('navSectionBehaviorMode');
+  return isValidNavSectionBehaviorMode(value) ? value : 'remember';
+}
+
+export function setNavSectionBehaviorMode(mode: NavSectionBehaviorMode): void {
+  setSetting('navSectionBehaviorMode', mode);
+}
+
+export function getNavCompactMode(): boolean {
+  return getSetting('navCompactMode') === true;
+}
+
+export function setNavCompactMode(enabled: boolean): void {
+  setSetting('navCompactMode', enabled);
+}
+
+export function getNavShowSectionLabels(): boolean {
+  const value = getSetting('navShowSectionLabels');
+  return typeof value === 'boolean' ? value : true;
+}
+
+export function setNavShowSectionLabels(enabled: boolean): void {
+  setSetting('navShowSectionLabels', enabled);
+}
+
+export function getNavRememberedSectionState(): string {
+  const value = getSetting('navRememberedSectionState');
+  return typeof value === 'string' ? value : '{}';
+}
+
+export function setNavRememberedSectionState(json: string): void {
+  setSetting('navRememberedSectionState', json);
 }

@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   logEvent: (eventData: any) => ipcRenderer.invoke('log-event', eventData),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSetting: (key: string, value: any) => ipcRenderer.invoke('set-setting', key, value),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   deleteRecipe: (recipeId: string) => ipcRenderer.invoke('delete-recipe', recipeId),
   getBackups: (gameId: string) => ipcRenderer.invoke('get-backups', gameId),
   restoreBackup: (backupId: string) => ipcRenderer.invoke('restore-backup', backupId),

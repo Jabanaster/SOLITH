@@ -353,6 +353,33 @@ button, input, select, textarea {
   font-weight: 700;
 }
 
+.sidebar-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}
+
+.sidebar-settings-btn:hover {
+  color: var(--cyan);
+  border-color: rgba(79, 184, 217, 0.22);
+  background: rgba(79, 184, 217, 0.08);
+}
+
+.sidebar-settings-btn:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 .sidebar-nav {
   flex: 1;
   min-height: 0;
@@ -428,6 +455,45 @@ button, input, select, textarea {
 
 .nav-section button.active .nav-category-dot {
   background: var(--cyan);
+}
+
+.nav-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nav-section-toggle:hover {
+  color: var(--cyan);
+  background: rgba(79, 184, 217, 0.08);
+}
+
+.nav-section-toggle:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.sidebar--compact .nav-section {
+  padding: 4px 8px;
+}
+
+.sidebar--compact .nav-section button {
+  padding: 8px 8px;
+}
+
+.sidebar--compact .nav-section h3 {
+  margin-bottom: 4px;
 }
 
 /* Sidebar top gradient accent */
@@ -3749,6 +3815,154 @@ code, .mono {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: rgba(8, 13, 26, 0.48);
+}
+
+/* ─── Settings Page ─────────────────────────────────────── */
+.settings-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+
+.settings-categories {
+  width: 220px;
+  min-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.settings-categories button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all var(--transition);
+}
+
+.settings-categories button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.settings-categories button.active {
+  background: linear-gradient(90deg, var(--cyan-dim), transparent);
+  color: var(--text-primary);
+  border-left-color: var(--cyan);
+  font-weight: 600;
+}
+
+.settings-categories button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: -2px;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+.settings-content h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 520px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-field label,
+.settings-field__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.settings-field select,
+.settings-field input[type="text"] {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.settings-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.settings-fieldset legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0 4px;
+}
+
+.settings-radio,
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.settings-empty-state {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 480px;
+}
+
+.settings-empty-state__hint {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+  .settings-categories {
+    width: 160px;
+    min-width: 160px;
+  }
+
+  .settings-content {
+    padding: 16px;
+  }
 }
 
 /* ─── Reduced Motion ────────────────────────────────────── */

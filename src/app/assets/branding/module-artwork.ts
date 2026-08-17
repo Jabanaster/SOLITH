@@ -19,7 +19,8 @@ export type ModuleViewId =
   | 'ct-library'
   | 'trainer-deck'
   | 'catalog-save-controls'
-  | 'registry-explorer';
+  | 'registry-explorer'
+  | 'settings';
 
 /**
  * Icon assignment:

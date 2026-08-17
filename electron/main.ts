@@ -542,6 +542,8 @@ ipcMain.handle('log-event', async (event, eventData) => {
   }
 });
 
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 ipcMain.handle('get-settings', async () => {
   try {
     const dbModule = await import('../src/core/database/index.js');

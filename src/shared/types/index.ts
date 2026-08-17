@@ -237,7 +237,17 @@ export interface Settings {
    * Default: false. Requires offline confirm + per-action approval at IPC.
    */
   inProcessScriptExecutionEnabled?: boolean;
+  /** Sidebar navigation-group behavior mode. Default: 'remember'. */
+  navSectionBehaviorMode?: 'remember' | 'always-expand' | 'always-collapse-inactive';
+  /** Compact sidebar spacing/icon sizing. Default: false. */
+  navCompactMode?: boolean;
+  /** Show navigation-group text labels (vs. icon-only groups) when the sidebar is expanded. Default: true. */
+  navShowSectionLabels?: boolean;
+  /** JSON-encoded map of section title -> manually-collapsed boolean, used only in 'remember' mode. Default: '{}'. */
+  navRememberedSectionState?: string;
 }
+
+export type NavSectionBehaviorMode = 'remember' | 'always-expand' | 'always-collapse-inactive';
 
 export interface AIConfig {
   provider: 'None' | 'Ollama' | 'LM Studio';
