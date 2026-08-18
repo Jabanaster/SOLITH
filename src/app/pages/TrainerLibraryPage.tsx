@@ -30,6 +30,27 @@ type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
 type SortMode = 'installed-first' | 'a-z';
 /** ROADMAP §3.3 — Popular is the default Trainer Library view; All Games preserves prior unranked behavior. */
 type ViewMode = 'popular' | 'all';
+/** ROADMAP §3.4 — All Games first-use notice dismissal, persisted the same way as other local-only UI preferences. */
+const ALL_GAMES_NOTICE_DISMISSED_KEY = 'trainerLibrary.allGamesNoticeDismissed';
+const ALL_GAMES_NOTICE_TEXT =
+  'All Games includes SOLITH’s full eligible catalog, including niche and less widely played titles. Use filters or search to narrow the list.';
+
+function readAllGamesNoticeDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(ALL_GAMES_NOTICE_DISMISSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeAllGamesNoticeDismissed(): void {
+  try {
+    window.localStorage.setItem(ALL_GAMES_NOTICE_DISMISSED_KEY, '1');
+  } catch {
+    // Local-only preference is best-effort; notice simply reappears next session.
+  }
+}
+
 const DISCOVERY_PREVIEW_HEIGHT_KEY = 'solith:trainer-library:discovery-preview-height';
 const DEFAULT_DISCOVERY_PREVIEW_HEIGHT = 288;
 const MIN_DISCOVERY_PREVIEW_HEIGHT = 192;
@@ -349,6 +370,7 @@ export default function TrainerLibraryPage({
   const [sortMode, setSortMode] = useState<SortMode>('installed-first');
   const [viewMode, setViewMode] = useState<ViewMode>('popular');
   const [popularityMap, setPopularityMap] = useState<Map<string, TrainerCatalogPopularityEvidence>>(new Map());
+  const [allGamesNoticeDismissed, setAllGamesNoticeDismissed] = useState(readAllGamesNoticeDismissed);
   const [dragOver, setDragOver] = useState(false);
   const [scanningInstalls, setScanningInstalls] = useState(false);
   const [addingSelectedInstalls, setAddingSelectedInstalls] = useState(false);
@@ -1058,6 +1080,11 @@ export default function TrainerLibraryPage({
       .filter(Boolean)
       .join(' · ') || null;
 
+  const handleDismissAllGamesNotice = () => {
+    setAllGamesNoticeDismissed(true);
+    writeAllGamesNoticeDismissed();
+  };
+
   const resetLibraryFilters = () => {
     setInstalledOnly(false);
     setRunningOnly(false);
@@ -1429,6 +1456,24 @@ export default function TrainerLibraryPage({
           </button>
         </div>
       </div>
+
+      {viewMode === 'all' && !allGamesNoticeDismissed && (
+        <p
+          id="trainer-library-all-games-notice"
+          className={styles.allGamesNotice}
+          role="status"
+        >
+          {ALL_GAMES_NOTICE_TEXT}
+          <button
+            type="button"
+            className={styles.allGamesNoticeDismiss}
+            onClick={handleDismissAllGamesNotice}
+            aria-label="Dismiss All Games notice"
+          >
+            Dismiss
+          </button>
+        </p>
+      )}
 
       {viewMode === 'all' && (
         <div className={styles.filterSection}>

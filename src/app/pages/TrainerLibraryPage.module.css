@@ -632,6 +632,36 @@
   font-size: 0.75rem;
 }
 
+.allGamesNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #b8c8e6;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: rgba(20, 32, 52, 0.5);
+}
+
+.allGamesNoticeDismiss {
+  flex-shrink: 0;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 180, 255, 0.3);
+  background: transparent;
+  color: #b8c8e6;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.allGamesNoticeDismiss:focus-visible {
+  outline: 2px solid rgba(80, 220, 255, 0.55);
+  outline-offset: 2px;
+}
+
 .quarantineBanner {
   color: #f0c674;
   font-size: 0.85rem;
