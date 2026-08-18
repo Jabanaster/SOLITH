@@ -877,6 +877,23 @@ function applySchema(): void {
     )
   `);
 
+  const trainerCatalogColumns = rawDb!.exec('PRAGMA table_info(trainer_catalog_games)')[0];
+  const trainerCatalogColumnNames = new Set(
+    (trainerCatalogColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  const optionalTrainerCatalogColumns = [
+    'antiCheat TEXT',
+    'offlinePlayAvailable INTEGER',
+    'catalogExclusionFlagsJson TEXT',
+    'explicitlyUnsupported INTEGER',
+  ];
+  for (const column of optionalTrainerCatalogColumns) {
+    const columnName = column.split(' ')[0];
+    if (!trainerCatalogColumnNames.has(columnName)) {
+      rawDb!.run(`ALTER TABLE trainer_catalog_games ADD COLUMN ${column}`);
+    }
+  }
+
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS trainer_mod_packs (
       packId TEXT PRIMARY KEY,

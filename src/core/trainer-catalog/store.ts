@@ -18,6 +18,7 @@ import {
   solithDefinitionToModPack,
 } from '../definitions/mod-pack-adapter.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
+import { filterEligibleForTrainerLibrary } from './eligibility-classification.js';
 
 export type HubCertificationLevel = 'L0_Community' | 'L3_Certified';
 
@@ -48,6 +49,12 @@ function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
     modPackId: row.modPackId ? String(row.modPackId) : undefined,
     cheatCount: Number(row.cheatCount ?? 0),
     searchableText: String(row.searchableText ?? ''),
+    antiCheat: row.antiCheat ? (String(row.antiCheat) as TrainerCatalogEntry['antiCheat']) : undefined,
+    offlinePlayAvailable: row.offlinePlayAvailable != null ? Number(row.offlinePlayAvailable) === 1 : undefined,
+    catalogExclusionFlags: row.catalogExclusionFlagsJson
+      ? (JSON.parse(String(row.catalogExclusionFlagsJson)) as TrainerCatalogEntry['catalogExclusionFlags'])
+      : undefined,
+    explicitlyUnsupported: row.explicitlyUnsupported != null ? Number(row.explicitlyUnsupported) === 1 : undefined,
   };
 }
 
@@ -57,8 +64,9 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
     `INSERT INTO trainer_catalog_games (
       catalogGameId, displayName, steamAppId, executablesJson, categoriesJson,
       headerUrl, coverUrl, iconUrl, verificationStatus, sourcesJson,
-      hasModPack, modPackId, cheatCount, searchableText, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      hasModPack, modPackId, cheatCount, searchableText,
+      antiCheat, offlinePlayAvailable, catalogExclusionFlagsJson, explicitlyUnsupported, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(catalogGameId) DO UPDATE SET
       displayName = excluded.displayName,
       steamAppId = excluded.steamAppId,
@@ -73,6 +81,10 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
       modPackId = excluded.modPackId,
       cheatCount = excluded.cheatCount,
       searchableText = excluded.searchableText,
+      antiCheat = excluded.antiCheat,
+      offlinePlayAvailable = excluded.offlinePlayAvailable,
+      catalogExclusionFlagsJson = excluded.catalogExclusionFlagsJson,
+      explicitlyUnsupported = excluded.explicitlyUnsupported,
       updatedAt = datetime('now')`,
   ).run(
     entry.catalogGameId,
@@ -89,6 +101,10 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
     entry.modPackId ?? null,
     entry.cheatCount,
     searchableText,
+    entry.antiCheat ?? null,
+    entry.offlinePlayAvailable != null ? (entry.offlinePlayAvailable ? 1 : 0) : null,
+    entry.catalogExclusionFlags ? JSON.stringify(entry.catalogExclusionFlags) : null,
+    entry.explicitlyUnsupported != null ? (entry.explicitlyUnsupported ? 1 : 0) : null,
   );
 }
 
@@ -294,8 +310,12 @@ export function searchCatalog(
     )
     .all(...params, limit, offset) as Record<string, unknown>[];
 
+  // Central §3.2 exclusion boundary (Step 9) — excluded titles never re-enter
+  // Trainer Library results here, regardless of which UI path calls searchCatalog.
+  const entries = filterEligibleForTrainerLibrary(rows.map(rowToEntry));
+
   return {
-    entries: rows.map(rowToEntry),
+    entries,
     total,
     query,
     offset,

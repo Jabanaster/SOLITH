@@ -1,6 +1,7 @@
 import { listInstalledGames } from '../install-discovery/store.js';
 import { getCatalogEntry } from '../trainer-catalog/store.js';
 import { getCatalogDemand } from '../catalog-demand/store.js';
+import { classifyTrainerCatalogEligibility, deriveEligibilityEvidenceFromCatalogEntry } from '../trainer-catalog/eligibility-classification.js';
 import { getGames } from '../games/index.js';
 import type { InstalledGameRecord } from '../install-discovery/types.js';
 import type { Game } from '../../shared/types/index.js';
@@ -90,6 +91,12 @@ function buildCanonicalGameForGroup(canonicalId: string, evidence: CanonicalIden
   // Real, already-tracked local demand signal (Step 17) — trivial and lossless to wire,
   // unlike developer/publisher/releaseDate which have no trusted source in this repo yet.
   const demand = catalogEntry ? getCatalogDemand(catalogEntry.catalogGameId) : null;
+  // Phase 3A (§3.1/§3.2) — one deterministic classification per canonical game,
+  // computed from the linked trainer-catalog entry's evidence, never per launcher
+  // installation (Step 12). No catalog link => 'eligible' with no exclusion evidence.
+  const classification = classifyTrainerCatalogEligibility(
+    catalogEntry ? deriveEligibilityEvidenceFromCatalogEntry(catalogEntry) : {},
+  );
 
   return {
     id: canonicalId,
@@ -98,7 +105,7 @@ function buildCanonicalGameForGroup(canonicalId: string, evidence: CanonicalIden
     aliases: [],
     genres: catalogEntry?.categories ?? [],
     playModes: [],
-    eligibility: 'listed',
+    eligibility: classification.state,
     supportState: catalogEntry?.hasModPack ? 'supported' : 'unknown',
     artworkIdentity: catalogEntry
       ? { headerUrl: catalogEntry.headerUrl, coverUrl: catalogEntry.coverUrl, iconUrl: catalogEntry.iconUrl }

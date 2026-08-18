@@ -14,6 +14,26 @@ export type ModPackSourceProvider =
 
 export type VerificationStatus = 'verified' | 'community' | 'metadata-only' | 'unverified';
 
+/**
+ * Phase 3A (§3.1/§3.2) safety-classification evidence. 'unknown' (or the field
+ * being absent) means no trusted evidence exists yet — it must never be treated
+ * as a safe default. Never derived from title/genre/launcher/popularity.
+ */
+export type AntiCheatStatus = 'none' | 'protected-multiplayer' | 'protected-online-only' | 'unknown';
+
+/** Phase 3A (§3.2) catalog exclusion categories — explicit evidence only, never inferred. */
+export type CatalogExclusionFlag =
+  | 'mmo'
+  | 'competitive-online-only'
+  | 'no-meaningful-offline-play'
+  | 'cloud-only'
+  | 'dedicated-server'
+  | 'demo'
+  | 'soundtrack'
+  | 'editor-tool'
+  | 'dlc-only'
+  | 'unsupported-delisted';
+
 export interface ModPackSource {
   provider: ModPackSourceProvider;
   url?: string;
@@ -80,6 +100,11 @@ export interface TrainerCatalogEntry {
    * Filled by search/load IPC when a definition payload exists — not a second SoT.
    */
   capabilities?: import('../definitions/load-catalog-definition.js').CatalogDefinitionCapabilities | null;
+  /** Phase 3A safety/exclusion evidence — absent means no known evidence (see AntiCheatStatus). */
+  antiCheat?: AntiCheatStatus;
+  offlinePlayAvailable?: boolean;
+  catalogExclusionFlags?: CatalogExclusionFlag[];
+  explicitlyUnsupported?: boolean;
 }
 
 export interface TrainerCatalogSearchResult {
