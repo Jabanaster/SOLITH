@@ -994,7 +994,11 @@ interface Window {
       demand?: { catalogGameId: string; notifyCount: number; verificationRequests: number };
       error?: string;
     }>;
-    catalogDemandList: () => Promise<{ success: boolean; error?: string }>;
+    catalogDemandList: () => Promise<{
+      success: boolean;
+      demand?: Array<{ catalogGameId: string; notifyCount: number; verificationRequests: number; lastRequestedAt: string }>;
+      error?: string;
+    }>;
     installDiscoveryOpenPath: (payload: {
       catalogGameId: string;
       targetPath?: string;

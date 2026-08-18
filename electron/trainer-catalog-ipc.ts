@@ -46,6 +46,7 @@ import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-re
 import { ensureCatalogGameForSaveAccess } from '../src/core/trainer-catalog/catalog-game-record.js';
 import { addUserSelectedLocation } from '../src/core/saves/locations.js';
 import { SolithDefinitionV1Schema } from '../src/core/definitions/schema.v1.js';
+import { POPULAR_TRAINER_LIMIT } from '../src/core/trainer-catalog/popular-ranking.js';
 
 const ApproveSavePathSchema = z.object({
   catalogGameId: z.string().min(1).max(120),
@@ -54,7 +55,10 @@ const ApproveSavePathSchema = z.object({
 
 const SearchSchema = z.object({
   query: z.string().max(200).optional().default(''),
-  limit: z.number().int().min(1).max(200).optional().default(48),
+  // Max raised from 200 to POPULAR_TRAINER_LIMIT (ROADMAP §3.3) so the Trainer
+  // Library's Popular view can fetch its full bounded ranking candidate set in
+  // one request instead of paginating.
+  limit: z.number().int().min(1).max(POPULAR_TRAINER_LIMIT).optional().default(48),
   offset: z.number().int().min(0).optional().default(0),
   categories: z.array(z.string().min(1).max(40)).max(12).optional(),
   verificationStatus: z
