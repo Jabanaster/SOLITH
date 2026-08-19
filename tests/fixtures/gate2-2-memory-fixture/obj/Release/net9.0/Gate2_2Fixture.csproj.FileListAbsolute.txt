@@ -1,0 +1,15 @@
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\bin\Release\net9.0\Gate2_2Fixture.exe
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\bin\Release\net9.0\Gate2_2Fixture.deps.json
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\bin\Release\net9.0\Gate2_2Fixture.runtimeconfig.json
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\bin\Release\net9.0\Gate2_2Fixture.dll
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\bin\Release\net9.0\Gate2_2Fixture.pdb
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.GeneratedMSBuildEditorConfig.editorconfig
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.AssemblyInfoInputs.cache
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.AssemblyInfo.cs
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.csproj.CoreCompileInputs.cache
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.sourcelink.json
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.dll
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\refint\Gate2_2Fixture.dll
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.pdb
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\Gate2_2Fixture.genruntimeconfig.cache
+G:\ACTIVE_PROJECTS\SOLITH\tests\fixtures\gate2-2-memory-fixture\obj\Release\net9.0\ref\Gate2_2Fixture.dll
