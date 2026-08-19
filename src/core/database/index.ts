@@ -172,6 +172,310 @@ function migrateInstalledGameIdentity(): void {
   console.info(`[database] installed-game identity migration ${boundedReport.slice(0, 512)}`);
 }
 
+export const BG3_ORPHAN_RECONCILIATION_ID = 'bg3-html-entity-orphan-v1';
+
+function queryOneRaw(sql: string, params: unknown[] = []): Record<string, unknown> | null {
+  const stmt = rawDb!.prepare(sql);
+  stmt.bind(params);
+  const row = stmt.step() ? stmt.getAsObject() : null;
+  stmt.free();
+  return row;
+}
+
+function queryAllRaw(sql: string, params: unknown[] = []): Record<string, unknown>[] {
+  const stmt = rawDb!.prepare(sql);
+  stmt.bind(params);
+  const rows: Record<string, unknown>[] = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+export type CatalogOrphanReconciliationResult =
+  | { status: 'applied'; reconciliationId: string }
+  | { status: 'already-clean' }
+  | { status: 'blocked'; reason: string };
+
+export type CatalogOrphanProof =
+  | { method: 'steamAppId'; expectedCanonicalSteamAppId: number }
+  | { method: 'providerUrl'; expectedProvider: string; expectedSourceUrl: string };
+
+export interface CatalogOrphanReconciliationDefinition {
+  reconciliationId: string;
+  orphanCatalogGameId: string;
+  canonicalCatalogGameId: string;
+  orphanDisplayName: string;
+  orphanModPackId: string;
+  proof: CatalogOrphanProof;
+}
+
+/**
+ * Immutable, explicitly authorized set of catalog orphan reconciliations.
+ * Every entry corresponds to a specific SOLITH.MD authorization that named
+ * the exact orphan/canonical pair and its identity proof by hand. This table
+ * is never populated from database discovery, regex matching, decoded-title
+ * comparison, or fuzzy/title-similarity matching — only explicit, reviewed
+ * entries. Adding a new pair requires a new authorization and a new entry
+ * here, not a generalized migration.
+ */
+const CATALOG_ORPHAN_RECONCILIATIONS: readonly CatalogOrphanReconciliationDefinition[] = [
+  {
+    reconciliationId: BG3_ORPHAN_RECONCILIATION_ID,
+    orphanCatalogGameId: 'baldur-x27-s-gate-3',
+    canonicalCatalogGameId: 'baldur-s-gate-3',
+    orphanDisplayName: "Baldur&#x27;s Gate 3",
+    orphanModPackId: 'plitch-baldur-x27-s-gate-3',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 1086940 },
+  },
+  {
+    reconciliationId: 'no-mans-sky-html-entity-orphan-v1',
+    orphanCatalogGameId: 'no-man-x27-s-sky',
+    canonicalCatalogGameId: 'no-man-s-sky',
+    orphanDisplayName: "No Man&#x27;s Sky",
+    orphanModPackId: 'plitch-no-man-x27-s-sky',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 275850 },
+  },
+  {
+    reconciliationId: 'gow-ragnarok-html-entity-orphan-v1',
+    orphanCatalogGameId: 'god-of-war-ragnar-xf6-k',
+    canonicalCatalogGameId: 'god-of-war-ragnar-k',
+    orphanDisplayName: 'God of War Ragnar&#xF6;k',
+    orphanModPackId: 'plitch-god-of-war-ragnar-xf6-k',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 2322010 },
+  },
+  {
+    reconciliationId: 'spider-man-remastered-html-entity-orphan-v1',
+    orphanCatalogGameId: 'marvel-x27-s-spider-man-remastered',
+    canonicalCatalogGameId: 'marvel-s-spider-man-remastered',
+    orphanDisplayName: "Marvel&#x27;s Spider-Man Remastered",
+    orphanModPackId: 'plitch-marvel-x27-s-spider-man-remastered',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 1817070 },
+  },
+  {
+    reconciliationId: 'dragons-dogma-2-html-entity-orphan-v1',
+    orphanCatalogGameId: 'dragon-x27-s-dogma-2',
+    canonicalCatalogGameId: 'dragon-s-dogma-2',
+    orphanDisplayName: "Dragon&#x27;s Dogma 2",
+    orphanModPackId: 'plitch-dragon-x27-s-dogma-2',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 2054970 },
+  },
+  {
+    reconciliationId: 'miles-morales-html-entity-orphan-v1',
+    orphanCatalogGameId: 'marvel-x2019-s-spider-man-miles-morales',
+    canonicalCatalogGameId: 'marvel-s-spider-man-miles-morales',
+    orphanDisplayName: 'Marvel&#x2019;s Spider-Man: Miles Morales',
+    orphanModPackId: 'plitch-marvel-x2019-s-spider-man-miles-morales',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 1817190 },
+  },
+  {
+    reconciliationId: 'dragons-dogma-dark-arisen-html-entity-orphan-v1',
+    orphanCatalogGameId: 'dragon-x27-s-dogma-dark-arisen',
+    canonicalCatalogGameId: 'dragon-s-dogma-dark-arisen',
+    orphanDisplayName: "Dragon&#x27;s Dogma - Dark Arisen",
+    orphanModPackId: 'plitch-dragon-x27-s-dogma-dark-arisen',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 367500 },
+  },
+  {
+    reconciliationId: 'ac-black-flag-resynced-html-entity-orphan-v1',
+    orphanCatalogGameId: 'assassin-8217-s-creed-black-flag-resynced',
+    canonicalCatalogGameId: 'assassin-s-creed-black-flag-resynced',
+    orphanDisplayName: 'Assassin&#8217;s Creed Black Flag Resynced',
+    orphanModPackId: 'fling-assassin-8217-s-creed-black-flag-resynced',
+    proof: {
+      method: 'providerUrl',
+      expectedProvider: 'fling',
+      expectedSourceUrl: 'https://flingtrainer.com/trainer/assassins-creed-black-flag-resynced-trainer/',
+    },
+  },
+];
+
+const catalogOrphanReconciliationResults = new Map<string, CatalogOrphanReconciliationResult>();
+
+export function getBg3OrphanReconciliationResult(): CatalogOrphanReconciliationResult | null {
+  return catalogOrphanReconciliationResults.get(BG3_ORPHAN_RECONCILIATION_ID) ?? null;
+}
+
+export function getCatalogOrphanReconciliationResult(
+  reconciliationId: string,
+): CatalogOrphanReconciliationResult | null {
+  return catalogOrphanReconciliationResults.get(reconciliationId) ?? null;
+}
+
+export function getAllCatalogOrphanReconciliationResults(): Record<string, CatalogOrphanReconciliationResult> {
+  return Object.fromEntries(catalogOrphanReconciliationResults);
+}
+
+function extractSourceUrl(sourcesJson: unknown, expectedProvider: string): string | null {
+  try {
+    const sources = JSON.parse(String(sourcesJson ?? '[]')) as Array<{ provider?: string; url?: string }>;
+    const match = sources.find((s) => s.provider === expectedProvider);
+    return match?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Narrow, deterministic, fail-closed reconciliation for one explicitly
+ * authorized orphan/canonical pair. Every condition below must hold before
+ * any row is touched; any mismatch blocks with an explicit reason and
+ * leaves the database unchanged. Operates only on the exact IDs in the
+ * supplied definition — never discovers rows dynamically.
+ */
+function reconcileCatalogOrphan(def: CatalogOrphanReconciliationDefinition): void {
+  const orphanCatalogRow = queryOneRaw(
+    'SELECT * FROM trainer_catalog_games WHERE catalogGameId = ?',
+    [def.orphanCatalogGameId],
+  );
+
+  if (!orphanCatalogRow) {
+    catalogOrphanReconciliationResults.set(def.reconciliationId, { status: 'already-clean' });
+    return;
+  }
+
+  const block = (reason: string) => {
+    catalogOrphanReconciliationResults.set(def.reconciliationId, { status: 'blocked', reason });
+  };
+
+  const canonicalRow = queryOneRaw(
+    'SELECT catalogGameId, steamAppId, sourcesJson FROM trainer_catalog_games WHERE catalogGameId = ?',
+    [def.canonicalCatalogGameId],
+  );
+  if (!canonicalRow) {
+    block(`canonical ${def.canonicalCatalogGameId} row is missing`);
+    return;
+  }
+
+  if (def.proof.method === 'steamAppId') {
+    if (Number(canonicalRow.steamAppId) !== def.proof.expectedCanonicalSteamAppId) {
+      block(
+        `canonical row steamAppId is ${String(canonicalRow.steamAppId)}, expected ${def.proof.expectedCanonicalSteamAppId}`,
+      );
+      return;
+    }
+  } else {
+    const canonicalUrl = extractSourceUrl(canonicalRow.sourcesJson, def.proof.expectedProvider);
+    if (canonicalUrl !== def.proof.expectedSourceUrl) {
+      block(
+        `canonical row has no matching ${def.proof.expectedProvider} source URL "${def.proof.expectedSourceUrl}" (found "${String(canonicalUrl)}")`,
+      );
+      return;
+    }
+    const orphanUrl = extractSourceUrl(orphanCatalogRow.sourcesJson, def.proof.expectedProvider);
+    if (orphanUrl !== def.proof.expectedSourceUrl) {
+      block(
+        `orphan row has no matching ${def.proof.expectedProvider} source URL "${def.proof.expectedSourceUrl}" (found "${String(orphanUrl)}")`,
+      );
+      return;
+    }
+  }
+
+  if (orphanCatalogRow.steamAppId !== null && orphanCatalogRow.steamAppId !== undefined) {
+    block(`orphan row steamAppId is ${String(orphanCatalogRow.steamAppId)}, expected NULL`);
+    return;
+  }
+
+  if (String(orphanCatalogRow.displayName) !== def.orphanDisplayName) {
+    block(`orphan row displayName is "${String(orphanCatalogRow.displayName)}", expected "${def.orphanDisplayName}"`);
+    return;
+  }
+
+  const feedbackCount = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM definition_feedback WHERE catalogGameId = ?',
+    [def.orphanCatalogGameId],
+  );
+  if (Number(feedbackCount?.cnt ?? 0) > 0) {
+    block('orphan has definition_feedback references');
+    return;
+  }
+
+  const queueCount = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM definition_update_queue WHERE catalogGameId = ?',
+    [def.orphanCatalogGameId],
+  );
+  if (Number(queueCount?.cnt ?? 0) > 0) {
+    block('orphan has definition_update_queue references');
+    return;
+  }
+
+  const modPackRows = queryAllRaw(
+    'SELECT * FROM trainer_mod_packs WHERE catalogGameId = ?',
+    [def.orphanCatalogGameId],
+  );
+  if (modPackRows.length !== 1 || String(modPackRows[0].packId) !== def.orphanModPackId) {
+    block(`unexpected trainer_mod_packs references for orphan (found ${modPackRows.length} row(s))`);
+    return;
+  }
+
+  const installedRefs = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM installed_games WHERE catalog_game_id = ?',
+    [def.orphanCatalogGameId],
+  );
+  if (Number(installedRefs?.cnt ?? 0) > 0) {
+    block('orphan has installed_games references');
+    return;
+  }
+
+  const healthRefs = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM trainer_health WHERE catalog_game_id = ?',
+    [def.orphanCatalogGameId],
+  );
+  if (Number(healthRefs?.cnt ?? 0) > 0) {
+    block('orphan has trainer_health references');
+    return;
+  }
+
+  const demandRefs = queryOneRaw(
+    'SELECT COUNT(*) as cnt FROM catalog_demand WHERE catalog_game_id = ?',
+    [def.orphanCatalogGameId],
+  );
+  if (Number(demandRefs?.cnt ?? 0) > 0) {
+    block('orphan has catalog_demand references');
+    return;
+  }
+
+  const modPackRow = modPackRows[0];
+
+  try {
+    rawDb!.run('BEGIN TRANSACTION');
+    rawDb!.run(
+      `INSERT INTO catalog_reconciliation_log (
+         reconciliationId, catalogGameId, removedCatalogRowJson, removedModPackRowJson
+       ) VALUES (?, ?, ?, ?)`,
+      [def.reconciliationId, def.orphanCatalogGameId, JSON.stringify(orphanCatalogRow), JSON.stringify(modPackRow)],
+    );
+    rawDb!.run('DELETE FROM trainer_mod_packs WHERE packId = ?', [def.orphanModPackId]);
+    rawDb!.run('DELETE FROM trainer_catalog_games WHERE catalogGameId = ?', [def.orphanCatalogGameId]);
+    rawDb!.run('COMMIT');
+  } catch (error) {
+    rawDb!.run('ROLLBACK');
+    throw error;
+  }
+
+  catalogOrphanReconciliationResults.set(def.reconciliationId, {
+    status: 'applied',
+    reconciliationId: def.reconciliationId,
+  });
+}
+
+/**
+ * Runs every explicitly authorized catalog orphan reconciliation
+ * independently. One blocked pair never prevents another valid pair from
+ * being applied; each pair's own deletion and evidence record remain
+ * atomic. Preserves the original BG3-only reconciliation's exact behavior
+ * as the first entry in the table.
+ */
+export function reconcileCatalogOrphans(): void {
+  for (const def of CATALOG_ORPHAN_RECONCILIATIONS) {
+    reconcileCatalogOrphan(def);
+  }
+}
+
+/** @deprecated Use reconcileCatalogOrphans(); retained for call-site compatibility. */
+export function reconcileBg3Orphan(): void {
+  reconcileCatalogOrphans();
+}
+
 function checkTransaction(sql: string) {
   const upper = sql.trim().toUpperCase();
   if (upper.startsWith('BEGIN') || upper.startsWith('SAVEPOINT')) {
@@ -1205,6 +1509,19 @@ function applySchema(): void {
       [c.id, c.provider, c.endpoint, c.model, c.timeout]
     );
   });
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_reconciliation_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reconciliationId TEXT NOT NULL,
+      catalogGameId TEXT NOT NULL,
+      removedCatalogRowJson TEXT NOT NULL,
+      removedModPackRowJson TEXT,
+      appliedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  reconcileCatalogOrphans();
 }
 
 async function initDatabaseAtPath(

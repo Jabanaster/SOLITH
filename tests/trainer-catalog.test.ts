@@ -6,6 +6,8 @@ import {
   parseRemoteGameCatalogHtml,
   parseFlingTrainerOptionsHtml,
 } from '../src/core/trainer-catalog/sync/parse-html.js';
+import { decodeHtmlEntities } from '../src/core/trainer-catalog/sync/decode-html-entities.js';
+import { isPlaceholderTitle } from '../src/core/trainer-catalog/sync/placeholder-titles.js';
 import { remoteTrainerToModPack, remoteTrainerToCatalogEntry } from '../src/core/trainer-catalog/sync/remote-sync.js';
 import { seedRecordToEntry } from '../src/core/trainer-catalog/seed.js';
 import { buildSearchableText, validateModPack } from '../src/core/trainer-catalog/types.js';
@@ -35,6 +37,91 @@ describe('trainer catalog HTML parsers', () => {
     const trainers = parseRemoteGameCatalogHtml(html);
     assert.equal(trainers.length, 1);
     assert.equal(trainers[0].gameName, 'Palworld');
+  });
+
+  it('decodes HTML entities in scraped trainer thread titles', () => {
+    const html = `<a href="/threads/baldurs-gate-3-trainer.789/">Baldur&#x27;s Gate 3 Trainer</a>`;
+    const trainers = parseTrainerListHtml('https://mrantifun.net', html);
+    assert.equal(trainers.length, 1);
+    assert.equal(trainers[0].gameName, "Baldur's Gate 3");
+    assert.ok(!trainers[0].gameName.includes('&#x27;'));
+  });
+
+  it('decodes HTML entities in remote trainer index links', () => {
+    const html = `<a href="/trainer/foo/">Tom &amp; Jerry Trainer</a>`;
+    const trainers = parseRemoteTrainerIndexHtml(html);
+    assert.equal(trainers.length, 1);
+    assert.equal(trainers[0].gameName, 'Tom & Jerry');
+  });
+
+  it('decodes HTML entities in remote game catalog links', () => {
+    const html = `<a href="/en/games/foo">Foo &amp; Bar</a>`;
+    const trainers = parseRemoteGameCatalogHtml(html);
+    assert.equal(trainers.length, 1);
+    assert.equal(trainers[0].gameName, 'Foo & Bar');
+  });
+
+  it('excludes placeholder-titled threads from XenForo-style scraping', () => {
+    const html = `
+      <a href="/threads/redacted-trainer.1/">[REDACTED] Trainer</a>
+      <a href="/threads/real-game-trainer.2/">Real Game Trainer</a>
+    `;
+    const trainers = parseTrainerListHtml('https://mrantifun.net', html);
+    assert.ok(!trainers.some((t) => t.gameName.toLowerCase().includes('redacted')));
+    assert.ok(trainers.some((t) => t.gameName === 'Real Game'));
+  });
+
+  it('excludes placeholder-titled entries from remote trainer index links', () => {
+    const html = `<a href="/trainer/foo/">[Hidden] Trainer</a>`;
+    const trainers = parseRemoteTrainerIndexHtml(html);
+    assert.equal(trainers.length, 0);
+  });
+
+  it('excludes placeholder-titled entries from remote game catalog links', () => {
+    const html = `<a href="/en/games/foo">[TBA]</a>`;
+    const trainers = parseRemoteGameCatalogHtml(html);
+    assert.equal(trainers.length, 0);
+  });
+});
+
+describe('isPlaceholderTitle', () => {
+  it('matches exact placeholder words with or without brackets, case-insensitive', () => {
+    assert.ok(isPlaceholderTitle('[REDACTED]'));
+    assert.ok(isPlaceholderTitle('redacted'));
+    assert.ok(isPlaceholderTitle('[Hidden]'));
+    assert.ok(isPlaceholderTitle('TBA'));
+    assert.ok(isPlaceholderTitle('[unannounced]'));
+  });
+
+  it('does not match legitimate titles that merely contain a placeholder word', () => {
+    assert.ok(!isPlaceholderTitle('[NINJA GAIDEN - Master Collection] NINJA GAIDEN 3'));
+    assert.ok(!isPlaceholderTitle('REDACTED Zone: A Real Game'));
+    assert.ok(!isPlaceholderTitle('Hidden Folks'));
+  });
+});
+
+describe('decodeHtmlEntities', () => {
+  it('decodes named entities', () => {
+    assert.equal(decodeHtmlEntities('Tom &amp; Jerry'), 'Tom & Jerry');
+    assert.equal(decodeHtmlEntities('Baldur&#x27;s Gate'), "Baldur's Gate");
+    assert.equal(decodeHtmlEntities('&quot;Quoted&quot;'), '"Quoted"');
+    assert.equal(decodeHtmlEntities('a &lt; b &gt; c'), 'a < b > c');
+  });
+
+  it('decodes decimal and hex numeric references', () => {
+    assert.equal(decodeHtmlEntities('&#931;'), 'Σ');
+    assert.equal(decodeHtmlEntities('&#x3A3;'), 'Σ');
+  });
+
+  it('leaves plain text and bare ampersands unchanged (idempotent, no double-decode)', () => {
+    assert.equal(decodeHtmlEntities('Sniper Elite: Resistance'), 'Sniper Elite: Resistance');
+    assert.equal(decodeHtmlEntities('Tom & Jerry'), 'Tom & Jerry');
+    assert.equal(decodeHtmlEntities('AT&T'), 'AT&T');
+  });
+
+  it('leaves malformed or unknown entities untouched rather than corrupting text', () => {
+    assert.equal(decodeHtmlEntities('&notarealentity;'), '&notarealentity;');
+    assert.equal(decodeHtmlEntities('&#xZZZZ;'), '&#xZZZZ;');
   });
 });
 

@@ -1,9 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const CARD_MIN_WIDTH = 180;
-const CARD_HEIGHT = 390;
-const GRID_GAP = 16;
+// 180px produced 10-11 columns at 2560px wide — cards that narrow read as a
+// wall of near-identical tiles rather than distinct game entries. Raised to
+// 300px so cards stay wide enough to carry a readable title, a short cover
+// band, and one clear action at every breakpoint. Column count is derived
+// from container width only (no fixed cap) so wide viewports use the full
+// available width instead of leaving unused space beyond a capped count.
+const CARD_MIN_WIDTH = 300;
+// Re-measured after round 3: the cover band shrank from a 16:9 band (~169px
+// at 300px wide) to a fixed 96px compact banner, and the card content lost
+// its redundant tagline line — total rendered height is well under the
+// previous 300px estimate.
+const CARD_HEIGHT = 250;
+const GRID_GAP = 20;
 const OVERSCAN_ROWS = 2;
+
+/**
+ * Pure so it can be unit-tested without rendering the component.
+ * Guards against non-finite input (NaN/±Infinity) — a ResizeObserver
+ * contentRect.width should never produce one, but Math.max(1, NaN) is NaN
+ * and would otherwise propagate into gridTemplateColumns/rowCount as a
+ * broken, non-numeric render.
+ */
+export function computeColumnCount(containerWidth: number): number {
+  if (!Number.isFinite(containerWidth)) return 1;
+  return Math.max(1, Math.floor((containerWidth + GRID_GAP) / (CARD_MIN_WIDTH + GRID_GAP)));
+}
 
 export interface VirtualCatalogGridProps<T> {
   items: T[];
@@ -36,10 +58,7 @@ export function VirtualCatalogGrid<T>({
   const [scrollTop, setScrollTop] = useState(0);
   const endLockRef = useRef(false);
 
-  const columnCount = useMemo(
-    () => Math.max(1, Math.floor((viewport.width + GRID_GAP) / (CARD_MIN_WIDTH + GRID_GAP))),
-    [viewport.width],
-  );
+  const columnCount = useMemo(() => computeColumnCount(viewport.width), [viewport.width]);
 
   const rowCount = Math.ceil(items.length / columnCount);
   const rowStride = CARD_HEIGHT + GRID_GAP;

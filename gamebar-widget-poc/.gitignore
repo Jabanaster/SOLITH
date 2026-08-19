@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+**/AppPackages/
+**/*_TemporaryKey.pfx
+**/*_LocalDevKey.pfx
+**/*_LocalDevKey.cer

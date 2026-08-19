@@ -13,6 +13,11 @@ https://github.com/Jabanaster/SOLITH.git
 ```
 
 Solith remains a local-first, offline/single-player trainer and save-editor project.
-Do not implement multiplayer targeting, anti-cheat bypass, kernel drivers, packet
-capture, unverified third-party executable execution, or host OS security-policy
-modification.
+
+Prohibited capabilities are authoritatively defined in `PROJECT_SPEC.md §3.2
+"STRICTLY PROHIBITED (The Safety Firewall)"`. Do not restate or re-derive that
+list here — consult that section directly, and treat it as controlling if any
+other document's wording differs.
+
+Current security-gate status (Gate 2.x, Batch B1.1, release authorization) is
+authoritatively tracked in `SOLITH_SECURITY_ROADMAP.md`, not here.

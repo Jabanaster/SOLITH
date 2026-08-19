@@ -21,6 +21,17 @@
 
 ---
 
+> **Security status ownership:** This file owns product direction, milestones,
+> and feature sequencing. It does not restate security-gate or Batch B1.1
+> verdicts — see `SOLITH_SECURITY_ROADMAP.md` for the current canonical
+> security status.
+>
+> **Branch caveat:** The most recent security verification (Gate 2.4/2.4A/2.5)
+> was performed on `review/gate2-5-doc-audit` @ `317baf0e`, not on `master`.
+> Do not treat `origin/master` below as having passed that verification until
+> the branch is merged and `SOLITH_SECURITY_ROADMAP.md` confirms the merged
+> commit was rechecked.
+
 ## Current Baseline (Solith 2.4.0-alpha.2)
 
 `package.json` (`solith@2.4.0-alpha.2`) remains the single authoritative version source for this repository. This roadmap does not restate release/version detail beyond this line — see `package.json`, `package-lock.json`, `README.md`, and `CHANGELOG.md` for the full version-consistency contract.

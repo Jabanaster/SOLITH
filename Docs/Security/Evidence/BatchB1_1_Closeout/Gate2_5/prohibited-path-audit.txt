@@ -1,1 +1,9 @@
 Gate 2.5 prohibited dependency/CI/release path changes: 0
+
+--- Addendum (this session, Claude Sonnet, independent recheck) ---
+Confirmed via `git diff --name-status` and `git status --short --untracked-
+files=all` this cycle: package.json, package-lock.json, .github/**, and any
+CI/release workflow file are all absent from this session's changes. Only
+tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts (new),
+Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/* (evidence), and
+SOLITH_SECURITY_ROADMAP.md were touched by this session.

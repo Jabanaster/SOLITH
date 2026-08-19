@@ -1,0 +1,11 @@
+
+Running 6 tests using 1 worker
+
+  ok 1 tests\gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:144:1 › Phase 4 — child iframes of the main window do not receive the privileged preload bridge (11.2s)
+  ok 2 tests\gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:234:1 › Phase 5 — a destroyed/removed iframe reference cannot be invoked and parent reload revokes state (9.6s)
+  ok 3 tests\gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:309:1 › Phase 6 — the DevTools webContents has no privileged preload bridge (5.1s)
+  ok 4 tests\gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:352:1 › Phase 7 — the real Wisp overlay can be destroyed and recreated with no inherited trust or state (16.0s)
+  ok 5 tests\gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:467:1 › Phase 8 — only the exact SOLITH_TEST_BUILD=1 value enables test-only globals; all other values fail closed (28.8s)
+  ok 6 tests\gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts:525:1 › Phase 3 addendum — overlay cannot reach freeze-stop or freeze-status (independent reproduction of a pre-existing fix) (14.3s)
+
+  6 passed (1.4m)

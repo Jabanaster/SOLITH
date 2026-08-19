@@ -1,4 +1,6 @@
 import { normalizeCatalogTitle } from '../normalize-title.js';
+import { decodeHtmlEntities } from './decode-html-entities.js';
+import { isPlaceholderTitle } from './placeholder-titles.js';
 
 const TRAINER_TITLE_RE = /(?:title="|>)([^<]{3,120}?\s+Trainer)\s*</gi;
 const HREF_RE = /href="(\/[^"]+)"/gi;
@@ -16,10 +18,10 @@ export function parseTrainerListHtml(baseUrl: string, html: string): ParsedRemot
   let match: RegExpExecArray | null;
   const titleRegex = /([^<>]{3,120})\s+Trainer/gi;
   while ((match = titleRegex.exec(html)) !== null) {
-    const rawTitle = match[0].trim();
+    const rawTitle = decodeHtmlEntities(match[0].trim());
     const rawGameName = rawTitle.replace(/\s+Trainer$/i, '').trim();
     const gameName = normalizeCatalogTitle(rawGameName);
-    if (!gameName) continue;
+    if (!gameName || isPlaceholderTitle(gameName)) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -34,9 +36,9 @@ export function parseTrainerListHtml(baseUrl: string, html: string): ParsedRemot
   const anchorRegex = /<a[^>]+href="([^"]+)"[^>]*>([^<]{3,120}?\s+Trainer)<\/a>/gi;
   while ((match = anchorRegex.exec(html)) !== null) {
     const href = match[1];
-    const rawTitle = match[2].trim();
+    const rawTitle = decodeHtmlEntities(match[2].trim());
     const gameName = normalizeCatalogTitle(rawTitle.replace(/\s+Trainer$/i, '').trim());
-    if (!gameName) continue;
+    if (!gameName || isPlaceholderTitle(gameName)) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -54,10 +56,10 @@ export function parseRemoteTrainerIndexHtml(html: string): ParsedRemoteTrainer[]
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null) {
     const href = match[1];
-    const label = match[2].trim();
+    const label = decodeHtmlEntities(match[2].trim());
     if (!/trainer/i.test(label) && !/\/trainer\//i.test(href)) continue;
     const gameName = normalizeCatalogTitle(label.replace(/\s+trainer.*$/i, '').trim());
-    if (!gameName) continue;
+    if (!gameName || isPlaceholderTitle(gameName)) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -77,8 +79,8 @@ export function parseRemoteGameCatalogHtml(html: string): ParsedRemoteTrainer[] 
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null) {
     const href = match[1];
-    const gameName = normalizeCatalogTitle(match[2].trim());
-    if (!gameName) continue;
+    const gameName = normalizeCatalogTitle(decodeHtmlEntities(match[2].trim()));
+    if (!gameName || isPlaceholderTitle(gameName)) continue;
     const key = gameName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -115,7 +117,7 @@ export function parseFlingTrainerOptionsHtml(html: string): ParsedFlingTrainerPa
   const regex = new RegExp(FLING_OPTION_SEGMENT_RE.source, 'gi');
   while ((match = regex.exec(block)) !== null) {
     const hotkey = match[1].replace(/\s+/g, ' ').trim();
-    const name = match[2].replace(/\s+/g, ' ').trim();
+    const name = decodeHtmlEntities(match[2].replace(/\s+/g, ' ').trim());
     if (!name || name.length < 2) continue;
     const key = `${hotkey}::${name}`.toLowerCase();
     if (seen.has(key)) continue;

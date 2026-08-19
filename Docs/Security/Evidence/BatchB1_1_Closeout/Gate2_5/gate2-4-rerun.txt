@@ -1,0 +1,10 @@
+
+Running 5 tests using 1 worker
+
+  ok 1 tests\gate2-4-final-certification.e2e.test.ts:151:1 › Phase 3 — independent reverification: full real propose->consent->start->restore->stop->replay-reject cycle (28.5s)
+  ok 2 tests\gate2-4-final-certification.e2e.test.ts:184:1 › Phase 4 — renderer crash while a real-flow freeze is active stops writes and revokes state (20.7s)
+  ok 3 tests\gate2-4-final-certification.e2e.test.ts:228:1 › Phase 5 — a second real trusted window (overlay) cannot use or interfere with the main window's freeze (15.1s)
+  ok 4 tests\gate2-4-final-certification.e2e.test.ts:304:1 › Phase 9.2/9.4 — same-prefix sibling and encoded-path local navigation do not retain authority (9.7s)
+  ok 5 tests\gate2-4-final-certification.e2e.test.ts:361:1 › Phase 9.5 — unapproved local HTTP origin does not retain privileged access (9.7s)
+
+  5 passed (1.4m)

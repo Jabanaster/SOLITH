@@ -1,13 +1,8 @@
-Product=Solith
-Version=2.4.0-alpha.2
-Platform=Windows x64
-NodeBuildToolchain=v22.23.1
-npm=10.9.8
-Electron=42.4.1
-ElectronABI=146
-ExecutableSHA256=0aec0dc0f5cdefc8d2c01dd4873b5722d4516fc068df8b37687586bd3ad2c602
-AppAsarSHA256=6c4b1f9ed17d937992048957f8bf06f1434e54ed1ff5bd3382b7b98aa16e590a
-BuildSteps=npm run build:vite; npm run build:electron; npm run dist:dir
-BuildResult=PASS
-ElectronOutputVerifier=29/29 PASS
-NativeAddonFinalWorkspaceABI=Node 22.23.1 (restored after packaged regression)
+Build timestamp (session-local): captured this Gate 2.5 cycle
+Node: v22.23.1
+npm: 10.9.8
+electron-builder: 26.15.3 (from build log)
+Electron: 42.4.1 (from build log)
+arch: x64
+-rwxr-xr-x 1 chase 197609 232375296 Jul 29 16:31 dist/win-unpacked/Solith.exe
+3d23858497ff75f56edacc726a29752feb0e27c0f4f7a80b227354f040565e68 *dist/win-unpacked/Solith.exe

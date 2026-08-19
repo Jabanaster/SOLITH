@@ -1,0 +1,67 @@
+<Page
+    x:Class="WispGameBarWidget.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Background="Transparent"
+    mc:Ignorable="d">
+
+    <!--
+        Root grid stays fully transparent so the game underneath is visible
+        everywhere except the Wisp image and the control panel. See
+        MainPage.xaml.cs for the click-through hit-test-region logic that
+        makes the transparent area pass mouse/pen input through to the game.
+    -->
+    <Grid x:Name="RootGrid" Background="Transparent">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Wisp companion image: static, transparent PNG, always visible while pinned. -->
+        <Image
+            x:Name="WispImage"
+            Grid.Row="0"
+            Source="/Assets/solith-wisp-base-float.png"
+            Width="128"
+            Height="128"
+            Stretch="Uniform"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,8" />
+
+        <!--
+            The only interactive surface in the widget. Its bounding box is
+            measured in code-behind and excluded from the click-through
+            (passthrough) regions so it remains clickable while every other
+            transparent pixel lets input fall through to the game.
+        -->
+        <StackPanel
+            x:Name="ControlPanel"
+            Grid.Row="1"
+            Orientation="Vertical"
+            HorizontalAlignment="Center"
+            Background="#CC1B1330"
+            Padding="12,8"
+            CornerRadius="8"
+            Margin="0,0,0,12">
+
+            <Button
+                x:Name="PingSolithButton"
+                Content="Ping Solith"
+                Click="PingSolithButton_Click"
+                HorizontalAlignment="Stretch" />
+
+            <TextBlock
+                x:Name="StatusText"
+                Text="Not contacted yet"
+                Foreground="White"
+                FontSize="12"
+                Margin="0,6,0,0"
+                TextWrapping="Wrap" />
+        </StackPanel>
+
+    </Grid>
+</Page>

@@ -25,13 +25,12 @@ import {
   type TrainerLibraryCatalogFilter,
 } from '../../core/trainer-catalog/all-games-filters.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
-import {
-  COMMUNITY_WARNING_LABEL,
-  requiresCommunityExecutionApproval,
-} from '../../core/trainer-catalog/community-trust.js';
+import { COMMUNITY_WARNING_LABEL } from '../../core/trainer-catalog/community-trust.js';
+import { isCommunityScanEntry, tierHint } from './trainer-library-verification-state.js';
+import { fallbackArtworkTreatment } from './trainer-card-fallback-artwork.js';
+import { isGenericTemplateEntry } from './trainer-catalog-generic-detection.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
-import { solithBranding } from '../assets/branding/index.js';
 import {
   ctImportUiReducer,
   friendlyCtImportError,
@@ -211,23 +210,8 @@ function newImportJobId(): string {
   return `ct-import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function isCommunityScanEntry(entry: TrainerCatalogEntry): boolean {
-  return entry.hasModPack && (
-    requiresCommunityExecutionApproval(entry.certLevel) ||
-    entry.verificationStatus === 'community'
-  );
-}
 
-function tierHint(entry: TrainerCatalogEntry): string {
-  if (isCommunityScanEntry(entry)) {
-    return 'Community definition — opens Discovery first; explicit approval is required before any live attach';
-  }
-  if (entry.verificationStatus === 'verified') return 'Instant — verified definition';
-  if (entry.verificationStatus === 'community') return 'First session scan may be required';
-  return 'Metadata only — sync or import a definition';
-}
-
-function CatalogCard({
+export function CatalogCard({
   entry,
   trust,
   installed,
@@ -252,9 +236,32 @@ function CatalogCard({
   onNotify: (entry: TrainerCatalogEntry) => void;
   onPublish: (entry: TrainerCatalogEntry) => void;
 }) {
-  const tagline = getCatalogTagline(entry);
   const coverUrl = resolveCatalogCoverUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
+  const fallback = fallbackArtworkTreatment(entry.displayName);
+  const isStale = healthStatus === 'stale' || healthStatus === 'quarantined';
+  const capabilitySummary = entry.capabilities ? describeCapabilityLanes(entry.capabilities) : undefined;
+  // Remote-sync entries with no curated reference all get the exact same
+  // fallback categories/cheat-count template (see remote-sync.ts) — showing
+  // that as if it were real per-game data is what made the catalog look
+  // like a wall of identical cards. Generic entries get a truthful label
+  // instead; curated entries are completely unaffected.
+  const isGeneric = isGenericTemplateEntry(entry);
+  const supportingLine = isGeneric
+    ? 'Community-sourced · details incomplete'
+    : [
+        entry.categories.slice(0, 2).join(' · ') || null,
+        entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+  const trustSuffix = [
+    trust?.positive ? `${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : null,
+    trust?.quarantined ? 'needs re-verify' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <article className={styles.card}>
       <div className={styles.coverWrap}>
@@ -266,103 +273,90 @@ function CatalogCard({
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               img.style.display = 'none';
-              const fallback = img.nextElementSibling;
-              if (fallback) (fallback as HTMLElement).style.display = 'flex';
+              const fallbackEl = img.nextElementSibling;
+              if (fallbackEl) (fallbackEl as HTMLElement).style.display = 'flex';
             }}
           />
         ) : null}
-        <div className={styles.coverFallback} style={coverUrl ? { display: 'none' } : undefined}>
-          <img
-            src={solithBranding.gameLibraryControllerMonitors}
-            alt=""
-            aria-hidden="true"
-            className={styles.coverFallbackArtwork}
-          />
-          <span>{entry.displayName}</span>
-          <small>No cover metadata yet</small>
+        <div
+          className={styles.coverFallback}
+          style={{
+            ...(coverUrl ? { display: 'none' } : undefined),
+            ['--fallback-hue-a' as string]: fallback.hueA,
+            ['--fallback-hue-b' as string]: fallback.hueB,
+          }}
+        >
+          {/* Generic entries: no monogram. The letter is always the same
+              character the title already leads with directly below — pure
+              redundancy, not identity. And the category tag here was
+              literally the same fabricated fallback categories now labeled
+              "details incomplete" in the supporting line; showing "ACTION"
+              on the banner while the body says the details are incomplete
+              contradicted itself. Curated entries keep both — their
+              category is real, and their monogram/title rarely share a
+              cover-banner strip this way (curated entries have varied
+              content below, not a one-line truthful-label placeholder). */}
+          {!isGeneric && (
+            <span className={styles.coverFallbackInitial} aria-hidden="true">
+              {fallback.initial}
+            </span>
+          )}
+          {!isGeneric && entry.categories[0] && (
+            <span className={styles.coverCategoryTag} aria-hidden="true">
+              {entry.categories[0]}
+            </span>
+          )}
         </div>
-        <span className={styles.badge} title={tierHint(entry)}>
-          {entry.verificationStatus}
-        </span>
-        {isCommunityScanEntry(entry) && (
-          <span
-            className={styles.communityBadge}
-            aria-label={COMMUNITY_WARNING_LABEL}
-          >
-            <span aria-hidden="true">⚠ </span>
-            {COMMUNITY_WARNING_LABEL}
-          </span>
-        )}
-        {installed && (
-          <span className={styles.installedBadge} title="Detected on this PC">
-            Installed
-          </span>
-        )}
-        {running && (
-          <span className={styles.runningBadge} title="Process detected on this PC">
-            Running
-          </span>
-        )}
-        {(healthStatus === 'stale' || healthStatus === 'quarantined') && (
-          <span className={styles.staleBadge} title="Executable drift or quarantine">
-            Stale
+        {(installed || running) && (
+          <span className={styles.presenceBadge}>
+            {installed && running ? 'Installed · Running' : running ? 'Running' : 'Installed'}
           </span>
         )}
       </div>
       <div className={styles.cardBody}>
-        <h2>{entry.displayName}</h2>
-        <p className={styles.tagline}>{tagline}</p>
-        <p>{entry.categories.slice(0, 2).join(' · ')}</p>
-        <p className={styles.meta}>
-          {entry.hasModPack ? `${entry.cheatCount || '—'} cheats` : 'Metadata only'}
-          {trust?.positive ? ` · ${trust.positive} confirmation${trust.positive === 1 ? '' : 's'}` : ''}
-          {trust?.quarantined ? ' · needs re-verify' : ''}
+        <h2 className={styles.title} title={entry.displayName}>
+          {entry.displayName}
+        </h2>
+        <p className={styles.supportingLine} title={capabilitySummary}>
+          {supportingLine}
+          {trustSuffix ? ` · ${trustSuffix}` : ''}
         </p>
-        {entry.capabilities ? (
-          <p className={styles.capabilityRow} title={describeCapabilityLanes(entry.capabilities)}>
-            {entry.capabilities.saveEdit !== 'none' && (
-              <span className={styles.capBadge} data-lane="save">
-                Save
-              </span>
-            )}
-            {entry.capabilities.liveMemory === 'scan-required' && (
-              <span className={styles.capBadge} data-lane="live-scan">
-                Live · Discovery
-              </span>
-            )}
-            {entry.capabilities.liveMemory === 'executable' && (
-              <span className={styles.capBadge} data-lane="live-exec">
-                Live · Resolved
-              </span>
-            )}
-            {entry.capabilities.injection === 'pilot-gated' && (
-              <span className={styles.capBadge} data-lane="inject">
-                Injection pilot
-              </span>
-            )}
-            {entry.capabilities.saveEdit === 'none' &&
-              entry.capabilities.liveMemory === 'none' &&
-              entry.capabilities.injection === 'forbidden' && (
-                <span className={styles.capBadge} data-lane="meta">
-                  Metadata
-                </span>
-              )}
-          </p>
-        ) : (
-          <p className={styles.meta}>No schema.v1 definition — metadata only</p>
-        )}
-        <p className={styles.meta}>{tierHint(entry)}</p>
+        <div className={styles.statusRow}>
+          {/* "community" and "metadata-only" are the expected default for
+              most of the catalog, not a state worth a badge on every single
+              card — that repetition is what made the badge read as vague
+              filler. Only render it for a state actually worth flagging: a
+              real problem (stale/quarantined) or the earned "verified" tier.
+              The scan-required signal still lives in tierHint's tooltip and
+              in the primary action's own (now neutral) label. */}
+          {(isStale || entry.verificationStatus === 'verified') && (
+            <span
+              className={isStale ? styles.staleBadge : styles.tierBadge}
+              data-tier={entry.verificationStatus}
+              aria-label={!isStale && communityScan ? COMMUNITY_WARNING_LABEL : undefined}
+              title={tierHint(entry)}
+            >
+              {isStale ? 'Needs re-verify' : entry.verificationStatus}
+            </span>
+          )}
+        </div>
         <div className={styles.cardActions}>
+          {/* Scan-required entries still open the same community discovery
+              deck on click (behavior unchanged) — only the label changed,
+              from a shouted "RUN COMMUNITY SCAN" repeated on nearly every
+              card to a neutral, truthful "View Details". The scan step
+              itself is what the deck opens into, not a separate action. */}
           <button
             type="button"
             className={communityScan ? styles.communityScanBtn : styles.launchBtn}
             onClick={() => void onLaunch(entry)}
-            title={communityScan ? 'Open the scan-required community discovery deck; no memory writes run from this card.' : undefined}
+            title={communityScan ? 'Opens trainer details; a community scan runs before any memory attach.' : undefined}
           >
-            {communityScan ? 'Run Community Scan' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
+            {communityScan || isGeneric ? 'View Details' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
           {entry.hasModPack && (
-            <>
+            <details className={styles.moreActions}>
+              <summary>More actions</summary>
               <button type="button" className={styles.secondaryBtn} onClick={() => void onExport(entry)}>
                 Export YAML
               </button>
@@ -386,7 +380,7 @@ function CatalogCard({
                   Notify when verified
                 </button>
               )}
-            </>
+            </details>
           )}
         </div>
       </div>

@@ -23,8 +23,12 @@ describe('community definition trust layer', () => {
     const source = fs.readFileSync(path.join(ROOT, 'src/app/pages/TrainerLibraryPage.tsx'), 'utf-8');
 
     assert.match(source, /entry\.verificationStatus === 'community'/);
-    assert.match(source, /Run Community Scan/);
-    assert.match(source, /no memory writes run from this card/i);
+    // Round 5 replaced the shouted "Run Community Scan" label with a neutral
+    // "View Details" — the scan-required signal now lives in the button's
+    // title tooltip and tierHint, not the visible label itself.
+    assert.match(source, /communityScan \|\| isGeneric \? 'View Details'/);
+    assert.ok(!source.includes('Run Community Scan'), 'obsolete "Run Community Scan" wording should be gone');
+    assert.match(source, /a community scan runs before any memory attach/i);
   });
 
   test('publishing strips PII paths and all client certification claims', () => {

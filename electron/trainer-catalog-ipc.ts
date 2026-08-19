@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   searchCatalog,
   countCatalogEntries,
-  getCatalogEntry,
+  getCatalogEntryForDisplay,
   getDefinitionPayload,
   getRecentSyncLogs,
   hasUserAuthoredDefinition,
@@ -138,7 +138,7 @@ export function registerTrainerCatalogIpc(): void {
   ipcMain.handle('trainer-catalog-get', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
-      const entry = getCatalogEntry(parsed.catalogGameId);
+      const entry = getCatalogEntryForDisplay(parsed.catalogGameId);
       if (!entry) return { success: false, error: 'not_found' };
       return { success: true, entry };
     } catch (error) {

@@ -19,6 +19,8 @@ import {
 } from '../definitions/mod-pack-adapter.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { filterEligibleForTrainerLibrary } from './eligibility-classification.js';
+import { decodeHtmlEntities } from './sync/decode-html-entities.js';
+import { isPlaceholderTitle, placeholderTitleLiterals } from './sync/placeholder-titles.js';
 
 export type HubCertificationLevel = 'L0_Community' | 'L3_Certified';
 
@@ -33,7 +35,10 @@ function parseModPackPayload(payloadJson: string): ModPack {
 function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
   return {
     catalogGameId: String(row.catalogGameId),
-    displayName: String(row.displayName),
+    // Self-heals rows persisted before entity decoding was added at the sync
+    // boundary (src/core/trainer-catalog/sync/parse-html.ts) — idempotent on
+    // already-clean text, so this does not double-decode current writes.
+    displayName: decodeHtmlEntities(String(row.displayName)),
     steamAppId: row.steamAppId != null ? Number(row.steamAppId) : undefined,
     executables: JSON.parse(String(row.executablesJson || '[]')) as string[],
     categories: JSON.parse(String(row.categoriesJson || '[]')) as string[],
@@ -102,7 +107,83 @@ function hasMeaningfulCatalogChange(
   );
 }
 
+// Higher number wins when incoming artwork (steamAppId/coverUrl/headerUrl/
+// iconUrl) conflicts with artwork already stored from a different provider.
+// Bundled/curated sources are authoritative; generic remote-sync scrapes
+// (mrantifun/fling/plitch/remote-listing) are the lowest tier and must never
+// clobber artwork a higher-precedence source already established.
+const ARTWORK_PRECEDENCE: Record<TrainerCatalogEntry['sources'][number]['provider'], number> = {
+  bundled: 100,
+  'solith-hub': 90,
+  'ct-import': 85,
+  user: 80,
+  community: 60,
+  fearless: 50,
+  mrantifun: 50,
+  fling: 50,
+  plitch: 50,
+  'remote-listing': 40,
+};
+
+function maxArtworkPrecedence(sources: TrainerCatalogEntry['sources']): number {
+  return sources.reduce((max, source) => Math.max(max, ARTWORK_PRECEDENCE[source.provider] ?? 0), 0);
+}
+
+function mergeSources(
+  existing: TrainerCatalogEntry['sources'],
+  incoming: TrainerCatalogEntry['sources'],
+): TrainerCatalogEntry['sources'] {
+  const merged = [...existing];
+  for (const incomingSource of incoming) {
+    const index = merged.findIndex((source) => source.provider === incomingSource.provider);
+    if (index === -1) {
+      merged.push(incomingSource);
+    } else {
+      merged[index] = incomingSource;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Resolves one artwork field (steamAppId/coverUrl/headerUrl/iconUrl) against
+ * whatever is already stored. Null/undefined incoming values never erase an
+ * existing value. A non-empty incoming value fills an empty field. A
+ * non-empty incoming value only replaces an existing non-empty value when
+ * its source's artwork precedence is at least as high as the precedence
+ * that already produced the stored value.
+ */
+function resolveArtworkField<T>(
+  existingValue: T | undefined,
+  incomingValue: T | undefined,
+  existingPrecedence: number,
+  incomingPrecedence: number,
+): T | undefined {
+  if (incomingValue == null) return existingValue;
+  if (existingValue == null) return incomingValue;
+  return incomingPrecedence >= existingPrecedence ? incomingValue : existingValue;
+}
+
 export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
+  const existingEntry = getCatalogEntry(entry.catalogGameId);
+
+  const mergedSources = existingEntry ? mergeSources(existingEntry.sources, entry.sources) : entry.sources;
+  const existingPrecedence = existingEntry ? maxArtworkPrecedence(existingEntry.sources) : 0;
+  const incomingPrecedence = maxArtworkPrecedence(entry.sources);
+
+  const steamAppId = existingEntry
+    ? resolveArtworkField(existingEntry.steamAppId, entry.steamAppId, existingPrecedence, incomingPrecedence)
+    : entry.steamAppId;
+  const headerUrl = existingEntry
+    ? resolveArtworkField(existingEntry.headerUrl, entry.headerUrl, existingPrecedence, incomingPrecedence)
+    : entry.headerUrl;
+  const coverUrl = existingEntry
+    ? resolveArtworkField(existingEntry.coverUrl, entry.coverUrl, existingPrecedence, incomingPrecedence)
+    : entry.coverUrl;
+  const iconUrl = existingEntry
+    ? resolveArtworkField(existingEntry.iconUrl, entry.iconUrl, existingPrecedence, incomingPrecedence)
+    : entry.iconUrl;
+
   const searchableText = entry.searchableText || buildSearchableText(entry);
   const hasModPackValue = entry.hasModPack ? 1 : 0;
   const offlinePlayAvailableValue = entry.offlinePlayAvailable != null ? (entry.offlinePlayAvailable ? 1 : 0) : null;
@@ -162,14 +243,14 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
   ).run(
     entry.catalogGameId,
     entry.displayName,
-    entry.steamAppId ?? null,
+    steamAppId ?? null,
     JSON.stringify(entry.executables),
     JSON.stringify(entry.categories),
-    entry.headerUrl ?? null,
-    entry.coverUrl ?? null,
-    entry.iconUrl ?? null,
+    headerUrl ?? null,
+    coverUrl ?? null,
+    iconUrl ?? null,
     entry.verificationStatus,
-    JSON.stringify(entry.sources),
+    JSON.stringify(mergedSources),
     hasModPackValue,
     entry.modPackId ?? null,
     entry.cheatCount,
@@ -333,6 +414,17 @@ function buildCatalogSearchWhere(
   const clauses: string[] = [];
   const params: Array<string | number> = [];
 
+  // Hides already-persisted placeholder rows (e.g. "[REDACTED]") without
+  // deleting them. Exact-match only, so legitimate bracketed titles like
+  // "[NINJA GAIDEN - Master Collection] NINJA GAIDEN 3" are unaffected —
+  // only rows whose ENTIRE trimmed displayName is one of these literals.
+  clauses.push(
+    `TRIM(displayName) != '' AND LOWER(TRIM(displayName)) NOT IN (${placeholderTitleLiterals()
+      .map(() => '?')
+      .join(', ')})`,
+  );
+  params.push(...placeholderTitleLiterals());
+
   const q = query.trim().toLowerCase();
   if (q) {
     clauses.push('searchableText LIKE ?');
@@ -414,6 +506,22 @@ export function getCatalogEntry(catalogGameId: string): TrainerCatalogEntry | nu
     | Record<string, unknown>
     | undefined;
   return row ? rowToEntry(row) : null;
+}
+
+/**
+ * User-facing single-entry lookup: same as getCatalogEntry(), but hides
+ * exact placeholder titles (e.g. "[REDACTED]") the same way the browse/search
+ * listing does. Use this from renderer-exposed IPC handlers. getCatalogEntry()
+ * itself stays raw/internal — quarantine, promotion, hub sync, discovery, and
+ * health-check logic all need to see placeholder rows to manage them, and
+ * none of them render displayName to the user.
+ */
+export function getCatalogEntryForDisplay(catalogGameId: string): TrainerCatalogEntry | null {
+  const entry = getCatalogEntry(catalogGameId);
+  if (!entry || isPlaceholderTitle(entry.displayName) || entry.displayName.trim() === '') {
+    return null;
+  }
+  return entry;
 }
 
 export function getDefinitionCertificationForGame(

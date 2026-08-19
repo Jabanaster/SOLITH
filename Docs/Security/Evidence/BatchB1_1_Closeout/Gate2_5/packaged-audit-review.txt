@@ -13,3 +13,31 @@ Result: PASS
 - DevTools was opened only through Playwright main-process evaluation in a SOLITH_TEST_BUILD=1 candidate.
 - Overlay was destroyed only through Playwright main-process evaluation and recreated through the real renderer toggle.
 - Evidence omits runtime PIDs, raw addresses, target values, consent tokens, and rollback bytes.
+
+--- Addendum: this session (Claude Sonnet) ---
+The review above covers a prior, different agent session's (Codex) packaged
+candidate (exeSHA256=0aec0dc0...), committed as 317baf0 before this session
+began. This session independently rebuilt its own fresh packaged candidate:
+
+Build identity: Solith 2.4.0-alpha.2; Electron 42.4.1 ABI 146; win32 x64;
+exeSHA256=3d23858497ff75f56edacc726a29752feb0e27c0f4f7a80b227354f040565e68
+Result: PASS
+
+- Fresh Vite, Electron (scanner included), and unpacked package build
+  completed this cycle.
+- Electron output verifier: 29/29 PASS.
+- Full packaged regression this cycle: 48/48 PASS (23 smoke + 5 Gate 2.4 +
+  3 Gate 2.3 + 10 Gate 2.2 Resume + 1 Gate 2.2A.1 write proof + 6 new Gate
+  2.5 tests).
+- No generic renderer-controlled URL, PID, process, command, address, value,
+  memory, frame, DevTools, or overlay interface was added this session.
+- DevTools was opened only via app.evaluate() in the main process (real
+  webContents.openDevTools({mode:'detach'})), not via any new production
+  code path.
+- The overlay's forced destroy used the real Electron BrowserWindow.destroy()
+  API invoked directly by the harness on its own harness-launched instance
+  (no new Solith destroy IPC was added); recreation used the real production
+  toggle/showWispOverlay() path.
+- Evidence omits runtime PIDs, raw addresses, target values, consent tokens,
+  and rollback bytes (confirmed by direct review of this session's own new
+  JSON evidence files before they were written).

@@ -170,8 +170,6 @@ function dedupeGames(games) {
   return [...byKey.values()];
 }
 
-/** Synthetic AppIDs — never collide with real Steam IDs; excluded from hotlinked art. */
-const SYNTHETIC_STEAM_APP_ID_BASE = 9_000_000;
 const PREFIXES = ['Legend of', 'Chronicles of', 'Tales of', 'Return to', 'Escape from', 'War for', 'Rise of', 'Fall of', 'Age of', 'Call of'];
 const NOUNS = ['Darkness', 'Empire', 'Kingdom', 'Shadows', 'Legends', 'Destiny', 'Revenge', 'Silence', 'Storm', 'Ashes', 'Blood', 'Steel', 'Fire', 'Ice', 'Void'];
 
@@ -206,7 +204,9 @@ function syntheticGames(targetCount) {
     const name = `${prefix} ${noun}${suffix}`;
     games.push(withExecutableGuesses({
       name,
-      steamAppId: SYNTHETIC_STEAM_APP_ID_BASE + i,
+      // No real Steam App ID exists for these synthetic filler titles — leave
+      // it absent rather than guessing/fabricating one, so no artwork gets
+      // derived from a fake ID downstream.
       categories: [GENRES[i % GENRES.length], GENRES[(i + 3) % GENRES.length]],
       verificationStatus: 'metadata-only',
     }));

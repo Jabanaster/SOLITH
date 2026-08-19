@@ -1,0 +1,183 @@
+All commands run from G:\ACTIVE_PROJECTS\solith-new1-new2 (branch security/new-1-new-2-trust-boundary).
+
+Environment note: this worktree ships package.json engines/.nvmrc pinned to
+Node 22.x; only Node 24.15.0 was available in this environment. `npm ci`
+refused (EBADENGINE). Verified G:\ACTIVE_PROJECTS\solith-b11-integration
+(the integration worktree, same base commit a63e9f5) has an identical
+package-lock.json/package.json and an already-installed node_modules; copied
+that node_modules (read-only source, untouched) into this worktree instead
+of installing fresh. All tsc/build/test commands below then ran normally
+under Node 24 against that dependency tree — the Node-22 pin is a repo dev-
+environment policy unrelated to this security fix, not a check this patch
+needed to satisfy.
+
+1) Electron TypeScript check
+   npx tsc -p tsconfig.electron.json --noEmit --pretty false
+   Exit code: 0 (no output — clean)
+
+2) Main TypeScript check
+   npx tsc -p tsconfig.json --noEmit --pretty false
+   Exit code: 0 (no output — clean)
+
+3) Focused NEW-1/NEW-2 unit tests
+   npx tsx --test tests/new1-new2-sender-validation.test.ts
+   tests 16, suites 2, pass 16, fail 0, cancelled 0, skipped 0, todo 0
+
+4) Focused NEW-1/NEW-2 real-Electron wiring tests
+   npx playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts
+   First pass (before corrective commit): 16 passed (2.1m), 0 failed
+   After corrective pass (added negative-control test, see independent-review.md):
+   17 passed (1.2m), 0 failed — includes the new negative-control test proving
+   all 7 hardened channels genuinely reject the real Wisp overlay window with
+   sender_rejected:unauthorized_window_type.
+
+5) Trusted-sender registry tests (pre-existing, regression check)
+   Included in the full `npm test` run below (tests/trusted-sender-registry.test.ts) — passed.
+
+6) Consent/write tests, injector tests, freeze/rollback tests (pre-existing, regression check)
+   Included in npm run test:live-memory and the full `npm test` run below — passed.
+   (tests/live-memory/write-consent.test.ts, tests/injector-destructive-boundary.test.ts,
+   tests/injector-process-integration.test.ts, tests/live-memory-rollback-freeze-ipc-validation.test.ts,
+   tests/consent-write-artifact.test.ts)
+
+7) Overlay and frame-security regression check
+   Covered by tests/new1-new2-trust-boundary.e2e.test.ts (real Wisp-overlay and
+   trainer-overlay window creation via the production toggle IPC channels, real
+   navigation/popup attempts). The pre-existing
+   tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts requires a
+   PACKAGED executable (dist/win-unpacked/Solith.exe via electron-builder) and
+   was NOT run — packaging is explicitly out of scope for this pass (see
+   remaining-risks.md).
+
+8) npm run test:live-memory
+   Exit code: 0
+   tests 257, suites 24, pass 257, fail 0, cancelled 0, skipped 0, todo 0
+
+9) Full `npm test`
+   The literal `npm test` invocation is blocked by the repo's own
+   `pretest` → scripts/check-node.mjs Node-22 gate (see environment note
+   above). Ran the identical underlying command (the exact string in
+   package.json's "test" script, which now includes
+   tests/new1-new2-sender-validation.test.ts) directly instead:
+     npx tsx --test <full test file list from package.json "test" script> && npx tsx --test tests/sql-parameter-binding.test.ts
+   Exit code: 0
+   First tsx --test invocation: tests 1046, suites 171, pass 1046, fail 0, cancelled 0, skipped 0, todo 0
+   Second tsx --test invocation (sql-parameter-binding.test.ts): tests 10, suites 1, pass 10, fail 0, cancelled 0, skipped 0, todo 0
+   Combined: 1056 tests, 1056 pass, 0 fail.
+   tests/companion-wisp.test.ts (Wisp's own suite) passed unchanged within this run,
+   confirming Wisp behavior was not affected.
+
+10) npm run build:vite
+    Exit code: 0 ("built in 1.59s")
+
+11) npm run build:electron
+    Exit code: 0 — scripts/verify-electron-output.mjs: 29/29 checks passed,
+    including "main.js has nodeIntegration: false", "main.js has
+    contextIsolation: true", "preload.js uses contextBridge" (unchanged
+    pre-existing checks, confirming this patch didn't weaken them).
+
+12) git diff --check
+    Exit code: 0 (no whitespace/conflict-marker errors)
+
+13) Packaging
+    NOT RUN — explicitly out of scope for this pass.
+
+14) Post-corrective-pass full re-verification (after fixing the 4 items in
+    independent-review.md that were in-scope: dev-gated allowed origins,
+    https external-link handoff, strengthened e2e tests, evidence corrections)
+    - tsc -p tsconfig.electron.json --noEmit: exit 0
+    - tsc -p tsconfig.json --noEmit: exit 0
+    - tests/new1-new2-sender-validation.test.ts: 16/16 pass (unchanged)
+    - npm run build:vite: exit 0
+    - npm run build:electron: 29/29 checks passed
+    - tests/new1-new2-trust-boundary.e2e.test.ts: 17/17 pass (see item 4 above)
+    - full `npm test` equivalent command: 1046 + 10 = 1056 tests, 1056 pass, 0 fail
+    - git diff --check: clean
+
+15) Second corrective pass (hardening in-process-confirm-hook,
+    in-process-rollback-hook, trainer-host-rollback — the two remaining
+    conditions from the first independent review)
+    Node version confirmed at time of this pass: v24.15.0 (same environment
+    as all prior runs in this file; repo still pins 22.x via .nvmrc/engines).
+
+    - npx tsc -p tsconfig.electron.json --noEmit --pretty false: exit 0
+    - npx tsc -p tsconfig.json --noEmit --pretty false: exit 0
+    - npx tsx --test tests/new1-new2-sender-validation.test.ts
+      tests/trusted-sender-registry.test.ts
+      tests/live-memory-rollback-freeze-ipc-validation.test.ts
+      (focused hook-confirm/hook-rollback + trainer-host-rollback trust
+      logic is exercised via the generic validateIpcSender/
+      applyWindowNavigationPolicy unit tests plus the e2e wiring proof below;
+      these three files are the "trusted-sender and frame-security" +
+      "live-memory rollback/freeze" regression set)
+      Exit code: 0 — tests 59, suites 8, pass 59, fail 0
+    - npx playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts
+      (rebuilt via npm run build:vite && npm run build:electron first)
+      Exit code: 0 — 20 passed (1.8m), 0 failed. 3 new positive-control tests
+      (in-process-confirm-hook, in-process-rollback-hook,
+      trainer-host-rollback each reach business logic, never sender_rejected)
+      plus all 3 added to the shared negative-control test (now asserts all
+      10 hardened channels reject the Wisp overlay window with
+      sender_rejected:unauthorized_window_type).
+    - npm run test:live-memory: exit 0 — tests 257, pass 257, fail 0
+    - Full test suite: the literal `npm test` invocation is STILL blocked by
+      this environment's Node 24 vs. the repo's pinned Node 22
+      (`scripts/check-node.mjs` pretest gate) — reconfirmed by directly
+      running `npm test` and observing the same
+      "[solith] Unsupported Node.js v24.15.0" failure before running the
+      substitute command below. Ran the exact string of package.json's
+      "test" script directly (confirmed byte-identical to the string used
+      in the first pass via `diff`) with node_modules/.bin on PATH:
+        npx tsx --test <full file list from package.json "test" script> && npx tsx --test tests/sql-parameter-binding.test.ts
+      Exit code: 0 — 1046 pass + 10 pass = 1056 tests, 1056 pass, 0 fail
+      (identical totals to the first pass — no regression from hardening
+      the 3 additional handlers).
+    - npm run build:vite: exit 0
+    - npm run build:electron: 29/29 checks passed
+    - git diff --check: exit 0, clean
+
+16) Final independent-review-driven re-verification (this pass — after the
+    second narrow independent review returned VERIFIED WITH CONDITIONS, whose
+    only condition was an evidence-accuracy overclaim, fixed in
+    remaining-risks.md; no code change was required by this review)
+    Node executable: C:\Program Files\nodejs\node.exe (via `where node`),
+    version v24.15.0 (via `node --version`), npm 11.12.1 (via `npm --version`).
+    No local Node 22 toolchain exists (checked: no .nvmrc-honoring version
+    manager, no Volta, no nvm — confirmed via `where`/`volta --version`/
+    `fnm --version` all failing). Did not download or install a runtime.
+    Lockfile identity re-confirmed: package-lock.json byte-identical to
+    G:\ACTIVE_PROJECTS\solith-b11-integration\package-lock.json (the source
+    of this worktree's copied node_modules) via `diff`.
+
+    - npx tsc -p tsconfig.electron.json --noEmit --pretty false: exit 0, no output
+    - npx tsc -p tsconfig.json --noEmit --pretty false: exit 0, no output
+    - npx tsx --test tests/new1-new2-sender-validation.test.ts
+      tests/trusted-sender-registry.test.ts
+      tests/live-memory-rollback-freeze-ipc-validation.test.ts
+      tests/live-memory/gate2-1-test-build-hooks.test.ts
+      Exit code: 0 — tests 62, suites 8, pass 62, fail 0, cancelled 0, skipped 0, todo 0
+    - npm run build:vite: exit 0
+    - npm run build:electron: 29/29 checks passed
+    - npx playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts
+      First run: 19 passed, 1 failed — `trainer-host-rollback passes the
+      sender check...` failed with "Error: worker process exited
+      unexpectedly (code=3221226505, signal=null)" (a Windows access-
+      violation-style exit code on the Electron worker process itself, not
+      a test assertion failure). Reran that single test in isolation
+      (`-g "trainer-host-rollback passes the sender check"`): passed (4.1s).
+      Reran the full 20-test suite again: 20 passed, 0 failed (1.5m),
+      matching the independent reviewer's own clean 20/20 run. Logged as a
+      one-off environment flake (sequential real-Electron process launches
+      under load in this sandbox), not a defect — see independent-review.md.
+    - npm run test:live-memory: exit 0 — tests 257, pass 257, fail 0
+    - Literal `npm test`: reconfirmed BLOCKED — ran it directly, exit 1,
+      output: "[solith] Unsupported Node.js v24.15.0. Required: Node.js
+      22.x (see .nvmrc and package.json engines)." NOT claimed as passed.
+      Ran the exact package.json "test" script string instead (confirmed
+      byte-identical to prior passes via `diff`), with node_modules/.bin on
+      PATH, under the same v24.15.0 node.exe reported above:
+        npx tsx --test <full file list from package.json "test" script> && npx tsx --test tests/sql-parameter-binding.test.ts
+      Exit code: 0 — 1046 pass + 10 pass = 1056 tests, 1056 pass, 0 fail
+      (unchanged from all prior passes — no regression).
+    - git diff --check: exit 0, clean
+    - git status --short --untracked-files=all: empty (clean tree)

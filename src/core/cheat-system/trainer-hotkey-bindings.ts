@@ -13,9 +13,14 @@ export const DEFAULT_TRAINER_HOTKEYS: Record<string, string> = {
   hide_overlay: 'Control+Shift+\\',
 };
 
-for (let i = 1; i <= 12; i += 1) {
+for (let i = 1; i <= 11; i += 1) {
   DEFAULT_TRAINER_HOTKEYS[`cheat_slot_${i}`] = `F${i}`;
 }
+// Plain F12 is unreliable as a global shortcut: isolated real-Electron
+// testing showed globalShortcut.register('F12', ...) returning false
+// deterministically (18/18 runs) regardless of window/DevTools/order,
+// while CommandOrControl+Shift+F12 registered successfully (3/3 runs).
+DEFAULT_TRAINER_HOTKEYS.cheat_slot_12 = 'CommandOrControl+Shift+F12';
 
 const SETTINGS_KEY = 'trainerHotkeyBindings';
 

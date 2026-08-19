@@ -96,7 +96,7 @@ export function registerTrainerResearchIpc(): void {
         title: parsed.title,
         executable: parsed.executable,
       });
-      if (!result.success) {
+      if (result.success === false) {
         return { success: false, errors: result.errors };
       }
       return { success: true, ...result };

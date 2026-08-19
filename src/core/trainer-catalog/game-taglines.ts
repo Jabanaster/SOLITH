@@ -4,7 +4,7 @@ import type { TrainerCatalogEntry } from './types.js';
 export const CURATED_GAME_TAGLINES: Record<string, string> = {
   palworld: 'Open-world survival crafting with creature companions.',
   'stardew-valley': 'Farming life sim with mines, relationships, and seasons.',
-  'baldurs-gate-3': 'Party-based CRPG with tactical turn-based combat.',
+  'baldur-s-gate-3': 'Party-based CRPG with tactical turn-based combat.',
   'cyberpunk-2077': 'Open-world RPG in Night City.',
   'elden-ring': 'Open-world action RPG from FromSoftware.',
   'red-dead-redemption-2': 'Western open-world story and exploration.',
@@ -51,6 +51,17 @@ export const CURATED_GAME_TAGLINES: Record<string, string> = {
   'mortal-kombat-1': 'Fighting with timeline reboot chaos.',
   'guilty-gear-strive': 'Anime fighting with roman cancel system.',
 };
+
+/**
+ * Curated tagline only — no synthesized fallback. The catalog's supporting
+ * metadata line (categories + cheat count) already covers uncurated entries;
+ * a synthesized tagline like "Action · Adventure single-player title" just
+ * restated that line in different words, so cards for the ~5,900 games
+ * without a curated blurb showed the same information twice.
+ */
+export function getCuratedTagline(entry: TrainerCatalogEntry): string | undefined {
+  return CURATED_GAME_TAGLINES[entry.catalogGameId];
+}
 
 export function getCatalogTagline(entry: TrainerCatalogEntry): string {
   const curated = CURATED_GAME_TAGLINES[entry.catalogGameId];

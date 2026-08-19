@@ -14,7 +14,7 @@ import {
 import { recordCatalogDemand, listCatalogDemandSorted } from '../src/core/catalog-demand/store.js';
 import { loadCatalogDefinition } from '../src/core/definitions/load-catalog-definition.js';
 import { buildTrainerDeckRows } from '../src/core/trainer-deck/build-deck-rows.js';
-import { getCatalogEntry } from '../src/core/trainer-catalog/store.js';
+import { getCatalogEntryForDisplay } from '../src/core/trainer-catalog/store.js';
 import { catalogDefinitionCapabilities } from '../src/core/definitions/load-catalog-definition.js';
 import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-read-save-controls.js';
 import {
@@ -44,7 +44,7 @@ export function registerTrainerDeckIpc(): void {
           : '';
       if (!catalogGameId) return { success: false, error: 'missing_catalog_game_id' };
 
-      const entry = getCatalogEntry(catalogGameId);
+      const entry = getCatalogEntryForDisplay(catalogGameId);
       const definition = loadCatalogDefinition(catalogGameId);
       const health = runTrainerHealthCheck(catalogGameId)[0];
       const installed = listInstalledGames().find((g) => g.catalogGameId === catalogGameId);
