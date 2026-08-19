@@ -22,6 +22,22 @@ export const CATALOG_GENRE_FILTERS = [
   'Sandbox',
 ] as const;
 
+
+/** ROADMAP §3.6 Genre filter slice. Keep this UI list exact even though the
+ * broader canonical normalizer intentionally recognizes additional genres. */
+export const ROADMAP_GENRE_FILTERS = [
+  'RPG',
+  'Action',
+  'Strategy',
+  'Simulation',
+  'Adventure',
+  'Shooter',
+  'Survival',
+  'Racing',
+  'Sports',
+  'Puzzle',
+] as const;
+
 export type CatalogGenreFilter = (typeof CATALOG_GENRE_FILTERS)[number];
 
 /** Normalize user/filter input to a canonical genre label when possible. */
