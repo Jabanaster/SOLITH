@@ -70,12 +70,12 @@ export function registerLocalOcrIpc(): void {
 }
 
 async function recognizeNumericText(image: Buffer): Promise<string> {
-  const { createWorker } = await import('tesseract.js');
+  const { createWorker, PSM } = await import('tesseract.js');
   const worker = await createWorker('eng');
   try {
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789.,/- ',
-      tessedit_pageseg_mode: '7',
+      tessedit_pageseg_mode: PSM.SINGLE_LINE,
     });
     const result = await worker.recognize(image);
     return result.data.text;

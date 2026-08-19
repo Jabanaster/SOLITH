@@ -1,10 +1,11 @@
 # SOLITH Security Completion Roadmap
 
-> **Project:** SOLITH  
-> **Repository root:** `G:\ACTIVE_PROJECTS\SOLITH`  
-> **Primary branch:** `master`  
-> **Current security verdict:** **BATCH B1.1 CONDITIONAL PASS**  
-> **Current program state:** Feature freeze active; release/security completion not yet granted  
+> **Project:** SOLITH
+> **Repository root:** `G:\ACTIVE_PROJECTS\SOLITH`
+> **Intended release branch:** `master`
+> **Verified branch (current security work):** `review/gate2-5-doc-audit` @ `317baf0ea573992dfa1a0cec2a30d6529b6ecee0` — **NOT `master` until merged.** Every Gate 2.4/2.4A/2.5 claim in this document applies only to that verified branch tip unless a later evidence record explicitly verifies another commit. `master` has not been rechecked against this work.
+> **Current security verdict:** **BATCH B1.1 CONDITIONAL PASS**
+> **Current program state:** Feature freeze active; release/security completion not yet granted
 > **Purpose of this document:** Provide a single root-level roadmap showing what has been reported complete, what must still be independently verified in the repository, what remains pending, and the exact work required before SOLITH may be considered security-complete.
 >
 > **Canonical location note (2026-07-29):** This file at the repository root
@@ -14,6 +15,17 @@
 > used as the starting point for this file but is no longer the canonical
 > location going forward. All future sessions must update this in-repository
 > file.
+>
+> **Documentation authority (2026-07-29):** This file is the **sole
+> canonical source** for security-gate status, Batch B1.1 status, security
+> verdicts, security residuals, and security promotion conditions. Where
+> `ROADMAP.md` mentions security state, it links here rather than restating
+> a verdict. Where a security-gate certification (Gate 2.x / Batch B1.1) is
+> discussed alongside `README.md`'s feature-maturity certification levels
+> (L0–L4), the two are unrelated systems — see `README.md`'s "Certification
+> levels" section for its own disambiguation note. Prohibited-capability
+> boundaries are owned by `PROJECT_SPEC.md §3.2 "STRICTLY PROHIBITED (The
+> Safety Firewall)"`, not restated here.
 
 ---
 
@@ -210,8 +222,8 @@ Known original residuals:
 
 Reported flow:
 
-`live-memory-freeze-propose`  
-→ `live-memory-freeze-issue-consent`  
+`live-memory-freeze-propose`
+→ `live-memory-freeze-issue-consent`
 → `live-memory-freeze-start`
 
 Required verification:
@@ -1108,6 +1120,17 @@ Gate 2.2 remaining lifecycle scenarios (Phases 3.7, 3.8): may resume (not yet ru
 
 # Phase 4 — Electron TypeScript Baseline Cleanup
 
+[Completion note, later session, Claude Sonnet: Phases 4.1-4.3 below are the
+original pre-cleanup planning record and describe the historical 31/13
+baseline; their `Status: PENDING` markers are preserved as written and were
+NOT edited in place. The work they describe has since been completed and
+independently reviewed twice: Electron TypeScript now independently
+reproduces 0 diagnostics, with no new ignores, exclusions, or weakened
+compiler settings beyond one documented, justified exclusion of an orphaned
+dead file (`electron/run-compat-test.ts`). See `owner-decision-package.md`
+OD-2.5-001 for the full provenance chain and current status. This note does
+not authorize B1.1 promotion, release, or any claim about `master`.]
+
 ## Phase 4.1 — Freeze and classify the 31-diagnostic baseline
 
 **Status:** PENDING
@@ -1815,6 +1838,9 @@ end-of-session update must:
 | 2026-07-29 | Gate 2.4A — Deleted-File Recovery and Scope-Integrity Reconciliation | Read-only follow-up to Gate 2.4's disclosed deletion of pre-existing untracked `test_output.txt`. Exhaustively searched for recovery: recursive filesystem search (`G:\ACTIVE_PROJECTS`, `G:\Downloads`, `%TEMP%`, `%LOCALAPPDATA%\Temp`), PowerShell PSReadLine history, Git Bash history, VS Code local-history metadata (70 entries), and the Windows Recycle Bin — zero matches in every location; no script/test/config file anywhere in the repository ever referenced the filename. Classified **NOT RECOVERABLE**; no guessed-content replacement created. Diffed Gate 2.4's own baseline status snapshot against current status and confirmed `test_output.txt` is the *only* path removed since Gate 2.4 began — no other unauthorized deletion or modification exists. Because the file had zero script references, its loss is proven to have had no effect on Gate 2.4's test results, test totals, packaged-build identity, or security conclusions. Corrected 3 Gate 2.4 evidence files with additive notices (no raw evidence rewritten) and formalized Gate 2.4's scope-integrity verdict as FAIL while its functional verdict remains VERIFIED. No production code, test code, `package.json`, or CI/release-workflow file touched; no git-mutating command run. Evidence: `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_4A_Integrity/` (16 files). | GATE 2.4A CONDITIONAL RECONCILIATION; BATCH B1.1 CONDITIONAL PASS (unchanged — no functional or security regression found or introduced) |
 
 | 2026-07-29 | Gate 2.5 — Final Frame, DevTools, and Overlay Lifecycle Closeout | Owner waived the Claude-model requirement and authorized Codex to execute. Independently reviewed Gate 2.4 raw evidence; added a narrow packaged harness for same-origin/trusted-looking/untrusted-file/local-HTTP/nested children, removed/navigated/reloaded stale frames, genuine detached DevTools, actual Wisp destroy/recreate, and exact `SOLITH_TEST_BUILD` variants. Initial live overlay run found that freeze-stop/status lacked the existing main-window sender guard; added `requireTrustedSender(event)` to exactly those two handlers. Final coherent packaged regression 49/49 PASS (smoke 23/23), `npm test` 1,040/1,040 PASS, `test:live-memory` 257/257 PASS, main TypeScript PASS, Electron TypeScript unchanged 31 diagnostics/13 files, diff-check unchanged GameLibrary lines 286/303. Evidence: `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/`. No commit/push or owner risk acceptance. | GATE 2.5 REPORTED COMPLETE — VERIFY; BATCH B1.1 CONDITIONAL PASS; RELEASE DENIED |
+| 2026-07-29 | Gate 2.5 — Independent Reconfirmation (separate session, Claude Sonnet) | Discovered this branch (`review/gate2-5-doc-audit`) already contained a full prior Gate 2.5 attempt by a different agent (Codex, committed 317baf0) before this session began, including a real security fix (missing `requireTrustedSender` guard on `live-memory-freeze-stop`/`live-memory-freeze-status`, already applied). Rather than accepting that report on faith, independently rebuilt a fresh packaged candidate (exeSHA256=3d23858497ff75f56edacc726a29752feb0e27c0f4f7a80b227354f040565e68) and reran the full Gate 2.5 scope with a new test file (`tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts`): child-frame rejection (data:/untrusted-local-file/about:blank, no preload bridge in any child frame), stale/destroyed-frame rejection, DevTools boundary (real detached DevTools webContents probed via `executeJavaScript`, confirmed no preload bridge), Wisp overlay destroy+recreate (harness-forced `BrowserWindow.destroy()` since `toggleWispOverlay()` itself only hides, not destroys — disclosed), `SOLITH_TEST_BUILD` 8-variant matrix (all fail closed except the exact `'1'` control), and independent reproduction of the freeze-stop/status fix against the real overlay — all 6/6 new tests pass, rerun twice for stability. Full regression: packaged smoke 23/23, Gate 2.4 rerun 5/5, Gate 2.3 rerun 3/3, Gate 2.2 Resume rerun 10/10 (one transient stall isolated and confirmed as a flake, not a regression), Gate 2.2A.1 write-proof rerun 1/1 (48/48 packaged total), `npm test` 1,040/1,040, `test:live-memory` 257/257, main TypeScript 0 diagnostics, Electron TypeScript unchanged 31/13, `git diff --check` exit 0 (GameLibrary.tsx's baseline issue is now inside HEAD's committed history, not the unstaged diff). No production code modified this session. Terminated 4 orphaned harness-created Solith.exe processes found mid-session after a transient test stall (confirmed harness-created via `--user-data-dir` command-line match). Evidence: `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/` (appended/updated, prior evidence preserved with addendum notices, not overwritten). | GATE 2.5 REPORTED COMPLETE — VERIFY (unchanged, independently reconfirmed); BATCH B1.1 CONDITIONAL PASS (unchanged); RELEASE DENIED |
+| 2026-07-29 | Residual-Risk and Documentation Reconciliation Review (same session, Claude Sonnet) | Read-only review reconciling apparent conflicts across the two Gate 2.5 sessions' evidence: confirmed 48/48 vs. 49/49 packaged totals are both individually correct for two different suite files and packaged-candidate hashes, not a stale number; confirmed "8 inventory rows" vs. "5 currently-defined hooks" both decompose to the identical 7 retained test-only functions plus 1 removed hook, just grouped by row-count vs. by-purpose; classified the overlay destroy/recreate residual (R-2.5-001) as an accepted architecture fact, not a security defect or B1.1 blocker; reconfirmed the branch-vs-`master` self-correction already present in `verification-final.txt`; confirmed the Gate 2.5 aggregate `REPORTED COMPLETE — VERIFY` wording is internally consistent (mirrors Gate 2.4's own convention), not stale; separated actual B1.1 blockers (Electron TypeScript baseline, branch/merge, final owner promotion decision) from disclosure-only items; produced a 5-item owner-decision package (OD-2.5-001 through 005, adding branch-merge and documentation-consolidation as new items). Zero files modified — confirmed via unchanged `git status --short --untracked-files=all` count (74) before and after. | No verdict change; findings fed directly into the following Canonical Documentation Reconciliation session |
+| 2026-07-29 | Canonical B1.1 Documentation Reconciliation (same session, Claude Sonnet) | Implemented this file's own prior review recommendations: added explicit branch-authority language (verified branch `review/gate2-5-doc-audit` @ `317baf0e`, not `master`, stated with full hash) to this file's header; added an explicit documentation-authority note naming this file as the sole canonical security-status source, `ROADMAP.md` as product-direction owner (linking here rather than restating verdicts), `PROJECT_SPEC.md §3.2` as the sole prohibited-capability source, and the README L0–L4 feature-maturity scale as a distinct system from Gate/Batch security certification; corrected the "Final Current Verdict" block's bare `49/49` packaged total to name its exact suite file and candidate hash and cross-reference the separate `48/48` result instead of letting either imply a single combined number; updated `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/owner-decision-package.md` with OD-2.5-004 (branch merge/release-line verification) and OD-2.5-005 (documentation consolidation, this session) and explicit PENDING/NOT AUTHORIZED status wording on OD-2.5-001/002/003; deduplicated the prohibited-capability list in `AGENTS.md` (now references `PROJECT_SPEC.md §3.2` instead of restating it) and added the same reference plus a certification-terminology disambiguation note to `README.md`; added a security-roadmap link plus the same branch caveat to `ROADMAP.md`'s "Current Baseline" section. No production code, test, or evidence file touched; no commit, merge, branch, or B1.1/release promotion performed. Electron TypeScript cleanup remains a separate, untouched Codex workstream. [Superseded: the owner later reassigned this control to a Claude Sonnet session — see the Addendum below and `owner-decision-package.md` OD-2.5-001.] | Gate 2.5: REPORTED COMPLETE — VERIFY (unchanged); BATCH B1.1 CONDITIONAL PASS (unchanged); RELEASE DENIED (unchanged); documentation authority now explicit across all 5 in-scope files |
 ---
 
 # Final Current Verdict
@@ -1843,12 +1869,24 @@ Gate 2.5 added requireTrustedSender(event) to exactly those two handlers.
 After correction, all seven main-only operations rejected from both the
 initial and recreated overlays.
 
-Final verification: packaged regression 49/49 PASS; packaged smoke 23/23;
-Gate 2.5 focused 7/7; npm test 1,040/1,040; test:live-memory 257/257;
-main TypeScript PASS; Electron output verifier 29/29; packaged build PASS.
-The unrelated Electron TypeScript baseline remains 31 diagnostics across
-13 files. git diff --check remains limited to the unrelated GameLibrary.tsx
-lines 286 and 303.
+Final verification (Codex session's own candidate,
+exeSHA256=0aec0dc0f5cdefc8d2c01dd4873b5722d4516fc068df8b37687586bd3ad2c602,
+suite tests/gate2-5-frame-overlay-closeout.e2e.test.ts): packaged regression
+49/49 PASS; packaged smoke 23/23; Gate 2.5 focused 7/7; npm test 1,040/1,040;
+test:live-memory 257/257; main TypeScript PASS; Electron output verifier
+29/29; packaged build PASS. (A separate Claude Sonnet addendum session below
+independently reran this scope against a different freshly rebuilt
+candidate and a differently scoped Gate 2.5 suite, producing 48/48 — see
+that addendum; both totals are individually correct for their own suite
+file and candidate hash and must not be merged into one bare number.) The
+unrelated Electron TypeScript baseline was, at the time of this Gate 2.5
+report, 31 diagnostics across 13 files. [Historical pre-cleanup baseline —
+not the current state. Current independently reproduced state: 0
+diagnostics, achieved and independently reviewed twice by a later session.
+See the "Final-decision checklist (post-cleanup)" addendum below and
+`owner-decision-package.md` OD-2.5-001. This does not authorize B1.1
+promotion, release, or any claim about `master`.] git diff --check remains
+limited to the unrelated GameLibrary.tsx lines 286 and 303.
 
 No unresolved exploitable Gate 2.5 defect remains in the tested Windows x64
 candidate. B1.1 is not promoted because the remaining documented conditions
@@ -1860,3 +1898,89 @@ cleanup is authorized, the exact next milestone is the separate Electron
 TypeScript baseline cleanup and re-verification. Do not begin Batch B2 or
 B2A under Gate 2.5.
 ```
+
+## Addendum (2026-07-29, same day, separate session — Claude Sonnet)
+
+The Gate 2.5 section and verdict above were authored by a different agent
+session (its own evidence says "Model: Codex") on this same
+`review/gate2-5-doc-audit` branch, committed as `317baf0` before this
+addendum session began. This session (Claude Sonnet, as the operator
+required) independently reran the full Gate 2.5 scope against a freshly
+rebuilt packaged candidate rather than accepting the above report on faith:
+the freeze-stop/freeze-status fix, child-frame/stale-frame/DevTools/overlay-
+recreation boundaries, and the `SOLITH_TEST_BUILD` guard were all
+reproduced with new tests (`tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts`,
+6/6 pass, rerun twice) and a full regression rerun (48/48 packaged, 1,040/1,040
+npm, 257/257 live-memory, TypeScript/diff-check baselines unchanged). No
+new defect was found; no production code was modified by this addendum
+session. One correction: the repository root's actual branch is
+`review/gate2-5-doc-audit`, not `master` as stated in the Gate 2.5 section
+above — this does not change any verdict. See
+`Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/verification-final.txt`'s
+own addendum section for full detail. Verdict unchanged: BATCH B1.1
+CONDITIONAL PASS; RELEASE DENIED; OWNER DECISION REQUIRED as stated above.
+
+## Addendum (2026-07-29, third session — Claude Sonnet, Canonical Documentation Reconciliation)
+
+This addendum implements the documentation-consolidation and branch-authority
+recommendations from this session's own prior residual-risk review. **No
+security verdict changed. No production code, test, or evidence file was
+modified.** Only this file's header (branch-authority language, documentation
+authority note) and the "Final Current Verdict" packaged-total wording above
+were edited, plus `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/owner-decision-package.md`
+(new OD-2.5-004/OD-2.5-005 entries and status clarifications), `ROADMAP.md`,
+`AGENTS.md`, and `README.md` (cross-reference/authority edits only — see each
+file's own change for detail).
+
+**Documentation authority is now explicit:** this file (`SOLITH_SECURITY_ROADMAP.md`)
+is the sole canonical source for security-gate/Batch-B1.1 status; `ROADMAP.md`
+owns product direction and links here instead of restating verdicts;
+`PROJECT_SPEC.md §3.2` is the sole canonical source for prohibited-capability
+language; `AGENTS.md` references that section rather than duplicating it;
+`README.md` retains a user-facing summary but defers to `PROJECT_SPEC.md` on
+conflict, and its L0–L4 feature-maturity scale is explicitly disambiguated
+from Gate/Batch security certification.
+
+**Status, unchanged by this addendum:**
+Gate 2.5: `REPORTED COMPLETE — VERIFY` (aggregate; individual scenarios remain
+individually `VERIFIED COMPLETE` in their own matrices).
+Batch B1.1: `CONDITIONAL PASS`.
+Release: `DENIED`.
+Batch B2/B2A: prohibited.
+Verified branch: `review/gate2-5-doc-audit` @ `317baf0ea573992dfa1a0cec2a30d6529b6ecee0`
+— not `master`.
+Electron TypeScript baseline cleanup: the owner explicitly reassigned this
+control to a Claude Sonnet session, superseding the Codex assignment recorded
+in the changelog above. A Claude Sonnet session performed the cleanup
+(31→0 diagnostics) and a subsequent corrective pass addressing independent-
+review findings; see `owner-decision-package.md` OD-2.5-001 for the full
+provenance chain and current status (technically resolved; owner disposition
+still required). Codex's assignment remains limited to the separate Wisp
+workstream only.
+
+**Final-decision checklist (post-cleanup)** (nothing below is authorized to
+proceed automatically — each step requires its own explicit owner
+authorization when reached):
+
+1. Record the exact commit for the Electron TypeScript cleanup (performed by
+   a Claude Sonnet session in this same working tree; see OD-2.5-001).
+2. Confirm the Electron TypeScript diagnostic count reaches the
+   owner-authorized target (baseline going in: 31 diagnostics/13 files;
+   achieved: 0 diagnostics, independently reviewed twice).
+3. Run the required scoped verification commands against that result.
+4. Confirm no Gate 2.4/2.5 security behavior regressed as a side effect of
+   the cleanup.
+5. Reconcile the Electron TypeScript cleanup's exact commit with this Gate
+   2.5 review branch (`review/gate2-5-doc-audit` @ `317baf0e`) — the cleanup
+   was performed directly in this same working tree, not on a separate
+   branch.
+6. Obtain explicit owner authorization before any merge or promotion step.
+7. Merge only through that explicitly authorized process — no session may
+   merge, rebase, or push on its own initiative.
+8. Identify the resulting `master` commit after merge.
+9. Re-run the required final checks against that actual `master` commit —
+   no claim in this document transfers to `master` before this step.
+10. Only then may the owner decide whether Batch B1.1 becomes an
+    unconditional pass.
+
+No step above has been started by this session.

@@ -10,6 +10,35 @@
 
 No unresolved exploitable Gate 2.5 defect remains after the freeze-stop/status sender guards and complete packaged rerun.
 
+## Addendum (this session, Claude Sonnet)
+
+The risks above were recorded by a prior, different agent session (Codex,
+committed as 317baf0 before this session began). This session independently
+reconfirmed the freeze-stop/status fix, the child-frame/stale-frame/DevTools/
+overlay-recreation boundaries, and the SOLITH_TEST_BUILD guard against a
+freshly rebuilt packaged candidate (all pass, 6/6 new tests, rerun twice) and
+found no additional Gate 2.5 defect. One new, narrower disclosure from this
+session:
+
+- **R-2.5-001 (new, disclosed):** `toggleWispOverlay()` only hides an
+  existing overlay (`hideWispOverlay()` → `.hide()`), it does not destroy the
+  webContents. `destroyWispOverlay()` (the real `.destroy()` path) is only
+  ever invoked from `electron/main.ts`'s `'will-quit'` handler. There is
+  therefore no renderer-reachable path to a live in-session overlay
+  destroy+recreate cycle — this session's Phase 7 test had the harness call
+  `BrowserWindow.destroy()` directly on its own harness-launched overlay
+  instance to construct the cycle, which is consistent with this gate's
+  explicit authorization to destroy/recreate harness-launched windows and
+  overlays, but is disclosed here so the distinction between "renderer-
+  reachable" and "harness-forced" is not lost. This does not change the
+  verdict — the window-type/registration mechanism exercised after the
+  forced destroy is entirely real production code.
+
+All other items in the list above (Gate 2.4 aggregate status wording,
+Electron TypeScript baseline, GameLibrary.tsx whitespace, natural PID reuse,
+unrelated repository work) remain accurate and unchanged from this session's
+own review.
+
 ## Evidence correction (owner-authorized, candidate 502300b4498828b40dcbb5be320c2f8d48603089)
 
 Prior Electron TypeScript result of 31 diagnostics did not reproduce under

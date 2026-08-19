@@ -7,3 +7,25 @@ Generated/ignored outputs:
 - dist/win-unpacked packaged candidate rebuilt.
 - vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node restored to Node 22 ABI.
 No dependency, package-lock, CI, release workflow, GameLibrary whitespace, or Electron TypeScript baseline change was made.
+
+--- Addendum: this session (Claude Sonnet) ---
+Lines above describe a prior, different agent session's (Codex, 317baf0)
+changes, already committed to this branch before this session began. THIS
+session made no further production code changes (electron/live-memory-ipc.ts
+and all other tracked source files are confirmed byte-identical to HEAD via
+hash comparison this cycle — see baseline-file-manifest.csv). This session's
+own changes are limited to:
+- tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts (new file, this
+  session; distinct from the prior session's
+  tests/gate2-5-frame-overlay-closeout.e2e.test.ts, which is not present in
+  the current working tree)
+- Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/* (evidence refreshed
+  and appended this cycle; some filenames pre-existed as scaffolding from
+  the prior agent's attempt and were updated/appended-to with this session's
+  own independently-gathered data rather than left stale)
+- SOLITH_SECURITY_ROADMAP.md (append-only update, this cycle)
+- dist/win-unpacked/* rebuilt fresh this cycle (generated build output)
+- vendor/memoryjs-3.5.1-patched/build/Release/memoryjs.node restored to Node
+  22 ABI after packaged testing (established housekeeping, every prior gate)
+No dependency, package-lock.json, CI/release workflow, GameLibrary.tsx, or
+Electron TypeScript baseline change was made by this session either.
