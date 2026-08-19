@@ -55,18 +55,87 @@ function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
       ? (JSON.parse(String(row.catalogExclusionFlagsJson)) as TrainerCatalogEntry['catalogExclusionFlags'])
       : undefined,
     explicitlyUnsupported: row.explicitlyUnsupported != null ? Number(row.explicitlyUnsupported) === 1 : undefined,
+    releaseDate: row.releaseDate ? String(row.releaseDate) : undefined,
+    createdAt: row.createdAt ? String(row.createdAt) : undefined,
+    contentUpdatedAt: row.contentUpdatedAt ? String(row.contentUpdatedAt) : undefined,
   };
+}
+
+interface ExistingTrainerCatalogRow {
+  displayName: string;
+  verificationStatus: string;
+  hasModPack: number;
+  modPackId: string | null;
+  cheatCount: number;
+  antiCheat: string | null;
+  offlinePlayAvailable: number | null;
+  catalogExclusionFlagsJson: string | null;
+  explicitlyUnsupported: number | null;
+  contentUpdatedAt: string | null;
+}
+
+/**
+ * ROADMAP §3.5 "Recently updated" — fields whose change counts as a meaningful catalog
+ * update. Cosmetic/technical fields (artwork URLs, source bookkeeping, searchableText,
+ * executable paths, categories, steamAppId, releaseDate) are intentionally excluded so a
+ * routine sync/seed/import upsert cannot silently refresh the semantic timestamp.
+ */
+function hasMeaningfulCatalogChange(
+  existing: ExistingTrainerCatalogRow | undefined,
+  entry: TrainerCatalogEntry,
+  hasModPackValue: number,
+  offlinePlayAvailableValue: number | null,
+  catalogExclusionFlagsJson: string | null,
+  explicitlyUnsupportedValue: number | null,
+): boolean {
+  if (!existing) return true;
+  return (
+    existing.displayName !== entry.displayName ||
+    existing.verificationStatus !== entry.verificationStatus ||
+    existing.hasModPack !== hasModPackValue ||
+    (existing.modPackId ?? null) !== (entry.modPackId ?? null) ||
+    existing.cheatCount !== entry.cheatCount ||
+    (existing.antiCheat ?? null) !== (entry.antiCheat ?? null) ||
+    (existing.offlinePlayAvailable ?? null) !== offlinePlayAvailableValue ||
+    (existing.catalogExclusionFlagsJson ?? null) !== catalogExclusionFlagsJson ||
+    (existing.explicitlyUnsupported ?? null) !== explicitlyUnsupportedValue
+  );
 }
 
 export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
   const searchableText = entry.searchableText || buildSearchableText(entry);
+  const hasModPackValue = entry.hasModPack ? 1 : 0;
+  const offlinePlayAvailableValue = entry.offlinePlayAvailable != null ? (entry.offlinePlayAvailable ? 1 : 0) : null;
+  const catalogExclusionFlagsJson = entry.catalogExclusionFlags ? JSON.stringify(entry.catalogExclusionFlags) : null;
+  const explicitlyUnsupportedValue = entry.explicitlyUnsupported != null ? (entry.explicitlyUnsupported ? 1 : 0) : null;
+
+  const existing = db
+    .prepare(
+      `SELECT displayName, verificationStatus, hasModPack, modPackId, cheatCount,
+              antiCheat, offlinePlayAvailable, catalogExclusionFlagsJson, explicitlyUnsupported,
+              contentUpdatedAt
+       FROM trainer_catalog_games WHERE catalogGameId = ?`,
+    )
+    .get(entry.catalogGameId) as ExistingTrainerCatalogRow | undefined;
+
+  const meaningfulChanged = hasMeaningfulCatalogChange(
+    existing,
+    entry,
+    hasModPackValue,
+    offlinePlayAvailableValue,
+    catalogExclusionFlagsJson,
+    explicitlyUnsupportedValue,
+  );
+  const contentUpdatedAt = meaningfulChanged ? new Date().toISOString() : existing?.contentUpdatedAt ?? null;
+
   db.prepare(
     `INSERT INTO trainer_catalog_games (
       catalogGameId, displayName, steamAppId, executablesJson, categoriesJson,
       headerUrl, coverUrl, iconUrl, verificationStatus, sourcesJson,
       hasModPack, modPackId, cheatCount, searchableText,
-      antiCheat, offlinePlayAvailable, catalogExclusionFlagsJson, explicitlyUnsupported, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      antiCheat, offlinePlayAvailable, catalogExclusionFlagsJson, explicitlyUnsupported,
+      releaseDate, createdAt, contentUpdatedAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'))
     ON CONFLICT(catalogGameId) DO UPDATE SET
       displayName = excluded.displayName,
       steamAppId = excluded.steamAppId,
@@ -85,7 +154,11 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
       offlinePlayAvailable = excluded.offlinePlayAvailable,
       catalogExclusionFlagsJson = excluded.catalogExclusionFlagsJson,
       explicitlyUnsupported = excluded.explicitlyUnsupported,
+      releaseDate = excluded.releaseDate,
+      contentUpdatedAt = excluded.contentUpdatedAt,
       updatedAt = datetime('now')`,
+    // createdAt is intentionally absent from the UPDATE SET list above — ON CONFLICT
+    // leaves it untouched, so it is only ever written by the INSERT branch.
   ).run(
     entry.catalogGameId,
     entry.displayName,
@@ -97,14 +170,16 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
     entry.iconUrl ?? null,
     entry.verificationStatus,
     JSON.stringify(entry.sources),
-    entry.hasModPack ? 1 : 0,
+    hasModPackValue,
     entry.modPackId ?? null,
     entry.cheatCount,
     searchableText,
     entry.antiCheat ?? null,
-    entry.offlinePlayAvailable != null ? (entry.offlinePlayAvailable ? 1 : 0) : null,
-    entry.catalogExclusionFlags ? JSON.stringify(entry.catalogExclusionFlags) : null,
-    entry.explicitlyUnsupported != null ? (entry.explicitlyUnsupported ? 1 : 0) : null,
+    offlinePlayAvailableValue,
+    catalogExclusionFlagsJson,
+    explicitlyUnsupportedValue,
+    entry.releaseDate ?? null,
+    contentUpdatedAt,
   );
 }
 

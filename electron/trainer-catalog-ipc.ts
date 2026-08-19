@@ -30,6 +30,7 @@ import { importDefinitionCt, previewDefinitionCt } from '../src/core/definitions
 import {
   recordDefinitionFeedback,
   getDefinitionFeedbackSummary,
+  listPositiveFeedbackCountsSorted,
 } from '../src/core/trainer-catalog/definition-feedback-store.js';
 import {
   listPendingDefinitionUpdates,
@@ -386,6 +387,16 @@ export function registerTrainerCatalogIpc(): void {
       const quarantined = isDefinitionQuarantined(parsed.catalogGameId);
       const pending = listPendingDefinitionUpdates(20).filter((r) => r.catalogGameId === parsed.catalogGameId);
       return { success: true, summary, quarantined, pendingUpdates: pending.length };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-all-time-popularity-list', async () => {
+    try {
+      // ROADMAP §3.5 "All-time popular" — lifetime positive community feedback count,
+      // deliberately distinct from the "Popular now" catalog_demand signal.
+      return { success: true, popularity: listPositiveFeedbackCountsSorted(500) };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

@@ -105,6 +105,12 @@ export interface TrainerCatalogEntry {
   offlinePlayAvailable?: boolean;
   catalogExclusionFlags?: CatalogExclusionFlag[];
   explicitlyUnsupported?: boolean;
+  /** ROADMAP §3.5 "Newest release" — real release date from seed/import sources only; undefined = unknown. */
+  releaseDate?: string;
+  /** ROADMAP §3.5 "Recently added to SOLITH" — set once on first insert; undefined on legacy pre-migration rows. */
+  createdAt?: string;
+  /** ROADMAP §3.5 "Recently updated" — set only on a meaningful content change, not every sync/upsert; undefined = never meaningfully updated. */
+  contentUpdatedAt?: string;
 }
 
 export interface TrainerCatalogSearchResult {

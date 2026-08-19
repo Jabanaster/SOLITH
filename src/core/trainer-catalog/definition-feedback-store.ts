@@ -50,6 +50,26 @@ export function getDefinitionFeedbackSummary(
   return { positive, negative, total: positive + negative };
 }
 
+/**
+ * ROADMAP §3.5 "All-time popular" — genuinely cumulative, distinct from the "Popular now"
+ * catalog_demand signal (pre-fulfillment notify/verification-request interest). This counts
+ * lifetime positive "Confirm works" community feedback, which never resets or decays.
+ */
+export function listPositiveFeedbackCountsSorted(
+  limit = 500,
+): Array<{ catalogGameId: string; positiveCount: number }> {
+  return db
+    .prepare(
+      `SELECT catalogGameId, COUNT(*) as positiveCount
+       FROM definition_feedback
+       WHERE rating > 0
+       GROUP BY catalogGameId
+       ORDER BY positiveCount DESC
+       LIMIT ?`,
+    )
+    .all(limit) as Array<{ catalogGameId: string; positiveCount: number }>;
+}
+
 export function listDefinitionFeedback(
   catalogGameId: string,
   limit = 50,

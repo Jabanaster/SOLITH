@@ -886,6 +886,16 @@ function applySchema(): void {
     'offlinePlayAvailable INTEGER',
     'catalogExclusionFlagsJson TEXT',
     'explicitlyUnsupported INTEGER',
+    // ROADMAP §3.5 — release date is real catalog metadata (from seed/import sources only);
+    // NULL means unknown, never derived from insertion/file time.
+    'releaseDate TEXT',
+    // ROADMAP §3.5 — set once on INSERT only (see upsertCatalogEntry); ON CONFLICT UPDATE
+    // never rewrites this column, so it stays an honest catalog-added timestamp.
+    'createdAt TEXT',
+    // ROADMAP §3.5 — set only when upsertCatalogEntry detects a meaningful content change
+    // (see MEANINGFUL_UPDATE_FIELDS in store.ts); unconditional syncs/no-op upserts do not
+    // touch it. Distinct from `updatedAt`, which remains an unconditional last-write stamp.
+    'contentUpdatedAt TEXT',
   ];
   for (const column of optionalTrainerCatalogColumns) {
     const columnName = column.split(' ')[0];

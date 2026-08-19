@@ -12,6 +12,11 @@ import {
   POPULAR_TRAINER_LIMIT,
   type TrainerCatalogPopularityEvidence,
 } from '../../core/trainer-catalog/popular-ranking.js';
+import {
+  sortAllGamesEntries,
+  ALL_GAMES_SORT_MODE_LABELS,
+  type AllGamesSortMode,
+} from '../../core/trainer-catalog/all-games-sorting.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
 import {
   COMMUNITY_WARNING_LABEL,
@@ -27,7 +32,7 @@ import {
 } from '../../core/ct-library/import-state.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
-type SortMode = 'installed-first' | 'a-z';
+type SortMode = AllGamesSortMode;
 /** ROADMAP §3.3 — Popular is the default Trainer Library view; All Games preserves prior unranked behavior. */
 type ViewMode = 'popular' | 'all';
 /** ROADMAP §3.4 — All Games first-use notice dismissal, persisted the same way as other local-only UI preferences. */
@@ -370,6 +375,7 @@ export default function TrainerLibraryPage({
   const [sortMode, setSortMode] = useState<SortMode>('installed-first');
   const [viewMode, setViewMode] = useState<ViewMode>('popular');
   const [popularityMap, setPopularityMap] = useState<Map<string, TrainerCatalogPopularityEvidence>>(new Map());
+  const [allTimePopularityMap, setAllTimePopularityMap] = useState<Map<string, number>>(new Map());
   const [allGamesNoticeDismissed, setAllGamesNoticeDismissed] = useState(readAllGamesNoticeDismissed);
   const [dragOver, setDragOver] = useState(false);
   const [scanningInstalls, setScanningInstalls] = useState(false);
@@ -452,6 +458,16 @@ export default function TrainerLibraryPage({
             ]),
           ),
         );
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogAllTimePopularityList) return;
+    void api.trainerCatalogAllTimePopularityList().then((result) => {
+      if (result.success && result.popularity) {
+        setAllTimePopularityMap(new Map(result.popularity.map((p) => [p.catalogGameId, p.positiveCount])));
       }
     });
   }, []);
@@ -1055,17 +1071,11 @@ export default function TrainerLibraryPage({
         installedCatalogGameIds: installedIds,
         popularityByCatalogGameId: popularityMap,
       }).map((ranked) => ranked.entry)
-    : filteredEntries
-        .slice()
-        .sort((a, b) => {
-          if (sortMode === 'a-z') {
-            return a.displayName.localeCompare(b.displayName);
-          }
-          const aInstalled = installedIds.has(a.catalogGameId) ? 1 : 0;
-          const bInstalled = installedIds.has(b.catalogGameId) ? 1 : 0;
-          if (aInstalled !== bInstalled) return bInstalled - aInstalled;
-          return a.displayName.localeCompare(b.displayName);
-        });
+    : sortAllGamesEntries(filteredEntries, sortMode, {
+        installedCatalogGameIds: installedIds,
+        popularityByCatalogGameId: popularityMap,
+        allTimePopularityByCatalogGameId: allTimePopularityMap,
+      });
 
   const activeFilterSummary =
     [
@@ -1075,7 +1085,7 @@ export default function TrainerLibraryPage({
       installedOnly ? 'installed' : null,
       runningOnly ? 'running' : null,
       needsReverifyOnly ? 'needs re-verify' : null,
-      viewMode === 'all' && sortMode === 'a-z' ? 'A–Z' : null,
+      viewMode === 'all' && sortMode !== 'installed-first' ? ALL_GAMES_SORT_MODE_LABELS[sortMode] : null,
     ]
       .filter(Boolean)
       .join(' · ') || null;
@@ -1481,6 +1491,14 @@ export default function TrainerLibraryPage({
           <div className={styles.filters}>
             <button
               type="button"
+              className={sortMode === 'recommended' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('recommended')}
+              aria-pressed={sortMode === 'recommended'}
+            >
+              Recommended
+            </button>
+            <button
+              type="button"
               className={sortMode === 'installed-first' ? styles.filterActive : styles.filterBtn}
               onClick={() => setSortMode('installed-first')}
               aria-pressed={sortMode === 'installed-first'}
@@ -1494,6 +1512,62 @@ export default function TrainerLibraryPage({
               aria-pressed={sortMode === 'a-z'}
             >
               A–Z
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'verified-first' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('verified-first')}
+              aria-pressed={sortMode === 'verified-first'}
+            >
+              Verified first
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'popular-now' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('popular-now')}
+              aria-pressed={sortMode === 'popular-now'}
+            >
+              Popular now
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'most-trainer-options' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('most-trainer-options')}
+              aria-pressed={sortMode === 'most-trainer-options'}
+            >
+              Most trainer options
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'all-time-popular' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('all-time-popular')}
+              aria-pressed={sortMode === 'all-time-popular'}
+            >
+              All-time popular
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'newest-release' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('newest-release')}
+              aria-pressed={sortMode === 'newest-release'}
+            >
+              Newest release
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'recently-added' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('recently-added')}
+              aria-pressed={sortMode === 'recently-added'}
+            >
+              Recently added to SOLITH
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'recently-updated' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('recently-updated')}
+              aria-pressed={sortMode === 'recently-updated'}
+            >
+              Recently updated
             </button>
           </div>
         </div>

@@ -500,6 +500,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   catalogDemandNotify: (payload: { catalogGameId: string; kind?: 'notify' | 'verification_request' }) =>
     ipcRenderer.invoke('catalog-demand-notify', payload),
   catalogDemandList: () => ipcRenderer.invoke('catalog-demand-list'),
+  trainerCatalogAllTimePopularityList: () => ipcRenderer.invoke('trainer-catalog-all-time-popularity-list'),
   installDiscoveryOpenPath: (payload: { catalogGameId: string; targetPath?: string }) =>
     ipcRenderer.invoke('install-discovery-open-path', payload),
   catalogProcessWatchActive: (payload: { active: boolean }) =>

@@ -999,6 +999,11 @@ interface Window {
       demand?: Array<{ catalogGameId: string; notifyCount: number; verificationRequests: number; lastRequestedAt: string }>;
       error?: string;
     }>;
+    trainerCatalogAllTimePopularityList: () => Promise<{
+      success: boolean;
+      popularity?: Array<{ catalogGameId: string; positiveCount: number }>;
+      error?: string;
+    }>;
     installDiscoveryOpenPath: (payload: {
       catalogGameId: string;
       targetPath?: string;
