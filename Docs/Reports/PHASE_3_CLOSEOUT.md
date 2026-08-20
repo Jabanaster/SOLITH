@@ -146,8 +146,9 @@ report was written after that commit; it remains untracked, a separate
 future action), the three untracked worktree directories, and both protected
 baseline stashes.
 
-- Commit SHA: **35a9487..<pending — filled in immediately after commit>**
-- Push: local == remote confirmed after push
+- Commit SHA: **12df29b225ac43c72803667462a9fa197130a92c**
+- Push: `35a9487..12df29b review/gate2-5-doc-audit -> review/gate2-5-doc-audit` — local == remote confirmed (both `12df29b225ac43c72803667462a9fa197130a92c`)
+- Post-commit dirty state: reconciled to baseline (only `Docs/Reports/PHASE_R_FULL_CLOSEOUT.md` untracked report + 3 pre-existing untracked worktree dirs remain; both protected stashes + 2 older pre-existing stashes untouched)
 - PR #7: not merged (out of scope for this authorization)
 
 ## Machine-readable summary
