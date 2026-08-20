@@ -36,6 +36,7 @@ import { NotificationBell } from './components/NotificationBell.js';
 import { NotificationCenter } from './components/NotificationCenter.js';
 import { ToastHost } from './components/ToastHost.js';
 import type { Settings, NotificationAction } from '../shared/types/index.js';
+import { type View, isValidView } from './nav-views.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -63,13 +64,6 @@ class ContentErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-
-type View =
-  | 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'trainer-research'
-  | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls' | 'live-memory' | 'trainer-library'
-  | 'catalog-save-controls' | 'trainer-deck' | 'registry-explorer' | 'ct-library'
-  | 'settings';
 
 type NavItem = {
   id: View;
@@ -345,8 +339,11 @@ const App: React.FC = () => {
     useNotifications({ toastsEnabled: settings?.notificationsToastEnabled ?? true });
   const handleNotificationAction = (action: NotificationAction) => {
     setNotificationCenterOpen(false);
-    if (action.type === 'open-view') {
-      setCurrentView(action.view as View);
+    // action.view is untrusted (persisted/IPC-derived) — never cast it, always
+    // validate against the canonical View allowlist. Unknown/malformed values
+    // are ignored and never touch currentView.
+    if (action.type === 'open-view' && isValidView(action.view)) {
+      setCurrentView(action.view);
     }
   };
 

@@ -41,7 +41,22 @@ describe('trainer_catalog_games schema — releaseDate / createdAt / contentUpda
     const row = getCatalogEntry('no-evidence');
     assert.ok(row);
     assert.equal(row!.releaseDate, undefined);
-    assert.equal(row!.createdAt, undefined || row!.createdAt, 'createdAt should be a real timestamp or undefined, never fabricated');
+    assert.ok(
+      row!.createdAt === undefined ||
+        (typeof row!.createdAt === 'string' && !Number.isNaN(Date.parse(row!.createdAt))),
+      'createdAt must be undefined or a real, parseable timestamp — never a fabricated/malformed value',
+    );
+  });
+
+  test('createdAt is never a malformed non-date string', () => {
+    upsertCatalogEntry(entry({ catalogGameId: 'malformed-check' }));
+    const row = getCatalogEntry('malformed-check');
+    // Insertion always sets createdAt via datetime('now') — this asserts the
+    // real assertion above would actually catch a malformed value, not just
+    // pass vacuously: a value like 'not-a-date' must fail Date.parse.
+    assert.ok(row!.createdAt !== undefined, 'createdAt is set on INSERT');
+    assert.equal(Number.isNaN(Date.parse('not-a-date')), true, 'sanity: malformed strings must fail Date.parse');
+    assert.equal(Number.isNaN(Date.parse(row!.createdAt!)), false);
   });
 
   test('createdAt is set on initial INSERT', () => {

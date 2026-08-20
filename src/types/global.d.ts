@@ -904,7 +904,10 @@ interface Window {
         needsReverification: boolean;
         catalogGameId?: string;
         catalogDisplayName?: string;
-        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+        // Matches InstalledGameRecord['platform'] (InstallPlatform, 8 values) — the
+        // narrower 5-value union above belongs only to preview/commit, whose scanners
+        // and Zod schema do not yet produce ubisoft/ea/battlenet records.
+        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
         installPath: string;
         executablePath?: string;
         displayName?: string;

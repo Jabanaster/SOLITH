@@ -135,6 +135,35 @@ describe('sortAllGamesEntries — determinism and non-mutation', () => {
     const second = sortAllGamesEntries(entries, 'most-trainer-options').map((e) => e.catalogGameId);
     assert.deepEqual(first, second);
   });
+
+  it('breaks ties on duplicate displayName by catalogGameId, not input order', () => {
+    const forward = [
+      makeEntry({ catalogGameId: 'zzz-second', displayName: 'Same Title' }),
+      makeEntry({ catalogGameId: 'aaa-first', displayName: 'Same Title' }),
+    ];
+    const reversed = [...forward].reverse();
+    const forwardResult = sortAllGamesEntries(forward, 'a-z').map((e) => e.catalogGameId);
+    const reversedResult = sortAllGamesEntries(reversed, 'a-z').map((e) => e.catalogGameId);
+    assert.deepEqual(forwardResult, ['aaa-first', 'zzz-second']);
+    assert.deepEqual(reversedResult, ['aaa-first', 'zzz-second']);
+  });
+
+  it('every sort mode resolves duplicate-name ties deterministically regardless of input order', () => {
+    const modes: Array<Parameters<typeof sortAllGamesEntries>[1]> = [
+      'installed-first', 'a-z', 'verified-first', 'popular-now', 'most-trainer-options',
+      'recommended', 'all-time-popular', 'newest-release', 'recently-added', 'recently-updated',
+    ];
+    const forward = [
+      makeEntry({ catalogGameId: 'zzz-second', displayName: 'Duplicate' }),
+      makeEntry({ catalogGameId: 'aaa-first', displayName: 'Duplicate' }),
+    ];
+    const reversed = [...forward].reverse();
+    for (const mode of modes) {
+      const forwardResult = sortAllGamesEntries(forward, mode).map((e) => e.catalogGameId);
+      const reversedResult = sortAllGamesEntries(reversed, mode).map((e) => e.catalogGameId);
+      assert.deepEqual(forwardResult, reversedResult, `mode "${mode}" must resolve the tie identically regardless of input order`);
+    }
+  });
 });
 
 describe('sortAllGamesEntries — recommended', () => {

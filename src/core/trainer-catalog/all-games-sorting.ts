@@ -41,7 +41,11 @@ function allTimePopularityValueFor(entry: TrainerCatalogEntry, context: AllGames
 }
 
 function compareByName(a: TrainerCatalogEntry, b: TrainerCatalogEntry): number {
-  return a.displayName.localeCompare(b.displayName);
+  const byName = a.displayName.localeCompare(b.displayName);
+  if (byName !== 0) return byName;
+  // Duplicate display names must not fall back to input/DB order — catalogGameId
+  // is stable and unique, so it is the final deterministic tie-break.
+  return a.catalogGameId.localeCompare(b.catalogGameId);
 }
 
 /**

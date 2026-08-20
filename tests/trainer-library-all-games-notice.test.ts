@@ -6,7 +6,9 @@ import test from 'node:test';
 const ROOT = path.resolve(import.meta.dirname ?? '.', '..');
 
 function readSource(relativePath: string): string {
-  return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8');
+  // Normalize CRLF to LF — core.autocrlf can materialize tracked files with
+  // CRLF on Windows checkouts, and this file's regexes are LF-anchored.
+  return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').replace(/\r\n/g, '\n');
 }
 
 test('ROADMAP §3.4 All Games first-use notice text matches the page implementation exactly', () => {
