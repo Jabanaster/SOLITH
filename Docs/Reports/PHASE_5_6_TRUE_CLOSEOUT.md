@@ -222,8 +222,8 @@ for real; live apply/rollback on the demo fixture specifically is BLOCKED
 by the fixture's own deliberate read-only design, not deferred by choice.
 Trainer E2E 5/5.
 
-Commit: **(recorded immediately below — see chat response for the exact
-hash)**.
+Commit: **c5f7e948a9c60917055c3304ee22274584d567cc**, pushed; local == remote
+confirmed (`b1f1aa1..c5f7e94 review/gate2-5-doc-audit -> review/gate2-5-doc-audit`).
 
 ---
 
