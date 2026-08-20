@@ -312,6 +312,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   artworkCachePause: () => ipcRenderer.invoke('artwork-cache-pause'),
   artworkCacheResume: () => ipcRenderer.invoke('artwork-cache-resume'),
   artworkCacheCancel: () => ipcRenderer.invoke('artwork-cache-cancel'),
+  catalogUpdatesStatus: () => ipcRenderer.invoke('catalog-updates-status'),
+  catalogUpdatesSetPreference: (payload: { autoUpdateEnabled?: boolean; bundledSnapshotOnly?: boolean; artworkNetworkOptOut?: boolean }) =>
+    ipcRenderer.invoke('catalog-updates-set-preference', payload),
+  catalogUpdatesImport: () => ipcRenderer.invoke('catalog-updates-import'),
+  catalogUpdatesRollbackLast: () => ipcRenderer.invoke('catalog-updates-rollback-last'),
   trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-evaluate-promotion', payload),
   trainerCatalogPromoteVerified: (payload: { catalogGameId: string }) =>

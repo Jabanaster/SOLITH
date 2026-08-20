@@ -1534,6 +1534,34 @@ function applySchema(): void {
     )
   `);
 
+  // ROADMAP §5.5/§5.6 signed catalog update state (single row) and history.
+  // rollbackDataJson on a history row holds the pre-update snapshot of every
+  // touched entry, enabling a targeted rollback without a whole-catalog backup.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_update_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      currentVersion INTEGER NOT NULL DEFAULT 0,
+      lastSuccessAt TEXT,
+      lastCheckAt TEXT,
+      autoUpdateEnabled INTEGER NOT NULL DEFAULT 1,
+      bundledSnapshotOnly INTEGER NOT NULL DEFAULT 0,
+      artworkNetworkOptOut INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_update_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version INTEGER NOT NULL,
+      appliedAt TEXT NOT NULL,
+      recordCount INTEGER NOT NULL,
+      notice TEXT NOT NULL,
+      status TEXT NOT NULL,
+      rejectReason TEXT,
+      rollbackDataJson TEXT
+    )
+  `);
+
   // ROADMAP §4.2/§4.3 managed local artwork cache metadata. localPath is a
   // solith-asset:// addressable file under Electron userData, never a
   // renderer-controlled path. rightsClass records the ROADMAP §4.2

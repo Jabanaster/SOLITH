@@ -578,6 +578,40 @@ interface Window {
     artworkCachePause: () => Promise<{ success: boolean; error?: string }>;
     artworkCacheResume: () => Promise<{ success: boolean; error?: string }>;
     artworkCacheCancel: () => Promise<{ success: boolean; error?: string }>;
+    catalogUpdatesStatus: () => Promise<{
+      success: boolean;
+      state?: {
+        currentVersion: number;
+        lastSuccessAt: string | null;
+        lastCheckAt: string | null;
+        autoUpdateEnabled: boolean;
+        bundledSnapshotOnly: boolean;
+        artworkNetworkOptOut: boolean;
+      };
+      history?: Array<{
+        id: number;
+        version: number;
+        appliedAt: string;
+        recordCount: number;
+        notice: string;
+        status: 'applied' | 'rejected' | 'rolled-back';
+        rejectReason?: string;
+      }>;
+      dueForAutomaticCheck?: boolean;
+      error?: string;
+    }>;
+    catalogUpdatesSetPreference: (payload: {
+      autoUpdateEnabled?: boolean;
+      bundledSnapshotOnly?: boolean;
+      artworkNetworkOptOut?: boolean;
+    }) => Promise<{ success: boolean; error?: string }>;
+    catalogUpdatesImport: () => Promise<{
+      success: boolean;
+      canceled?: boolean;
+      result?: { status: 'applied' | 'rejected'; version: number; recordCount: number; rejectReason?: string };
+      error?: string;
+    }>;
+    catalogUpdatesRollbackLast: () => Promise<{ success: boolean; restoredCount?: number; error?: string }>;
     trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       eligibility?: { eligible: boolean; reasons: string[] };
