@@ -4,6 +4,7 @@ import path from 'path';
 import { isContainedWithin, validatePathSafety } from '../src/core/safety/path-safety.js';
 import { getGameById } from '../src/core/games/index.js';
 import { isPathApproved } from '../src/core/saves/locations.js';
+import { POPULAR_TRAINER_LIMIT } from '../src/core/trainer-catalog/popular-ranking.js';
 
 /**
  * Zod validation schemas for all Electron IPC payloads.
@@ -784,3 +785,8 @@ export function validateSaveDataFileAccess(gameId: string, filePath: string): Ip
     return { safe: false, error: UNAPPROVED_FILE_ERROR };
   }
 }
+
+/** ROADMAP §4.5 artwork refresh IPC payload — optional explicit scope, bounded to the same limit as a full Popular projection. */
+export const ArtworkCacheRefreshSchema = z.object({
+  catalogGameIds: z.array(z.string().min(1).max(120)).max(POPULAR_TRAINER_LIMIT).optional(),
+});

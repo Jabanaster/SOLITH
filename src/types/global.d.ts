@@ -559,6 +559,25 @@ interface Window {
       ownedConfirmed?: boolean;
       error?: string;
     }>;
+    artworkCacheRefresh: (payload?: { catalogGameIds?: string[] }) => Promise<{
+      success: boolean;
+      queued?: number;
+      error?: string;
+    }>;
+    artworkCacheRetryMissing: () => Promise<{ success: boolean; queued?: number; error?: string }>;
+    artworkCacheStatus: () => Promise<{
+      success: boolean;
+      running?: boolean;
+      active?: number;
+      completed?: number;
+      total?: number;
+      paused?: boolean;
+      cancelled?: boolean;
+      error?: string;
+    }>;
+    artworkCachePause: () => Promise<{ success: boolean; error?: string }>;
+    artworkCacheResume: () => Promise<{ success: boolean; error?: string }>;
+    artworkCacheCancel: () => Promise<{ success: boolean; error?: string }>;
     trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       eligibility?: { eligible: boolean; reasons: string[] };

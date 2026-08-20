@@ -1534,6 +1534,29 @@ function applySchema(): void {
     )
   `);
 
+  // ROADMAP §4.2/§4.3 managed local artwork cache metadata. localPath is a
+  // solith-asset:// addressable file under Electron userData, never a
+  // renderer-controlled path. rightsClass records the ROADMAP §4.2
+  // persistent-cache rights decision every row was written under — see
+  // src/core/artwork-cache/fetch-policy.ts#isPersistableRightsClass, the
+  // gate actually enforced (in src/core/artwork-cache/cache-writer.ts)
+  // before any row here can exist with a non-persistable class and status='ok'.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS artwork_cache (
+      catalogGameId TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      sourceUrl TEXT NOT NULL,
+      rightsClass TEXT NOT NULL,
+      licenseNote TEXT,
+      localPath TEXT NOT NULL,
+      sizeBytes INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      fetchedAt TEXT NOT NULL,
+      lastError TEXT,
+      PRIMARY KEY (catalogGameId, kind)
+    )
+  `);
+
   reconcileCatalogOrphans();
 }
 
