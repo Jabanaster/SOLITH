@@ -20,6 +20,10 @@ export interface TrainerCatalogRankingContext {
   popularityByCatalogGameId?: Map<string, TrainerCatalogPopularityEvidence>;
 }
 
+function hasValidReleaseDate(value: string | undefined): boolean {
+  return Boolean(value) && !Number.isNaN(Date.parse(value!));
+}
+
 export interface TrainerCatalogRankSignals {
   /** ROADMAP §3.3 ranking tier 1 — real signal (install-discovery). */
   installed: boolean;
@@ -29,19 +33,10 @@ export interface TrainerCatalogRankSignals {
   popularityValue: number;
   /** True when popularityValue is 0 because no local demand evidence exists yet for this entry (fallback, not measured zero-popularity). */
   popularityIsFallback: boolean;
-  /**
-   * ROADMAP §3.3 ranking tier 4 ("Recently released"). No release-date evidence
-   * field exists anywhere in the current catalog schema (Step 8: do not fabricate).
-   * Always false — this tier deterministically ties for every entry until a real
-   * release-date field is added in a future slice.
-   */
-  recentlyReleased: false;
-  /**
-   * ROADMAP §3.3 ranking tier 5 ("Enduring favorites"). No long-term-favorite
-   * evidence field exists in the current catalog schema. Always false — ties for
-   * every entry until a real evidence source exists (Step 8).
-   */
-  enduringFavorite: false;
+  /** ROADMAP §3.3 ranking tier 4 ("Recently released") — a real, parseable releaseDate. Absent/malformed dates never count. */
+  recentlyReleased: boolean;
+  /** ROADMAP §3.3 ranking tier 5 ("Enduring favorites") — the curated isAllTimeClassic flag only, never inferred. */
+  enduringFavorite: boolean;
   /** Final deterministic, stable tie-break — never depends on DB row order. */
   deterministicKey: string;
 }
@@ -64,8 +59,8 @@ export function computeRankSignals(
     verifiedSolithSupport,
     popularityValue,
     popularityIsFallback: !demand || popularityValue === 0,
-    recentlyReleased: false,
-    enduringFavorite: false,
+    recentlyReleased: hasValidReleaseDate(entry.releaseDate),
+    enduringFavorite: entry.isAllTimeClassic === true,
     deterministicKey: `${entry.displayName.toLowerCase()}::${entry.catalogGameId}`,
   };
 }
@@ -76,8 +71,8 @@ function compareRanked(a: RankedTrainerCatalogEntry, b: RankedTrainerCatalogEntr
   if (sa.installed !== sb.installed) return sa.installed ? -1 : 1;
   if (sa.verifiedSolithSupport !== sb.verifiedSolithSupport) return sa.verifiedSolithSupport ? -1 : 1;
   if (sa.popularityValue !== sb.popularityValue) return sb.popularityValue - sa.popularityValue;
-  // recentlyReleased / enduringFavorite tiers always tie today (Step 8) — no
-  // comparison performed, deliberately, rather than fabricating a signal.
+  if (sa.recentlyReleased !== sb.recentlyReleased) return sa.recentlyReleased ? -1 : 1;
+  if (sa.enduringFavorite !== sb.enduringFavorite) return sa.enduringFavorite ? -1 : 1;
   return sa.deterministicKey.localeCompare(sb.deterministicKey);
 }
 

@@ -1200,6 +1200,19 @@ function applySchema(): void {
     // (see MEANINGFUL_UPDATE_FIELDS in store.ts); unconditional syncs/no-op upserts do not
     // touch it. Distinct from `updatedAt`, which remains an unconditional last-write stamp.
     'contentUpdatedAt TEXT',
+    // ROADMAP §3.6 Mode — curated capability evidence; NULL = unknown, never inferred.
+    // A routine catalog sync that omits these fields must not null them out (see
+    // upsertCatalogEntry's curated-value preservation in store.ts).
+    'singlePlayer INTEGER',
+    'offlineCoop INTEGER',
+    'localMultiplayer INTEGER',
+    'onlineFeaturesPresent INTEGER',
+    // ROADMAP §3.6 Catalog "All-time classic" — curated flag, no fabricated threshold.
+    'isAllTimeClassic INTEGER',
+    // ROADMAP §3.6 Availability "Owned" — explicit local user confirmation only, set via
+    // setCatalogEntryOwnedConfirmed(); intentionally never written by upsertCatalogEntry
+    // so a routine catalog sync can never wipe a user's manual ownership mark.
+    'ownedConfirmed INTEGER',
   ];
   for (const column of optionalTrainerCatalogColumns) {
     const columnName = column.split(' ')[0];

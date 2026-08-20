@@ -7,14 +7,29 @@ export type TrainerLibraryAvailabilityFilter =
   | 'not-installed'
   | 'has-trainer-profile'
   | 'verified'
-  | 'community-unverified';
+  | 'community-unverified'
+  | 'owned';
 
 /** ROADMAP §3.6 — evidence-backed Catalog subset only. */
 export type TrainerLibraryCatalogFilter =
   | 'popular'
   | 'new-release'
   | 'niche-deep-catalog'
-  | 'recently-added';
+  | 'recently-added'
+  | 'all-time-classic';
+
+/**
+ * ROADMAP §3.6 Mode. Curated capability evidence only (TrainerCatalogEntry.modeCapabilities) —
+ * never inferred from categories/antiCheat/offlinePlayAvailable. "Offline-only support" is
+ * intentionally absent: its semantics were ambiguous between "the game itself has no online
+ * component" and "SOLITH supports only the offline portion" and were left NEEDS OWNER DECISION
+ * rather than guessed (see the §3.6 final-seven completion report).
+ */
+export type TrainerLibraryModeFilter =
+  | 'single-player'
+  | 'offline-co-op'
+  | 'local-multiplayer'
+  | 'online-features-present';
 
 /**
  * ROADMAP §3.6 Launcher. V1 semantics: detected install platform for
@@ -28,6 +43,8 @@ export interface TrainerLibraryFilterState {
   catalog: TrainerLibraryCatalogFilter[];
   /** Optional so the pre-existing 19-value call sites remain unchanged. */
   launcher?: TrainerLibraryLauncherFilter[];
+  /** Optional so pre-existing call sites remain unchanged. */
+  mode?: TrainerLibraryModeFilter[];
 }
 
 export interface TrainerLibraryFilterContext {
@@ -49,6 +66,7 @@ export const TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS: Record<TrainerLibraryAv
   'has-trainer-profile': 'Has trainer/profile',
   verified: 'Verified',
   'community-unverified': 'Community/unverified',
+  owned: 'Owned',
 };
 
 export const TRAINER_LIBRARY_CATALOG_FILTER_LABELS: Record<TrainerLibraryCatalogFilter, string> = {
@@ -56,6 +74,14 @@ export const TRAINER_LIBRARY_CATALOG_FILTER_LABELS: Record<TrainerLibraryCatalog
   'new-release': 'New release',
   'niche-deep-catalog': 'Niche/deep catalog',
   'recently-added': 'Recently added',
+  'all-time-classic': 'All-time classic',
+};
+
+export const TRAINER_LIBRARY_MODE_FILTER_LABELS: Record<TrainerLibraryModeFilter, string> = {
+  'single-player': 'Single-player',
+  'offline-co-op': 'Offline co-op',
+  'local-multiplayer': 'Local multiplayer',
+  'online-features-present': 'Online features present',
 };
 
 /** Exact ROADMAP §3.6 Launcher labels, mapped to the actual InstallPlatform enum. */
@@ -93,6 +119,10 @@ function matchesAvailability(
         return entry.verificationStatus === 'verified';
       case 'community-unverified':
         return entry.verificationStatus !== 'verified';
+      case 'owned':
+        // Step 4 Option A: explicit local user confirmation only — never inferred
+        // from installation, launcher, or catalog presence.
+        return entry.ownedConfirmed === true;
     }
   });
 }
@@ -120,6 +150,29 @@ function matchesCatalog(
         // Same evidence-only rule as New release: createdAt is immutable insertion
         // evidence; legacy/unknown/malformed timestamps do not match.
         return hasValidTimestamp(entry.createdAt);
+      case 'all-time-classic':
+        // Step 13: no age/popularity threshold is fabricated. Curated flag only.
+        return entry.isAllTimeClassic === true;
+    }
+  });
+}
+
+function matchesMode(
+  entry: TrainerCatalogEntry,
+  selected: TrainerLibraryModeFilter[],
+): boolean {
+  if (selected.length === 0) return true;
+  const caps = entry.modeCapabilities;
+  return selected.some((filter) => {
+    switch (filter) {
+      case 'single-player':
+        return caps?.singlePlayer === true;
+      case 'offline-co-op':
+        return caps?.offlineCoop === true;
+      case 'local-multiplayer':
+        return caps?.localMultiplayer === true;
+      case 'online-features-present':
+        return caps?.onlineFeaturesPresent === true;
     }
   });
 }
@@ -152,6 +205,7 @@ export function filterTrainerLibraryEntries(
     (entry) =>
       matchesAvailability(entry, filters.availability, context) &&
       matchesCatalog(entry, filters.catalog, context) &&
-      matchesLauncher(entry, filters.launcher ?? [], context),
+      matchesLauncher(entry, filters.launcher ?? [], context) &&
+      matchesMode(entry, filters.mode ?? []),
   );
 }

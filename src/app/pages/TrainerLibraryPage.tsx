@@ -22,9 +22,11 @@ import {
   TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS,
   TRAINER_LIBRARY_CATALOG_FILTER_LABELS,
   TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS,
+  TRAINER_LIBRARY_MODE_FILTER_LABELS,
   type TrainerLibraryAvailabilityFilter,
   type TrainerLibraryCatalogFilter,
   type TrainerLibraryLauncherFilter,
+  type TrainerLibraryModeFilter,
 } from '../../core/trainer-catalog/all-games-filters.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
 import { COMMUNITY_WARNING_LABEL } from '../../core/trainer-catalog/community-trust.js';
@@ -55,6 +57,7 @@ interface RememberedTrainerLibraryFilters {
   catalog: TrainerLibraryCatalogFilter[];
   genres: string[];
   launcher: TrainerLibraryLauncherFilter[];
+  mode: TrainerLibraryModeFilter[];
 }
 
 const EMPTY_REMEMBERED_FILTERS: RememberedTrainerLibraryFilters = {
@@ -62,6 +65,7 @@ const EMPTY_REMEMBERED_FILTERS: RememberedTrainerLibraryFilters = {
   catalog: [],
   genres: [],
   launcher: [],
+  mode: [],
 };
 
 function readRememberedTrainerLibraryFilters(): RememberedTrainerLibraryFilters {
@@ -89,7 +93,12 @@ function readRememberedTrainerLibraryFilters(): RememberedTrainerLibraryFilters 
           typeof value === 'string' && value in TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS,
         )
       : [];
-    return { availability, catalog, genres, launcher };
+    const mode = Array.isArray(parsed.mode)
+      ? parsed.mode.filter((value): value is TrainerLibraryModeFilter =>
+          typeof value === 'string' && value in TRAINER_LIBRARY_MODE_FILTER_LABELS,
+        )
+      : [];
+    return { availability, catalog, genres, launcher, mode };
   } catch {
     return EMPTY_REMEMBERED_FILTERS;
   }
@@ -246,6 +255,7 @@ export function CatalogCard({
   onRequestVerification,
   onNotify,
   onPublish,
+  onToggleOwned,
 }: {
   entry: TrainerCatalogEntry;
   trust?: TrustMeta;
@@ -258,6 +268,7 @@ export function CatalogCard({
   onRequestVerification: (entry: TrainerCatalogEntry) => void;
   onNotify: (entry: TrainerCatalogEntry) => void;
   onPublish: (entry: TrainerCatalogEntry) => void;
+  onToggleOwned?: (entry: TrainerCatalogEntry) => void;
 }) {
   const coverUrl = resolveCatalogCoverUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
@@ -377,6 +388,17 @@ export function CatalogCard({
           >
             {communityScan || isGeneric ? 'View Details' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
+          {onToggleOwned && (
+            <button
+              type="button"
+              className={entry.ownedConfirmed === true ? styles.filterActive : styles.secondaryBtn}
+              onClick={() => onToggleOwned(entry)}
+              aria-pressed={entry.ownedConfirmed === true}
+              title="Deliberate local confirmation only — never inferred from installation or launcher detection."
+            >
+              {entry.ownedConfirmed === true ? 'Owned ✓' : 'Mark as owned'}
+            </button>
+          )}
           {entry.hasModPack && (
             <details className={styles.moreActions}>
               <summary>More actions</summary>
@@ -438,6 +460,7 @@ export default function TrainerLibraryPage({
   const [catalogFilters, setCatalogFilters] = useState<TrainerLibraryCatalogFilter[]>(rememberedFilters.catalog);
   const [genreFilters, setGenreFilters] = useState<string[]>(rememberedFilters.genres);
   const [launcherFilters, setLauncherFilters] = useState<TrainerLibraryLauncherFilter[]>(rememberedFilters.launcher);
+  const [modeFilters, setModeFilters] = useState<TrainerLibraryModeFilter[]>(rememberedFilters.mode);
   const [importing, setImporting] = useState(false);
   const [ctImportState, dispatchCtImport] = useReducer(ctImportUiReducer, idleCtImportUiState);
   const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
@@ -551,7 +574,7 @@ export default function TrainerLibraryPage({
     tier: TierFilter = tierFilter,
     genres: string[] = genreFilters,
     view: ViewMode = viewMode,
-    hasDerivedFilters = availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0,
+    hasDerivedFilters = availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0 || modeFilters.length > 0,
   ) => {
     setOffset(0);
     // §3.6 derived filters must see the complete search/genre candidate set;
@@ -564,7 +587,7 @@ export default function TrainerLibraryPage({
     // up to POPULAR_TRAINER_LIMIT in one page instead of the paginated PAGE_SIZE
     // used by All Games, so ranking always sees the full Popular candidate set.
     await fetchPage(searchQuery, 0, false, tier, genres, view === 'popular' ? POPULAR_TRAINER_LIMIT : PAGE_SIZE);
-  }, [fetchAllCandidatePages, fetchPage, query, tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters]);
+  }, [fetchAllCandidatePages, fetchPage, query, tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters, modeFilters]);
 
   useEffect(() => {
     void load(
@@ -572,9 +595,9 @@ export default function TrainerLibraryPage({
       tierFilter,
       genreFilters,
       viewMode,
-      availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0,
+      availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0 || modeFilters.length > 0,
     );
-  }, [tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
+  }, [tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters, modeFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -610,8 +633,9 @@ export default function TrainerLibraryPage({
       catalog: catalogFilters,
       genres: genreFilters,
       launcher: launcherFilters,
+      mode: modeFilters,
     });
-  }, [availabilityFilters, catalogFilters, genreFilters, launcherFilters]);
+  }, [availabilityFilters, catalogFilters, genreFilters, launcherFilters, modeFilters]);
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -769,6 +793,26 @@ export default function TrainerLibraryPage({
     setLauncherFilters((prev) =>
       prev.includes(filter) ? prev.filter((value) => value !== filter) : [...prev, filter],
     );
+  };
+
+  const toggleModeFilter = (filter: TrainerLibraryModeFilter) => {
+    setModeFilters((prev) =>
+      prev.includes(filter) ? prev.filter((value) => value !== filter) : [...prev, filter],
+    );
+  };
+
+  const handleToggleOwned = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogSetOwned) return;
+    const nextOwned = entry.ownedConfirmed !== true;
+    const result = await api.trainerCatalogSetOwned({ catalogGameId: entry.catalogGameId, owned: nextOwned });
+    if (result.success) {
+      setEntries((prev) =>
+        prev.map((e) => (e.catalogGameId === entry.catalogGameId ? { ...e, ownedConfirmed: result.ownedConfirmed ?? nextOwned } : e)),
+      );
+    } else {
+      setMessage(result.error ?? 'Failed to update ownership.');
+    }
   };
 
   const handleScanInstalled = async () => {
@@ -1272,7 +1316,7 @@ export default function TrainerLibraryPage({
 
   const filteredEntries = filterTrainerLibraryEntries(
     legacyStatusFilteredEntries,
-    { availability: availabilityFilters, catalog: catalogFilters, launcher: launcherFilters },
+    { availability: availabilityFilters, catalog: catalogFilters, launcher: launcherFilters, mode: modeFilters },
     { installedCatalogGameIds: installedIds, popularCatalogGameIds, installedPlatformsByCatalogGameId },
   );
 
@@ -1299,6 +1343,9 @@ export default function TrainerLibraryPage({
       launcherFilters.length > 0
         ? launcherFilters.map((filter) => TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS[filter]).join(', ')
         : null,
+      modeFilters.length > 0
+        ? modeFilters.map((filter) => TRAINER_LIBRARY_MODE_FILTER_LABELS[filter]).join(', ')
+        : null,
       genreFilters.length > 0 ? genreFilters.join(', ') : null,
       runningOnly ? 'running' : null,
       needsReverifyOnly ? 'needs re-verify' : null,
@@ -1311,6 +1358,7 @@ export default function TrainerLibraryPage({
     availabilityFilters.length > 0 ||
     catalogFilters.length > 0 ||
     launcherFilters.length > 0 ||
+    modeFilters.length > 0 ||
     genreFilters.length > 0 ||
     runningOnly ||
     needsReverifyOnly;
@@ -1324,6 +1372,7 @@ export default function TrainerLibraryPage({
     setAvailabilityFilters([]);
     setCatalogFilters([]);
     setLauncherFilters([]);
+    setModeFilters([]);
     setGenreFilters([]);
     setRunningOnly(false);
     setNeedsReverifyOnly(false);
@@ -1710,6 +1759,23 @@ export default function TrainerLibraryPage({
       )}
 
       <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Mode</span>
+        <div className={styles.filters}>
+          {(Object.entries(TRAINER_LIBRARY_MODE_FILTER_LABELS) as Array<[TrainerLibraryModeFilter, string]>).map(([filter, label]) => (
+            <button
+              key={filter}
+              type="button"
+              className={modeFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
+              onClick={() => toggleModeFilter(filter)}
+              aria-pressed={modeFilters.includes(filter)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.filterSection}>
         <span className={styles.filterLabel}>Catalog</span>
         <div className={styles.filters}>
           {(Object.entries(TRAINER_LIBRARY_CATALOG_FILTER_LABELS) as Array<[TrainerLibraryCatalogFilter, string]>).map(([filter, label]) => (
@@ -1899,6 +1965,7 @@ export default function TrainerLibraryPage({
               onRequestVerification={handleRequestVerification}
               onNotify={handleNotifyWhenVerified}
               onPublish={handlePublish}
+              onToggleOwned={handleToggleOwned}
             />
           )}
         />

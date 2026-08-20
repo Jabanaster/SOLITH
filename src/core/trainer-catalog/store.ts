@@ -1,5 +1,5 @@
 import db from '../database/index.js';
-import type { ModPack, TrainerCatalogEntry, TrainerCatalogSearchResult, VerificationStatus } from './types.js';
+import type { GameModeCapabilities, ModPack, TrainerCatalogEntry, TrainerCatalogSearchResult, VerificationStatus } from './types.js';
 import { buildSearchableText } from './types.js';
 import { categoryJsonLikePattern, normalizeGenreFilterList } from './catalog-genres.js';
 import { normalizeCatalogTitle } from './normalize-title.js';
@@ -30,6 +30,17 @@ function parseModPackPayload(payloadJson: string): ModPack {
     return solithDefinitionToModPack(raw as SolithDefinitionV1);
   }
   return raw as ModPack;
+}
+
+/** Only includes keys with real DB evidence — an all-unknown row yields `undefined`, not an object of undefined fields. */
+function buildModeCapabilities(row: Record<string, unknown>): GameModeCapabilities | undefined {
+  const caps: GameModeCapabilities = {};
+  let any = false;
+  if (row.singlePlayer != null) { caps.singlePlayer = Number(row.singlePlayer) === 1; any = true; }
+  if (row.offlineCoop != null) { caps.offlineCoop = Number(row.offlineCoop) === 1; any = true; }
+  if (row.localMultiplayer != null) { caps.localMultiplayer = Number(row.localMultiplayer) === 1; any = true; }
+  if (row.onlineFeaturesPresent != null) { caps.onlineFeaturesPresent = Number(row.onlineFeaturesPresent) === 1; any = true; }
+  return any ? caps : undefined;
 }
 
 function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
@@ -63,6 +74,9 @@ function rowToEntry(row: Record<string, unknown>): TrainerCatalogEntry {
     releaseDate: row.releaseDate ? String(row.releaseDate) : undefined,
     createdAt: row.createdAt ? String(row.createdAt) : undefined,
     contentUpdatedAt: row.contentUpdatedAt ? String(row.contentUpdatedAt) : undefined,
+    modeCapabilities: buildModeCapabilities(row),
+    isAllTimeClassic: row.isAllTimeClassic != null ? Number(row.isAllTimeClassic) === 1 : undefined,
+    ownedConfirmed: row.ownedConfirmed != null ? Number(row.ownedConfirmed) === 1 : undefined,
   };
 }
 
@@ -77,6 +91,22 @@ interface ExistingTrainerCatalogRow {
   catalogExclusionFlagsJson: string | null;
   explicitlyUnsupported: number | null;
   contentUpdatedAt: string | null;
+  singlePlayer: number | null;
+  offlineCoop: number | null;
+  localMultiplayer: number | null;
+  onlineFeaturesPresent: number | null;
+  isAllTimeClassic: number | null;
+}
+
+/**
+ * ROADMAP §3.6 Step 12: "Do not let routine sync wipe curated capability metadata."
+ * A curated boolean/mode column only changes when the incoming entry explicitly
+ * supplies a value for it; an incoming `undefined` (a routine sync that has no
+ * opinion on curated fields) always preserves whatever is already stored.
+ */
+function resolveCuratedBoolean(existingValue: number | null | undefined, incomingValue: boolean | undefined): number | null {
+  if (incomingValue != null) return incomingValue ? 1 : 0;
+  return existingValue ?? null;
 }
 
 /**
@@ -92,6 +122,11 @@ function hasMeaningfulCatalogChange(
   offlinePlayAvailableValue: number | null,
   catalogExclusionFlagsJson: string | null,
   explicitlyUnsupportedValue: number | null,
+  singlePlayerValue: number | null,
+  offlineCoopValue: number | null,
+  localMultiplayerValue: number | null,
+  onlineFeaturesPresentValue: number | null,
+  isAllTimeClassicValue: number | null,
 ): boolean {
   if (!existing) return true;
   return (
@@ -103,7 +138,12 @@ function hasMeaningfulCatalogChange(
     (existing.antiCheat ?? null) !== (entry.antiCheat ?? null) ||
     (existing.offlinePlayAvailable ?? null) !== offlinePlayAvailableValue ||
     (existing.catalogExclusionFlagsJson ?? null) !== catalogExclusionFlagsJson ||
-    (existing.explicitlyUnsupported ?? null) !== explicitlyUnsupportedValue
+    (existing.explicitlyUnsupported ?? null) !== explicitlyUnsupportedValue ||
+    (existing.singlePlayer ?? null) !== singlePlayerValue ||
+    (existing.offlineCoop ?? null) !== offlineCoopValue ||
+    (existing.localMultiplayer ?? null) !== localMultiplayerValue ||
+    (existing.onlineFeaturesPresent ?? null) !== onlineFeaturesPresentValue ||
+    (existing.isAllTimeClassic ?? null) !== isAllTimeClassicValue
   );
 }
 
@@ -194,10 +234,20 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
     .prepare(
       `SELECT displayName, verificationStatus, hasModPack, modPackId, cheatCount,
               antiCheat, offlinePlayAvailable, catalogExclusionFlagsJson, explicitlyUnsupported,
-              contentUpdatedAt
+              contentUpdatedAt, singlePlayer, offlineCoop, localMultiplayer, onlineFeaturesPresent,
+              isAllTimeClassic
        FROM trainer_catalog_games WHERE catalogGameId = ?`,
     )
     .get(entry.catalogGameId) as ExistingTrainerCatalogRow | undefined;
+
+  // ROADMAP §3.6 Step 12 — a routine sync/seed upsert that has no opinion on a curated
+  // mode/classic field (entry.modeCapabilities?.field / entry.isAllTimeClassic is
+  // undefined) must preserve whatever is already stored, never null it out.
+  const singlePlayerValue = resolveCuratedBoolean(existing?.singlePlayer, entry.modeCapabilities?.singlePlayer);
+  const offlineCoopValue = resolveCuratedBoolean(existing?.offlineCoop, entry.modeCapabilities?.offlineCoop);
+  const localMultiplayerValue = resolveCuratedBoolean(existing?.localMultiplayer, entry.modeCapabilities?.localMultiplayer);
+  const onlineFeaturesPresentValue = resolveCuratedBoolean(existing?.onlineFeaturesPresent, entry.modeCapabilities?.onlineFeaturesPresent);
+  const isAllTimeClassicValue = resolveCuratedBoolean(existing?.isAllTimeClassic, entry.isAllTimeClassic);
 
   const meaningfulChanged = hasMeaningfulCatalogChange(
     existing,
@@ -206,6 +256,11 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
     offlinePlayAvailableValue,
     catalogExclusionFlagsJson,
     explicitlyUnsupportedValue,
+    singlePlayerValue,
+    offlineCoopValue,
+    localMultiplayerValue,
+    onlineFeaturesPresentValue,
+    isAllTimeClassicValue,
   );
   const contentUpdatedAt = meaningfulChanged ? new Date().toISOString() : existing?.contentUpdatedAt ?? null;
 
@@ -215,8 +270,9 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
       headerUrl, coverUrl, iconUrl, verificationStatus, sourcesJson,
       hasModPack, modPackId, cheatCount, searchableText,
       antiCheat, offlinePlayAvailable, catalogExclusionFlagsJson, explicitlyUnsupported,
-      releaseDate, createdAt, contentUpdatedAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'))
+      releaseDate, createdAt, contentUpdatedAt, updatedAt,
+      singlePlayer, offlineCoop, localMultiplayer, onlineFeaturesPresent, isAllTimeClassic
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), ?, ?, ?, ?, ?)
     ON CONFLICT(catalogGameId) DO UPDATE SET
       displayName = excluded.displayName,
       steamAppId = excluded.steamAppId,
@@ -237,9 +293,17 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
       explicitlyUnsupported = excluded.explicitlyUnsupported,
       releaseDate = excluded.releaseDate,
       contentUpdatedAt = excluded.contentUpdatedAt,
-      updatedAt = datetime('now')`,
+      updatedAt = datetime('now'),
+      singlePlayer = excluded.singlePlayer,
+      offlineCoop = excluded.offlineCoop,
+      localMultiplayer = excluded.localMultiplayer,
+      onlineFeaturesPresent = excluded.onlineFeaturesPresent,
+      isAllTimeClassic = excluded.isAllTimeClassic`,
     // createdAt is intentionally absent from the UPDATE SET list above — ON CONFLICT
     // leaves it untouched, so it is only ever written by the INSERT branch.
+    // ownedConfirmed is intentionally absent from this entire statement — it is only
+    // ever written by setCatalogEntryOwnedConfirmed(), so a routine catalog sync can
+    // never overwrite a user's manual ownership mark.
   ).run(
     entry.catalogGameId,
     entry.displayName,
@@ -261,6 +325,24 @@ export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
     explicitlyUnsupportedValue,
     entry.releaseDate ?? null,
     contentUpdatedAt,
+    singlePlayerValue,
+    offlineCoopValue,
+    localMultiplayerValue,
+    onlineFeaturesPresentValue,
+    isAllTimeClassicValue,
+  );
+}
+
+/**
+ * ROADMAP §3.6 Availability "Owned" (Step 4 Option A). The only writer of the
+ * `ownedConfirmed` column — deliberately separate from upsertCatalogEntry so
+ * a routine catalog sync can never touch a user's manual ownership mark. A
+ * no-op if the catalogGameId does not exist.
+ */
+export function setCatalogEntryOwnedConfirmed(catalogGameId: string, owned: boolean): void {
+  db.prepare('UPDATE trainer_catalog_games SET ownedConfirmed = ? WHERE catalogGameId = ?').run(
+    owned ? 1 : 0,
+    catalogGameId,
   );
 }
 

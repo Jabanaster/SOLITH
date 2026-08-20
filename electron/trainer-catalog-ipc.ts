@@ -14,6 +14,7 @@ import {
   listPendingIdentityReviewItems,
   getPendingIdentityReviewCount,
   resolveIdentityReviewItem,
+  setCatalogEntryOwnedConfirmed,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
 import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.js';
@@ -70,6 +71,12 @@ const SearchSchema = z.object({
 
 const CatalogGameIdSchema = z.object({
   catalogGameId: z.string().min(1).max(120),
+});
+
+/** ROADMAP §3.6 Availability "Owned" — deliberate local user confirmation, never inferred. */
+const SetOwnedSchema = z.object({
+  catalogGameId: z.string().min(1).max(120),
+  owned: z.boolean(),
 });
 
 const ImportYamlSchema = z.object({
@@ -375,6 +382,17 @@ export function registerTrainerCatalogIpc(): void {
       recordDefinitionFeedback({ ...parsed, rating: parsed.rating as -1 | 0 | 1 });
       const summary = getDefinitionFeedbackSummary(parsed.catalogGameId, parsed.featureId);
       return { success: true, summary };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('trainer-catalog-set-owned', async (_event, payload: unknown) => {
+    try {
+      const parsed = SetOwnedSchema.parse(payload);
+      setCatalogEntryOwnedConfirmed(parsed.catalogGameId, parsed.owned);
+      const entry = getCatalogEntryForDisplay(parsed.catalogGameId);
+      return { success: true, ownedConfirmed: entry?.ownedConfirmed ?? parsed.owned };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

@@ -304,6 +304,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('trainer-catalog-feedback-record', payload),
   trainerCatalogFeedbackSummary: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-feedback-summary', payload),
+  trainerCatalogSetOwned: (payload: { catalogGameId: string; owned: boolean }) =>
+    ipcRenderer.invoke('trainer-catalog-set-owned', payload),
   trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-evaluate-promotion', payload),
   trainerCatalogPromoteVerified: (payload: { catalogGameId: string }) =>

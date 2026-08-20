@@ -554,6 +554,11 @@ interface Window {
       pendingUpdates?: number;
       error?: string;
     }>;
+    trainerCatalogSetOwned: (payload: { catalogGameId: string; owned: boolean }) => Promise<{
+      success: boolean;
+      ownedConfirmed?: boolean;
+      error?: string;
+    }>;
     trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       eligibility?: { eligible: boolean; reasons: string[] };

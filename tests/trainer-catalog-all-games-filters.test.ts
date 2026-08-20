@@ -203,3 +203,139 @@ describe('§3.6 Launcher filter — installed-platform evidence only', () => {
     assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [] }), input);
   });
 });
+
+describe('§3.6 final seven — Owned (Availability)', () => {
+  it('matches only entries with explicit local ownership confirmation', () => {
+    const input = [
+      entry({ catalogGameId: 'confirmed', ownedConfirmed: true }),
+      entry({ catalogGameId: 'unconfirmed', ownedConfirmed: false }),
+      entry({ catalogGameId: 'unknown' }),
+    ];
+    assert.deepEqual(
+      filterTrainerLibraryEntries(input, { availability: ['owned'], catalog: [] }).map((e) => e.catalogGameId),
+      ['confirmed'],
+    );
+  });
+
+  it('does not treat installed as owned — no automatic Installed -> Owned promotion', () => {
+    const input = [entry({ catalogGameId: 'installed-only' })];
+    const context = { installedCatalogGameIds: new Set(['installed-only']) };
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: ['owned'], catalog: [] }, context), []);
+  });
+
+  it('an uninstalled but confirmed-owned entry still matches', () => {
+    const input = [entry({ catalogGameId: 'uninstalled-owned', ownedConfirmed: true })];
+    const context = { installedCatalogGameIds: new Set<string>() };
+    assert.deepEqual(
+      filterTrainerLibraryEntries(input, { availability: ['owned'], catalog: [] }, context).map((e) => e.catalogGameId),
+      ['uninstalled-owned'],
+    );
+  });
+
+  it('ORs Owned with other Availability selections, ANDs with Catalog', () => {
+    const input = [
+      entry({ catalogGameId: 'owned', ownedConfirmed: true }),
+      entry({ catalogGameId: 'verified', verificationStatus: 'verified' }),
+      entry({ catalogGameId: 'neither', verificationStatus: 'community' }),
+    ];
+    const result = filterTrainerLibraryEntries(input, { availability: ['owned', 'verified'], catalog: [] });
+    assert.deepEqual(result.map((e) => e.catalogGameId), ['owned', 'verified']);
+  });
+});
+
+describe('§3.6 final seven — Mode (curated capability evidence only)', () => {
+  it('matches explicit true for each of the 4 implemented mode values', () => {
+    const cases: Array<['single-player' | 'offline-co-op' | 'local-multiplayer' | 'online-features-present', string]> = [
+      ['single-player', 'singlePlayer'],
+      ['offline-co-op', 'offlineCoop'],
+      ['local-multiplayer', 'localMultiplayer'],
+      ['online-features-present', 'onlineFeaturesPresent'],
+    ];
+    for (const [filter, field] of cases) {
+      const input = [entry({ catalogGameId: 'g', modeCapabilities: { [field]: true } })];
+      assert.deepEqual(
+        filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: [filter] }).map((e) => e.catalogGameId),
+        ['g'],
+        `expected ${filter} to match on ${field}: true`,
+      );
+    }
+  });
+
+  it('explicit false does not match', () => {
+    const input = [entry({ catalogGameId: 'g', modeCapabilities: { singlePlayer: false } })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['single-player'] }), []);
+  });
+
+  it('unknown (no modeCapabilities at all) does not match', () => {
+    const input = [entry({ catalogGameId: 'g' })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['single-player'] }), []);
+  });
+
+  it('generic co-op category alone does not imply offline co-op', () => {
+    const input = [entry({ catalogGameId: 'g', categories: ['Co-op'] })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['offline-co-op'] }), []);
+  });
+
+  it('generic multiplayer category alone does not imply local multiplayer', () => {
+    const input = [entry({ catalogGameId: 'g', categories: ['Multiplayer'] })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['local-multiplayer'] }), []);
+  });
+
+  it('offline co-op and local multiplayer are independent flags — one true does not imply the other', () => {
+    const input = [entry({ catalogGameId: 'g', modeCapabilities: { offlineCoop: true, localMultiplayer: false } })];
+    assert.deepEqual(
+      filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['offline-co-op'] }).map((e) => e.catalogGameId),
+      ['g'],
+    );
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['local-multiplayer'] }), []);
+  });
+
+  it('online-features-present is informational only — never implied by antiCheat evidence alone', () => {
+    const input = [entry({ catalogGameId: 'g', antiCheat: 'protected-multiplayer' })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['online-features-present'] }), []);
+  });
+
+  it('ORs within Mode, ANDs Mode with Availability', () => {
+    const input = [
+      entry({ catalogGameId: 'sp', modeCapabilities: { singlePlayer: true }, verificationStatus: 'verified' }),
+      entry({ catalogGameId: 'coop', modeCapabilities: { offlineCoop: true }, verificationStatus: 'community' }),
+    ];
+    const orResult = filterTrainerLibraryEntries(input, { availability: [], catalog: [], mode: ['single-player', 'offline-co-op'] });
+    assert.deepEqual(orResult.map((e) => e.catalogGameId), ['sp', 'coop']);
+    const andResult = filterTrainerLibraryEntries(input, { availability: ['verified'], catalog: [], mode: ['single-player', 'offline-co-op'] });
+    assert.deepEqual(andResult.map((e) => e.catalogGameId), ['sp']);
+  });
+
+  it('omitting mode entirely preserves existing behavior (backward compatible)', () => {
+    const input = [entry({ catalogGameId: 'a' })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: [] }), input);
+  });
+});
+
+describe('§3.6 final seven — All-time classic (curated flag, no fabricated threshold)', () => {
+  it('matches only an explicit curated true', () => {
+    const input = [
+      entry({ catalogGameId: 'classic', isAllTimeClassic: true }),
+      entry({ catalogGameId: 'not-classic', isAllTimeClassic: false }),
+      entry({ catalogGameId: 'unknown' }),
+    ];
+    assert.deepEqual(
+      filterTrainerLibraryEntries(input, { availability: [], catalog: ['all-time-classic'] }).map((e) => e.catalogGameId),
+      ['classic'],
+    );
+  });
+
+  it('does not derive classic status from releaseDate or popularity alone', () => {
+    const input = [entry({ catalogGameId: 'old-and-popular', releaseDate: '1998-01-01' })];
+    assert.deepEqual(filterTrainerLibraryEntries(input, { availability: [], catalog: ['all-time-classic'] }), []);
+  });
+
+  it('ORs with other Catalog selections', () => {
+    const input = [
+      entry({ catalogGameId: 'classic', isAllTimeClassic: true }),
+      entry({ catalogGameId: 'new', releaseDate: '2026-01-01' }),
+    ];
+    const result = filterTrainerLibraryEntries(input, { availability: [], catalog: ['all-time-classic', 'new-release'] });
+    assert.deepEqual(result.map((e) => e.catalogGameId), ['classic', 'new']);
+  });
+});

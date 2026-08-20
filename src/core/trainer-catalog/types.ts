@@ -111,6 +111,24 @@ export interface TrainerCatalogEntry {
   createdAt?: string;
   /** ROADMAP §3.5 "Recently updated" — set only on a meaningful content change, not every sync/upsert; undefined = never meaningfully updated. */
   contentUpdatedAt?: string;
+  /** ROADMAP §3.6 Mode — curated capability evidence only; undefined field = unknown, never inferred from categories/antiCheat/offlinePlayAvailable. */
+  modeCapabilities?: GameModeCapabilities;
+  /** ROADMAP §3.6 Catalog "All-time classic" — curated flag only; no age/popularity threshold is fabricated. */
+  isAllTimeClassic?: boolean;
+  /** ROADMAP §3.6 Availability "Owned" — explicit local user confirmation only (never inferred from installation/launcher/catalog presence). Set via a deliberate "Mark as owned" action, distinct from `installations` evidence in the canonical Game Library model. */
+  ownedConfirmed?: boolean;
+}
+
+/**
+ * ROADMAP §3.6 Mode capability lanes. `undefined` on any field means unknown —
+ * it must never be silently treated as `false`. Populated only by explicit
+ * curated evidence (seed/import/manual curation), never inferred.
+ */
+export interface GameModeCapabilities {
+  singlePlayer?: boolean;
+  offlineCoop?: boolean;
+  localMultiplayer?: boolean;
+  onlineFeaturesPresent?: boolean;
 }
 
 export interface TrainerCatalogSearchResult {

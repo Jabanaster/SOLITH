@@ -52,11 +52,38 @@ describe('computeRankSignals', () => {
     assert.equal(withoutDemand.popularityIsFallback, true);
   });
 
-  it('never marks recentlyReleased or enduringFavorite true — no evidence field exists yet', () => {
-    const entry = makeEntry({ catalogGameId: 'a' });
-    const signals = computeRankSignals(entry);
-    assert.equal(signals.recentlyReleased, false);
-    assert.equal(signals.enduringFavorite, false);
+  it('marks recentlyReleased only from a valid releaseDate evidence field, never fabricated', () => {
+    const noEvidence = makeEntry({ catalogGameId: 'a' });
+    const malformed = makeEntry({ catalogGameId: 'b', releaseDate: 'not-a-date' });
+    const valid = makeEntry({ catalogGameId: 'c', releaseDate: '2024-01-01T00:00:00.000Z' });
+    assert.equal(computeRankSignals(noEvidence).recentlyReleased, false);
+    assert.equal(computeRankSignals(malformed).recentlyReleased, false);
+    assert.equal(computeRankSignals(valid).recentlyReleased, true);
+  });
+
+  it('marks enduringFavorite only from the curated isAllTimeClassic flag, never inferred', () => {
+    const noEvidence = makeEntry({ catalogGameId: 'a' });
+    const notClassic = makeEntry({ catalogGameId: 'b', isAllTimeClassic: false });
+    const classic = makeEntry({ catalogGameId: 'c', isAllTimeClassic: true });
+    assert.equal(computeRankSignals(noEvidence).enduringFavorite, false);
+    assert.equal(computeRankSignals(notClassic).enduringFavorite, false);
+    assert.equal(computeRankSignals(classic).enduringFavorite, true);
+  });
+});
+
+describe('compareRanked — tier 4/5 ordering', () => {
+  it('ranks a recently-released entry above an entry with no release-date evidence, after tiers 1-3 tie', () => {
+    const withDate = makeEntry({ catalogGameId: 'recent', releaseDate: '2024-01-01T00:00:00.000Z' });
+    const withoutDate = makeEntry({ catalogGameId: 'unknown' });
+    const ranked = rankPopularTrainerEntries([withoutDate, withDate]);
+    assert.deepEqual(ranked.map((r) => r.entry.catalogGameId), ['recent', 'unknown']);
+  });
+
+  it('ranks an all-time-classic entry above a non-classic entry, after tiers 1-4 tie', () => {
+    const classic = makeEntry({ catalogGameId: 'classic', isAllTimeClassic: true });
+    const notClassic = makeEntry({ catalogGameId: 'plain' });
+    const ranked = rankPopularTrainerEntries([notClassic, classic]);
+    assert.deepEqual(ranked.map((r) => r.entry.catalogGameId), ['classic', 'plain']);
   });
 });
 
