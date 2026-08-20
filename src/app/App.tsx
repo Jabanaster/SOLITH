@@ -7,6 +7,7 @@ import ExternalTrainerResearchLab from './pages/ExternalTrainerResearchLab';
 import Recipes from './pages/Recipes';
 import Backups from './pages/Backups';
 import Journal from './pages/Journal';
+import ProposalInspector from './pages/ProposalInspector';
 import SaveLocations from './pages/SaveLocations';
 import CompatibilityDashboard from './pages/CompatibilityDashboard';
 import SessionMonitorPage from './pages/SessionMonitorPage';
@@ -136,7 +137,8 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'registry-explorer', label: 'Registry Explorer', icon: 'database' },
       { id: 'data', label: 'Data Editor', icon: 'database' },
       { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
-      { id: 'recipes', label: 'Recipes', icon: 'apply' },
+      { id: 'recipes', label: 'Recipe Editor', icon: 'apply' },
+      { id: 'proposal-inspector', label: 'Proposal Inspector', icon: 'log' },
     ],
   },
   {
@@ -386,6 +388,8 @@ const App: React.FC = () => {
         return <CtLibraryExplorerPage />;
       case 'recipes':
         return <Recipes gameId={selectedGame?.id ?? null} />;
+      case 'proposal-inspector':
+        return <ProposalInspector gameId={selectedGame?.id ?? null} />;
       case 'backups':
         return <Backups gameId={selectedGame?.id ?? null} />;
       case 'journal':

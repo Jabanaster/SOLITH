@@ -5,6 +5,17 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const LOOPBACK_HOST = '127.0.0.1';
+
+/**
+ * Resolves a Windows system binary by absolute path under System32 rather
+ * than trusting PATH resolution. PATH order is not a trust boundary — a
+ * same-named executable earlier on PATH (a different `whoami.exe`, for
+ * example) would otherwise run instead of the real system binary.
+ */
+function systemBinaryPath(name: string): string {
+  const systemRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
+  return path.join(systemRoot, 'System32', name);
+}
 const MAX_BODY_BYTES = 1024;
 const REQUEST_WINDOW_MS = 30_000;
 const RATE_WINDOW_MS = 10_000;
@@ -127,7 +138,7 @@ function parsePingBody(buffer: Buffer, sessionId: string, now: number): PingBody
 }
 
 function currentUserSid(): string {
-  const output = execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], {
+  const output = execFileSync(systemBinaryPath('whoami.exe'), ['/user', '/fo', 'csv', '/nh'], {
     encoding: 'utf8',
     windowsHide: true,
   });
@@ -153,7 +164,7 @@ function restrictAndAssertDiscoveryAcl(discoveryPath: string): void {
   }
   const userSid = currentUserSid();
   const appContainerSid = deriveAppContainerSid();
-  execFileSync('icacls.exe', [
+  execFileSync(systemBinaryPath('icacls.exe'), [
     discoveryPath,
     '/inheritance:r',
     '/grant:r',
@@ -163,7 +174,7 @@ function restrictAndAssertDiscoveryAcl(discoveryPath: string): void {
     '*S-1-5-32-544:(F)',
   ], { encoding: 'utf8', windowsHide: true });
 
-  const output = execFileSync('icacls.exe', [discoveryPath], {
+  const output = execFileSync(systemBinaryPath('icacls.exe'), [discoveryPath], {
     encoding: 'utf8',
     windowsHide: true,
   }).toLowerCase();

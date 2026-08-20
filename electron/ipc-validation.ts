@@ -119,6 +119,11 @@ export const GetJournalSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')).nullable().optional()
 });
 
+/** ROADMAP §6.2 Proposal Inspector — same gameId shape as GetJournalSchema, since proposals are scoped per-game the same way journal events are. */
+export const GetProposalsSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+});
+
 export const LogEventSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')).nullable().optional(),
   recipeId: z.string().uuid().nullable().optional(),

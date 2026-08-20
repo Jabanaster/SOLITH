@@ -31,6 +31,27 @@ interface Window {
     deleteRecipe: (recipeId: string) => Promise<any>;
     // Journal
     getJournal: (gameId?: string) => Promise<any[]>;
+    getProposals: (gameId: string) => Promise<{
+      success: boolean;
+      proposals?: Array<{
+        id: string;
+        gameId: string;
+        recipeId?: string;
+        targetFile: string;
+        operation: 'set' | 'increment' | 'decrement' | 'toggle';
+        path: string;
+        oldValue: unknown;
+        newValue: unknown;
+        risk: string;
+        preview: string;
+        validationRule: string;
+        requiresBackup: boolean;
+        dryRunPassed: boolean;
+        status: 'pending' | 'approved' | 'rejected';
+        createdAt: string;
+      }>;
+      error?: string;
+    }>;
     logEvent: (eventData: any) => Promise<any>;
     // Settings
     getSettings: () => Promise<any>;

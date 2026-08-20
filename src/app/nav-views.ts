@@ -6,7 +6,7 @@
  */
 export const ALL_VIEWS = [
   'library', 'trainer', 'saves', 'data', 'discovery', 'trainer-research',
-  'recipes', 'backups', 'journal', 'locations', 'compatibility',
+  'recipes', 'proposal-inspector', 'backups', 'journal', 'locations', 'compatibility',
   'session-monitor', 'controls', 'live-memory', 'trainer-library',
   'catalog-save-controls', 'trainer-deck', 'registry-explorer', 'ct-library',
   'settings',

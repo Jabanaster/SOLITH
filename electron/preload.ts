@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRecipes: (gameId: string) => ipcRenderer.invoke('get-recipes', gameId),
   createRecipe: (recipeData: any) => ipcRenderer.invoke('create-recipe', recipeData),
   getJournal: (gameId?: string) => ipcRenderer.invoke('get-journal', gameId),
+  getProposals: (gameId: string) => ipcRenderer.invoke('get-proposals', gameId),
   logEvent: (eventData: any) => ipcRenderer.invoke('log-event', eventData),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSetting: (key: string, value: any) => ipcRenderer.invoke('set-setting', key, value),

@@ -50,6 +50,11 @@ export const AdvancedSection: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
+  const replayOnboarding = async () => {
+    await window.electronAPI?.setSetting?.('onboardingCompleted', false);
+    window.location.reload();
+  };
+
   const load = useCallback(async () => {
     if (!window.electronAPI?.trainerCatalogIdentityReviewList) {
       setError('Identity review is unavailable in this build.');
@@ -85,6 +90,20 @@ export const AdvancedSection: React.FC = () => {
 
   return (
     <div className="settings-section">
+      <div className="settings-field">
+        <h3>Onboarding &amp; demo</h3>
+        <p>
+          Replay the first-run walkthrough, including the bundled read-only demo preview. The demo fixture is
+          intentionally preview-only — it has no write, backup, or rollback path — so the full propose-approve-backup
+          rollback flow it describes is demonstrated on a real attached game, not the demo data itself.
+        </p>
+        <div className="settings-actions">
+          <button type="button" onClick={() => void replayOnboarding()}>
+            Reset demo / replay onboarding
+          </button>
+        </div>
+      </div>
+
       <div className="settings-field">
         <h3>Catalog identity review</h3>
         <p>

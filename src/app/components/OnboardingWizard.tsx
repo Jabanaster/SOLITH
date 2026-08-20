@@ -80,6 +80,12 @@ export function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <li>Automatic backup before write</li>
               <li>Verify on disk — rollback if needed</li>
             </ol>
+            <p className={styles.note}>
+              A bundled demo fixture ("Demo RPG Quest Preview") lets you see real proposed values without touching
+              any of your own game data — but it is intentionally read-only: it has no write, backup, or rollback
+              path defined, so this exact safety chain is demonstrated for real once you add and attach a supported
+              game, not on the demo data itself. Reset it anytime from Settings → Advanced.
+            </p>
           </>
         )}
 

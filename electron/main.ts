@@ -12,6 +12,7 @@ import {
   DeleteRecipeSchema,
   DeleteGameSchema,
   GetJournalSchema,
+  GetProposalsSchema,
   LogEventSchema,
   SetSettingSchema,
   GetBackupsSchema,
@@ -667,6 +668,20 @@ ipcMain.handle('get-journal', async (event, gameId?: string) => {
   } catch (error) {
     console.error('get-journal error:', error);
     return { error: String(error) };
+  }
+});
+
+ipcMain.handle('get-proposals', async (event, gameId?: string) => {
+  try {
+    const parsed = GetProposalsSchema.parse({ gameId });
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+
+    const proposalsModule = await import('../src/core/proposals/index.js');
+    return { success: true, proposals: proposalsModule.getProposals(parsed.gameId) };
+  } catch (error) {
+    console.error('get-proposals error:', error);
+    return { success: false, error: String(error) };
   }
 });
 

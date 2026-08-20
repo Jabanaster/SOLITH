@@ -760,16 +760,26 @@ Allow:
 
 # PHASE 6 — V1 CORE TRAINER/SAVE/DISCOVERY GAP AUDIT AND CLOSEOUT
 
-**Status: VERIFIED — §6.1/§6.3/§6.4 confirmed real; §6.2/§6.5/§6.6 partially
-overstated, see Docs/Reports/PHASE_6_CLOSEOUT.md.** §6.5 (Local AI) closed
-this pass — a real pre-existing bug (`setAIConfig` always threw; wrong SQL
-conflict target) is fixed and the config is now reachable from Settings.
-§6.2's named "Trainer Builder"/"Recipe Editor"/"Proposal Inspector"/
-"Resource Browser" are not distinct, verifiable features (their substance
-exists, folded into other pages) — NEEDS OWNER DECISION on whether that
-naming/consolidation is acceptable. §6.6 has a real demo game profile but
-no guided-discovery walkthrough or reset-demo action — DEFERRED, not built
-this pass (scope beyond a narrow gap-close).
+**Status: VERIFIED COMPLETE — see Docs/Reports/PHASE_6_CLOSEOUT.md and
+PHASE_5_6_TRUE_CLOSEOUT.md.** §6.1/§6.3/§6.4 confirmed real. §6.5 (Local AI)
+closed — a real pre-existing bug (`setAIConfig` always threw; wrong SQL
+conflict target) is fixed and the config is reachable from Settings. §6.2
+closed by renaming "Recipes" → "Recipe Editor" (an honest 1:1 naming match)
+and building a real, bounded "Proposal Inspector" page over the existing
+`src/core/proposals` data model — "Trainer Builder" and "Resource Browser"
+remain NEEDS OWNER DECISION on scope (no existing backing capability to
+name-match or wrap; building either would be new feature work, not a gap
+close). §6.6: a real, working "reset demo / replay onboarding" action ships
+in Settings → Advanced, and onboarding copy now truthfully discloses that
+the bundled demo fixture is read-only by design (`writeSupportStatus:
+'blocked'`, no backup/rollback path) — live propose→apply→rollback on the
+demo itself remains BLOCKED by that deliberate fixture design, not
+deferred by choice; it requires a new write-capable demo fixture, an owner
+decision. Trainer E2E is 5/5 — the long-carried `.solith-top-banner__title`
+failure was a stale locator (the banner was redesigned to one full raster
+image); fixed alongside a real PATH-hijacking hardening in
+`electron/gamebar-transport.ts` (whoami.exe/icacls.exe now resolved by
+absolute System32 path, not PATH order).
 
 Do not rewrite working systems.
 
