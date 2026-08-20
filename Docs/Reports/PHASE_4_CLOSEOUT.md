@@ -182,7 +182,7 @@ every priority tier to have a live automatic trigger.
 
 ## 7. Commit/push (Part F)
 
-Exact Phase 4 scope staged (21 total: 8 modified + 13 new):
+Exact Phase 4 scope staged (24 total: 8 modified + 16 new):
 
 ```
 electron/ipc-validation.ts
@@ -217,9 +217,9 @@ Excluded, untouched: `Docs/Reports/PHASE_3_TO_5_FINAL_CLOSEOUT.md` and
 this commit), the three untracked worktree directories, and all four
 stashes.
 
-- Commit SHA: **(recorded immediately below after the commit — see the
-  final chat response for the exact hash)**
-- Push: local == remote confirmed after push
+- Commit SHA: **6d5a81bce8b33fc82c033c51896e1dd801b378e5**
+- Push: `3515f12..6d5a81b review/gate2-5-doc-audit -> review/gate2-5-doc-audit` — local == remote confirmed (both `6d5a81bce8b33fc82c033c51896e1dd801b378e5`)
+- Post-commit dirty state: reconciled to baseline (only `Docs/Reports/PHASE_3_TO_5_FINAL_CLOSEOUT.md` + `Docs/Reports/PHASE_R_FULL_CLOSEOUT.md` untracked reports and the 3 pre-existing untracked worktree dirs remain; all 4 stashes untouched)
 - PR #7: not merged (out of scope for this authorization)
 
 ## Machine-readable summary
