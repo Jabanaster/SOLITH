@@ -1,7 +1,7 @@
 export type SettingsCategoryId =
   | 'general' | 'appearance' | 'navigation' | 'game-library' | 'trainer-library'
   | 'launchers-accounts' | 'catalog-updates' | 'artwork-cache' | 'notifications'
-  | 'privacy-network' | 'advanced' | 'about';
+  | 'privacy-network' | 'local-ai' | 'advanced' | 'about';
 
 export type SettingsCategory = {
   id: SettingsCategoryId;
@@ -19,6 +19,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: 'artwork-cache', label: 'Artwork & Cache' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'privacy-network', label: 'Privacy & Network' },
+  { id: 'local-ai', label: 'Local AI' },
   { id: 'advanced', label: 'Advanced' },
   { id: 'about', label: 'About' },
 ];

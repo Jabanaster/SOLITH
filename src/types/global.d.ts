@@ -612,6 +612,12 @@ interface Window {
       error?: string;
     }>;
     catalogUpdatesRollbackLast: () => Promise<{ success: boolean; restoredCount?: number; error?: string }>;
+    aiConfigTestConnection: (payload: {
+      provider: 'None' | 'Ollama' | 'LM Studio';
+      endpoint?: string;
+      model?: string;
+      timeout?: number;
+    }) => Promise<{ success: boolean; result?: { success: boolean; message: string }; error?: string }>;
     trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       eligibility?: { eligible: boolean; reasons: string[] };

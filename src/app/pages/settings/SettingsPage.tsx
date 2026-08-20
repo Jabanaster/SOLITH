@@ -11,6 +11,7 @@ import { GameLibrarySection } from './sections/GameLibrarySection.js';
 import { LaunchersAccountsSection } from './sections/LaunchersAccountsSection.js';
 import { ArtworkCacheSection } from './sections/ArtworkCacheSection.js';
 import { CatalogUpdatesSection } from './sections/CatalogUpdatesSection.js';
+import { LocalAiSection } from './sections/LocalAiSection.js';
 
 type Props = {
   settings: Settings | null;
@@ -67,6 +68,8 @@ export const SettingsPage: React.FC<Props> = ({ settings, onUpdateSetting, sideb
         return <ArtworkCacheSection />;
       case 'catalog-updates':
         return <CatalogUpdatesSection />;
+      case 'local-ai':
+        return <LocalAiSection settings={settings} onUpdate={onUpdateSetting} />;
       case 'about':
         return <AboutSection />;
       case 'advanced':

@@ -58,6 +58,7 @@ import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
 import { registerLocalOcrIpc } from './local-ocr-ipc.js';
 import { registerArtworkCacheIpc } from './artwork-cache-ipc.js';
 import { registerCatalogUpdatesIpc } from './catalog-updates-ipc.js';
+import { registerAIConfigIpc } from './ai-config-ipc.js';
 import { startCatalogProcessWatch } from './catalog-process-watch.js';
 import { registerNotificationsIpc, broadcastNotificationCreated } from './notifications-ipc.js';
 import {
@@ -108,6 +109,7 @@ registerTrainerResearchIpc();
 registerNotificationsIpc();
 registerArtworkCacheIpc();
 registerCatalogUpdatesIpc();
+registerAIConfigIpc();
 
 configureCommunitySyncOrchestrator({
   notifyCatalogUpdate: (importedCount) => {

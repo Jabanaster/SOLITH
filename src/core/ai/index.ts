@@ -32,15 +32,19 @@ export function getAIConfig(): AIConfig {
 }
 
 export function setAIConfig(provider: 'Ollama' | 'LM Studio', config: Partial<AIConfig>): void {
+  // ai_config's real key is `id` (PRIMARY KEY), not `provider` — the default
+  // seed rows use id === provider name (see initDatabase's defaultAIConfig),
+  // so that's the conflict target here too.
   const stmt = db.prepare(`
-    INSERT INTO ai_config (provider, endpoint, model, timeout)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(provider) DO UPDATE SET
+    INSERT INTO ai_config (id, provider, endpoint, model, timeout)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      provider = excluded.provider,
       endpoint = excluded.endpoint,
       model = excluded.model,
       timeout = excluded.timeout
   `);
-  stmt.run(provider, config.endpoint || '', config.model || '', config.timeout || 60000);
+  stmt.run(provider, provider, config.endpoint || '', config.model || '', config.timeout || 60000);
 }
 
 export function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {

@@ -317,6 +317,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('catalog-updates-set-preference', payload),
   catalogUpdatesImport: () => ipcRenderer.invoke('catalog-updates-import'),
   catalogUpdatesRollbackLast: () => ipcRenderer.invoke('catalog-updates-rollback-last'),
+  aiConfigTestConnection: (payload: { provider: 'None' | 'Ollama' | 'LM Studio'; endpoint?: string; model?: string; timeout?: number }) =>
+    ipcRenderer.invoke('ai-config-test-connection', payload),
   trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-evaluate-promotion', payload),
   trainerCatalogPromoteVerified: (payload: { catalogGameId: string }) =>

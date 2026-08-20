@@ -760,7 +760,16 @@ Allow:
 
 # PHASE 6 — V1 CORE TRAINER/SAVE/DISCOVERY GAP AUDIT AND CLOSEOUT
 
-**Status: REPORTED COMPLETE — VERIFY CAPABILITY BY CAPABILITY**
+**Status: VERIFIED — §6.1/§6.3/§6.4 confirmed real; §6.2/§6.5/§6.6 partially
+overstated, see Docs/Reports/PHASE_6_CLOSEOUT.md.** §6.5 (Local AI) closed
+this pass — a real pre-existing bug (`setAIConfig` always threw; wrong SQL
+conflict target) is fixed and the config is now reachable from Settings.
+§6.2's named "Trainer Builder"/"Recipe Editor"/"Proposal Inspector"/
+"Resource Browser" are not distinct, verifiable features (their substance
+exists, folded into other pages) — NEEDS OWNER DECISION on whether that
+naming/consolidation is acceptable. §6.6 has a real demo game profile but
+no guided-discovery walkthrough or reset-demo action — DEFERRED, not built
+this pass (scope beyond a narrow gap-close).
 
 Do not rewrite working systems.
 
