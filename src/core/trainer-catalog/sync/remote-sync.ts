@@ -11,6 +11,14 @@ import { getFlingReference } from '../../cheat-system/trainer-reference.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'Solith-TrainerCatalog/1.0 (+local definitions sync; no binary download)';
+// Phase 7 hardening — this scraped a fixed page with a timeout but no
+// explicit size cap and no explicit/re-validated redirect cap (unlike the
+// artwork fetcher's MAX_ARTWORK_REDIRECTS and hub-client's
+// MAX_SYNC_RESPONSE_BYTES patterns this mirrors). The 3 source hosts are
+// hardcoded, not renderer-controlled, so this is defense-in-depth against a
+// compromised/misbehaving upstream host, not a proven exploitable gap.
+const MAX_HTML_REDIRECTS = 5;
+const MAX_HTML_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 export interface SyncImportResult {
   provider: string;
@@ -24,17 +32,38 @@ async function fetchHtml(url: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': USER_AGENT,
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} for ${url}`);
+    let currentUrl = url;
+    let response: Response | undefined;
+    for (let redirects = 0; ; redirects += 1) {
+      response = await fetch(currentUrl, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: {
+          'User-Agent': USER_AGENT,
+          Accept: 'text/html,application/xhtml+xml',
+        },
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) throw new Error(`Redirect from ${currentUrl} had no Location header`);
+        if (redirects >= MAX_HTML_REDIRECTS) throw new Error('Exceeded maximum redirect count');
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+      break;
     }
-    return await response.text();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} for ${currentUrl}`);
+    }
+    const contentLength = Number(response.headers.get('content-length') ?? 0);
+    if (contentLength > MAX_HTML_RESPONSE_BYTES) {
+      throw new Error(`Response for ${currentUrl} exceeds ${MAX_HTML_RESPONSE_BYTES} byte cap`);
+    }
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_HTML_RESPONSE_BYTES) {
+      throw new Error(`Response for ${currentUrl} exceeds ${MAX_HTML_RESPONSE_BYTES} byte cap`);
+    }
+    return text;
   } finally {
     clearTimeout(timer);
   }
