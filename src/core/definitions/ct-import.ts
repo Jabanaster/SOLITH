@@ -1,4 +1,5 @@
 import { parseStringPromise } from 'xml2js';
+import { validateXmlSafety } from '../adapters/xml.js';
 import type { MemoryDataType, MemoryFeatureV1, SolithDefinitionV1 } from './schema.v1.js';
 import { SOLITH_DEFINITION_SCHEMA_VERSION, validateSolithDefinitionV1 } from './schema.v1.js';
 import { slugifyGameId } from '../trainer-catalog/types.js';
@@ -147,6 +148,17 @@ function parseOffsets(entry: Record<string, unknown>): number[] {
 export async function parseCheatTableXml(xmlText: string, options: { title?: string } = {}): Promise<CtImportResult> {
   const rejected: Array<{ name: string; reason: string }> = [];
   const accepted: CtImportEntry[] = [];
+
+  // Phase 7 hardening: this importer previously called xml2js directly with
+  // none of the size/DOCTYPE-entity/nesting-depth guards already applied to
+  // the save-editor XML path (adapters/xml.ts's validateXmlSafety, reused
+  // here rather than duplicated) — xml2js/sax doesn't resolve external
+  // entities by default, so this closes a defense-in-depth gap, not a proven
+  // live exploit.
+  const safety = validateXmlSafety(xmlText);
+  if (!safety.safe) {
+    return emptyResult(options.title ?? 'Imported Table', [`xml_safety_violation:${safety.error ?? 'unknown'}`]);
+  }
 
   let parsed: Record<string, unknown>;
   try {
