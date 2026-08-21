@@ -1,5 +1,138 @@
 # PHASE 7 CLOSEOUT — RECONCILIATION PASS (2026-08-20)
 
+## UPDATE (same day, continuation pass) — real Batch B2 audit begun, one critical fix shipped
+
+Continuing directly from the reconciliation above, three parallel read-only audits were run against
+the current tree (IPC/preload/navigation surface; process/command/path safety repo-wide; network
+requests + `.CT` import + registry security). Findings below are real, with file:line evidence — not
+sampled, not summarized-away. One confirmed-exploitable vulnerability was fixed and shipped
+(`aa4474a`) in this same pass; the rest is real, itemized, unfinished work.
+
+### Finding 1 (Critical, FIXED this pass): shell-injection in game-running detection
+
+`src/core/process/index.ts` `checkMacProcessList`/`checkLinuxProcessList` ran
+`execSync(\`ps aux | grep -i "${baseName}" | grep -v grep\`)` where `baseName` derives from
+`profile.executableNames` — a renderer-settable field (`z.array(z.string())`, no character
+allowlist in `src/core/profiles/schema.ts`) reachable through the app's own compatibility-profile
+creation flow. A crafted executable name containing `"`, `;`, or `$()` breaks out of the shell
+string. **Fixed:** rewrote both to `execFileSync('ps', ['aux'], ...)` (array args, no shell) with
+JS-side substring matching; also switched the Windows `tasklist` call from a shell string to
+`execFileSync` array args for consistency. Verified: main tsc 0/0, Electron tsc 0/0, `npm test`
+1643/1643 + SQL 10/10, `test:live-memory` 257/257, `tests/process.test.ts` 4/4, `git diff --check`
+clean. Commit `aa4474a`, pushed, local == remote.
+
+### Finding 2 (High, PARTIALLY FIXED this pass): IPC sender-identity gap — 151/180 handlers unguarded
+
+Full inventory (100% coverage, all 180 `ipcMain.handle` sites in `electron/*.ts`) found that only 29
+of 180 handlers call `requireTrustedSender`/`validateIpcSender` (the B1.1-pattern sender/window-type
+guard). **151 (84%) have no sender-identity check at all.** Preload allowlisting, `webPreferences`
+(`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` on all 3 windows),
+navigation/popup policy (`applyWindowNavigationPolicy`, deny-by-default), and CSP
+(`default-src 'self'`, `frame-src 'none'`, no `unsafe-eval`) are all solid and not blocking on their
+own.
+
+**Fixed this pass (22 handlers, `electron/live-memory-ipc.ts`):** every previously-unguarded
+`live-memory-*`/`research:*`/`in-process-propose-hook` handler now calls
+`requireTrustedSender(event)` before touching session state — this specifically closes the
+reconnaissance/attach/read/scan primitives (`live-memory-list-processes`, `live-memory-attach`,
+`live-memory-read`, `live-memory-read-many`, `live-memory-pointer-scan`, `live-memory-scan-aob`,
+`research:hex`, `research:view`, and 14 others), which is the same class of defect Gate 2.5 already
+found and fixed for `live-memory-freeze-stop`/`live-memory-freeze-status` — a trusted-but-wrong-type
+window (e.g. the Wisp/trainer overlay) could otherwise independently attach to and read arbitrary
+process memory, since session binding is per-`webContents.id`, not per-window-type.
+
+**NOT fixed, still unguarded (129 handlers remain) — itemized, not vague:**
+
+| File | Unguarded count | Highest-risk examples |
+|---|---|---|
+| `electron/main.ts` | 44 of 46 | `add-game`, `delete-game`, `restore-backup`, `apply-proposal`, `add-user-selected-location`, `check-game-running`, `v2-monitor-start`, `trainer-host-start`, `trainer-host-read-field` |
+| `electron/trainer-catalog-ipc.ts` | all | `trainer-catalog-import-ct`, `trainer-catalog-preview-ct`, `trainer-catalog-promote-verified`, `trainer-catalog-import-yaml`, `trainer-catalog-approve-save-path` |
+| `electron/trainer-research-ipc.ts` | all | `trainer-research-analyze-exe`, `trainer-research-import-dumpspace`, `trainer-research-analyze-ct-scripts` |
+| `electron/ct-library-ipc.ts` | all | `ct-library-import-zip-start`, `ct-library-import-zip-preview` |
+| `electron/install-discovery-ipc.ts` | all | `install-discovery-preview`, `install-discovery-commit` |
+| `electron/local-ocr-ipc.ts` | all | `local-ocr-read-window-region` (captures pixel data from another window) |
+| `electron/canonical-games-ipc.ts` | all | `launch-installation` (spawns an installer process) |
+| `electron/cheat-toggle-ipc.ts`, `notifications-ipc.ts`, `trainer-deck-ipc.ts`, `trainer-hotkeys.ts`, `wisp-overlay.ts` | all | DB mutation, global hotkey rebinding, overlay window control |
+| `electron/registry-verification-ipc.ts` | 1 of 3 | `registry-compare-restart-artifacts` |
+
+This is the largest remaining release-blocking item. Recommended order: `main.ts`'s
+file/process/DB-mutating handlers first (highest blast radius), then `trainer-catalog-ipc.ts`'s
+CT-import/promote group, then the rest.
+
+### Finding 3 (High, NOT fixed — repo-wide, itemized): PATH-hijack class beyond the two already-fixed binaries
+
+Every bare `powershell`/`powershell.exe`, `reg`, and `tasklist` invocation across `src/core/` resolves
+via PATH, the same class of bug already fixed once for `whoami.exe`/`icacls.exe` in
+`electron/gamebar-transport.ts`. Confirmed sites: `src/core/install-discovery/registry-win.ts:10,30`
+(also uses `execSync` with string interpolation of a hive path — low-likelihood injection, requires
+a locally-planted malicious registry key), `src/core/live-memory/remote-connection-observer.ts:56`,
+`src/core/live-memory/windows-process-identity.ts:107,140`, `src/core/live-memory/native-memory-driver.ts:460`,
+`src/core/in-process-script/helper-manifest.ts:213`, `src/core/v2/observers/process-observer.ts:58`.
+`electron/gamebar-transport.ts`'s `systemBinaryPath()` helper is not exported/shared — no other site
+reuses it. Recommended fix: extract it to a shared `src/core/safety/system-binary.ts` and route all
+of the above through it in one pass. Separately flagged: `windows-process-identity.ts:140-144` embeds
+a path into a PowerShell double-quoted string via `JSON.stringify()`, which does not neutralize `$()`
+subexpression expansion — the correct pattern (single-quote-doubling) is already used correctly in
+`helper-manifest.ts:209` and should be copied.
+
+### Finding 4 (Medium, NOT fixed): `.CT` import has no XXE/nesting guard
+
+`src/core/adapters/xml.ts`'s `validateXmlSafety()` (size cap, DOCTYPE/ENTITY block, nesting-depth
+cap) exists and is wired into the save-file XML editor, but the actual `.CT`/Cheat-Table importer
+(`src/core/definitions/ct-import.ts`'s `parseCheatTableXml`) calls `xml2js.parseStringPromise`
+directly with none of those guards — it only inherits the 8 MB file-size cap enforced at the IPC
+layer (`electron/trainer-catalog-ipc.ts:302-305`). `xml2js`'s underlying `sax`-based parser doesn't
+resolve external entities by default, so classic XXE-via-disclosure is unlikely, but there is no
+defense-in-depth entity/nesting guard the way the save-editor path has one. Embedded script
+execution itself is safe by construction — `REJECTED_CHILD_TAGS` (`ct-import.ts:42-48`) rejects any
+`CheatScript`/`LuaScript`/`AutoAssemblerScript` entry outright; nothing is ever auto-executed.
+
+### Finding 5 (Low, NOT verified): possible weaker path-safety gate in real backup flow
+
+`src/core/backups/index.ts` defines its own local `validatePathSafety()` (only checks `..` substring
++ `path.isAbsolute()`, no symlink/system-dir/containment checks) in the same file that also imports
+the stronger shared `validateCentralPathSafety` from `src/core/safety/path-safety.ts` — it's unclear
+from static reading alone which one actually gates `createBackup`/`restoreBackup`. Needs a direct
+read of the call sites to confirm, not yet done this pass.
+
+### Network / registry / privacy audit (no fixes needed — findings are clean)
+
+Full outbound-network inventory (6 call sites, all `fetch()`, no `axios`/raw `http.request`): artwork
+fetch has the strongest controls (rights-gate before I/O, HTTPS-only, host allowlist, bounded
+redirects re-validated per hop, 8 MiB cap, SVG rejected). Catalog-update mechanism does not
+currently perform any network fetch — local signed-file import only. Trainer-catalog HTML scraping
+(`remote-sync.ts`) has a timeout but no explicit size/redirect cap — flagged, not blocking. No
+telemetry/analytics library exists anywhere in the codebase; the local crash reporter is
+file-only and never opens a socket; the only path that ever leaves the machine is the sanitized
+community-definition publish flow, which strips user-profile paths and reduces exe paths to
+basenames before submission. Registry Explorer ("CT Registry") is Solith's own compiled index, not
+the Windows registry, and is read-only by construction (no write/delete exports exist anywhere in
+the module). Real Windows-registry access is limited to two hardcoded, read-only `reg query` calls
+(Steam/Epic install-path discovery) with no renderer-exposed arbitrary-key IPC path.
+
+### Updated Part 2 blocker table (supersedes the original above for items it covers)
+
+| # | Severity | Blocker | Status |
+|---|---|---|---|
+| 1 | Critical | Shell injection in `src/core/process/index.ts` | **FIXED**, commit `aa4474a` |
+| 2 | High | 151/180 IPC handlers lack sender-identity check | **22 fixed** (`live-memory-ipc.ts`), **129 remain** — itemized above |
+| 3 | High | PATH-hijack class on bare `powershell`/`reg`/`tasklist` across `src/core/` | Not fixed — itemized above |
+| 4 | Medium | `.CT` importer missing XXE/nesting defense-in-depth | Not fixed |
+| 5 | Low | Possibly-weaker local path-safety gate in backup flow | Not verified |
+| 6 | missing independent verification | Neither this pass's fixes nor the Phase 5/6 true-closeout commits have been independently reviewed | Still open |
+| 7 | installer/signing requirement | No signing cert in this environment; NSIS installer target exists, uncertified against Part 13's clean-install/upgrade/uninstall requirements | Still open |
+
+## Final Gate (unchanged)
+
+`PHASE 7 — BLOCKED`
+
+Real progress this pass: 1 confirmed vulnerability fixed, 22 of 151 unguarded IPC handlers fixed,
+full evidence-backed inventory of the remaining 129 plus two further real (unfixed) findings. Next
+highest-priority action: continue the IPC sender-identity fix through `electron/main.ts` (44
+handlers, highest blast radius — direct DB/file/process operations), then `trainer-catalog-ipc.ts`'s
+CT-import/promote group.
+
+
 ## Scope of this pass
 
 This pass did **not** attempt to fabricate execution of all 25 parts of the
