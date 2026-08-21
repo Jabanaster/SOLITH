@@ -1,17 +1,27 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { systemBinaryPath } from '../safety/system-binary.js';
 
 function isWindows(): boolean {
   return process.platform === 'win32';
 }
 
+/**
+ * execFileSync (array args, no shell, absolute System32 path) — no PATH
+ * lookup and no shell interpolation of hiveKey/valueName, unlike the prior
+ * `execSync(\`reg query "${hiveKey}" ...\`)` form (Phase 7 hardening).
+ */
+function regQuery(args: string[]): string {
+  return execFileSync(systemBinaryPath('reg.exe'), args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    windowsHide: true,
+  });
+}
+
 export function readRegistryString(hiveKey: string, valueName: string): string | null {
   if (!isWindows()) return null;
   try {
-    const out = execSync(`reg query "${hiveKey}" /v ${valueName}`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      windowsHide: true,
-    });
+    const out = regQuery(['query', hiveKey, '/v', valueName]);
     const line = out
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -27,11 +37,7 @@ export function readRegistryString(hiveKey: string, valueName: string): string |
 export function listRegistrySubkeys(hiveKey: string): string[] {
   if (!isWindows()) return [];
   try {
-    const out = execSync(`reg query "${hiveKey}"`, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      windowsHide: true,
-    });
+    const out = regQuery(['query', hiveKey]);
     const prefix = hiveKey.replace(/\\/g, '\\\\');
     return out
       .split(/\r?\n/)

@@ -3,19 +3,10 @@ import fs from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { systemBinaryPath } from '../src/core/safety/system-binary.js';
 
 const LOOPBACK_HOST = '127.0.0.1';
 
-/**
- * Resolves a Windows system binary by absolute path under System32 rather
- * than trusting PATH resolution. PATH order is not a trust boundary — a
- * same-named executable earlier on PATH (a different `whoami.exe`, for
- * example) would otherwise run instead of the real system binary.
- */
-function systemBinaryPath(name: string): string {
-  const systemRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
-  return path.join(systemRoot, 'System32', name);
-}
 const MAX_BODY_BYTES = 1024;
 const REQUEST_WINDOW_MS = 30_000;
 const RATE_WINDOW_MS = 10_000;

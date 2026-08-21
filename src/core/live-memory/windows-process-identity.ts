@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { systemPowerShellPath } from '../safety/system-binary.js';
 
 export interface WindowsProcessIdentity {
   pid: number;
@@ -105,7 +106,7 @@ export function queryWindowsProcessIdentity(pid: number): WindowsProcessIdentity
 
   try {
     const raw = execFileSync(
-      'powershell.exe',
+      systemPowerShellPath(),
       ['-NoProfile', '-NonInteractive', '-Command', coreScript],
       { encoding: 'utf8', timeout: 5_000, windowsHide: true },
     ).trim();
@@ -117,9 +118,16 @@ export function queryWindowsProcessIdentity(pid: number): WindowsProcessIdentity
     let volumeSerialNumber: string | null = null;
     let fileIndex: string | null = null;
     if (resolvedPath) {
+      // Single-quoted PowerShell string literal with '' doubling — not
+      // JSON.stringify, which only escapes JSON-significant characters and
+      // leaves `$` untouched, so a path containing `$(...)`/`$env:...` would
+      // have been expanded by PowerShell's double-quoted-string parser
+      // (Phase 7 finding — this executable path can come from an OS-reported
+      // process, not a value this process itself chose).
+      const psSingleQuoted = `'${resolvedPath.replace(/'/g, "''")}'`;
       const enrichScript = [
         `$ErrorActionPreference = 'Continue'`,
-        `$path = ${JSON.stringify(resolvedPath)}`,
+        `$path = ${psSingleQuoted}`,
         `$vol = ''`,
         `$fidx = ''`,
         `try {`,
@@ -138,7 +146,7 @@ export function queryWindowsProcessIdentity(pid: number): WindowsProcessIdentity
       ].join('; ');
       try {
         const enrichRaw = execFileSync(
-          'powershell.exe',
+          systemPowerShellPath(),
           ['-NoProfile', '-NonInteractive', '-Command', enrichScript],
           { encoding: 'utf8', timeout: 3_000, windowsHide: true },
         ).trim();

@@ -1,6 +1,7 @@
 import { platform } from 'node:os';
 import type { ProcessObservationResult, ProcessIdentity } from '../lifecycle/types.js';
 import { runCommand } from './command-runner.js';
+import { systemPowerShellPath } from '../../safety/system-binary.js';
 
 /**
  * Read-only process observer — async, no shell, no blocking.
@@ -55,7 +56,7 @@ async function observeProcessWindows(
   let raw: string;
   try {
     raw = await runCommand(
-      'powershell',
+      systemPowerShellPath(),
       ['-NoProfile', '-NonInteractive', '-Command', script],
       { RF_PROC_NAME: executableName },
       6000,

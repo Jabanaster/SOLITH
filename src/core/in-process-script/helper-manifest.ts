@@ -5,6 +5,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { systemPowerShellPath } from '../safety/system-binary.js';
 
 export const HELPER_MANIFEST_FILE = 'manifest.json';
 export const HELPER_MANIFEST_SEAL_FILE = 'manifest.seal';
@@ -210,7 +211,7 @@ export function queryAuthenticodePublisher(exePath: string): string | null {
       `if ($s.Status -ne 'Valid') { '' ; exit 0 }`,
       `$s.SignerCertificate.Subject`,
     ].join('; ');
-    const raw = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    const raw = execFileSync(systemPowerShellPath(), ['-NoProfile', '-NonInteractive', '-Command', script], {
       encoding: 'utf8',
       timeout: 8_000,
       windowsHide: true,

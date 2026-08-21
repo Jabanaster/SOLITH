@@ -1,5 +1,6 @@
 import { platform } from 'node:os';
 import { runCommand } from '../v2/observers/command-runner.js';
+import { systemPowerShellPath } from '../safety/system-binary.js';
 import type { RemoteConnectionEvidence } from './types.js';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1']);
@@ -53,7 +54,7 @@ export async function observeRemoteConnections(
   let raw: string;
   try {
     raw = await runCommand(
-      'powershell.exe',
+      systemPowerShellPath(),
       ['-NoProfile', '-NonInteractive', '-Command', script],
       {},
       6000,

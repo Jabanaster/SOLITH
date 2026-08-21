@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import type { LiveProcessHandle, LiveValueType, MemoryDriver, MemoryModule, MemoryRegion } from './types.js';
 import { queryWindowsProcessIdentity } from './windows-process-identity.js';
+import { systemPowerShellPath } from '../safety/system-binary.js';
 
 // Win32 VirtualQuery constants (stable OS ABI values, not re-exported from
 // memoryjs's JS surface in a form worth depending on here).
@@ -457,7 +458,7 @@ function queryWindowsProcessMetadata(): Map<number, WindowsProcessMetadata> {
   if (process.platform !== 'win32') return new Map();
   const script = "$ErrorActionPreference='SilentlyContinue'; Get-CimInstance Win32_Process | ForEach-Object { $start = if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') } else { $null }; [pscustomobject]@{ ProcessId=$_.ProcessId; ParentProcessId=$_.ParentProcessId; Name=$_.Name; ExecutablePath=$_.ExecutablePath; StartTime=$start } } | ConvertTo-Json -Compress";
   try {
-    const raw = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 5_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true }).trim();
+    const raw = execFileSync(systemPowerShellPath(), ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 5_000, maxBuffer: 2 * 1024 * 1024, windowsHide: true }).trim();
     if (!raw) return new Map();
     const parsed = JSON.parse(raw) as WindowsProcessMetadata | WindowsProcessMetadata[];
     return new Map((Array.isArray(parsed) ? parsed : [parsed]).map((item) => [Number(item.ProcessId), item]));

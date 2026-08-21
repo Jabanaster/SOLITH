@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { platform } from 'node:os';
 import type { CompatibilityProfile } from '../profiles/schema.js';
+import { systemBinaryPath } from '../safety/system-binary.js';
 
 /**
  * Game-Running Detection
@@ -76,7 +77,7 @@ function checkWindowsProcessList(executableNames: string[]): GameRunningCheck {
     // Use tasklist to get current processes
     // Output format: "Image Name","PID","Session Name","Session Number","Memory Usage"
     // execFileSync (array args, no shell) — no command/shell interpolation, only fixed literal args.
-    const output = execFileSync('tasklist', ['/V', '/FO', 'CSV'], {
+    const output = execFileSync(systemBinaryPath('tasklist.exe'), ['/V', '/FO', 'CSV'], {
       encoding: 'utf-8',
       timeout: 5000,
     });
