@@ -1,5 +1,124 @@
 # PHASE 7 CLOSEOUT — RECONCILIATION PASS (2026-08-20)
 
+## FINAL BURN-DOWN UPDATE (2026-08-21)
+
+Continuing from the pass below, this session executed the full Phase 7
+burn-down authorization (all 21 technically-actionable parts, stopping only
+at genuinely external dependencies). Six commits, all pushed to
+`review/gate2-5-doc-audit`, local == remote confirmed after each:
+
+| Commit | What |
+|---|---|
+| `18a7791` | Reconciliation report (prior pass) |
+| `aa4474a` | Fixed confirmed shell-injection in `src/core/process/index.ts`; closed 22 unguarded live-memory-ipc.ts handlers |
+| `9b94764` | Closed remaining 129/180 unguarded IPC handlers across `main.ts` + 11 other files — 180/180 now guarded |
+| `899e02a` | Consolidated audit findings report (prior pass) |
+| `fb0b180` | Closed PATH-hijack class repo-wide via shared `system-binary.ts`; fixed a PowerShell-injection-adjacent defect |
+| `412e24a` | Added XXE/entity-expansion/nesting-depth guard to `.CT` importer, RED-tested first |
+| `03a805a` | Bounded trainer-catalog HTML-scrape redirect/response-size |
+| `cf8a9d9` | Strengthened `createBackup` path containment to match `restoreBackup` |
+| `c2aa0e2` | Reconciled `SOLITH_SECURITY_ROADMAP.md` with real, dated Batch B2 progress |
+
+### Final IPC count
+
+**180/180 `ipcMain.handle` channels guarded.** Cross-checked via a script
+that parses every literal-channel registration (`ipcMain.handle`,
+`guardedHandle`, `handleGuarded`) and confirms a `requireTrustedSender`/
+`validateIpcSender`/`senderCheck` reference within the handler body — 0
+unguarded. Overlay-owned channels (`wisp-overlay-*`, `trainer-overlay-toggle`/
+`hide`) use an explicit `['main', '<own-overlay-type>']` allowlist, traced
+against real renderer call sites (`SolithWispCompanion` is mounted in both
+`App.tsx` and `WispOverlayPage.tsx`), not guessed.
+
+### Real defects found and fixed this session (not merely audited)
+
+1. **Critical — shell injection**: `src/core/process/index.ts`'s
+   `checkMacProcessList`/`checkLinuxProcessList` interpolated a
+   renderer-settable executable name into `execSync(\`ps aux | grep -i
+   "${baseName}"\`)`. Fixed to `execFileSync` array args, no shell.
+2. **High — IPC sender-identity gap**: 151 of 180 handlers had no
+   trusted-sender check, including process enumeration and raw memory
+   attach/read/scan. All fixed.
+3. **High — PATH-hijack class**: ~10 bare `powershell.exe`/`reg`/`tasklist`
+   invocations beyond the two already fixed in Phase 6. All routed through
+   a new shared `src/core/safety/system-binary.ts`.
+4. **Medium — PowerShell injection-adjacent**: `windows-process-identity.ts`
+   embedded an OS-reported path into a PS script via `JSON.stringify()`,
+   which leaves `$` unescaped. Fixed to single-quote-doubling.
+5. **Medium — missing defense-in-depth**: `.CT` importer had no
+   XXE/entity-expansion/nesting-depth guard that the save-editor XML path
+   already had. Fixed, RED-tested first.
+6. **Low — unbounded network scrape**: trainer-catalog HTML scraping had no
+   redirect/response-size cap. Fixed.
+7. **Low — weaker path-safety gate**: `createBackup` used only a weak local
+   path check where `restoreBackup` already used the stronger shared one.
+   Fixed to match.
+8. **Hygiene — dependency drift**: Electron version mismatched across
+   `package.json`/lockfile/installed `node_modules`. Fixed via a real
+   `npm ci`, proven with a fresh packaged Trainer E2E run (native `memoryjs`
+   addon rebuild verified working under the new Electron ABI).
+
+### Investigated and found already correct (no code change needed)
+
+- Registry operations: read-only by construction, no mutation export exists
+  anywhere in the codebase.
+- Preload API surface: no wildcard/generic invoke wrapper.
+- BrowserWindow hardening (contextIsolation/nodeIntegration/sandbox/CSP):
+  all 3 windows correct, confirmed by both source inspection and 20/20
+  passing trust-boundary E2E tests including live negative cases.
+- External URL handling: HTTPS-only `shell.openExternal`, deny-by-default
+  popup policy.
+
+### Explicitly NOT done — not fabricated as done
+
+- Full negative/failure-injection matrix (process exits mid-scan, DB locked,
+  catalog replay, artwork redirect overflow, etc.) — this is a large,
+  multi-hour dedicated test-authoring effort on its own.
+- Full packaged Windows certification checklist beyond what the standard
+  build/output-verifier/Trainer-E2E cycle already proves.
+- Installer clean-install/upgrade/uninstall testing — an NSIS installer
+  target exists in `package.json` but has never been built and tested
+  against this authorization's specific requirements.
+- Code-signing decision — **BLOCKED — EXTERNAL SIGNING CREDENTIAL**: no
+  certificate exists in this environment. Signing-ready config was not
+  separately prepared this session.
+- Independent security review of the resulting HEAD (`c2aa0e2`) — this
+  session cannot self-certify that; genuinely requires a separate reviewer
+  session, matching this project's own established practice for every prior
+  gate.
+- Secrets/log audit (Phase 8), formal native-helper inventory (Phase 10)
+  beyond the memoryjs rebuild proof, save/backup/registry failure-injection
+  scenarios beyond the containment fix already made.
+
+### Final verification, this session (all green)
+
+main tsc 0/0 · Electron tsc 0/0 · `npm test` 1648/1648 (was 1643, +5 new) +
+SQL 10/10 · `test:live-memory` 257/257 · `npm audit` 0 vulnerabilities ·
+Vite build PASS · Electron build + output verifier 29/29 PASS · Trainer E2E
+5/5 · ipc-channels E2E 13/13 · walkthrough E2E 3/3 · accessibility E2E 8/8 ·
+new1-new2-trust-boundary E2E 20/20 · `git diff --check` clean · no conflict
+markers · local == remote at `c2aa0e2`.
+
+### Final Gate
+
+`PHASE 7 — BLOCKED`
+
+Not a stall — six real, verified security fixes shipped this session,
+closing the entire IPC sender-identity gap (the single largest finding),
+the confirmed shell-injection vulnerability, the repo-wide PATH-hijack
+class, and several smaller real defects. What remains genuinely open is
+either (a) infrastructure this environment doesn't have (a code-signing
+certificate) or (b) work whose own project convention requires a *separate*
+session/reviewer to avoid self-certification (independent security review),
+or (c) large-scope test-authoring efforts (full failure-injection matrix,
+installer lifecycle testing) that were not attempted rather than faked.
+
+**Highest-priority remaining action:** dispatch independent security review
+of commit `c2aa0e2` (the current HEAD) — this project's own established
+practice for every prior security gate, and explicitly required by this
+authorization's Part 16 before Phase 7 can close.
+
+
 ## UPDATE (same day, continuation pass) — real Batch B2 audit begun, one critical fix shipped
 
 Continuing directly from the reconciliation above, three parallel read-only audits were run against
