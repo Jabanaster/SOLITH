@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import {
   CreateNotificationSchema,
   MarkNotificationReadSchema,
@@ -13,8 +14,28 @@ export function broadcastNotificationCreated(record: NotificationRecord): void {
   }
 }
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerNotificationsIpc(): void {
-  ipcMain.handle('list-notifications', async () => {
+  guardedHandle('list-notifications', async () => {
     try {
       const dbModule = await import('../src/core/database/index.js');
       await dbModule.initDatabase();
@@ -26,7 +47,7 @@ export function registerNotificationsIpc(): void {
     }
   });
 
-  ipcMain.handle('get-unread-notification-count', async () => {
+  guardedHandle('get-unread-notification-count', async () => {
     try {
       const dbModule = await import('../src/core/database/index.js');
       await dbModule.initDatabase();
@@ -38,7 +59,7 @@ export function registerNotificationsIpc(): void {
     }
   });
 
-  ipcMain.handle('create-notification', async (event, payload) => {
+  guardedHandle('create-notification', async (event, payload) => {
     try {
       const parsed = CreateNotificationSchema.parse(payload);
       const dbModule = await import('../src/core/database/index.js');
@@ -53,7 +74,7 @@ export function registerNotificationsIpc(): void {
     }
   });
 
-  ipcMain.handle('mark-notification-read', async (event, payload) => {
+  guardedHandle('mark-notification-read', async (event, payload) => {
     try {
       const parsed = MarkNotificationReadSchema.parse(payload);
       const dbModule = await import('../src/core/database/index.js');
@@ -67,7 +88,7 @@ export function registerNotificationsIpc(): void {
     }
   });
 
-  ipcMain.handle('mark-all-notifications-read', async () => {
+  guardedHandle('mark-all-notifications-read', async () => {
     try {
       const dbModule = await import('../src/core/database/index.js');
       await dbModule.initDatabase();
@@ -80,7 +101,7 @@ export function registerNotificationsIpc(): void {
     }
   });
 
-  ipcMain.handle('clear-notification-history', async () => {
+  guardedHandle('clear-notification-history', async () => {
     try {
       const dbModule = await import('../src/core/database/index.js');
       await dbModule.initDatabase();

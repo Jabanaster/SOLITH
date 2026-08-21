@@ -1,4 +1,6 @@
-import { BrowserWindow, app, ipcMain, screen } from 'electron';
+import { BrowserWindow, app, ipcMain, screen, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
+import type { SolithWindowType } from '../src/core/security/trusted-sender-registry.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { dirname } from 'node:path';
@@ -224,23 +226,52 @@ export function destroyWispOverlay(): void {
   wispOverlayInteractive = false;
 }
 
+function requireTrustedSender(
+  event: IpcMainInvokeEvent,
+  allowedWindowTypes: readonly SolithWindowType[],
+): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, allowedWindowTypes);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/**
+ * Phase 7 B2 hardening — mirrors trainer-hotkeys.ts's guardedHandle. All 5
+ * wisp-overlay-* channels allow both 'main' (App.tsx mounts
+ * SolithWispCompanion at the top level) and 'wisp-overlay' (the overlay's
+ * own WispOverlayPage self-controls position/expanded/interactive state).
+ */
+function guardedHandle(
+  channel: string,
+  allowedWindowTypes: readonly SolithWindowType[],
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event, allowedWindowTypes);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerWispOverlayIpc(): void {
-  ipcMain.handle('wisp-overlay-toggle', async () => {
+  guardedHandle('wisp-overlay-toggle', ['main', 'wisp-overlay'], async () => {
     const visible = toggleWispOverlay();
     return { success: true, visible };
   });
 
-  ipcMain.handle('wisp-overlay-hide', async () => {
+  guardedHandle('wisp-overlay-hide', ['main', 'wisp-overlay'], async () => {
     hideWispOverlay();
     return { success: true };
   });
 
-  ipcMain.handle('wisp-overlay-set-expanded', async (_event, payload: { expanded?: boolean }) => {
+  guardedHandle('wisp-overlay-set-expanded', ['main', 'wisp-overlay'], async (_event, payload: { expanded?: boolean }) => {
     applyOverlayBounds(Boolean(payload?.expanded));
     return { success: true, expanded: wispOverlayExpanded };
   });
 
-  ipcMain.handle('wisp-overlay-move-by', async (_event, payload: { deltaX?: number; deltaY?: number }) => {
+  guardedHandle('wisp-overlay-move-by', ['main', 'wisp-overlay'], async (_event, payload: { deltaX?: number; deltaY?: number }) => {
     if (!wispOverlayWindow || wispOverlayWindow.isDestroyed()) {
       return { success: false, error: 'overlay_unavailable' };
     }
@@ -270,7 +301,7 @@ export function registerWispOverlayIpc(): void {
     return { success: true };
   });
 
-  ipcMain.handle('wisp-overlay-set-interactive', async (_event, payload: { interactive?: boolean }) => {
+  guardedHandle('wisp-overlay-set-interactive', ['main', 'wisp-overlay'], async (_event, payload: { interactive?: boolean }) => {
     setWispOverlayInteractive(Boolean(payload?.interactive));
     return { success: true, interactive: wispOverlayInteractive };
   });

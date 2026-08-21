@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { ipcMain, shell } from 'electron';
+import { ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import { z } from 'zod';
 import { buildGameLibraryRecords } from '../src/core/canonical-games/render-model.js';
 import { getCanonicalGame, listCanonicalGames, listInstallationsForGame } from '../src/core/canonical-games/store.js';
@@ -19,8 +20,28 @@ const LaunchInstallationSchema = z.object({
   installationId: z.string().min(1).max(400),
 }).strict();
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerCanonicalGamesIpc(): void {
-  ipcMain.handle('list-game-library', async (_event, payload: unknown) => {
+  guardedHandle('list-game-library', async (_event, payload: unknown) => {
     try {
       const { view } = GameLibraryViewSchema.parse(payload ?? {});
       const records = buildGameLibraryRecords(view ?? 'installed');
@@ -30,7 +51,7 @@ export function registerCanonicalGamesIpc(): void {
     }
   });
 
-  ipcMain.handle('list-canonical-games', async () => {
+  guardedHandle('list-canonical-games', async () => {
     try {
       return { success: true, games: listCanonicalGames() };
     } catch (error) {
@@ -38,7 +59,7 @@ export function registerCanonicalGamesIpc(): void {
     }
   });
 
-  ipcMain.handle('get-canonical-game', async (_event, payload: unknown) => {
+  guardedHandle('get-canonical-game', async (_event, payload: unknown) => {
     try {
       const { canonicalGameId } = z.object({ canonicalGameId: z.string().min(1).max(200) }).strict().parse(payload);
       const game = getCanonicalGame(canonicalGameId);
@@ -49,7 +70,7 @@ export function registerCanonicalGamesIpc(): void {
     }
   });
 
-  ipcMain.handle('launch-installation', async (_event, payload: unknown) => {
+  guardedHandle('launch-installation', async (_event, payload: unknown) => {
     try {
       const { canonicalGameId, installationId } = LaunchInstallationSchema.parse(payload);
       const installations = listInstallationsForGame(canonicalGameId);

@@ -1,4 +1,5 @@
-import { ipcMain, shell } from 'electron';
+import { ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import path from 'node:path';
 import {
   listInstalledGamesWithCatalog,
@@ -35,8 +36,28 @@ function isPathUnderApprovedInstall(targetPath: string, installPath: string): bo
   );
 }
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerTrainerDeckIpc(): void {
-  ipcMain.handle('trainer-deck-get', async (_event, payload: unknown) => {
+  guardedHandle('trainer-deck-get', async (_event, payload: unknown) => {
     try {
       const catalogGameId =
         payload && typeof payload === 'object' && 'catalogGameId' in payload
@@ -69,7 +90,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-health-check', async (_event, payload: unknown) => {
+  guardedHandle('trainer-health-check', async (_event, payload: unknown) => {
     try {
       const catalogGameId =
         payload && typeof payload === 'object' && 'catalogGameId' in payload
@@ -82,7 +103,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-health-list', async () => {
+  guardedHandle('trainer-health-list', async () => {
     try {
       return { success: true, records: listTrainerHealthRecords(), map: getTrainerHealthMap() };
     } catch (error) {
@@ -90,7 +111,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-certify-l1', async (_event, payload: unknown) => {
+  guardedHandle('trainer-catalog-certify-l1', async (_event, payload: unknown) => {
     try {
       const catalogGameId =
         payload && typeof payload === 'object' && 'catalogGameId' in payload
@@ -104,7 +125,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('catalog-demand-notify', async (_event, payload: unknown) => {
+  guardedHandle('catalog-demand-notify', async (_event, payload: unknown) => {
     try {
       const parsed =
         payload && typeof payload === 'object'
@@ -121,7 +142,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('catalog-demand-list', async () => {
+  guardedHandle('catalog-demand-list', async () => {
     try {
       return { success: true, demand: listCatalogDemandSorted(100) };
     } catch (error) {
@@ -129,7 +150,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('install-discovery-open-path', async (_event, payload: unknown) => {
+  guardedHandle('install-discovery-open-path', async (_event, payload: unknown) => {
     try {
       const parsed =
         payload && typeof payload === 'object'
@@ -156,7 +177,7 @@ export function registerTrainerDeckIpc(): void {
     }
   });
 
-  ipcMain.handle('catalog-process-watch-active', async (_event, payload: unknown) => {
+  guardedHandle('catalog-process-watch-active', async (_event, payload: unknown) => {
     try {
       const active =
         payload && typeof payload === 'object' && 'active' in payload

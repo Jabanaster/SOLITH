@@ -1,4 +1,5 @@
-import { BrowserWindow, dialog, ipcMain, app } from 'electron';
+import { BrowserWindow, dialog, ipcMain, app, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -108,8 +109,28 @@ const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = path.dirname(moduleFilename);
 const projectRoot = path.resolve(moduleDirectory, '..');
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function handleGuarded(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerTrainerCatalogIpc(): void {
-  ipcMain.handle('trainer-catalog-search', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-search', async (_event, payload: unknown) => {
     try {
       const parsed = SearchSchema.parse(payload ?? {});
       const result = searchCatalog(parsed.query, parsed.limit, parsed.offset, {
@@ -130,7 +151,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-stats', async () => {
+  handleGuarded('trainer-catalog-stats', async () => {
     try {
       return {
         success: true,
@@ -142,7 +163,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-get', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-get', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const entry = getCatalogEntryForDisplay(parsed.catalogGameId);
@@ -153,7 +174,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-seed', async () => {
+  handleGuarded('trainer-catalog-seed', async () => {
     try {
       const seedPath = resolvePackagedSeedPath();
       const total = ensureCatalogSeeded(seedPath, 1000);
@@ -164,7 +185,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-sync-remote', async () => {
+  handleGuarded('trainer-catalog-sync-remote', async () => {
     try {
       if (getSetting('v2RemoteCatalogSyncEnabled') === false) {
         return { success: false, error: 'remote_sync_disabled' };
@@ -176,7 +197,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-sync-hub', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-sync-hub', async (_event, payload: unknown) => {
     try {
       const parsed = SyncHubSchema.parse(payload ?? {});
       const report = await syncCommunityDefinitions({
@@ -188,7 +209,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-get-definition', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-get-definition', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const definition = getDefinitionPayload(parsed.catalogGameId);
@@ -204,7 +225,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('publishToCommunity', async (_event, payload: unknown) => {
+  handleGuarded('publishToCommunity', async (_event, payload: unknown) => {
     try {
       const parsed = PublishToCommunitySchema.parse(payload);
       const published = await publishCommunityDefinition(parsed);
@@ -214,7 +235,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-load-game', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-load-game', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const definition = loadCatalogDefinition(parsed.catalogGameId);
@@ -244,7 +265,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-get-trainer-controls', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-get-trainer-controls', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const dual = resolveSaveEditControlsDualRead({ catalogGameId: parsed.catalogGameId });
@@ -263,7 +284,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-approve-save-path', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-approve-save-path', async (_event, payload: unknown) => {
     try {
       const parsed = ApproveSavePathSchema.parse(payload);
       const definition = loadCatalogDefinition(parsed.catalogGameId);
@@ -284,7 +305,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-pick-ct', async (event) => {
+  handleGuarded('trainer-catalog-pick-ct', async (event) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender);
       const picked = await dialog.showOpenDialog(win ?? undefined, {
@@ -317,7 +338,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-preview-ct', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-preview-ct', async (_event, payload: unknown) => {
     try {
       const parsed = PickedCtSchema.parse(payload);
       const currentHash = crypto.createHash('sha256').update(parsed.xmlText, 'utf8').digest('hex');
@@ -349,7 +370,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-import-ct', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-import-ct', async (_event, payload: unknown) => {
     try {
       const parsed = ImportCtSchema.parse(payload);
       const result = await importDefinitionCt(parsed.xmlText, { title: parsed.title });
@@ -372,7 +393,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-feedback-record', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-feedback-record', async (_event, payload: unknown) => {
     try {
       const parsed = DefinitionFeedbackSchema.parse(payload);
       // `rating` is a required z.union of literals in DefinitionFeedbackSchema
@@ -387,7 +408,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-set-owned', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-set-owned', async (_event, payload: unknown) => {
     try {
       const parsed = SetOwnedSchema.parse(payload);
       setCatalogEntryOwnedConfirmed(parsed.catalogGameId, parsed.owned);
@@ -398,7 +419,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-feedback-summary', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-feedback-summary', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const summary = getDefinitionFeedbackSummary(parsed.catalogGameId);
@@ -410,7 +431,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-all-time-popularity-list', async () => {
+  handleGuarded('trainer-catalog-all-time-popularity-list', async () => {
     try {
       // ROADMAP §3.5 "All-time popular" — lifetime positive community feedback count,
       // deliberately distinct from the "Popular now" catalog_demand signal.
@@ -420,7 +441,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-evaluate-promotion', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-evaluate-promotion', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const definition = loadCatalogDefinition(parsed.catalogGameId);
@@ -432,7 +453,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-promote-verified', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-promote-verified', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const definition = loadCatalogDefinition(parsed.catalogGameId);
@@ -444,7 +465,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-export-definition', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-export-definition', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
       const bundle = exportCatalogDefinitionToYaml(parsed.catalogGameId);
@@ -462,7 +483,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-pending-quarantine', async () => {
+  handleGuarded('trainer-catalog-pending-quarantine', async () => {
     try {
       const pending = listPendingDefinitionUpdates(100);
       return { success: true, pending };
@@ -471,7 +492,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-identity-review-list', async () => {
+  handleGuarded('trainer-catalog-identity-review-list', async () => {
     try {
       const items = listPendingIdentityReviewItems();
       return { success: true, items };
@@ -480,7 +501,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-identity-review-count', async () => {
+  handleGuarded('trainer-catalog-identity-review-count', async () => {
     try {
       const count = getPendingIdentityReviewCount();
       return { success: true, count };
@@ -489,7 +510,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-identity-review-resolve', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-identity-review-resolve', async (_event, payload: unknown) => {
     try {
       const parsed = ResolveIdentityReviewSchema.parse(payload);
       const item = resolveIdentityReviewItem(parsed.id, parsed.resolution);
@@ -500,7 +521,7 @@ export function registerTrainerCatalogIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-catalog-import-yaml', async (_event, payload: unknown) => {
+  handleGuarded('trainer-catalog-import-yaml', async (_event, payload: unknown) => {
     try {
       const parsed = ImportYamlSchema.parse(payload);
       const result = importDefinitionYaml(parsed.yamlText);

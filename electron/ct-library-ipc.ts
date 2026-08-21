@@ -1,4 +1,5 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,8 +68,28 @@ function errorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerCtLibraryIpc(): void {
-  ipcMain.handle('ct-library-pick-zip', async (event) => {
+  guardedHandle('ct-library-pick-zip', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     console.info('[ct-library] ZIP picker opened');
     const result = await pickerBridge.pick(event.sender.id, () => dialog.showOpenDialog(win ?? undefined, {
@@ -82,7 +103,7 @@ export function registerCtLibraryIpc(): void {
     return result;
   });
 
-  ipcMain.handle('ct-library-summary', async () => {
+  guardedHandle('ct-library-summary', async () => {
     try {
       const summary = await loadCtLibrarySummary(paths);
       return {
@@ -95,7 +116,7 @@ export function registerCtLibraryIpc(): void {
     }
   });
 
-  ipcMain.handle('ct-library-search', async (_event, payload: unknown) => {
+  guardedHandle('ct-library-search', async (_event, payload: unknown) => {
     try {
       const parsed = SearchSchema.parse(payload ?? {});
       return { success: true, ...(await searchCtLibrary(paths, parsed)) };
@@ -104,7 +125,7 @@ export function registerCtLibraryIpc(): void {
     }
   });
 
-  ipcMain.handle('ct-library-game-detail', async (_event, payload: unknown) => {
+  guardedHandle('ct-library-game-detail', async (_event, payload: unknown) => {
     try {
       const parsed = GameDetailSchema.parse(payload);
       return { success: true, ...(await getCtLibraryGameDetail(paths, parsed.gameId)) };
@@ -113,7 +134,7 @@ export function registerCtLibraryIpc(): void {
     }
   });
 
-  ipcMain.handle('ct-library-import-zip-preview', async (event, payload: unknown) => {
+  guardedHandle('ct-library-import-zip-preview', async (event, payload: unknown) => {
     const parsed = ImportPreviewSchema.safeParse(payload);
     if (!parsed.success) {
       return { success: false, jobId: 'invalid', errorCode: 'INVALID_PAYLOAD', error: parsed.error.message };
@@ -175,7 +196,7 @@ export function registerCtLibraryIpc(): void {
     }
   });
 
-  ipcMain.handle('ct-library-import-zip-start', async (event, payload: unknown) => {
+  guardedHandle('ct-library-import-zip-start', async (event, payload: unknown) => {
     const parsed = ImportStartSchema.safeParse(payload);
     if (!parsed.success) {
       return { success: false, jobId: 'invalid', error: parsed.error.message };
@@ -230,7 +251,7 @@ export function registerCtLibraryIpc(): void {
     }
   });
 
-  ipcMain.handle('ct-library-import-zip-cancel', async (_event, payload: unknown) => {
+  guardedHandle('ct-library-import-zip-cancel', async (_event, payload: unknown) => {
     const parsed = ImportCancelSchema.parse(payload);
     const controller = activeImports.get(parsed.jobId);
     if (!controller) {

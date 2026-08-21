@@ -1,4 +1,5 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { ipcMain, dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -16,8 +17,28 @@ function activeWindow(): BrowserWindow | null {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
 }
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerTrainerResearchIpc(): void {
-  ipcMain.handle('trainer-research-pick-exe', async (event) => {
+  guardedHandle('trainer-research-pick-exe', async (event) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const win = BrowserWindow.fromWebContents(event.sender) ?? activeWindow();
@@ -38,7 +59,7 @@ export function registerTrainerResearchIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-research-analyze-exe', async (event, payload: unknown) => {
+  guardedHandle('trainer-research-analyze-exe', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const parsed = TrainerResearchAnalyzeExeSchema.parse(payload);
@@ -52,7 +73,7 @@ export function registerTrainerResearchIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-research-pick-dumpspace-folder', async (event) => {
+  guardedHandle('trainer-research-pick-dumpspace-folder', async (event) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const win = BrowserWindow.fromWebContents(event.sender) ?? activeWindow();
@@ -83,7 +104,7 @@ export function registerTrainerResearchIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-research-import-dumpspace', async (event, payload: unknown) => {
+  guardedHandle('trainer-research-import-dumpspace', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const parsed = TrainerResearchImportDumpspaceSchema.parse(payload);
@@ -108,7 +129,7 @@ export function registerTrainerResearchIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-research-pick-ct', async (event) => {
+  guardedHandle('trainer-research-pick-ct', async (event) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const win = BrowserWindow.fromWebContents(event.sender) ?? activeWindow();
@@ -131,7 +152,7 @@ export function registerTrainerResearchIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-research-analyze-ct-scripts', async (event, payload: unknown) => {
+  guardedHandle('trainer-research-analyze-ct-scripts', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const parsed = TrainerResearchAnalyzeCtSchema.parse(payload);
@@ -148,7 +169,7 @@ export function registerTrainerResearchIpc(): void {
     }
   });
 
-  ipcMain.handle('trainer-research-merge-ue-scripts', async (event, payload: unknown) => {
+  guardedHandle('trainer-research-merge-ue-scripts', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const body = payload as {
