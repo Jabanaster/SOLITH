@@ -105,10 +105,27 @@ export function createBackup(
   proposalId?: string,
   operationId?: string
 ): Backup {
-  // Validate paths
+  // Validate paths — local check first (fast, always applies), then the
+  // stronger central check (symlink/junction canonicalization, approved-root
+  // containment) scoped to the owning game's install path, matching the
+  // pattern restoreBackup already uses for its destructive write direction
+  // (Phase 7 hardening — createBackup previously relied on the local check
+  // alone, which only rejects a literal ".." substring and requires an
+  // absolute path; it does not canonicalize symlinks or enforce containment).
   validatePathSafety(targetFile);
   validatePathSafety(backupDir);
-  
+  const owningGame = getGameById(gameId);
+  if (owningGame) {
+    const targetSafety = validateCentralPathSafety(targetFile, [owningGame.path]);
+    if (!targetSafety.safe) {
+      throw new Error(targetSafety.reason || 'Target path failed containment validation.');
+    }
+  }
+  const backupDirSafety = validateCentralPathSafety(backupDir);
+  if (!backupDirSafety.safe) {
+    throw new Error(backupDirSafety.reason || 'Backup directory failed safety validation.');
+  }
+
   // Verify source file exists
   if (!fs.existsSync(targetFile)) {
     throw new Error(`Source file not found: ${targetFile}`);
