@@ -203,6 +203,25 @@ function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: f
   return { ok: true };
 }
 
+/**
+ * Wraps ipcMain.handle with the requireTrustedSender check applied uniformly
+ * before the real handler body runs (Phase 7 B2 hardening — closes the class
+ * of handlers in this file that previously had no sender-identity check at
+ * all, reachable by any trusted-but-wrong-window-type sender).
+ */
+function handleGuarded(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 function isPathInside(candidatePath: string, rootPath: string): boolean {
   const relative = path.relative(rootPath, candidatePath);
   return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -494,7 +513,7 @@ app.on('activate', () => {
 });
 
 // Database & Core Operations
-ipcMain.handle('get-games', async () => {
+handleGuarded('get-games', async () => {
   try {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
@@ -507,7 +526,7 @@ ipcMain.handle('get-games', async () => {
   }
 });
 
-ipcMain.handle('pick-game-folder', async (event) => {
+handleGuarded('pick-game-folder', async (event) => {
   try {
     const win = BrowserWindow.fromWebContents(event.sender);
     const result = await dialog.showOpenDialog(win ?? undefined, {
@@ -523,7 +542,7 @@ ipcMain.handle('pick-game-folder', async (event) => {
   }
 });
 
-ipcMain.handle('pick-game-executable', async (event) => {
+handleGuarded('pick-game-executable', async (event) => {
   try {
     const win = BrowserWindow.fromWebContents(event.sender);
     const result = await dialog.showOpenDialog(win ?? undefined, {
@@ -541,7 +560,7 @@ ipcMain.handle('pick-game-executable', async (event) => {
   }
 });
 
-ipcMain.handle('add-game', async (event, gameData) => {
+handleGuarded('add-game', async (event, gameData) => {
   try {
     const parsed = AddGameSchema.parse(gameData);
     const safetyModule = await import('../src/core/safety/path-safety.js');
@@ -562,7 +581,7 @@ ipcMain.handle('add-game', async (event, gameData) => {
   }
 });
 
-ipcMain.handle('update-game', async (_event, gameData) => {
+handleGuarded('update-game', async (_event, gameData) => {
   try {
     const parsed = UpdateGameSchema.parse(gameData);
     const safetyModule = await import('../src/core/safety/path-safety.js');
@@ -595,7 +614,7 @@ ipcMain.handle('update-game', async (_event, gameData) => {
   }
 });
 
-ipcMain.handle('scan-game', async (event, gameId: string) => {
+handleGuarded('scan-game', async (event, gameId: string) => {
   try {
     const parsed = ScanGameSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -609,7 +628,7 @@ ipcMain.handle('scan-game', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('delete-game', async (event, gameId: string) => {
+handleGuarded('delete-game', async (event, gameId: string) => {
   try {
     const parsed = DeleteGameSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -624,7 +643,7 @@ ipcMain.handle('delete-game', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('get-recipes', async (event, gameId: string) => {
+handleGuarded('get-recipes', async (event, gameId: string) => {
   try {
     const parsed = GetRecipesSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -638,7 +657,7 @@ ipcMain.handle('get-recipes', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('create-recipe', async (event, recipeData) => {
+handleGuarded('create-recipe', async (event, recipeData) => {
   try {
     const parsed = CreateRecipeSchema.parse(recipeData);
     if (!validateIpcPathSafety(parsed.target, parsed.gameId)) {
@@ -657,7 +676,7 @@ ipcMain.handle('create-recipe', async (event, recipeData) => {
   }
 });
 
-ipcMain.handle('get-journal', async (event, gameId?: string) => {
+handleGuarded('get-journal', async (event, gameId?: string) => {
   try {
     const parsed = GetJournalSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -671,7 +690,7 @@ ipcMain.handle('get-journal', async (event, gameId?: string) => {
   }
 });
 
-ipcMain.handle('get-proposals', async (event, gameId?: string) => {
+handleGuarded('get-proposals', async (event, gameId?: string) => {
   try {
     const parsed = GetProposalsSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -685,7 +704,7 @@ ipcMain.handle('get-proposals', async (event, gameId?: string) => {
   }
 });
 
-ipcMain.handle('log-event', async (event, eventData) => {
+handleGuarded('log-event', async (event, eventData) => {
   try {
     const parsed = LogEventSchema.parse(eventData);
     const dbModule = await import('../src/core/database/index.js');
@@ -704,9 +723,9 @@ ipcMain.handle('log-event', async (event, eventData) => {
   }
 });
 
-ipcMain.handle('get-app-version', () => app.getVersion());
+handleGuarded('get-app-version', () => app.getVersion());
 
-ipcMain.handle('get-settings', async () => {
+handleGuarded('get-settings', async () => {
   try {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
@@ -719,7 +738,7 @@ ipcMain.handle('get-settings', async () => {
   }
 });
 
-ipcMain.handle('set-setting', async (event, key: any, value: any) => {
+handleGuarded('set-setting', async (event, key: any, value: any) => {
   try {
     const parsed = SetSettingSchema.parse({ key, value });
     const dbModule = await import('../src/core/database/index.js');
@@ -746,7 +765,7 @@ ipcMain.handle('set-setting', async (event, key: any, value: any) => {
   }
 });
 
-ipcMain.handle('delete-recipe', async (event, recipeId: string) => {
+handleGuarded('delete-recipe', async (event, recipeId: string) => {
   try {
     const parsed = DeleteRecipeSchema.parse({ recipeId });
     const dbModule = await import('../src/core/database/index.js');
@@ -761,7 +780,7 @@ ipcMain.handle('delete-recipe', async (event, recipeId: string) => {
   }
 });
 
-ipcMain.handle('get-backups', async (event, gameId: string) => {
+handleGuarded('get-backups', async (event, gameId: string) => {
   try {
     const parsed = GetBackupsSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -775,7 +794,7 @@ ipcMain.handle('get-backups', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('restore-backup', async (event, backupId: string) => {
+handleGuarded('restore-backup', async (event, backupId: string) => {
   try {
     const parsed = RestoreBackupSchema.parse({ backupId });
     const dbModule = await import('../src/core/database/index.js');
@@ -812,7 +831,7 @@ ipcMain.handle('restore-backup', async (event, backupId: string) => {
 });
 
 // Saves & Discovery & Proposals Operations
-ipcMain.handle('detect-save-files', async (event, gameId: string) => {
+handleGuarded('detect-save-files', async (event, gameId: string) => {
   try {
     const parsed = DetectSaveFilesSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -849,7 +868,7 @@ ipcMain.handle('detect-save-files', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('pick-save-file', async (event, gameId: string) => {
+handleGuarded('pick-save-file', async (event, gameId: string) => {
   try {
     const parsed = DetectSaveFilesSchema.parse({ gameId });
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -878,7 +897,7 @@ ipcMain.handle('pick-save-file', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('parse-save', async (event, gameId: string, filePath: string) => {
+handleGuarded('parse-save', async (event, gameId: string, filePath: string) => {
   try {
     const parsedInput = ParseSaveSchema.parse({ gameId, filePath });
     
@@ -907,7 +926,7 @@ ipcMain.handle('parse-save', async (event, gameId: string, filePath: string) => 
   }
 });
 
-ipcMain.handle('compare-saves', async (event, savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => {
+handleGuarded('compare-saves', async (event, savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => {
   try {
     const parsed = CompareSavesSchema.parse({ savePathA, savePathB, gameId, knownOldValue, knownNewValue });
     
@@ -934,7 +953,7 @@ ipcMain.handle('compare-saves', async (event, savePathA: string, savePathB: stri
   }
 });
 
-ipcMain.handle('compare-saves-report', async (event, savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => {
+handleGuarded('compare-saves-report', async (event, savePathA: string, savePathB: string, gameId?: string, knownOldValue?: any, knownNewValue?: any) => {
   try {
     const parsed = CompareSavesWithReportSchema.parse({ savePathA, savePathB, gameId, knownOldValue, knownNewValue });
 
@@ -962,7 +981,7 @@ ipcMain.handle('compare-saves-report', async (event, savePathA: string, savePath
   }
 });
 
-ipcMain.handle('create-proposal-for-edit', async (event, gameId: string, filePath: string, pathStr: string, oldValue: any, newValue: any, recipeId?: string) => {
+handleGuarded('create-proposal-for-edit', async (event, gameId: string, filePath: string, pathStr: string, oldValue: any, newValue: any, recipeId?: string) => {
   try {
     const parsed = CreateProposalSchema.parse({ gameId, filePath, path: pathStr, oldValue, newValue, recipeId });
     
@@ -990,7 +1009,7 @@ ipcMain.handle('create-proposal-for-edit', async (event, gameId: string, filePat
   }
 });
 
-ipcMain.handle('apply-proposal', async (event, proposal: any) => {
+handleGuarded('apply-proposal', async (event, proposal: any) => {
   try {
     const parsed = ApplyProposalSchema.parse(proposal);
     
@@ -1015,7 +1034,7 @@ ipcMain.handle('apply-proposal', async (event, proposal: any) => {
   }
 });
 
-ipcMain.handle('suggest-data-edits', async (event, gameId: string, filePath: string) => {
+handleGuarded('suggest-data-edits', async (event, gameId: string, filePath: string) => {
   try {
     const parsed = SuggestDataEditsSchema.parse({ gameId, filePath });
     
@@ -1036,7 +1055,7 @@ ipcMain.handle('suggest-data-edits', async (event, gameId: string, filePath: str
   }
 });
 
-ipcMain.handle('discover-save-locations', async (event, gameId: string) => {
+handleGuarded('discover-save-locations', async (event, gameId: string) => {
   try {
     const parsed = DiscoverSaveLocationsSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -1050,7 +1069,7 @@ ipcMain.handle('discover-save-locations', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('get-save-locations', async (event, gameId: string) => {
+handleGuarded('get-save-locations', async (event, gameId: string) => {
   try {
     const parsed = GetSaveLocationsSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -1064,7 +1083,7 @@ ipcMain.handle('get-save-locations', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('approve-save-location', async (event, locationId: string) => {
+handleGuarded('approve-save-location', async (event, locationId: string) => {
   try {
     const parsed = ApproveSaveLocationSchema.parse({ locationId });
     const dbModule = await import('../src/core/database/index.js');
@@ -1079,7 +1098,7 @@ ipcMain.handle('approve-save-location', async (event, locationId: string) => {
   }
 });
 
-ipcMain.handle('revoke-save-location', async (event, locationId: string) => {
+handleGuarded('revoke-save-location', async (event, locationId: string) => {
   try {
     const parsed = RevokeSaveLocationSchema.parse({ locationId });
     const dbModule = await import('../src/core/database/index.js');
@@ -1094,7 +1113,7 @@ ipcMain.handle('revoke-save-location', async (event, locationId: string) => {
   }
 });
 
-ipcMain.handle('add-user-selected-location', async (event, gameId: string, path: string) => {
+handleGuarded('add-user-selected-location', async (event, gameId: string, path: string) => {
   try {
     const parsed = AddUserSelectedLocationSchema.parse({ gameId, path });
     const dbModule = await import('../src/core/database/index.js');
@@ -1109,7 +1128,7 @@ ipcMain.handle('add-user-selected-location', async (event, gameId: string, path:
   }
 });
 
-ipcMain.handle('check-game-running', async (event, gameId: string) => {
+handleGuarded('check-game-running', async (event, gameId: string) => {
   try {
     const parsed = CheckGameRunningSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -1130,7 +1149,7 @@ ipcMain.handle('check-game-running', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('get-compatibility-profile', async (event, gameId: string) => {
+handleGuarded('get-compatibility-profile', async (event, gameId: string) => {
   try {
     const parsed = GetCompatibilityProfileSchema.parse({ gameId });
     const dbModule = await import('../src/core/database/index.js');
@@ -1145,7 +1164,7 @@ ipcMain.handle('get-compatibility-profile', async (event, gameId: string) => {
   }
 });
 
-ipcMain.handle('get-all-profiles', async () => {
+handleGuarded('get-all-profiles', async () => {
   try {
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
@@ -1177,7 +1196,7 @@ ipcMain.handle('get-all-profiles', async () => {
 // These handlers are registered exactly once at module level. Recreating a
 // BrowserWindow does not re-register them.
 
-ipcMain.handle('v2-monitor-start', async (event, payload: unknown) => {
+handleGuarded('v2-monitor-start', async (event, payload: unknown) => {
   try {
     if (!lifecycleWiring) {
       return { success: false, error: 'Monitor not initialised yet.' };
@@ -1208,7 +1227,7 @@ ipcMain.handle('v2-monitor-start', async (event, payload: unknown) => {
   }
 });
 
-ipcMain.handle('v2-monitor-stop', async (event) => {
+handleGuarded('v2-monitor-stop', async (event) => {
   try {
     if (!lifecycleWiring) {
       return { success: false, error: 'Monitor not initialised yet.' };
@@ -1222,7 +1241,7 @@ ipcMain.handle('v2-monitor-stop', async (event) => {
   }
 });
 
-ipcMain.handle('v2-monitor-get-state', async () => {
+handleGuarded('v2-monitor-get-state', async () => {
   try {
     const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
     return getSessionMonitor().getStatus();
@@ -1231,7 +1250,7 @@ ipcMain.handle('v2-monitor-get-state', async () => {
   }
 });
 
-ipcMain.handle('v2-monitor-clear-timeline', async () => {
+handleGuarded('v2-monitor-clear-timeline', async () => {
   try {
     const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
     getSessionMonitor().clearTimeline();
@@ -1241,7 +1260,7 @@ ipcMain.handle('v2-monitor-clear-timeline', async () => {
   }
 });
 
-ipcMain.handle('v2-monitor-export-diagnostics', async () => {
+handleGuarded('v2-monitor-export-diagnostics', async () => {
   try {
     const { getSessionMonitor } = await import('../src/core/v2/session-monitor.js');
     return getSessionMonitor().exportDiagnostics();
@@ -1256,7 +1275,7 @@ ipcMain.handle('v2-monitor-export-diagnostics', async () => {
 // owner identifier — never a value supplied in the IPC payload.
 // No memory access. No injection. File reads only from approved paths.
 
-ipcMain.handle('trainer-host-start', async (event, payload: unknown) => {
+handleGuarded('trainer-host-start', async (event, payload: unknown) => {
   try {
     if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
     TrainerHostStartSchema.parse(payload);
@@ -1277,7 +1296,7 @@ ipcMain.handle('trainer-host-start', async (event, payload: unknown) => {
   }
 });
 
-ipcMain.handle('trainer-host-stop', async (event) => {
+handleGuarded('trainer-host-stop', async (event) => {
   try {
     if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
@@ -1292,7 +1311,7 @@ ipcMain.handle('trainer-host-stop', async (event) => {
   }
 });
 
-ipcMain.handle('trainer-host-get-status', async () => {
+handleGuarded('trainer-host-get-status', async () => {
   try {
     if (!trainerHostSupervisor) return { running: false, pid: null, capabilities: [] };
     return trainerHostSupervisor.getStatus();
@@ -1301,7 +1320,7 @@ ipcMain.handle('trainer-host-get-status', async () => {
   }
 });
 
-ipcMain.handle('trainer-host-read-field', async (event, payload: unknown) => {
+handleGuarded('trainer-host-read-field', async (event, payload: unknown) => {
   try {
     if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
@@ -1319,7 +1338,7 @@ ipcMain.handle('trainer-host-read-field', async (event, payload: unknown) => {
 
 // Propose a write — validates params and current value, creates a pending proposal.
 // The proposal must be explicitly approved by calling trainer-host-approve-and-write.
-ipcMain.handle('trainer-host-propose-write', async (event, payload: unknown) => {
+handleGuarded('trainer-host-propose-write', async (event, payload: unknown) => {
   try {
     if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
     if (trainerHostOwner !== null && trainerHostOwner !== event.sender.id) {
