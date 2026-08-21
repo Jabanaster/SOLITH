@@ -183,7 +183,15 @@ Phase 0 closes only when:
 
 # PHASE 1 — QUICK RELEASE POLISH: SHELL, SETTINGS, NOTIFICATIONS, BANNER, GRID, TITLE HYGIENE
 
-**Status: PROPOSED**
+**Status: BLOCKED — see Docs/Reports/PHASE_1_MANUAL_CERTIFICATION_2026-07-26.md.**
+Discovery manual certification passed and this phase's implementation work is
+substantially built and covered by automated tests (shell/settings/
+notifications/banner/grid/title-hygiene). The phase's own closeout report
+explicitly withholds sign-off: 7 required process-picker manual test cases
+remain `NOT TESTED`. Per that report's own rule ("any remaining NOT TESTED
+prevents sign-off"), this phase is not VERIFIED COMPLETE until those cases
+are run. Reconciled 2026-08-21 — this was previously mismarked `PROPOSED`,
+which understated real implementation progress in the opposite direction.
 
 This is the first feature phase after stabilization.
 
@@ -310,7 +318,12 @@ Required:
 
 # PHASE 2 — CANONICAL GAME MODEL + GAME LIBRARY REBUILD
 
-**Status: PROPOSED / EXTEND EXISTING SYSTEMS**
+**Status: VERIFIED COMPLETE — see Docs/Reports/PHASE_2C_LAUNCHER_IDENTITY_REPORT.md.**
+§2.1, §2.3, §2.4, §2.5, §2.6 confirmed COMPLETE. §2.2 (canonical game record)
+is PARTIALLY COMPLETE: `genres`/`popularityMetadata` are populated where a
+trusted source exists; `developer`/`publisher`/`releaseDate` enrichment has
+no trusted source wired in yet — a known, non-blocking residual, not a
+regression. Reconciled 2026-08-21 — previously mismarked `PROPOSED`.
 
 The existing install-discovery and launcher metadata should be reused rather than replaced.
 
@@ -424,7 +437,10 @@ Owned games remain a filter/view, not a higher default priority than Installed.
 
 # PHASE 3 — TRAINER LIBRARY: POPULAR, ALL GAMES, SORTING, FILTERS, SUPPORT STATES
 
-**Status: PROPOSED**
+**Status: VERIFIED COMPLETE — see Docs/Reports/PHASE_3_CLOSEOUT.md and
+PHASE_3_TO_5_FINAL_CLOSEOUT.md.** §3.1–§3.5 all VERIFIED_COMPLETE; reconfirmed
+in the later closeout pass with no correction required. Reconciled
+2026-08-21 — previously mismarked `PROPOSED`.
 
 ## 3.1 Support states
 
@@ -563,7 +579,11 @@ UX requirements:
 
 # PHASE 4 — ARTWORK IDENTITY, CACHE, LEGAL SOURCING, AND BACKGROUND FETCHING
 
-**Status: PROPOSED**
+**Status: VERIFIED COMPLETE — see Docs/Reports/PHASE_4_CLOSEOUT.md and
+PHASE_3_TO_5_FINAL_CLOSEOUT.md.** §4.1–§4.4 VERIFIED_COMPLETE; §4.5
+(background fetch) PARTIAL, non-blocking — priority model and scheduler are
+complete and tested, only visible/popular tiers are currently triggered.
+Reconciled 2026-08-21 — previously mismarked `PROPOSED`.
 
 ## 4.1 Identity-safe artwork
 
@@ -661,7 +681,13 @@ Add:
 
 # PHASE 5 — POPULARITY PIPELINE + CURATED CATALOG + SIGNED CATALOG UPDATES
 
-**Status: PROPOSED**
+**Status: VERIFIED COMPLETE — see Docs/Reports/PHASE_5_CLOSEOUT.md and
+PHASE_5_6_TRUE_CLOSEOUT.md.** All 57 original Phase 5 tests re-run and
+passing as of commit `c5d4800`. Note: an earlier same-day draft
+(PHASE_3_TO_5_FINAL_CLOSEOUT.md, 10:44) recorded Phase 5 as "not started" —
+superseded by PHASE_5_CLOSEOUT.md (11:08) and finalized by
+PHASE_5_6_TRUE_CLOSEOUT.md (11:50), both VERIFIED COMPLETE. Reconciled
+2026-08-21 — previously mismarked `PROPOSED`.
 
 ## 5.1 Ranking sources
 
@@ -1083,18 +1109,21 @@ Never weaken the safety firewall.
 
 # ACTIVE EXECUTION ORDER
 
-1. Gate 2.5 Phase 7 verified stable (6/6 PASS ×3 consecutive, fresh packaged candidate); root cause was a stale packaged binary, not a test or product defect — no repair to commit.
-2. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene.
-3. Phase 2 — canonical game model + Game Library.
-4. Phase 3 — Trainer Library Popular/All Games/sorting/filtering.
-5. Phase 4 — artwork identity/cache/legal sourcing/background fetch.
-6. Phase 5 — popularity pipeline + signed catalog updates.
-7. Phase 6 — V1 trainer/save/discovery/CT capability gap audit and closeout.
-8. Phase 7 — security/package/supply-chain/failure-injection QA.
-9. Phase 8 — customization.
-10. Phase 9 — final owner-interactive acceptance.
-11. Phase 10 — V1 release.
-12. Post-V1 — Wisp and advanced creator/live-memory expansion.
+Reconciled 2026-08-21 against current phase statuses above. Do not restart
+Phases 2–6, which are VERIFIED COMPLETE — pick up at the next open item.
+
+1. Gate 2.5 Phase 7 verified stable (6/6 PASS ×3 consecutive, fresh packaged candidate); root cause was a stale packaged binary, not a test or product defect — no repair to commit. DONE.
+2. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene. BLOCKED: implementation and automated coverage are in place; 7 required process-picker manual test cases remain NOT TESTED per PHASE_1_MANUAL_CERTIFICATION_2026-07-26.md. Next action: run those 7 cases and update that report.
+3. Phase 2 — canonical game model + Game Library. VERIFIED COMPLETE (§2.2 developer/publisher/releaseDate enrichment is a known non-blocking residual).
+4. Phase 3 — Trainer Library Popular/All Games/sorting/filtering. VERIFIED COMPLETE.
+5. Phase 4 — artwork identity/cache/legal sourcing/background fetch. VERIFIED COMPLETE.
+6. Phase 5 — popularity pipeline + signed catalog updates. VERIFIED COMPLETE.
+7. Phase 6 — V1 trainer/save/discovery/CT capability gap audit and closeout. VERIFIED COMPLETE.
+8. Phase 7 — security/package/supply-chain/failure-injection QA. BLOCKED — see SOLITH_SECURITY_ROADMAP.md and Docs/Reports/PHASE_7_CLOSEOUT.md for current gate-by-gate status; remaining blockers are external (production signing credential, independent reviewer) or owner-interactive, not open engineering defects.
+9. Phase 8 — customization. PROPOSED, correctly deferred — does not block release.
+10. Phase 9 — final owner-interactive acceptance. Awaiting Phase 7 close.
+11. Phase 10 — V1 release. Awaiting Phase 9.
+12. Post-V1 — Wisp and advanced creator/live-memory expansion. Out of scope until V1 ships.
 
 ---
 

@@ -109,6 +109,23 @@ check('headless-verification-worker.js < 500 KB (not bloated)', headlessWorkerSi
 check('solith-readonly-scanner.exe > 10 KB on Windows (not empty/stub)', process.platform !== 'win32' || scannerSize > 10_000, `actual: ${scannerSize} bytes`);
 check('solith-readonly-scanner.exe < 5 MB on Windows (not bloated)', process.platform !== 'win32' || scannerSize < 5_000_000, `actual: ${(scannerSize/1024).toFixed(1)} KB`);
 
+// ── 7. Catalog-update trust root ────────────────────────────────────────────
+// TRUSTED_CATALOG_UPDATE_PUBLIC_KEY_PEM in src/core/catalog-updates/signing.ts
+// is a placeholder Ed25519 keypair (see that file's header comment) — it must
+// never ship as the trust root for a real release. There is no source-level
+// enforcement of that today, so this is the only backstop. Only fails the
+// build when SOLITH_RELEASE_BUILD=1 is explicitly set (a real release run);
+// ordinary dev/CI builds only warn, since no production key exists yet.
+console.log('\n── Catalog-update trust root');
+const PLACEHOLDER_CATALOG_KEY_BODY = 'nLCX7HvCLQNhwVLBPl90PtEbZ+D648Bkj0yuTRt9geU=';
+const hasPlaceholderCatalogKey = mainText.includes(PLACEHOLDER_CATALOG_KEY_BODY);
+if (process.env.SOLITH_RELEASE_BUILD === '1') {
+  check('main.js does not embed the placeholder catalog-update trust root', !hasPlaceholderCatalogKey,
+    hasPlaceholderCatalogKey ? 'SOLITH_RELEASE_BUILD=1 but TRUSTED_CATALOG_UPDATE_PUBLIC_KEY_PEM is still the placeholder key — replace it before release' : '');
+} else if (hasPlaceholderCatalogKey) {
+  console.warn('  ⚠️  main.js still embeds the placeholder catalog-update trust root (expected for dev builds; set SOLITH_RELEASE_BUILD=1 to enforce this at release time)');
+}
+
 // ── Result ───────────────────────────────────────────────────────────────────
 console.log(`\n── Summary: ${checks - failures}/${checks} checks passed\n`);
 
