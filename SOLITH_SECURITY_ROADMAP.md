@@ -1230,9 +1230,20 @@ Before every final gate:
 
 ## Phase 6.1 — Handler-by-handler authorization model
 
-**Status:** PENDING
-
-For every privileged handler verify:
+**Status:** PARTIAL (2026-08-21 session — see Session Update Log). Trusted-sender
+authorization is now applied to all 180 `ipcMain.handle` channels (verified 0
+unguarded via a cross-check script; was 51/180 guarded going into this
+session). Overlay-owned channels use an explicit per-channel allowedWindowTypes
+list (`['main']` vs. `['main','wisp-overlay']`/`['main','trainer-overlay']`)
+traced against real renderer call sites, not guessed. NOT independently
+re-verified this session: per-handler feature-flag gating, operation-specific
+authorization beyond sender identity, timeout/cancellation, and sanitized
+audit-event emission — those existed unevenly before this session and were
+not the scope of the sender-identity closure. Positive evidence: Trainer E2E
+5/5, ipc-channels E2E 13/13, new1-new2-trust-boundary E2E 20/20 (including its
+existing negative-control asserting 10 sampled hardened channels reject the
+Wisp overlay with `sender_rejected:unauthorized_window_type`). For every
+privileged handler verify:
 
 - Trusted sender.
 - Allowed window type.
@@ -1247,9 +1258,20 @@ For every privileged handler verify:
 
 ## Phase 6.2 — File and path authorization
 
-**Status:** PENDING
-
-Verify all file operations for:
+**Status:** PARTIAL (2026-08-21 session). `src/core/backups/index.ts`'s
+`createBackup` previously relied only on a local weak check (literal `..`
+substring + absolute-path only, no symlink canonicalization, no containment)
+while `restoreBackup` already used the stronger shared
+`validateCentralPathSafety`; `createBackup` now applies the same stronger
+check too (scoped to the owning game's install path). `.CT` importer
+(`src/core/definitions/ct-import.ts`) now runs the existing
+`validateXmlSafety` (size cap, DOCTYPE/ENTITY rejection, nesting-depth cap)
+before parsing — RED-tested (4 negative cases confirmed failing pre-fix) then
+GREEN. NOT independently re-audited this session: CT library, install
+discovery, external trainer research, recipes, registry import/export, and
+file launch/reveal priority surfaces named below — those were covered by IPC
+sender-identity closure (Phase 6.1) but not a dedicated per-surface
+containment re-audit. Verify all file operations for:
 
 - Canonicalization.
 - Approved roots.
@@ -1273,9 +1295,23 @@ Priority surfaces:
 
 ## Phase 6.3 — Process and command execution
 
-**Status:** PENDING
-
-For every execution site:
+**Status:** PARTIAL (2026-08-21 session). Repo-wide audit of every
+`spawn`/`exec`/`execFile(Sync)`/PowerShell/`reg`/`tasklist` call site found:
+(1) a confirmed shell-injection defect in `src/core/process/index.ts`
+(renderer-settable `profile.executableNames` interpolated into an
+`execSync(\`ps aux | grep -i "${baseName}"\`)` string on macOS/Linux) —
+fixed to `execFileSync('ps', ['aux'], ...)` with JS-side matching, no shell;
+(2) the PATH-hijack class already fixed once for `whoami.exe`/`icacls.exe`
+(Phase 6, prior pass) was still present at ~7 more sites (`reg.exe`,
+`tasklist.exe`, `powershell.exe`) — extracted to a shared
+`src/core/safety/system-binary.ts` and applied to all of them; (3) a separate
+injection-adjacent defect in `windows-process-identity.ts` where an
+OS-reported executable path was embedded into a PowerShell script via
+`JSON.stringify()` (leaves `$` unescaped) instead of the single-quote-doubling
+pattern used correctly elsewhere — fixed. NOT verified this session: a
+formal executable allowlist, timeout/output-limit enforcement audited per
+site (several already had it, not all re-checked), or environment-secret
+leakage. For every execution site:
 
 - Remove shell interpolation.
 - Use argument arrays.
@@ -1288,9 +1324,24 @@ For every execution site:
 
 ## Phase 6.4 — Registry operations
 
-**Status:** PENDING
-
-Verify:
+**Status:** VERIFIED COMPLETE (2026-08-21 session, source-inspection based —
+no code change was required, none made). Investigated both things that share
+the word "registry" in this codebase: the "Registry Explorer" / "CT
+Registry" feature (`src/core/registry/query-registry.ts`,
+`electron/registry-verification-ipc.ts`) is Solith's own compiled index of
+pointer/AOB/script definitions, not the Windows registry — its module
+exports only `searchRegistry`/`getRegistryEntry`, no write/mutate export
+exists anywhere in the module, confirmed by grep across the whole file. Real
+Windows-registry access is confined to `src/core/install-discovery/registry-win.ts`,
+which only ever invokes `reg query` (grepped the whole tree for `reg add`/
+`reg delete`/`RegSetValue`/`RegDeleteKey` — zero matches anywhere in
+`electron/` or `src/`), scoped to two hardcoded, non-renderer-controllable
+hive paths (Steam/Epic install discovery only) — no mutation surface exists
+to gate, so "operation-bound consent for writes"/"rollback before mutation"
+are moot. This session additionally hardened `registry-win.ts`'s two `reg
+query` calls from `execSync` shell-string interpolation to `execFileSync`
+array-args via `systemBinaryPath('reg.exe')` (Phase 6.3 above) — not a new
+finding here, cross-referenced for completeness. Verify:
 
 - Read and mutation paths are separated.
 - Hive/path allowlists.
@@ -1311,40 +1362,42 @@ Verify:
 
 ## Phase 7.1 — Preload API minimization
 
-**Status:** PENDING
-
-- Remove dead methods.
-- Reject arbitrary channel names.
-- Freeze exposed API surfaces where appropriate.
-- Ensure safe listener cleanup.
-- Prevent event spoofing.
+**Status:** VERIFIED COMPLETE (2026-08-21 session, source-inspection). Grepped
+`electron/preload.ts` for a generic/wildcard channel-invoke wrapper (e.g.
+`invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args)`) — zero
+matches. Every exposed method is an individually named, explicit
+`ipcRenderer.invoke('literal-channel-name', ...)` call (spot-checked ~25
+entries, pattern-grepped across the whole file). The preload surface is
+allowlisted by construction; the actual risk this session found and fixed
+was entirely on the main-process handler side (Phase 6.1 above), not here.
+Dead-method removal / listener-cleanup / event-spoofing were not
+independently re-audited this session.
 
 ## Phase 7.2 — BrowserWindow hardening
 
-**Status:** PENDING
-
-Verify every window uses appropriate settings:
-
-- `contextIsolation: true`
-- `nodeIntegration: false`
-- sandbox where compatible
-- no remote module
-- restricted navigation
-- restricted new-window creation
-- trusted preload
-- packaged DevTools policy
-- CSP
-- no privileged remote content
+**Status:** VERIFIED COMPLETE (2026-08-21 session, source-inspection + E2E).
+All 3 `BrowserWindow` instances (main, wisp overlay, trainer overlay) confirmed
+`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No
+`remote` module usage found. `applyWindowNavigationPolicy` denies same-window
+navigation outside each window's own `allowedUrlPrefixes` and denies all
+`window.open()`/`target="_blank"` popups as in-app windows (handing only
+strictly-`https:` requests to `shell.openExternal`), applied consistently to
+all 3 windows. Positive/negative E2E evidence:
+`new1-new2-trust-boundary.e2e.test.ts` 20/20, including live tests that deny
+same-window navigation to an unexpected origin/local-file/`data:` URL, deny a
+trusted-looking wrong-port localhost origin, deny `window.open` and
+`target="_blank"`, and confirm both overlay windows enforce the same policy
+as main.
 
 ## Phase 7.3 — External URL handling
 
-**Status:** PENDING
-
-- Allow only approved protocols.
-- Reject `file:`, `javascript:`, `data:`, and unsafe custom schemes.
-- Validate hostnames.
-- Require explicit user action.
-- Never place secrets in URLs.
+**Status:** VERIFIED COMPLETE (2026-08-21 session, source-inspection +
+E2E — same evidence as Phase 7.2, this is the same `applyWindowNavigationPolicy`
+mechanism). `isHttpsUrl()` gates the only allowed external-open path
+(`shell.openExternal`) to strictly `https:`; every other scheme
+(`file:`/`javascript:`/`data:`/custom) is denied by the deny-by-default
+`setWindowOpenHandler`. No secrets are placed in any URL this session found
+(the network audit in Phase 9 below covers outbound request contents).
 
 ---
 
@@ -1440,9 +1493,36 @@ No broad dependency upgrades during feature freeze without explicit authorizatio
 
 ## Phase 9.3 — Build and package integrity
 
-**Status:** PENDING
-
-Verify:
+**Status:** VERIFIED COMPLETE for deterministic installation specifically
+(2026-08-21 session, proven via a real clean install, not documented as a
+gap). Found and closed a real drift: `package.json` declared
+`electron: ^42.5.1`, the committed `package-lock.json` (last touched by
+commit `792c53f`, a merge the day before this session) pinned `42.6.2`, but
+this working tree's local `node_modules` still had the stale `42.5.1` —
+three different numbers in the same "current state." Root-caused as ordinary
+node_modules staleness (the lockfile bump predates this session and was
+never followed by a reinstall on this machine), not a lockfile-tampering
+concern. Ran a real `npm ci` (not `npm install`) — this reinstalled 413
+packages from the lockfile exactly, and its own `postinstall`
+(`patch-package && electron-builder install-app-deps`) automatically rebuilt
+the vendored native `memoryjs` addon for the resulting Electron 42.6.2 ABI.
+Post-`npm ci`: `npm ls electron` → `42.6.2` (now matches the lockfile
+exactly), `npm audit` → 0 vulnerabilities, full regression clean (main/Electron
+tsc 0/0, `npm test` 1648/1648 + SQL 10/10, `test:live-memory` 257/257), fresh
+Vite/Electron build + output verifier 29/29, and Trainer E2E 5/5 against the
+freshly-rebuilt packaged candidate — proving the native addon rebuild actually
+works under the new ABI, not just that `npm ci` exited 0.
+`@img/sharp-wasm32@0.35.3` reported `extraneous` by `npm ls` — investigated:
+`sharp` is a devDependency with per-platform `optionalDependencies`
+sub-packages; the wasm32 fallback variant reappeared identically after the
+clean `npm ci`, meaning it is npm's own expected resolution for this
+lockfile/platform combination, not stale leftover install state. Classified
+as expected/non-blocking, not force-removed (hand-editing the lockfile to
+suppress it would risk a worse regression than the cosmetic `npm ls` label).
+"No unexpected postinstall behavior" / "no runtime downloads" / "no
+writable search-path hijacking" / "no loading code from user-controlled
+locations" / "packaged resource integrity" were not independently re-audited
+this session beyond what the above proves. Verify:
 
 - Deterministic installation.
 - No unexpected postinstall behavior.
@@ -1841,6 +1921,7 @@ end-of-session update must:
 | 2026-07-29 | Gate 2.5 — Independent Reconfirmation (separate session, Claude Sonnet) | Discovered this branch (`review/gate2-5-doc-audit`) already contained a full prior Gate 2.5 attempt by a different agent (Codex, committed 317baf0) before this session began, including a real security fix (missing `requireTrustedSender` guard on `live-memory-freeze-stop`/`live-memory-freeze-status`, already applied). Rather than accepting that report on faith, independently rebuilt a fresh packaged candidate (exeSHA256=3d23858497ff75f56edacc726a29752feb0e27c0f4f7a80b227354f040565e68) and reran the full Gate 2.5 scope with a new test file (`tests/gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts`): child-frame rejection (data:/untrusted-local-file/about:blank, no preload bridge in any child frame), stale/destroyed-frame rejection, DevTools boundary (real detached DevTools webContents probed via `executeJavaScript`, confirmed no preload bridge), Wisp overlay destroy+recreate (harness-forced `BrowserWindow.destroy()` since `toggleWispOverlay()` itself only hides, not destroys — disclosed), `SOLITH_TEST_BUILD` 8-variant matrix (all fail closed except the exact `'1'` control), and independent reproduction of the freeze-stop/status fix against the real overlay — all 6/6 new tests pass, rerun twice for stability. Full regression: packaged smoke 23/23, Gate 2.4 rerun 5/5, Gate 2.3 rerun 3/3, Gate 2.2 Resume rerun 10/10 (one transient stall isolated and confirmed as a flake, not a regression), Gate 2.2A.1 write-proof rerun 1/1 (48/48 packaged total), `npm test` 1,040/1,040, `test:live-memory` 257/257, main TypeScript 0 diagnostics, Electron TypeScript unchanged 31/13, `git diff --check` exit 0 (GameLibrary.tsx's baseline issue is now inside HEAD's committed history, not the unstaged diff). No production code modified this session. Terminated 4 orphaned harness-created Solith.exe processes found mid-session after a transient test stall (confirmed harness-created via `--user-data-dir` command-line match). Evidence: `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/` (appended/updated, prior evidence preserved with addendum notices, not overwritten). | GATE 2.5 REPORTED COMPLETE — VERIFY (unchanged, independently reconfirmed); BATCH B1.1 CONDITIONAL PASS (unchanged); RELEASE DENIED |
 | 2026-07-29 | Residual-Risk and Documentation Reconciliation Review (same session, Claude Sonnet) | Read-only review reconciling apparent conflicts across the two Gate 2.5 sessions' evidence: confirmed 48/48 vs. 49/49 packaged totals are both individually correct for two different suite files and packaged-candidate hashes, not a stale number; confirmed "8 inventory rows" vs. "5 currently-defined hooks" both decompose to the identical 7 retained test-only functions plus 1 removed hook, just grouped by row-count vs. by-purpose; classified the overlay destroy/recreate residual (R-2.5-001) as an accepted architecture fact, not a security defect or B1.1 blocker; reconfirmed the branch-vs-`master` self-correction already present in `verification-final.txt`; confirmed the Gate 2.5 aggregate `REPORTED COMPLETE — VERIFY` wording is internally consistent (mirrors Gate 2.4's own convention), not stale; separated actual B1.1 blockers (Electron TypeScript baseline, branch/merge, final owner promotion decision) from disclosure-only items; produced a 5-item owner-decision package (OD-2.5-001 through 005, adding branch-merge and documentation-consolidation as new items). Zero files modified — confirmed via unchanged `git status --short --untracked-files=all` count (74) before and after. | No verdict change; findings fed directly into the following Canonical Documentation Reconciliation session |
 | 2026-07-29 | Canonical B1.1 Documentation Reconciliation (same session, Claude Sonnet) | Implemented this file's own prior review recommendations: added explicit branch-authority language (verified branch `review/gate2-5-doc-audit` @ `317baf0e`, not `master`, stated with full hash) to this file's header; added an explicit documentation-authority note naming this file as the sole canonical security-status source, `ROADMAP.md` as product-direction owner (linking here rather than restating verdicts), `PROJECT_SPEC.md §3.2` as the sole prohibited-capability source, and the README L0–L4 feature-maturity scale as a distinct system from Gate/Batch security certification; corrected the "Final Current Verdict" block's bare `49/49` packaged total to name its exact suite file and candidate hash and cross-reference the separate `48/48` result instead of letting either imply a single combined number; updated `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/owner-decision-package.md` with OD-2.5-004 (branch merge/release-line verification) and OD-2.5-005 (documentation consolidation, this session) and explicit PENDING/NOT AUTHORIZED status wording on OD-2.5-001/002/003; deduplicated the prohibited-capability list in `AGENTS.md` (now references `PROJECT_SPEC.md §3.2` instead of restating it) and added the same reference plus a certification-terminology disambiguation note to `README.md`; added a security-roadmap link plus the same branch caveat to `ROADMAP.md`'s "Current Baseline" section. No production code, test, or evidence file touched; no commit, merge, branch, or B1.1/release promotion performed. Electron TypeScript cleanup remains a separate, untouched Codex workstream. [Superseded: the owner later reassigned this control to a Claude Sonnet session — see the Addendum below and `owner-decision-package.md` OD-2.5-001.] | Gate 2.5: REPORTED COMPLETE — VERIFY (unchanged); BATCH B1.1 CONDITIONAL PASS (unchanged); RELEASE DENIED (unchanged); documentation authority now explicit across all 5 in-scope files |
+| 2026-08-21 | Phase 7 Final Burn-Down — Batch B2 IPC Hardening, PATH-Hijack Closure, .CT Hardening, Network Bounds, Backup Containment, Dependency Determinism (Claude Sonnet) | First found and reconciled that this file's own "Final Current Verdict" text was stale relative to `Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/owner-decision-package.md`'s later, dated (2026-08-04), verbatim owner decisions: OD-2.5-001 (Electron TS baseline)/OD-2.5-003 (B1.1 promotion)/OD-2.5-004 (branch merge to origin/master @ `3fd402b`) are all CLOSED — B1.1 is promoted (conditional), not "RELEASE DENIED / OWNER DECISION REQUIRED" as this file's own verdict block still read. That promotion does not by itself satisfy `OVERALL SOLITH SECURITY` — this session then did real Batch B2 work, not just reconciliation: (1) full IPC sender-identity inventory found 151/180 handlers unguarded (was reported as an open finding at session start); closed all of them across 2 commits (`aa4474a` live-memory-ipc.ts's 22 reconnaissance/attach/read/scan handlers, `9b94764` the remaining 129 across main.ts and 11 other IPC files) — 180/180 now guarded, cross-checked via a script, positive+negative E2E evidence (Trainer E2E 5/5, ipc-channels 13/13, new1-new2-trust-boundary 20/20 including live wrong-window-type rejection). (2) Found and fixed a confirmed shell-injection vulnerability in `src/core/process/index.ts` (`aa4474a`) — renderer-settable executable name interpolated into an `execSync` shell string on macOS/Linux. (3) Closed the PATH-hijack class (bare `powershell.exe`/`reg`/`tasklist`) at ~10 sites via a new shared `src/core/safety/system-binary.ts` (`fb0b180`), plus a separate PowerShell-injection-adjacent defect (`JSON.stringify` leaving `$` unescaped in a double-quoted PS string). (4) Added the .CT importer's missing XXE/entity-expansion/nesting-depth guard, RED-tested first (`412e24a`). (5) Bounded the previously-uncapped trainer-catalog HTML-scrape redirect/response-size (`03a805a`). (6) Strengthened `createBackup`'s path containment to match `restoreBackup`'s already-stronger check (`cf8a9d9`). (7) Closed the Electron-version/dependency-determinism drift (package.json ^42.5.1 / lockfile 42.6.2 / stale local node_modules 42.5.1) via a real `npm ci`, not documentation — native `memoryjs` auto-rebuilt for Electron 42.6.2, full regression + fresh packaged Trainer E2E 5/5 proved the rebuild actually works. Registry operations (Phase 6.4) and preload/BrowserWindow/external-URL (Phase 7.1–7.3) investigated and found already correct — reclassified VERIFIED COMPLETE on source-inspection + existing E2E evidence, no code change needed. NOT done this session, explicitly not fabricated as done: full negative/failure-injection matrix (Phase 12), full packaged Windows certification checklist (Phase 13) beyond what regression/build/Trainer-E2E already covers, installer/upgrade/uninstall testing (Phase 14), code-signing decision (Phase 15 — no certificate exists in this environment), independent security review of the resulting HEAD (Phase 16 — cannot self-certify), secrets/log audit (Phase 8), native-helper formal inventory (Phase 10) beyond the memoryjs rebuild proof above, save/backup/registry failure-injection (Phase 11) beyond the containment fix in (6). Full regression after every commit: main/Electron tsc 0/0, `npm test` 1648/1648 (was 1643, +5 new `.CT` security tests) + SQL 10/10, `test:live-memory` 257/257, Vite build PASS, Electron build + output verifier 29/29, Trainer E2E 5/5, ipc-channels E2E 13/13, walkthrough E2E 3/3, accessibility E2E 8/8, new1-new2-trust-boundary E2E 20/20, `npm audit` 0 vulnerabilities, `git diff --check` clean, no conflict markers. 6 commits pushed to `review/gate2-5-doc-audit`, local == remote confirmed after each. | BATCH B2 SUBSTANTIALLY ADVANCED (IPC/command/CT/network/backup/dependency closed with evidence); OVERALL SOLITH SECURITY: still NOT COMPLETE (failure-injection, packaged full certification, installer/signing, independent review, secrets audit, native-helper inventory, save/backup failure-injection all remain genuinely open — not fabricated as done) |
 ---
 
 # Final Current Verdict
@@ -1984,3 +2065,41 @@ authorization when reached):
     unconditional pass.
 
 No step above has been started by this session.
+
+## Addendum (2026-08-21, Phase 7 Final Burn-Down session — Claude Sonnet)
+
+The "Final Current Verdict" text block above (and the three addenda
+preceding this one) is **stale** relative to
+`Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/owner-decision-package.md`,
+which records later, dated (2026-08-04), verbatim owner decisions this
+addendum does not repeat in full (see that file directly): OD-2.5-001, OD-2.5-003,
+and OD-2.5-004 are all **CLOSED**. B1.1 is **promoted (conditional)** and
+`origin/master` is at `3fd402b`, which this session's branch
+(`review/gate2-5-doc-audit`) contains as an ancestor (confirmed via
+`git merge-base --is-ancestor`) plus many further commits. This does not
+change `OVERALL SOLITH SECURITY`, which remains **NOT COMPLETE** — B1.1
+covers only the live-memory/session security surface; the broader Batch B2
+scope (this file's own Phase 6–15) is what actually gates that overall
+verdict, and most of it remained `PENDING` at the start of this session.
+
+This session then did real Batch B2 work rather than only reconciling
+documentation — see the 2026-08-21 Session Update Log entry above for the
+full list (IPC sender-identity closure across all 180 handlers, a confirmed
+shell-injection fix, the PATH-hijack class closed repo-wide, .CT importer
+XXE/nesting hardening, bounded network scraping, backup path containment,
+and dependency-determinism proven via a real `npm ci`). Phase 6.1–6.3, 7.1–7.3,
+and 9.3 above were updated in place (not just here) with dated, specific
+status changes and evidence — this addendum does not duplicate that detail,
+only flags that the older verdict text above should be read alongside it,
+not as the current picture on its own.
+
+**Not done this session, not fabricated as done:** full negative/
+failure-injection matrix (Phase 12), full packaged Windows certification
+checklist (Phase 13) beyond regression/build/Trainer-E2E, installer/upgrade/
+uninstall testing (Phase 14), code-signing decision (Phase 15 — no
+certificate exists in this environment), independent security review of the
+resulting HEAD (Phase 16 — this session cannot self-certify that), secrets/
+log audit (Phase 8), formal native-helper inventory (Phase 10) beyond the
+memoryjs rebuild proof in Phase 9.3, and save/backup/registry
+failure-injection scenarios (Phase 11) beyond the containment fix already
+made. `OVERALL SOLITH SECURITY: NOT COMPLETE` remains the accurate verdict.
