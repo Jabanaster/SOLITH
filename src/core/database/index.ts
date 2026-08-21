@@ -574,7 +574,17 @@ export function persistDatabase(sqlDb: any, forceSync = false): Promise<void> {
 
   persistTimeout = setTimeout(() => {
     persistTimeout = null;
-    performWrite();
+    try {
+      performWrite();
+    } catch {
+      // performWrite() already logged the error and rejected pendingPersistPromise
+      // for any caller awaiting it. This debounced timer callback has no caller of
+      // its own to propagate to — a synchronous throw here becomes an uncaught
+      // exception that kills the whole process over one transient write failure
+      // (observed: a same-directory renameSync EXDEV during Phase 7 installer
+      // upgrade testing crashed a running app on its own autosave tick). Swallow
+      // it here so a failed background persist degrades instead of crashing.
+    }
   }, 10);
 
   return pendingPersistPromise;

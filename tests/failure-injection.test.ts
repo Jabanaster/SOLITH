@@ -372,4 +372,60 @@ describe('Solith Failure Injection & Security Invariant Tests', () => {
     const resultNormal = scanGame(game.id);
     assert.strictEqual(resultNormal.success, true);
   });
+
+  test('11. Backup creation fails cleanly when the source file disappears mid-operation', () => {
+    const targetFile = path.join(testDir, 'save_vanish.json');
+    fs.writeFileSync(targetFile, JSON.stringify({ gold: 100 }));
+
+    const backupDir = path.join(testDir, 'backups');
+    // Source exists at call time but is removed before createBackup can copy it —
+    // simulates a concurrent delete/rename racing the backup step.
+    fs.unlinkSync(targetFile);
+
+    assert.throws(() => {
+      createBackup(gameId, targetFile, backupDir);
+    }, /not found/i);
+
+    // No partial backup artifact should exist for a source that never got copied.
+    if (fs.existsSync(backupDir)) {
+      const manifestPath = path.join(backupDir, 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        const leaked = manifest.backups.find((b: any) => b.filePath === targetFile);
+        assert.strictEqual(leaked, undefined);
+      }
+    }
+  });
+
+  test('12. Restore is rejected while the rollback target is locked by another operation', () => {
+    const targetFile = path.join(testDir, 'save_restore_lock.json');
+    fs.writeFileSync(targetFile, JSON.stringify({ hp: 100 }));
+
+    const backupDir = path.join(testDir, 'backups');
+    const backup = createBackup(gameId, targetFile, backupDir);
+
+    // Target changes after the backup was taken — this is the state restoreBackup
+    // is meant to revert.
+    fs.writeFileSync(targetFile, JSON.stringify({ hp: 999 }));
+
+    const locked = acquireFileLock(targetFile);
+    assert.strictEqual(locked, true);
+    try {
+      const restored = restoreBackup(backup);
+      assert.strictEqual(restored, false);
+
+      // Restore must not have proceeded: target keeps its pre-restore (locked) content.
+      const current = JSON.parse(fs.readFileSync(targetFile, 'utf-8'));
+      assert.strictEqual(current.hp, 999);
+    } finally {
+      releaseFileLock(targetFile);
+    }
+
+    // Once released, the same restore succeeds — proves the lock, not a corrupt
+    // backup, was the reason for the earlier rejection.
+    const restoredAfterUnlock = restoreBackup(backup);
+    assert.strictEqual(restoredAfterUnlock, true);
+    const finalContent = JSON.parse(fs.readFileSync(targetFile, 'utf-8'));
+    assert.strictEqual(finalContent.hp, 100);
+  });
 });
