@@ -1,5 +1,81 @@
 # PHASE 7 CLOSEOUT — RECONCILIATION PASS (2026-08-20)
 
+## INDEPENDENT REVIEW RESULT AND REMEDIATION (2026-08-21)
+
+The "Highest-priority remaining action" from the Final Burn-Down pass below
+— dispatch independent security review of the HEAD at the time — was
+carried out (after an intervening Phase 1 manual-certification session
+advanced HEAD to `ef254d19aed3359a0676fedf714e76e3533b0c30`). The review was
+explicitly adversarial and independent of this project's own agents.
+
+**Result: `INDEPENDENT SECURITY REVIEW — FAIL`** against
+`ef254d19aed3359a0676fedf714e76e3533b0c30` — 1 CRITICAL, 1 HIGH, 3 MEDIUM,
+several Low/Informational. This is recorded as historical fact and left in
+this document permanently: `ef254d1` genuinely failed independent review. It
+was never merged, tagged, published, or released.
+
+A same-day remediation session fixed all 5 release-blocking findings,
+RED-first regression-tested, full battery green after each fix. Full detail
+per finding (files touched, exact fix, exact new test files, RED/GREEN
+evidence) is recorded in `SOLITH_SECURITY_ROADMAP.md`'s Session Update Log,
+"Security Remediation — Findings 1-5 from the ef254d1 independent review"
+row — summarized here:
+
+| Finding | Severity | Summary | Status |
+|---|---|---|---|
+| 1 | CRITICAL | `.CT` fallback/metadata/script-research parsers (and a directly renderer-reachable IPC path) never validated raw XML — only the main parser did | CLOSED — authoritative `validateXmlSafety` gate added to all 3 fallback parsers + top-level entry points |
+| 2 | HIGH | Process-picker blocklist was renderer-UI-only; main-process attach had no equivalent policy | CLOSED — `assessTargetProcessAuthorization` added to `protected-target-guard.ts`, enforced in `LiveMemorySession.attach()` before any handle is opened |
+| 3 | MEDIUM | EXDEV fallback could delete the only recoverable copy on a secondary failure | CLOSED — shared `renameOrCopyAcrossDevices` helper (never deletes `src`) applied to all 5 identified write paths |
+| 4 | MEDIUM | `launch-installation`'s path-safety check was a no-op (empty `approvedRoots`) | CLOSED — bound to `installation.installPath`; matching persistence-time gap in `add-game`/`update-game` also closed |
+| 5 | MEDIUM | No release command guaranteed `SOLITH_RELEASE_BUILD=1`, so the placeholder-key gate could be silently skipped | CLOSED — `scripts/run-release-build.mjs` + `build:release`/`dist:release`/`release:verify`; live-verified the gate now hard-fails (exit 1) on the placeholder key |
+
+Low findings also addressed: bare-DOCTYPE rejection (folded into Finding 1);
+a new static test (`tests/ipc-guard-inventory.test.ts`) independently
+re-derives the "180/180 IPC guard" count from source instead of relying on
+a hand-maintained sample — reconfirmed 180/180; removed the stale
+`dist-electron/host-entry.js._bak_cert` packaging artifact and hardened
+`package.json`'s `build.files` glob against it recurring. Not fixed this
+session (disclosed): the XML depth-tracking method itself remains
+regex-based (only its threshold was corrected — see below); remote-sync
+redirect re-validation was not touched.
+
+**A genuine pre-existing calibration defect was discovered while fixing
+Finding 1**, not introduced by it: the XML nesting-depth limit (32) was
+already too strict for real community `.CT` content — the real
+`CrimsonDesert.CT` fixture nests to depth 75 and was being silently
+rejected by the *existing, already-correct* main parser, a fact masked
+until Finding 1's fix made the fallback/metadata path enforce the same
+check for the first time. Recalibrated to 256 with regression tests updated
+to the new, evidence-based threshold.
+
+**Final verification, this remediation session:** main tsc 0/0 · Electron
+tsc 0/0 · `npm test` 1654/1654 (was 1648, +6 new test files) + SQL 10/10 ·
+`test:live-memory` 257/257 · `npm audit --omit=dev` 0 vulnerabilities · Vite
+build PASS · Electron build + dev-mode output verifier 29/29 PASS ·
+`npm run release:verify` (release mode) correctly FAILS 29/30 on the
+still-placeholder key, proving the gate itself works (no production key was
+created) · `git diff --check` clean · no conflict markers.
+
+**NOT rerun this session** (disclosed, not fabricated as done): the
+Playwright/packaged E2E battery (packaged smoke, IPC-channel E2E,
+trust-boundary E2E, Trainer E2E, walkthrough E2E, accessibility E2E, Gate
+2.2/2.5 lifecycle suites). None of this session's changes touch the
+lifecycle/session-resume/window-identity machinery those suites cover, but
+they were not independently rerun here due to time budget — this remains a
+real gap to close before merge, not an inferred pass.
+
+### Phase 7 status
+
+`PHASE 7 — READY FOR INDEPENDENT RE-REVIEW`
+
+Not `PASS` — only the independent reviewer may issue that verdict, per this
+authorization's own rule. All Critical/High/Medium findings from the
+`ef254d1` review are closed with regression evidence. Nothing has been
+merged to `master`, tagged, published, or released. The exact next action is
+to freeze the new HEAD SHA (recorded at the top of the required final
+report for this session) and dispatch a fresh independent security review
+against it.
+
 ## FINAL BURN-DOWN UPDATE (2026-08-21)
 
 Continuing from the pass below, this session executed the full Phase 7

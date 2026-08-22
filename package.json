@@ -72,6 +72,9 @@
     "test:performance": "playwright test tests/performance.e2e.test.ts --config playwright.e2e.config.ts",
     "test:pilot-intake": "tsx --test tests/pilot-intake.test.ts",
     "verify:electron-output": "node scripts/verify-electron-output.mjs",
+    "build:release": "node scripts/run-release-build.mjs build",
+    "dist:release": "node scripts/run-release-build.mjs build",
+    "release:verify": "node scripts/run-release-build.mjs verify:electron-output",
     "verify:fresh-clone-verification": "node scripts/verify-fresh-clone-verification.mjs",
     "verify:release-artifacts": "node scripts/verify-release-artifacts.mjs",
     "verify:clean-env": "npm run build && npm test && npm run test:electron-smoke",
@@ -104,7 +107,11 @@
     "artifactName": "${productName} Setup ${version}.${ext}",
     "files": [
       "dist-electron/**/*",
-      "!dist-electron/**/*.map"
+      "!dist-electron/**/*.map",
+      "!dist-electron/**/*.bak",
+      "!dist-electron/**/*._bak_cert",
+      "!dist-electron/**/*.orig",
+      "!dist-electron/**/*.tmp"
     ],
     "asarUnpack": [
       "node_modules/sql.js/**",

@@ -27,7 +27,7 @@ import {
   unregisterActiveFreeze,
   unregisterAllFreezesForOwner,
 } from './freeze-concurrency-registry.js';
-import { assessProtectedTarget } from '../runtime/protected-target-guard.js';
+import { assessProtectedTarget, assessTargetProcessAuthorization } from '../runtime/protected-target-guard.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
 import {
   compareProcessIdentity,
@@ -495,6 +495,24 @@ export class LiveMemorySession {
     this.revoking = false;
     if (this.isAttached()) {
       return { success: false, guard: { allowed: false, reason: 'Session already attached.' }, error: 'already_attached' };
+    }
+
+    // Finding 2 (independent security review, ef254d1): the process picker's
+    // blocklist (src/app/live-memory/process-picker.ts) only filters the
+    // renderer's UI list — it is not a security boundary. This is the
+    // authoritative, main-process check, enforced here regardless of what a
+    // renderer sent, before consent evaluation or opening any process handle.
+    const targetAuthorization = assessTargetProcessAuthorization({
+      pid: target.pid,
+      executableName: target.executableName,
+      executablePath: target.executablePath,
+    });
+    if (!targetAuthorization.allowed) {
+      return {
+        success: false,
+        guard: { allowed: false, reason: targetAuthorization.reason },
+        error: targetAuthorization.reason,
+      };
     }
 
     const acceptedConnectionBaseline =

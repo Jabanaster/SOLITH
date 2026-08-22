@@ -73,3 +73,102 @@ export function assertProtectedTargetAllowed(input: {
     throw new Error(assessment.reason);
   }
 }
+
+// Finding 2 (independent security review, ef254d1): src/app/live-memory/process-picker.ts's
+// BLOCKED_PROCESS_PATTERNS only filtered the renderer's process-picker UI list — a
+// renderer bypassing that UI (or a compromised renderer) could still request the
+// main process attach directly to a critical Windows process or to Solith's own
+// process. This is the single authoritative, server-side policy: the canonical
+// pattern list moved here so process-picker.ts imports it for UX filtering rather
+// than maintaining its own copy, and LiveMemorySession.attach() enforces it
+// directly (not merely trusting that the renderer already filtered).
+export const BLOCKED_TARGET_PROCESS_PATTERNS: RegExp[] = [
+  /^solith/i,
+  /^electron/i,
+  /^explorer(?:\.exe)?$/i,
+  /^runtimebroker(?:\.exe)?$/i,
+  /^applicationframehost(?:\.exe)?$/i,
+  /^textinputhost(?:\.exe)?$/i,
+  /^startmenuexperiencehost(?:\.exe)?$/i,
+  /^shellexperiencehost(?:\.exe)?$/i,
+  /^systemsettings(?:\.exe)?$/i,
+  /^taskmgr(?:\.exe)?$/i,
+  /^dwm(?:\.exe)?$/i,
+  /^winlogon(?:\.exe)?$/i,
+  /^csrss(?:\.exe)?$/i,
+  /^lsass(?:\.exe)?$/i,
+  /^services(?:\.exe)?$/i,
+  /^svchost(?:\.exe)?$/i,
+];
+
+function normalizeTargetProcessName(value: string | null | undefined): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/^.*[\\/]/, '')
+    .toLowerCase();
+}
+
+function normalizeTargetProcessPath(value: string | null | undefined): string {
+  return String(value ?? '').trim().replace(/\//g, '\\').toLowerCase();
+}
+
+export interface TargetProcessAuthorizationInput {
+  pid: number;
+  executableName: string;
+  executablePath?: string | null;
+}
+
+export interface TargetProcessAuthorizationResult {
+  allowed: boolean;
+  reason: string;
+}
+
+/**
+ * Authoritative, main-process-enforced check for whether a live-memory session
+ * may attach to a target process at all — independent of, and not derived from,
+ * whatever the renderer's process picker happened to display. Must be invoked
+ * immediately before any attach authority is granted (see
+ * LiveMemorySession.attach()), before the anti-cheat/DRM protectedTarget check,
+ * and before opening a handle to the target process.
+ */
+export function assessTargetProcessAuthorization(
+  target: TargetProcessAuthorizationInput,
+): TargetProcessAuthorizationResult {
+  if (!Number.isInteger(target.pid) || target.pid <= 0) {
+    return { allowed: false, reason: 'Refusing to attach: target PID is invalid.' };
+  }
+
+  if (target.pid === process.pid) {
+    return { allowed: false, reason: "Refusing to attach: target PID is Solith's own process." };
+  }
+
+  const name = normalizeTargetProcessName(target.executableName);
+  if (!name) {
+    return { allowed: false, reason: 'Refusing to attach: target process has no resolvable executable name.' };
+  }
+
+  if (BLOCKED_TARGET_PROCESS_PATTERNS.some((pattern) => pattern.test(name))) {
+    return {
+      allowed: false,
+      reason: `Refusing to attach: "${target.executableName}" is a protected system/Solith process.`,
+    };
+  }
+
+  const targetPath = normalizeTargetProcessPath(target.executablePath);
+  const ownExecutablePath = normalizeTargetProcessPath(process.execPath);
+  if (targetPath && ownExecutablePath && targetPath === ownExecutablePath) {
+    return {
+      allowed: false,
+      reason: "Refusing to attach: target executable path matches Solith's own executable.",
+    };
+  }
+
+  return { allowed: true, reason: 'No protected system/self-target indicators detected.' };
+}
+
+export function assertTargetProcessAllowed(target: TargetProcessAuthorizationInput): void {
+  const result = assessTargetProcessAuthorization(target);
+  if (!result.allowed) {
+    throw new Error(result.reason);
+  }
+}

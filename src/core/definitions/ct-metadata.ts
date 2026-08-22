@@ -2,6 +2,7 @@ import { parseStringPromise } from 'xml2js';
 import { slugifyGameId } from '../trainer-catalog/types.js';
 import type { MemoryFeatureV1, SolithDefinitionV1 } from './schema.v1.js';
 import { SOLITH_DEFINITION_SCHEMA_VERSION } from './schema.v1.js';
+import { validateXmlSafety } from '../adapters/xml.js';
 
 export interface CtMetadataEntry {
   id: string;
@@ -102,6 +103,17 @@ export async function parseCheatTableMetadata(
     executables?: string[];
   } = {},
 ): Promise<CtMetadataResult> {
+  // Authoritative XML safety boundary — every raw-XML parser (main table,
+  // metadata fallback, script-research, raw-script catalog) must gate on this
+  // before touching xml2js, regardless of caller. See Finding 1 (independent
+  // security review, ef254d1): the metadata fallback previously reparsed raw
+  // XML unguarded whenever the main parser found zero accepted entries, which
+  // conflated "validation rejected this document" with "valid empty table".
+  const safety = validateXmlSafety(xmlText);
+  if (!safety.safe) {
+    throw new Error(`xml_safety_violation:${safety.error ?? 'unknown'}`);
+  }
+
   const parsed = (await parseStringPromise(xmlText, { explicitArray: false, trim: true })) as Record<
     string,
     unknown

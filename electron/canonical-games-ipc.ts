@@ -82,7 +82,19 @@ export function registerCanonicalGamesIpc(): void {
       if (!executablePath) {
         return { success: false, error: 'No known executable for this installation.' };
       }
-      const safety = validatePathSafety(executablePath);
+      // Finding 4 (independent security review, ef254d1): validatePathSafety's
+      // containment check is a no-op when approvedRoots is empty (its default) —
+      // calling it bare here made this a shell.openPath launch primitive for
+      // any existing local .exe, not just this installation's own executable.
+      // installation.installPath is trusted, main-process-owned installation
+      // metadata (populated only by install-discovery scans and the manual
+      // Game Library "add" flow — never writable by renderer IPC), so binding
+      // the launch target to it is the correct approved root. Fail closed if
+      // it is missing rather than falling back to an unbounded check.
+      if (!installation.installPath) {
+        return { success: false, error: 'No known installation directory to bind the launch target to.' };
+      }
+      const safety = validatePathSafety(executablePath, [installation.installPath]);
       if (!safety.safe) {
         return { success: false, error: `Unsafe executable path: ${safety.reason ?? 'blocked'}` };
       }

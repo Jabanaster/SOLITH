@@ -58,3 +58,37 @@ test('atomicWriteFileSync still rejects non-EXDEV rename failures', () => {
   assert.equal(fs.existsSync(targetPath), false);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// Finding 3 (independent security review, ef254d1): if the EXDEV fallback's
+// copyFileSync itself fails (disk full, lock, throttled cloud driver), the
+// original `finally` block still unconditionally deleted the temp file —
+// destroying the only recoverable copy of the write, even though targetPath
+// may now be truncated/corrupt from the failed copy attempt.
+test('atomicWriteFileSync preserves the temp file when the EXDEV fallback copy itself fails', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-exdev-test-'));
+  const targetPath = path.join(dir, 'solith.db');
+
+  const originalRename = fs.renameSync;
+  const originalCopy = fs.copyFileSync;
+  (fs as any).renameSync = () => {
+    const error: NodeJS.ErrnoException = new Error('EXDEV: cross-device link not permitted (simulated)');
+    error.code = 'EXDEV';
+    throw error;
+  };
+  (fs as any).copyFileSync = () => {
+    throw new Error('ENOSPC: no space left on device (simulated)');
+  };
+
+  try {
+    assert.throws(() => atomicWriteFileSync(targetPath, Buffer.from('the only good copy')), /ENOSPC/);
+  } finally {
+    fs.renameSync = originalRename;
+    fs.copyFileSync = originalCopy;
+  }
+
+  const leftoverTempFiles = fs.readdirSync(dir).filter((name) => name.endsWith('.tmp'));
+  assert.equal(leftoverTempFiles.length, 1, 'the temp file holding the only good copy must survive the failed fallback');
+  assert.equal(fs.readFileSync(path.join(dir, leftoverTempFiles[0]), 'utf8'), 'the only good copy');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});

@@ -9,6 +9,7 @@ import {
   INSTALL_IDENTITY_VERSION,
 } from '../install-discovery/identity.js';
 import type { InstallPlatform, RawInstalledGame } from '../install-discovery/types.js';
+import { renameOrCopyAcrossDevices } from '../safety/exdev-safe-rename.js';
 
 let dbPath = '';
 
@@ -498,29 +499,24 @@ export function atomicWriteFileSync(targetPath: string, data: Buffer | string): 
     dir,
     `${path.basename(targetPath)}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`,
   );
-  try {
-    fs.writeFileSync(tempPath, data);
+
+  fs.writeFileSync(tempPath, data);
+
+  // Finding 3 (independent security review, ef254d1): tempPath is the ONLY
+  // known-good copy of the new data until this call proves targetPath now
+  // holds it too (targetPath itself may be absent, stale, or about to be
+  // partially overwritten by a failing copy fallback). If this throws —
+  // EXDEV copy failing partway, or any other rename failure — tempPath must
+  // NOT be deleted, so the propagating exception below skips the cleanup
+  // entirely rather than deleting it in a finally.
+  renameOrCopyAcrossDevices(tempPath, targetPath);
+
+  if (fs.existsSync(tempPath)) {
     try {
-      fs.renameSync(tempPath, targetPath);
-    } catch (error) {
-      // Some Windows profiles (observed: a OneDrive-redirected/Files-On-Demand
-      // AppData\Roaming) report EXDEV on renameSync even for a same-directory
-      // rename, because the cloud filter driver can place sibling files on
-      // different underlying extents. rename() cannot cross that boundary but
-      // copy+delete can, so fall back to it instead of losing the write.
-      if ((error as NodeJS.ErrnoException)?.code === 'EXDEV') {
-        fs.copyFileSync(tempPath, targetPath);
-      } else {
-        throw error;
-      }
-    }
-  } finally {
-    if (fs.existsSync(tempPath)) {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {
-        // Preserve the original write/rename failure for callers.
-      }
+      fs.unlinkSync(tempPath);
+    } catch {
+      // The write itself already succeeded — a leftover temp file is a
+      // harmless recovery artifact, not a reason to fail the write.
     }
   }
 }

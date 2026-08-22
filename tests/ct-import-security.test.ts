@@ -48,7 +48,11 @@ describe('ct-import security hardening', () => {
   });
 
   test('rejects XML nesting beyond the safe depth limit', async () => {
-    const depth = 60;
+    // Limit recalibrated to 256 (from 32) after Finding 1's fix exposed that
+    // 32 rejected legitimate real-world CT tables (CrimsonDesert.CT nests to
+    // depth 75) — see src/core/adapters/xml.ts. 300 stays a clear, deliberate
+    // exceedance of the new limit.
+    const depth = 300;
     let xml = '<?xml version="1.0"?>\n<CheatTable><CheatEntries>';
     for (let i = 0; i < depth; i++) xml += '<CheatEntry><CheatEntries>';
     xml += '<CheatEntry><Description>"deep"</Description><VariableType>4 Bytes</VariableType><Address>1</Address></CheatEntry>';

@@ -1,6 +1,7 @@
 import { parseStringPromise } from 'xml2js';
 import { slugifyGameId } from '../trainer-catalog/types.js';
 import { analyzeAaScript } from './aa-script-analyzer.js';
+import { validateXmlSafety } from '../adapters/xml.js';
 import type {
   AaScriptAnalysis,
   CtRawScriptCatalog,
@@ -116,6 +117,15 @@ export async function analyzeCheatTableScripts(
   xmlText: string,
   options: { title?: string; executable?: string } = {},
 ): Promise<CtScriptResearchReport> {
+  // Authoritative XML safety boundary — see ct-metadata.ts's parseCheatTableMetadata
+  // for the Finding 1 rationale. This is a directly renderer-reachable path
+  // (electron/trainer-research-ipc.ts) so it must not rely on an upstream caller
+  // having already validated.
+  const safety = validateXmlSafety(xmlText);
+  if (!safety.safe) {
+    throw new Error(`xml_safety_violation:${safety.error ?? 'unknown'}`);
+  }
+
   const parsed = (await parseStringPromise(xmlText, { explicitArray: false, trim: true })) as Record<
     string,
     unknown
@@ -155,6 +165,12 @@ export async function extractCheatTableRawScriptCatalog(
   xmlText: string,
   options: { title?: string; sourceNote?: string } = {},
 ): Promise<CtRawScriptCatalog> {
+  // Authoritative XML safety boundary — see analyzeCheatTableScripts above.
+  const safety = validateXmlSafety(xmlText);
+  if (!safety.safe) {
+    throw new Error(`xml_safety_violation:${safety.error ?? 'unknown'}`);
+  }
+
   const parsed = (await parseStringPromise(xmlText, { explicitArray: false, trim: true })) as Record<
     string,
     unknown

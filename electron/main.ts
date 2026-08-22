@@ -568,6 +568,19 @@ handleGuarded('add-game', async (event, gameData) => {
     if (!safety.safe) {
       return { error: `Path safety violation: ${safety.reason}` };
     }
+    // Finding 4 (independent security review, ef254d1): executablePath was
+    // shape-validated (a string, zod) but never checked against `path` — a
+    // renderer could record an arbitrary local .exe (e.g. a Windows system
+    // binary) as this game's launch target. `path`, once validated above, is
+    // the owner-approved root for this game going forward; bind
+    // executablePath's containment to it here, at persistence time, in
+    // addition to the launch-time check in canonical-games-ipc.ts.
+    if (parsed.executablePath) {
+      const executableSafety = safetyModule.validatePathSafety(parsed.executablePath, [parsed.path]);
+      if (!executableSafety.safe) {
+        return { error: `Executable path safety violation: ${executableSafety.reason}` };
+      }
+    }
 
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
@@ -588,6 +601,13 @@ handleGuarded('update-game', async (_event, gameData) => {
     const safety = safetyModule.validatePathSafety(parsed.path);
     if (!safety.safe) {
       return { success: false, error: `Path safety violation: ${safety.reason}` };
+    }
+    // See add-game above — same Finding 4 fix.
+    if (parsed.executablePath) {
+      const executableSafety = safetyModule.validatePathSafety(parsed.executablePath, [parsed.path]);
+      if (!executableSafety.safe) {
+        return { success: false, error: `Executable path safety violation: ${executableSafety.reason}` };
+      }
     }
 
     const dbModule = await import('../src/core/database/index.js');

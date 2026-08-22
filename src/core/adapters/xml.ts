@@ -11,17 +11,23 @@ export function validateXmlSafety(content: string): { safe: boolean; error?: str
     return { safe: false, error: 'XML file size exceeds safe limit of 5MB' };
   }
 
-  // 2. Reject DOCTYPE or entity definitions
+  // 2. Reject DOCTYPE and entity definitions outright. A bare DOCTYPE with no
+  // visible ENTITY/SYSTEM/PUBLIC is still rejected — parsers can resolve
+  // internal subsets or externally-referenced DTDs the regex above can't see,
+  // so "no entity keyword present" is not proof of safety.
   if (/<!DOCTYPE/i.test(content)) {
-    if (/<!ENTITY/i.test(content)) {
-      return { safe: false, error: 'XML entity declarations (<!ENTITY) are blocked to prevent expansion attacks.' };
-    }
-    if (/SYSTEM|PUBLIC/i.test(content)) {
-      return { safe: false, error: 'External entity resolution is blocked.' };
-    }
+    return { safe: false, error: 'XML DOCTYPE declarations are blocked to prevent entity expansion and external entity resolution attacks.' };
   }
 
-  // 3. Limit depth
+  // 3. Limit depth. Real community Cheat Engine tables nest CheatEntry
+  // category folders far deeper than a typical save-editor XML document —
+  // a genuine CrimsonDesert.CT fixture reaches depth 75 with no malicious
+  // intent. 32 rejected real, legitimate tables outright (discovered when
+  // Finding 1's fix wired this same validator into the metadata/script
+  // fallback path, which had never enforced it before). 256 stays orders of
+  // magnitude below any realistic engineered stack-exhaustion depth while
+  // comfortably covering real-world nesting.
+  const MAX_XML_DEPTH = 256;
   let depth = 0;
   let maxDepth = 0;
   const tagRegex = /<(\/?[a-zA-Z_][a-zA-Z0-9_\-\.:]*)(?:\s+[^>]*)*>/g;
@@ -35,8 +41,8 @@ export function validateXmlSafety(content: string): { safe: boolean; error?: str
       if (depth > maxDepth) {
         maxDepth = depth;
       }
-      if (maxDepth > 32) {
-        return { safe: false, error: 'XML nesting depth exceeds safe limit of 32.' };
+      if (maxDepth > MAX_XML_DEPTH) {
+        return { safe: false, error: `XML nesting depth exceeds safe limit of ${MAX_XML_DEPTH}.` };
       }
     }
   }
