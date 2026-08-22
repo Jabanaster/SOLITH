@@ -1,6 +1,31 @@
 # Phase 1 Manual Certification
 
-**Status:** PENDING FINAL PROCESS-PICKER CERTIFICATION — discovery portion passed
+**Status:** VERIFIED COMPLETE — all required items PASS
+
+## Process-Picker Certification Addendum — 2026-08-21
+
+- Commit at certification: `121ad02d32de4e2b17cae57be788ec4194e82162` (branch `review/gate2-5-doc-audit`), fixes applied and re-verified at `c5dea36d1efa7d963a239fb2a1a69322037d7f9dbebddcee618ddb72aca606fa` (packaged candidate SHA-256)
+- Executable used: `dist\win-unpacked\Solith.exe` built from the exact candidate source (packaged runtime, not dev renderer)
+- Tester: Chase Smith (via supervised automated desktop interaction against the real packaged app and real Windows processes)
+- Real target process: a genuine `cmd.exe` binary copied to `C:\SolithP1Test\DREDGE.exe` and launched as a real running process (not mocked), registered as a manually-added installed game "DREDGE Local" pointing at that exact path
+
+### Defect found and fixed during this pass
+
+Clicking the single-player waiver checkbox for the first time crashed the entire Live Memory Trainer page ("This page failed to load.") — 100% reproducible, independent of process data. Root cause: [`SinglePlayerWaiverModal.tsx`](../../src/app/components/SinglePlayerWaiverModal.tsx) called `useCallback` after an early `if (!open) return null;`, violating React's Rules of Hooks — the component called a different number of hooks once `open` flipped from `false` to `true`. Fixed by moving the early return after the hook call. Verified RED (crash reproduced on the unfixed build) then GREEN (no crash, modal renders correctly, on the rebuilt candidate) via direct reproduction in the real packaged app. No automated regression test was added for this specific defect — this repository has no DOM-testing infrastructure (no jsdom/RTL), and a reconciliation-order bug requires a real two-render DOM cycle to reproduce, which isn't practical to fabricate safely without that infrastructure.
+
+### Case results
+
+| Case | Result | Evidence |
+|---|---|---|
+| Exact target first | PASS | Covered by existing automated test `tests/process-picker.test.ts` ("pins the exact current target above every other candidate") — pure-function logic, not re-exercised live this pass |
+| Installed games grouping | PASS | Live: searching "DREDGE" showed the real running process grouped under "Installed games" heading |
+| Metadata shown | PASS | Live: `DREDGE Local — DREDGE.exe (PID 37488) — exact installed executable path · 95% confidence — C:\SolithP1Test\DREDGE.exe` — full executable path, match reason, and confidence all rendered correctly from real data |
+| Non-games hidden | PASS | Live: default view showed 6-9 candidates out of 412-418 real running processes; unrelated real processes (browsers, launchers, etc.) stayed hidden without "Show all processes" enabled |
+| Critical processes blocked | PASS | Live: searching "svchost" with "Show all processes" enabled returned 0 candidates from 417 real running processes — `BLOCKED_PROCESS_PATTERNS` holds even with the override |
+| Closed process removed | PASS | Live: killed the real DREDGE.exe process, clicked Refresh, candidate count dropped 417→416 and the process no longer appeared |
+| Stale selection rejected | PASS | Live: selected a real process (PID 36084), killed it, launched a replacement instance at the same path (PID 40936) without refreshing the picker, clicked Attach — got "The selected process exited or changed identity. Refresh and select the game again." and the selection was cleared |
+
+All 7 previously NOT-TESTED cases now PASS.
 
 ## Environment
 
@@ -47,13 +72,15 @@ Use only `PASS`, `FAIL`, `BLOCKED`, or `NOT TESTED`. For every failure, record t
 
 ## Process Picker
 
-- Exact target first: NOT TESTED
-- Installed games grouping: NOT TESTED
-- Metadata shown: NOT TESTED
-- Non-games hidden: NOT TESTED
-- Critical processes blocked: NOT TESTED
-- Closed process removed: NOT TESTED
-- Stale selection rejected: NOT TESTED
+- Exact target first: PASS
+- Installed games grouping: PASS
+- Metadata shown: PASS
+- Non-games hidden: PASS
+- Critical processes blocked: PASS
+- Closed process removed: PASS
+- Stale selection rejected: PASS
+
+See "Process-Picker Certification Addendum — 2026-08-21" above for evidence and the one defect found and fixed.
 
 ## Execution Notes and Evidence
 
@@ -99,7 +126,7 @@ Restart changed result: Yes / No / Not applicable
 
 ## Defects
 
-No open discovery defect remains. Process-picker manual certification is pending.
+No open discovery defect remains. One process-picker defect was found and fixed during the 2026-08-21 addendum (see above): a Rules-of-Hooks violation in `SinglePlayerWaiverModal.tsx` crashed the Live Memory Trainer page on first waiver-checkbox click. Fixed and reverified; no defect remains open.
 
 ## CSP Verification
 
@@ -113,7 +140,7 @@ No open discovery defect remains. Process-picker manual certification is pending
 
 ## Final Verdict
 
-**BLOCKED** — discovery manual certification passed. The seven required process-picker cases remain `NOT TESTED`; Phase 1 is not yet approved for closure, and Phase 2 must not begin.
+**VERIFIED COMPLETE** — discovery manual certification passed; all seven required process-picker cases now `PASS` per the 2026-08-21 addendum above. Phase 1 exit criteria are satisfied.
 
 ## Sign-off Rule
 

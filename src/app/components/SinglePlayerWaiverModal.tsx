@@ -23,7 +23,6 @@ export const SinglePlayerWaiverModal: React.FC<SinglePlayerWaiverModalProps> = (
   onCancel,
 }) => {
   const [busy, setBusy] = useState(false);
-  if (!open) return null;
 
   const accept = useCallback(() => {
     setBusy(true);
@@ -34,6 +33,8 @@ export const SinglePlayerWaiverModal: React.FC<SinglePlayerWaiverModalProps> = (
       setBusy(false);
     }
   }, [onAccept, scopeKey, store]);
+
+  if (!open) return null;
 
   return (
     <div

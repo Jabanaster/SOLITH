@@ -1113,7 +1113,7 @@ Reconciled 2026-08-21 against current phase statuses above. Do not restart
 Phases 2–6, which are VERIFIED COMPLETE — pick up at the next open item.
 
 1. Gate 2.5 Phase 7 verified stable (6/6 PASS ×3 consecutive, fresh packaged candidate); root cause was a stale packaged binary, not a test or product defect — no repair to commit. DONE.
-2. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene. BLOCKED: implementation and automated coverage are in place; 7 required process-picker manual test cases remain NOT TESTED per PHASE_1_MANUAL_CERTIFICATION_2026-07-26.md. Next action: run those 7 cases and update that report.
+2. Phase 1 — shell, Settings, notifications, banner, grid, title hygiene. VERIFIED COMPLETE: all 7 required process-picker manual test cases now PASS per PHASE_1_MANUAL_CERTIFICATION_2026-07-26.md's 2026-08-21 addendum (one real defect — a Rules-of-Hooks crash in the single-player waiver modal — found and fixed during that pass).
 3. Phase 2 — canonical game model + Game Library. VERIFIED COMPLETE (§2.2 developer/publisher/releaseDate enrichment is a known non-blocking residual).
 4. Phase 3 — Trainer Library Popular/All Games/sorting/filtering. VERIFIED COMPLETE.
 5. Phase 4 — artwork identity/cache/legal sourcing/background fetch. VERIFIED COMPLETE.

@@ -500,7 +500,20 @@ export function atomicWriteFileSync(targetPath: string, data: Buffer | string): 
   );
   try {
     fs.writeFileSync(tempPath, data);
-    fs.renameSync(tempPath, targetPath);
+    try {
+      fs.renameSync(tempPath, targetPath);
+    } catch (error) {
+      // Some Windows profiles (observed: a OneDrive-redirected/Files-On-Demand
+      // AppData\Roaming) report EXDEV on renameSync even for a same-directory
+      // rename, because the cloud filter driver can place sibling files on
+      // different underlying extents. rename() cannot cross that boundary but
+      // copy+delete can, so fall back to it instead of losing the write.
+      if ((error as NodeJS.ErrnoException)?.code === 'EXDEV') {
+        fs.copyFileSync(tempPath, targetPath);
+      } else {
+        throw error;
+      }
+    }
   } finally {
     if (fs.existsSync(tempPath)) {
       try {
