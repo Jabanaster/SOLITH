@@ -1,5 +1,79 @@
 # PHASE 7 CLOSEOUT — RECONCILIATION PASS (2026-08-20)
 
+## PACKAGED/E2E VERIFICATION RESULT AND REGRESSION REMEDIATION (2026-08-21/22)
+
+The section below ("INDEPENDENT REVIEW RESULT AND REMEDIATION") froze
+`9163da193839b8397ef488db42ca9e8206db0f09` and described it as "READY FOR
+INDEPENDENT RE-REVIEW." That candidate had never had its Playwright/E2E
+battery actually run — the remediation session disclosed this as an open
+gap, not a pass. A follow-up verification-only session ran it for the first
+time.
+
+**Result: `PACKAGED/E2E VERIFICATION — FAIL`** against `9163da1`. Recorded
+as historical fact and left in this document permanently: `9163da1`
+genuinely failed its first packaged/E2E verification pass.
+
+Root cause: `BLOCKED_TARGET_PROCESS_PATTERNS` in
+`src/core/runtime/protected-target-guard.ts` (added by the Finding 2
+remediation described below) included `/^solith/i` — a name-**prefix**
+match, not an identity check. It rejected any executable merely starting
+with "solith", including the pre-existing legitimate E2E fixture
+`SolithConsentGame.exe`, breaking the real privileged write-consent
+workflow: `tests/electron-consent-boundary.e2e.test.ts` failed 4/9, every
+failure at the attach step (`Refusing to attach: "SolithConsentGame.exe" is
+a protected system/Solith process.`). The self-PID and self-executable-path
+identity checks in the same function were and remained correct — only the
+redundant name-pattern layer was over-broad.
+
+A same-day narrow remediation session fixed exactly that regex:
+`/^solith/i` → `/^solith(?:\.exe)?$/i` (exact-name match, one line, one
+file). No other pattern, file, or behavior touched — in particular the
+similarly-shaped `/^electron/i` entry was deliberately left unchanged since
+no failing test implicated it and altering it would have been unauthorized
+scope creep for this task. Added 5 new regression tests to
+`tests/live-memory/target-process-authorization.test.ts`: 4 proving
+`SolithConsentGame.exe`/`SolithiumGame.exe`/`SolithTestTarget.exe`/
+`MySolithGame.exe` all attach successfully post-fix (general fix, not a
+special-cased exception for the one originally-reported name), plus 1
+proving the exact extension-less name `Solith` is still correctly rejected.
+
+**Verification after the fix:** `target-process-authorization.test.ts`
+21/21 (was 16/16) · `electron-consent-boundary.e2e.test.ts` 9/9 (was 5/9,
+rebuilt `dist-electron/main.js` first) · adjacent
+`live-memory-session.test.ts`/`process-picker.test.ts` unaffected, 53/53 ·
+TypeScript root/Electron 0/0 · `npm test` 1654/1654 + SQL 10/10 (unchanged
+— `target-process-authorization.test.ts` remains outside both `test` and
+`test:live-memory` npm scripts, a pre-existing wiring gap disclosed but not
+fixed here, out of authorized scope) · `npm audit` 0 vulnerabilities · Vite
++ Electron dev build 29/29 · `release:verify` unchanged (29/30, exit 1,
+correct placeholder-key hard-fail — gate not touched) · `git diff --check`
+clean, no conflict markers. A fresh full packaged build was produced
+strictly after the fix (timestamp confirmed later than the commit) and the
+complete 22-suite Playwright battery rerun against it: 20/22 suites clean.
+The 2 pre-existing `startup-visibility-behavior.e2e.test.ts` failures
+(disclosed in the section below, unrelated to this fix) reproduced
+unchanged. One new residual surfaced under this session's sustained system
+load: `gate2-4-final-certification.e2e.test.ts` and
+`gate2-5-frame-devtools-overlay-lifecycle.e2e.test.ts` each showed one
+flaky failure in the full-battery run; `gate2-4` reran 5/5 clean in
+isolation, but `gate2-5`'s Phase 7 (Wisp overlay obtainable via a fixed
+700ms sleep) reproduced the same timing-window failure twice more across
+two further isolated reruns, always at the identical fixed-sleep assertion
+and never elsewhere in that 7-test suite — consistent with a pre-existing,
+timing-fragile fixed-sleep race under heavy session load, not a regression
+from the one-line, functionally-unrelated pattern change. Disclosed as an
+unresolved residual requiring a clean-machine rerun for full confidence,
+not fabricated as passing.
+
+### Phase 7 status (superseding the status at the end of the section below)
+
+`PHASE 7 — BLOCKED BY SECURITY FINDINGS` is no longer accurate (the
+regression that blocked it is remediated and verified), but
+`PHASE 7 — READY FOR INDEPENDENT RE-REVIEW` cannot yet be honestly
+reasserted either until the `gate2-5` Phase 7 timing residual is confirmed
+non-defective on an idle/clean machine. Merge readiness remains
+**DO NOT MERGE** either way.
+
 ## INDEPENDENT REVIEW RESULT AND REMEDIATION (2026-08-21)
 
 The "Highest-priority remaining action" from the Final Burn-Down pass below

@@ -114,6 +114,50 @@ describe('LiveMemorySession.attach — Finding 2 server-side target authorizatio
     assert.equal(session.isAttached(), true);
   });
 
+  // Regression (this session): BLOCKED_TARGET_PROCESS_PATTERNS previously
+  // included /^solith/i — a name-PREFIX match, not an identity check. That
+  // rejected any executable merely starting with "solith", including the
+  // pre-existing legitimate E2E fixture SolithConsentGame.exe used by
+  // tests/electron-consent-boundary.e2e.test.ts, breaking the entire
+  // privileged write-consent workflow before consent could even begin.
+  // "Starts with, ends with, or contains solith" must never by itself imply
+  // "is Solith". Only PID (process.pid), the exact known executable name
+  // (Solith.exe / Solith), and the exact executable-path match against
+  // process.execPath are valid Solith self-identity signals.
+  const LOOKS_LIKE_SOLITH_BUT_ISNT = [
+    'SolithConsentGame.exe',
+    'SolithiumGame.exe',
+    'SolithTestTarget.exe',
+    'MySolithGame.exe',
+  ];
+
+  for (const executableName of LOOKS_LIKE_SOLITH_BUT_ISNT) {
+    test(`does not reject "${executableName}" merely for containing/starting with "solith" (name-prefix over-blocking regression)`, async () => {
+      const driver = new FakeMemoryDriver({ '4096': 100 });
+      const session = makeSession(driver);
+      const foreignPid = process.pid === 777777 ? 777776 : 777777;
+      driver.setProcessExecutableName(foreignPid, executableName);
+
+      const result = await session.attach({ pid: foreignPid, executableName }, true);
+
+      assert.equal(result.success, true, result.error ?? executableName);
+      assert.equal(driver.isOpen(), true);
+      assert.equal(session.isAttached(), true);
+    });
+  }
+
+  test('still rejects the exact known Solith executable name without the .exe suffix', async () => {
+    const driver = new FakeMemoryDriver();
+    const session = makeSession(driver);
+    const foreignPid = process.pid === 888888 ? 888887 : 888888;
+
+    const result = await session.attach({ pid: foreignPid, executableName: 'Solith' }, true);
+
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /protected system\/solith process/i);
+    assert.equal(driver.isOpen(), false);
+  });
+
   test('the renderer UI blocklist and the main-process authoritative blocklist are the same object (cannot silently drift)', async () => {
     const { BLOCKED_PROCESS_PATTERNS } = await import('../../src/app/live-memory/process-picker.js');
     assert.equal(BLOCKED_PROCESS_PATTERNS, BLOCKED_TARGET_PROCESS_PATTERNS);

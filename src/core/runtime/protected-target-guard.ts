@@ -83,7 +83,13 @@ export function assertProtectedTargetAllowed(input: {
 // than maintaining its own copy, and LiveMemorySession.attach() enforces it
 // directly (not merely trusting that the renderer already filtered).
 export const BLOCKED_TARGET_PROCESS_PATTERNS: RegExp[] = [
-  /^solith/i,
+  // Exact-name match only. A prefix match (/^solith/i) previously rejected
+  // ANY executable merely starting with "solith" — including legitimate
+  // unrelated local processes/test fixtures (e.g. SolithConsentGame.exe) —
+  // even though PID and executable-path identity are already checked above.
+  // This entry is defense-in-depth for Solith's own known packaged/dev
+  // executable name, not a substring/branding filter.
+  /^solith(?:\.exe)?$/i,
   /^electron/i,
   /^explorer(?:\.exe)?$/i,
   /^runtimebroker(?:\.exe)?$/i,
