@@ -10,21 +10,35 @@
 // builds (`npm run build` directly) are unaffected and continue to only warn.
 import { spawnSync } from 'node:child_process';
 
-const npmScript = process.argv[2];
-if (!npmScript) {
-  console.error('Usage: node scripts/run-release-build.mjs <npm-script-name>');
+const npmScripts = process.argv.slice(2);
+if (npmScripts.length === 0) {
+  console.error('Usage: node scripts/run-release-build.mjs <npm-script-name> [<npm-script-name>...]');
   process.exit(1);
 }
 
-const result = spawnSync('npm', ['run', npmScript], {
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-  env: { ...process.env, SOLITH_RELEASE_BUILD: '1' },
-});
+// Every listed script runs to completion even if an earlier one fails — a
+// release-mode verifier can have multiple independent, simultaneously-true
+// blockers (e.g. the placeholder trust-root key AND unsigned artifacts),
+// and stopping at the first would hide the rest. The overall exit code is
+// non-zero if any script failed.
+let worstStatus = 0;
 
-if (result.error) {
-  console.error(`Failed to launch npm run ${npmScript}:`, result.error);
-  process.exit(1);
+for (const npmScript of npmScripts) {
+  const result = spawnSync('npm', ['run', npmScript], {
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+    env: { ...process.env, SOLITH_RELEASE_BUILD: '1' },
+  });
+
+  if (result.error) {
+    console.error(`Failed to launch npm run ${npmScript}:`, result.error);
+    process.exit(1);
+  }
+
+  const status = result.status ?? 1;
+  if (status !== 0) {
+    worstStatus = status;
+  }
 }
 
-process.exit(result.status ?? 1);
+process.exit(worstStatus);

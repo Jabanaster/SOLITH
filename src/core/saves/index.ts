@@ -3,6 +3,7 @@ import xml2js from 'xml2js';
 import crypto from 'crypto';
 import { ParsedSave, SaveValue } from '../../shared/types';
 import { SAFE_KEYWORDS, RISKY_KEYWORDS } from '../../shared/constants';
+import { validateXmlSafety } from '../adapters/xml';
 
 export const MAX_SAVE_FILE_BYTES = 8 * 1024 * 1024;
 
@@ -211,6 +212,15 @@ export function parseSaveFileStrict(filePath: string): ParsedSave {
     const cleanContent = stripJSONComments(content);
     return { data: JSON.parse(cleanContent), format: 'json', path: filePath };
   } else if (lowerName.endsWith('.xml')) {
+    // Finding R2 (independent security review, d3397bb): this path parsed
+    // XML save files directly with xml2js, unlike every other XML entry
+    // point in the codebase (.CT import, metadata/script fallbacks), which
+    // all route through validateXmlSafety first. Reuse the same gate here
+    // rather than fork a second XML security policy.
+    const safety = validateXmlSafety(content);
+    if (!safety.safe) {
+      throw new Error(safety.error ?? 'XML save file failed safety validation.');
+    }
     let parseResult: any = null;
     let parseError: any = null;
     const parser = new xml2js.Parser({ async: false });

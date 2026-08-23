@@ -1,5 +1,98 @@
 # PHASE 7 CLOSEOUT — RECONCILIATION PASS (2026-08-20)
 
+## FINAL RELEASE-GATE SECURITY REMEDIATION (2026-08-22)
+
+Following the target-process-authorization fix (SHA `d3397bbe89fdc2fc6c088dfe44ea8bb2007d21d2`)
+and its independent security re-review (verdict: `INDEPENDENT SECURITY
+RE-REVIEW — PASS WITH NON-BLOCKING RESIDUALS`, 0 Critical/High), this session
+closed the review's Medium findings and one optional Low finding, producing
+a new remediation SHA (recorded in the commit for this change).
+
+**FINDING-R1 — remote-sync redirect revalidation.** The independent review
+corrected a prior misclassification: `remote-sync.ts`'s catalog-scrape fetch
+is not dormant — `bootstrapTrainerCatalog()` auto-invokes it on first launch
+by default. Added `validateRedirectTarget()` to `src/core/trainer-catalog/sync/remote-sync.ts`:
+every HTTP redirect hop must now be HTTPS, target the exact original request
+hostname, and carry no embedded credentials, or the fetch fails closed
+before the next request is even issued. Since the 3 configured sources are
+fixed, non-renderer-controlled hostnames, strict same-host matching makes a
+separate private-network denylist redundant — a compromised source host can
+only ever redirect to itself. 11 new tests in `tests/remote-sync-redirect-policy.test.ts`.
+
+**FINDING-R2 — save-file XML safety gate.** `src/core/saves/index.ts`'s
+`parseSaveFileStrict` parsed `.xml` save files directly with `xml2js.Parser`,
+unlike every `.CT`/XML entry point elsewhere in the codebase, which all
+route through `validateXmlSafety` first. Now calls that same gate before
+parsing — same size cap, DOCTYPE rejection, and depth bound as everywhere
+else, no forked second policy. 7 new tests in `tests/save-xml-safety-gate.test.ts`.
+
+**Artifact-signing verification gap.** The independent review found that
+electron-builder's build log claims `signing with signtool.exe` while
+`Get-AuthenticodeSignature` on the actual packaged `Solith.exe` and
+installer reported `NotSigned` — nothing in the release pipeline checked
+the artifact itself. New `scripts/signing-verification.mjs` provides a pure,
+independently-testable `evaluateSigningStatus()` decision function plus a
+Windows `Get-AuthenticodeSignature`-based I/O helper, wired into
+`scripts/verify-release-artifacts.mjs`. It checks `Solith.exe`, the
+installer, and the first-party `solith-readonly-scanner.exe` helper (not
+the third-party `elevate.exe`); in release mode (`SOLITH_RELEASE_BUILD=1`)
+a `NotSigned` or missing required artifact now hard-fails the build —
+confirmed live against the real (still unsigned) dev artifacts: exit 1.
+`scripts/run-release-build.mjs` was extended to run multiple npm scripts in
+sequence, and `release:verify` now runs both `verify:electron-output` and
+`verify:release-artifacts`. 8 new tests in `tests/signing-verification.test.ts`,
+all using injected Authenticode statuses — no real certificate needed or
+invented. Production signing remains genuinely `BLOCKED` until a real
+certificate is provisioned; this remediation only closes the gap where an
+unsigned build could pass the pipeline silently.
+
+**Test-orchestration gap.** `tests/live-memory/target-process-authorization.test.ts`
+was not included in `npm test` or `npm run test:live-memory`, a
+pre-existing gap disclosed but not fixed by two prior sessions. Wired into
+`test:live-memory` (257→278 tests). The 4 new security test files added
+this session were also wired into `npm test` (1654→1687) to avoid
+immediately recreating the same orphaned-test problem.
+
+**FINDING-R3 — EXDEV fallback atomicity (optional, completed).**
+`src/core/safety/exdev-safe-rename.ts`'s cross-device fallback used to
+`copyFileSync` straight onto the live destination path — a crash mid-copy
+could leave a real save/database file truncated. It now copies to a
+same-directory temp file first, then performs a true same-device atomic
+rename into the destination, cleaning up the temp file on any failure;
+the destination is never touched until the copy is fully verified on disk.
+3 new tests plus the 4 pre-existing EXDEV tests updated for the new
+two-rename call shape (their mocks previously assumed exactly one
+`renameSync` call; behavioral contract — src/dest end states — unchanged
+and reconfirmed by the same assertions).
+
+**Verification.** Narrow suites: 115/115. Full regression: TypeScript
+root/Electron 0/0, `npm test` 1687/1687 + SQL 10/10, `test:live-memory`
+278/278, `npm audit --omit=dev` 0 vulnerabilities, full 22-suite Playwright
+battery 21/22 clean (only the pre-existing startup-visibility Game Bar
+mismatch; `gate2-5-frame-devtools-overlay-lifecycle` and `gate2-4` both
+fully clean this run). `release:verify` reconfirmed correctly failing
+closed on both the placeholder trust-root key and (newly) unsigned
+artifacts. Fresh packaged build produced after the remediation commit.
+
+**Residuals, unchanged and disclosed, not fixed this session:** production
+catalog trust-root key (still placeholder, by design — gate correctly
+fails), production code-signing certificate (not available in this
+environment), installer lifecycle (not performed), manual packaged
+click-through (not performed), XML depth-tracking method (still
+regex-based, independently re-assessed as Low and acceptable for V1),
+startup-visibility Game Bar mismatch (environment-specific test assumption,
+not a product defect).
+
+### Phase 7 status (superseding the status at the end of the section below and the "PACKAGED/E2E VERIFICATION" section immediately below this one)
+
+All authorized code-level release-security gates are now implemented and
+independently proven to fail closed. `PHASE 7 — READY FOR INDEPENDENT
+RE-REVIEW` in the unqualified sense still does not apply to a release
+decision — production signing and production trust-root provisioning
+remain genuine external dependencies, and installer lifecycle / manual
+packaged verification remain unperformed. **Merge readiness: DO NOT
+MERGE**, unchanged.
+
 ## PACKAGED/E2E VERIFICATION RESULT AND REGRESSION REMEDIATION (2026-08-21/22)
 
 The section below ("INDEPENDENT REVIEW RESULT AND REMEDIATION") froze

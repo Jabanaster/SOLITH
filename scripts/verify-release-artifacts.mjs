@@ -10,6 +10,7 @@ import {
   readPackageMetadata,
   releaseArtifactPaths,
 } from './release-artifact-utils.mjs';
+import { evaluateSigningStatus, getAuthenticodeStatuses } from './signing-verification.mjs';
 
 const root = process.env.SOLITH_RELEASE_ROOT
   ? path.resolve(process.env.SOLITH_RELEASE_ROOT)
@@ -79,6 +80,43 @@ const installerName = path.basename(paths.installer);
 check('installer name includes current package version', installerName.includes(pkg.version), installerName);
 check('installer name does not include 1.4.0', !installerName.includes('1.4.0'), installerName);
 check('installer name does not include old internal project names', !/trainer|drill|pilot/i.test(installerName), installerName);
+
+// ── Artifact-signing verification ───────────────────────────────────────────
+// Finding: build logs claiming "signing with signtool.exe" were not proof the
+// artifact was actually signed. This checks real Authenticode state on disk.
+// In release mode (SOLITH_RELEASE_BUILD=1), NotSigned/missing required
+// first-party executables hard-fail the build; in dev mode they only warn.
+// elevate.exe is a third-party electron-builder helper and is intentionally
+// not required to carry a Solith signature.
+console.log('\nArtifact signing');
+const releaseMode = process.env.SOLITH_RELEASE_BUILD === '1';
+const signingTargets = [
+  { name: 'main executable (Solith.exe)', path: paths.executable },
+  { name: 'installer', path: paths.installer },
+  {
+    name: 'solith-readonly-scanner.exe (first-party helper)',
+    path: path.join(path.dirname(paths.executable), 'resources', 'app.asar.unpacked', 'dist-electron', 'solith-readonly-scanner.exe'),
+  },
+];
+
+if (process.platform !== 'win32') {
+  console.log('  SKIP — Authenticode verification requires Windows');
+} else {
+  const statuses = getAuthenticodeStatuses(signingTargets);
+  const { results, ok } = evaluateSigningStatus(statuses, { releaseMode });
+  for (const r of results) {
+    checks++;
+    if (r.severity === 'fail') {
+      failures++;
+      console.error(`  FAIL [${checks}] ${r.name} is ${r.status} (release mode requires a valid signature): ${r.path}`);
+    } else if (r.severity === 'warn') {
+      console.warn(`  WARN [${checks}] ${r.name} is ${r.status} (expected for dev builds; will hard-fail once SOLITH_RELEASE_BUILD=1): ${r.path}`);
+    } else {
+      console.log(`  PASS [${checks}] ${r.name} Authenticode status: ${r.status}`);
+    }
+  }
+  void ok;
+}
 
 console.log(`\nSummary: ${checks - failures}/${checks} checks passed\n`);
 

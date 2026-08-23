@@ -11,12 +11,6 @@ import { getFlingReference } from '../../cheat-system/trainer-reference.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'Solith-TrainerCatalog/1.0 (+local definitions sync; no binary download)';
-// Phase 7 hardening — this scraped a fixed page with a timeout but no
-// explicit size cap and no explicit/re-validated redirect cap (unlike the
-// artwork fetcher's MAX_ARTWORK_REDIRECTS and hub-client's
-// MAX_SYNC_RESPONSE_BYTES patterns this mirrors). The 3 source hosts are
-// hardcoded, not renderer-controlled, so this is defense-in-depth against a
-// compromised/misbehaving upstream host, not a proven exploitable gap.
 const MAX_HTML_REDIRECTS = 5;
 const MAX_HTML_RESPONSE_BYTES = 8 * 1024 * 1024;
 
@@ -28,10 +22,43 @@ export interface SyncImportResult {
   trainers: ParsedRemoteTrainer[];
 }
 
+// Finding R1 (independent security review, d3397bb): every redirect hop is a
+// new outbound network target and must be revalidated, not just counted and
+// size-capped. Strict same-host, HTTPS-only policy: a redirect is only
+// followed if it stays on the exact hostname of the original request. Since
+// the 3 configured sources are fixed, non-renderer-controlled hostnames, this
+// makes a separate private-network/loopback denylist redundant here — a
+// compromised source host cannot redirect off its own hostname to pivot
+// anywhere else (localhost, RFC1918, link-local, or an unrelated public
+// host), so there is no host it could redirect to that isn't itself.
+export function validateRedirectTarget(location: string, currentUrl: string, allowedHost: string): URL {
+  let target: URL;
+  try {
+    target = new URL(location, currentUrl);
+  } catch {
+    throw new Error(`Redirect from ${currentUrl} had a malformed Location header`);
+  }
+  if (target.protocol !== 'https:') {
+    throw new Error(`Redirect from ${currentUrl} to disallowed scheme "${target.protocol}" rejected`);
+  }
+  if (target.username || target.password) {
+    throw new Error(`Redirect from ${currentUrl} carrying embedded credentials rejected`);
+  }
+  if (target.hostname.toLowerCase() !== allowedHost.toLowerCase()) {
+    throw new Error(`Redirect from ${currentUrl} to disallowed host "${target.hostname}" rejected`);
+  }
+  return target;
+}
+
 async function fetchHtml(url: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
+    const initialUrl = new URL(url);
+    if (initialUrl.protocol !== 'https:') {
+      throw new Error(`Refusing non-HTTPS sync source: ${url}`);
+    }
+    const allowedHost = initialUrl.hostname;
     let currentUrl = url;
     let response: Response | undefined;
     for (let redirects = 0; ; redirects += 1) {
@@ -47,7 +74,7 @@ async function fetchHtml(url: string): Promise<string> {
         const location = response.headers.get('location');
         if (!location) throw new Error(`Redirect from ${currentUrl} had no Location header`);
         if (redirects >= MAX_HTML_REDIRECTS) throw new Error('Exceeded maximum redirect count');
-        currentUrl = new URL(location, currentUrl).toString();
+        currentUrl = validateRedirectTarget(location, currentUrl, allowedHost).toString();
         continue;
       }
       break;

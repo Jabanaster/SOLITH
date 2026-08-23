@@ -17,11 +17,19 @@ test('atomicWriteFileSync falls back to copy+delete when renameSync reports EXDE
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-exdev-test-'));
   const targetPath = path.join(dir, 'solith.db');
 
+  // Only the first renameSync (the real write's rename attempt) reports
+  // EXDEV. The fallback's own final step — renaming its same-directory temp
+  // copy into targetPath — is a true same-device rename and must succeed.
   const originalRename = fs.renameSync;
-  (fs as any).renameSync = () => {
-    const error: NodeJS.ErrnoException = new Error('EXDEV: cross-device link not permitted (simulated)');
-    error.code = 'EXDEV';
-    throw error;
+  let callCount = 0;
+  (fs as any).renameSync = (...args: Parameters<typeof fs.renameSync>) => {
+    callCount += 1;
+    if (callCount === 1) {
+      const error: NodeJS.ErrnoException = new Error('EXDEV: cross-device link not permitted (simulated)');
+      error.code = 'EXDEV';
+      throw error;
+    }
+    return originalRename(...args);
   };
 
   try {
