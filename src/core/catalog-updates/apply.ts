@@ -42,7 +42,10 @@ function buildMergedEntry(
  * returns a 'rejected' result and leaves the current catalog completely
  * unchanged — this function never partially applies a manifest.
  */
-export function applySignedCatalogUpdate(pkg: unknown, options: { nowIso?: string } = {}): ApplyCatalogUpdateResult {
+export function applySignedCatalogUpdate(
+  pkg: unknown,
+  options: { nowIso?: string; trustedPublicKeyPem?: string } = {},
+): ApplyCatalogUpdateResult {
   const nowIso = options.nowIso ?? new Date().toISOString();
   const state = getCatalogUpdateState();
 
@@ -62,7 +65,7 @@ export function applySignedCatalogUpdate(pkg: unknown, options: { nowIso?: strin
   const signedPkg = parsedSchema.data as SignedCatalogUpdatePackage;
   const { version, records, notice } = signedPkg.manifest;
 
-  if (!verifySignedCatalogUpdate(signedPkg)) {
+  if (!verifySignedCatalogUpdate(signedPkg, options.trustedPublicKeyPem)) {
     return reject('signature verification failed', version, records.length);
   }
 

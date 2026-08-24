@@ -9,15 +9,21 @@ import { getCatalogUpdateState, listCatalogUpdateHistory } from '../src/core/cat
 import { getCatalogEntry, upsertCatalogEntry } from '../src/core/trainer-catalog/store.ts';
 import type { CatalogUpdateManifest, SignedCatalogUpdatePackage } from '../src/core/catalog-updates/types.ts';
 
-const TEST_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIH/bSebUQjeRKoZXCROjazY+igPtKM3c363sA+svTRHe
------END PRIVATE KEY-----
-`;
+// Ephemeral test-only Ed25519 keypair — never the production catalog signing
+// key. applyPkg() passes TEST_PUBLIC_KEY_PEM as the trust root explicitly,
+// since the production private key never enters this repository.
+const testKeyPair = crypto.generateKeyPairSync('ed25519');
+const TEST_PRIVATE_KEY_PEM = testKeyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+const TEST_PUBLIC_KEY_PEM = testKeyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
 
 function sign(m: CatalogUpdateManifest): SignedCatalogUpdatePackage {
   const privateKey = crypto.createPrivateKey(TEST_PRIVATE_KEY_PEM);
   const payload = Buffer.from(canonicalizeForSigning(m), 'utf8');
   return { manifest: m, signature: crypto.sign(null, payload, privateKey).toString('base64') };
+}
+
+function applyPkg(pkg: unknown): ReturnType<typeof applySignedCatalogUpdate> {
+  return applySignedCatalogUpdate(pkg, { trustedPublicKeyPem: TEST_PUBLIC_KEY_PEM });
 }
 
 describe('rollbackCatalogUpdate', () => {
@@ -45,7 +51,7 @@ describe('rollbackCatalogUpdate', () => {
       searchableText: 'stable title',
     });
 
-    applySignedCatalogUpdate(
+    applyPkg(
       sign({
         version: 1,
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -64,7 +70,7 @@ describe('rollbackCatalogUpdate', () => {
   });
 
   test('rolling back an update that added a brand-new entry deletes it', () => {
-    applySignedCatalogUpdate(
+    applyPkg(
       sign({
         version: 1,
         createdAt: '2026-01-01T00:00:00.000Z',
@@ -87,7 +93,7 @@ describe('rollbackCatalogUpdate', () => {
   });
 
   test('rolling back an already-rolled-back entry is refused', () => {
-    applySignedCatalogUpdate(
+    applyPkg(
       sign({ version: 1, createdAt: '2026-01-01T00:00:00.000Z', notice: 'x', records: [{ kind: 'add', catalogGameId: 'double-rollback', patch: { displayName: 'X' } }] }),
     );
     const historyId = listCatalogUpdateHistory()[0].id;
@@ -98,7 +104,7 @@ describe('rollbackCatalogUpdate', () => {
   });
 
   test('rolling back a rejected entry (never applied) is refused', () => {
-    applySignedCatalogUpdate({ manifest: { version: 999 } as unknown as CatalogUpdateManifest, signature: 'x' });
+    applyPkg({ manifest: { version: 999 } as unknown as CatalogUpdateManifest, signature: 'x' });
     const rejected = listCatalogUpdateHistory().find((entry) => entry.status === 'rejected');
     assert.ok(rejected);
     const result = rollbackCatalogUpdate(rejected!.id);
@@ -106,11 +112,11 @@ describe('rollbackCatalogUpdate', () => {
   });
 
   test('rolling back a superseded (non-latest) update out of order is refused', () => {
-    applySignedCatalogUpdate(
+    applyPkg(
       sign({ version: 1, createdAt: '2026-01-01T00:00:00.000Z', notice: 'a', records: [{ kind: 'add', catalogGameId: 'first-of-two', patch: { displayName: 'A' } }] }),
     );
     const firstHistoryId = listCatalogUpdateHistory()[0].id;
-    applySignedCatalogUpdate(
+    applyPkg(
       sign({ version: 2, createdAt: '2026-01-02T00:00:00.000Z', notice: 'b', records: [{ kind: 'add', catalogGameId: 'second-of-two', patch: { displayName: 'B' } }] }),
     );
     const result = rollbackCatalogUpdate(firstHistoryId);

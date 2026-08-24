@@ -2306,3 +2306,37 @@ was invented, used, or worked around — all remain
 `FROZEN — OWNER/STORE STEP` exactly as before this session.
 `OVERALL SOLITH SECURITY: NOT COMPLETE` remains the accurate verdict; this
 session narrows what's left to the frozen owner/Store items, not zero.
+
+## Addendum (2026-08-24, Autonomous V1 Closeout to Owner Boundary — Claude Sonnet)
+
+Full detail: [Docs/Reports/AUTONOMOUS_V1_CLOSEOUT.md](Docs/Reports/AUTONOMOUS_V1_CLOSEOUT.md).
+This session generated SOLITH's real production Ed25519 catalog-update
+signing keypair (never the Windows/Store signing identity — that stays
+`FROZEN — OWNER/STORE STEP`). The private key was generated locally,
+written only to `%USERPROFILE%\.solith-secrets\` outside this repository
+with NTFS ACLs restricted to the current user, never printed, and never
+committed. The matching public key (fingerprint
+`13b56bdbb492311cf016267e083f33f558410aea0e3660e4a789e264d66a17fb`)
+replaced the placeholder `TRUSTED_CATALOG_UPDATE_PUBLIC_KEY_PEM` constant
+in `src/core/catalog-updates/signing.ts`. Sign/verify/tamper/wrong-key
+checks against the real key all passed. Two integration test files
+(`tests/catalog-updates-apply.test.ts`, `tests/catalog-updates-rollback.test.ts`)
+had hardcoded a test-fixture private key matching the old placeholder;
+fixed by adding an explicit `trustedPublicKeyPem` override parameter to
+`applySignedCatalogUpdate` (production default behavior unchanged — the
+parameter is optional and falls back to the embedded production trust
+root when omitted) and switching those tests to ephemeral, per-run
+keypairs instead of a fixed fixture. `scripts/verify-electron-output.mjs`'s
+placeholder-trust-root check now actively passes (`SOLITH_RELEASE_BUILD=1`
+run: 30/30, including the previously-dormant placeholder-detection check).
+Full regression after the swap: TypeScript root and Electron configs
+clean, 1699/1699 unit/integration, 10/10 SQL, 278/278 live memory,
+151/151 full sequential E2E, 23/23 packaged smoke against a fresh dev
+build, 0 npm production audit vulnerabilities. MSIX/AppX scaffolding
+(env-gated identity, asset generation, WACK runner) reconfirmed working
+and still fail-closed with no Partner Center values invented. Store
+submission draft copy and an owner Store-identity intake template were
+authored (no submission made). `OVERALL SOLITH SECURITY: NOT COMPLETE`
+remains accurate — the only work genuinely left is Microsoft
+Partner Center identity, Store certification, and Store-side signing,
+none of which this session could or did perform.

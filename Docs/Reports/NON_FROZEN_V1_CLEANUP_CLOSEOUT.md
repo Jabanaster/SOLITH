@@ -3,6 +3,8 @@
 Date: 2026-08-24
 Branch: `review/gate2-5-doc-audit`
 Starting SHA: `b19a093989de647790c7e43675f69975482733f1`
+Cleanup commit SHA: `35be7a17e7fa7d03937c89231cc5db4055c64ff8` (not pushed,
+not merged, not tagged)
 
 This closes the bounded pre-release cleanup pass authorized against the
 starting SHA above: close every remaining non-frozen code/test/packaging
