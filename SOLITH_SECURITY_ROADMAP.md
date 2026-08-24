@@ -2284,3 +2284,25 @@ log audit (Phase 8), formal native-helper inventory (Phase 10) beyond the
 memoryjs rebuild proof in Phase 9.3, and save/backup/registry
 failure-injection scenarios (Phase 11) beyond the containment fix already
 made. `OVERALL SOLITH SECURITY: NOT COMPLETE` remains the accurate verdict.
+
+## Addendum (2026-08-24, Non-Frozen V1 Cleanup session — Claude Sonnet)
+
+Full detail: [Docs/Reports/NON_FROZEN_V1_CLEANUP_CLOSEOUT.md](Docs/Reports/NON_FROZEN_V1_CLEANUP_CLOSEOUT.md).
+This session closed the bounded pre-release cleanup pass against SHA
+`b19a093989de647790c7e43675f69975482733f1`: replaced the regex-based XML
+structural depth scan with a bounded tokenizer immune to comment/CDATA/
+quoted-`>` evasion (`src/core/adapters/xml.ts`, 12 new tests), fixed the
+startup-visibility suite's hardcoded "Game Bar must fail" assumption to
+accept either contractually valid outcome plus hardened a navigation-race
+retry, replaced four fixed-duration sleeps in the Gate 2.5 lifecycle suite
+with bounded state-driven polls, reconfirmed (no change needed — already
+closed by prior work) storage-time install-path containment, and added a
+parallel, env-gated Microsoft Store/MSIX electron-builder target
+(`electron-builder.msix.config.cjs`, `npm run build:msix`,
+`npm run wack:msix`) that fails closed with no Store identity hardcoded
+anywhere and leaves the existing NSIS target untouched. No production
+signing certificate, catalog Ed25519 keypair, or Partner Center identity
+was invented, used, or worked around — all remain
+`FROZEN — OWNER/STORE STEP` exactly as before this session.
+`OVERALL SOLITH SECURITY: NOT COMPLETE` remains the accurate verdict; this
+session narrows what's left to the frozen owner/Store items, not zero.

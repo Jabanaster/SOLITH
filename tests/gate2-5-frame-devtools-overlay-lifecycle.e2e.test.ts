@@ -76,6 +76,30 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+// Bounded state-driven poll, used in place of fixed sleeps wherever an
+// observable predicate exists (e.g. "the overlay window now exists" /
+// "the destroyed webContents id is gone"). Prior fixed-duration sleeps here
+// (700ms for overlay creation, 500ms for destruction settling) were a
+// Gate 2.5 timing-hardening residual — a slow CI/VM tick could still lose
+// the race against a fixed wait, while a healthy run wastes the fixed
+// duration every time. Throws (rather than looping forever) once
+// timeoutMs elapses without the predicate becoming truthy.
+async function waitForCondition<T>(
+  check: () => T | null | undefined | false | Promise<T | null | undefined | false>,
+  timeoutMs: number,
+  intervalMs = 50,
+): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const result = await check();
+    if (result) return result;
+    if (Date.now() - start >= timeoutMs) {
+      throw new Error(`waitForCondition timed out after ${timeoutMs}ms`);
+    }
+    await sleep(intervalMs);
+  }
+}
+
 async function spawnFixture(tag: string): Promise<FixtureHandle> {
   const runId = `${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const statusPath = path.join(os.tmpdir(), `gate2-5-status-${runId}.json`);
@@ -317,7 +341,18 @@ test('Phase 6 — the DevTools webContents has no privileged preload bridge', as
       wc.openDevTools({ mode: 'detach' });
       return { opened: true };
     });
-    await sleep(1500);
+    await waitForCondition(
+      () => ctx!.app.evaluate(({ webContents }) => {
+        const mainWc = webContents.getAllWebContents().find((w) => !w.getURL().startsWith('devtools://'));
+        return Boolean(mainWc?.devToolsWebContents);
+      }),
+      5_000,
+      100,
+    ).catch(() => {
+      // Best-effort: fall through to the one-shot probe below, which itself
+      // reports hasDevToolsWebContents:false and fails the assertion — a
+      // real absence is a genuine finding, not something to mask here.
+    });
 
     const devtoolsProbe = await ctx.app.evaluate(async ({ webContents }) => {
       const mainWc = webContents.getAllWebContents().find((w) => !w.getURL().startsWith('devtools://'));
@@ -359,8 +394,10 @@ test('Phase 7 — the real Wisp overlay can be destroyed and recreated with no i
 
     // Create the overlay via the real production toggle.
     await ctx.win.evaluate(async () => (window as any).electronAPI.wispOverlayToggle?.());
-    await sleep(700);
-    let overlayWin = ctx.app.windows().find((w) => w !== ctx!.win) ?? null;
+    let overlayWin = await waitForCondition(
+      () => ctx!.app.windows().find((w) => w !== ctx!.win) ?? null,
+      10_000,
+    ).catch(() => null);
     expect(overlayWin, 'the real Wisp overlay window must be obtainable via the production toggle').not.toBeNull();
 
     const firstOverlayId = await ctx.app.evaluate(({ webContents }) => {
@@ -408,12 +445,23 @@ test('Phase 7 — the real Wisp overlay can be destroyed and recreated with no i
       const bw = overlayWc ? BrowserWindow.fromWebContents(overlayWc) : null;
       bw?.destroy();
     });
-    await sleep(500);
+    await waitForCondition(
+      () => ctx!.app.evaluate(({ webContents }) => !webContents.getAllWebContents().some((w) => w.getURL().includes('#wisp-overlay'))),
+      5_000,
+      100,
+    ).catch(() => {
+      // Best-effort: if the destroyed-webContents signal never clears within
+      // the bound, the recreation toggle below still proves the real
+      // question (can the overlay be recreated) — surfaced via its own
+      // assertion rather than failing this wait silently.
+    });
 
     // Recreate the overlay through the real application flow (toggle again).
     await ctx.win.evaluate(async () => (window as any).electronAPI.wispOverlayToggle?.());
-    await sleep(700);
-    overlayWin = ctx.app.windows().find((w) => w !== ctx!.win) ?? null;
+    overlayWin = await waitForCondition(
+      () => ctx!.app.windows().find((w) => w !== ctx!.win && w !== overlayWin) ?? null,
+      10_000,
+    ).catch(() => null);
     expect(overlayWin, 'the overlay must be recreatable through the real production toggle').not.toBeNull();
 
     const secondOverlayId = await ctx.app.evaluate(({ webContents }) => {
@@ -547,8 +595,10 @@ test('Phase 3 addendum — overlay cannot reach freeze-stop or freeze-status (in
     expect(start?.success).toBe(true);
 
     await ctx.win.evaluate(async () => (window as any).electronAPI.wispOverlayToggle?.());
-    await sleep(700);
-    const overlayWin = ctx.app.windows().find((w) => w !== ctx!.win) ?? null;
+    const overlayWin = await waitForCondition(
+      () => ctx!.app.windows().find((w) => w !== ctx!.win) ?? null,
+      10_000,
+    ).catch(() => null);
     expect(overlayWin, 'the real Wisp overlay window must be obtainable').not.toBeNull();
 
     const overlayStatus = await overlayWin!.evaluate(async () => {
