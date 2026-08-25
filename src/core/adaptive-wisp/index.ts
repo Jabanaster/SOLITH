@@ -45,3 +45,27 @@ export {
   clearWispSelectedProfile,
   resetWispUserState,
 } from './user-state-service.js';
+
+// Increment 3 — runtime trainer-entry binding + session isolation. No execution yet.
+export type { WispBindingDiagnostic, WispBindingDiagnosticCode } from './binding-errors.js';
+export { bindingDiagnostic } from './binding-errors.js';
+export type {
+  BoundWispAction,
+  BoundWispGroup,
+  BoundWispProfile,
+  WispActionAvailability,
+  WispBoundEntryDescriptor,
+  WispProfileBindingResult,
+  WispRuntimeBinding,
+  WispRuntimeContext,
+} from './runtime-types.js';
+export type { WispTrainerEntryLookup } from './entry-lookup.js';
+export { bindResolvedProfile, revalidateBoundAction } from './profile-binder.js';
+export type { WispBindingValidationResult } from './binding-validation.js';
+export { validateWispBinding } from './binding-validation.js';
+export type { WispRuntimeBindingRegistry } from './binding-registry.js';
+export { createWispRuntimeBindingRegistry } from './binding-registry.js';
+export type { WispRawAttachIdentity, WispSessionContextProvider, WispSessionGenerationTracker } from './session-context.js';
+export { createWispSessionGenerationTracker } from './session-context.js';
+export { createSessionMonitorContextProvider } from './session-monitor-context-provider.js';
+export { createCheatSystemEntryLookup } from './cheat-system-entry-lookup.js';

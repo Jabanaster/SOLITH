@@ -258,16 +258,81 @@ actions' stale references are dropped silently.
 `WISP_RESOLUTION_OVERRIDE_APPLIED` / `_PARTIALLY_APPLIED` / `_INVALID`) —
 see `resolution-types.ts`.
 
-## 16. Planned next layers (PLANNED — not implemented)
+## 17. Runtime trainer-entry binding (implemented, Increment 3)
+
+Answers a different question than the resolver: not "which profile applies"
+but "is this profile action valid for the CURRENT attached session, right
+now?" Pure/testable — `profile-binder.ts` and `binding-validation.ts` take
+only in-memory data, never touch a live process, and never execute anything.
+
+**Runtime context (`runtime-types.ts`):** `WispRuntimeContext { gameId,
+trainerId?, tableId?, tableVersion?, sessionId, sessionGeneration }`. Never
+persisted (Increment 2's persistence stays configuration-only — see the new
+regression test asserting the strict user-state schema rejects `sessionId`/
+`sessionGeneration`/`pid`/`runtimeBinding`).
+
+**Entry lookup (`entry-lookup.ts`):** `WispTrainerEntryLookup` is an injected
+interface, not a hard dependency — `profile-binder.ts` never crawls
+trainer-catalog/cheat-system structures directly. `cheat-system-entry-lookup.ts`
+is the real adapter over `cheat-system/game-registry.ts`'s existing
+`getGameConfig()` + `GameConfig.cheats[]`, scoped by `gameId` so two games
+with a colliding `entryId` (e.g. both have `"health"`) never cross-resolve.
+**Known limitation:** cheat-system's `GameId` and canonical-games'
+`CanonicalGameId` are two separate identity spaces with no existing
+authoritative mapping in this codebase — the adapter takes that mapping as
+an explicit injected function rather than assuming they're equal, since
+guessing wrong would silently defeat cross-game isolation.
+
+**Binding (`profile-binder.ts`):** `bindResolvedProfile(profile, context,
+entryLookup)`. Profile-level trust-boundary mismatches (gameId, trainerId,
+tableId) reject the *whole* profile — Section 23's distinction from
+per-action failures. Missing/disabled entries degrade only that one action
+(`missing-entry` / `disabled`) without breaking the rest of the profile.
+`revalidateBoundAction()` re-checks one action against a fresh context —
+ready for Increment 4 to call immediately before execution.
+
+**Availability states:** `available`, `detached`, `missing-entry`,
+`wrong-game`, `wrong-trainer`, `wrong-table`, `stale-session`, `unsupported`,
+`incompatible`, `disabled`, `unauthorized` (`WispActionAvailability`).
+
+**Validation (`binding-validation.ts`):** `validateWispBinding(binding,
+currentContext)` — a binding is never trusted indefinitely; generation
+comparison against the current context is the ultimate stale-binding
+defense, re-checkable at any time (not just at bind time).
+
+**Session identity (`session-context.ts`):** `SessionMonitorService`
+(`src/core/v2/session-monitor.ts`) has no public generation counter or
+subscribe API (confirmed by audit — its `generation` field is private).
+`createWispSessionGenerationTracker()` derives a local, monotonic
+"attach generation" from `(gameId, pid, processStartTime)` samples — the
+same process-identity evidence (`ProcessIdentity`/`LiveProcessTarget`) the
+rest of the codebase already treats as authoritative, since PID alone is
+insufficient due to reuse. `session-monitor-context-provider.ts` wires this
+to `SessionMonitorService.getStatus()` read-only — never `start()`/`stop()`,
+never attaches to a process itself (Section 50).
+
+**Binding store (`binding-registry.ts`):** `createWispRuntimeBindingRegistry()`
+— in-memory, session-scoped, `replaceProfileBindings` / `get` / `clearSession`
+/ `clearAll`. Every read/write goes through `structuredClone`. No disk
+persistence.
+
+**Security boundary:** a `WispRuntimeBinding` never contains a raw memory
+address, process handle, authorization token, or consent token — only
+`actionId`, `entryId`, `gameId`, optional `trainerId`/`tableId`, `sessionId`,
+`sessionGeneration`, `availability`, `boundAt`. No execution function exists
+yet (`executeWispAction`/`toggleWispAction`/`setWispValue`/`freezeWispValue`
+are not implemented — Increment 4's job), enforced by a static test asserting
+`index.ts` exports none of them.
+
+## 18. Planned next layers (PLANNED — not implemented)
 
 None of the following exist yet:
 
-- **Increment 3 (next):** canonical trainer-entry runtime binding —
-  resolving `entryId` against a live attached session, with
-  stale/session-generation rejection.
-- Action execution / control-type adapters actually invoking anything.
+- **Increment 4 (next):** action execution adapter that revalidates a
+  binding immediately before use and routes operations through SOLITH's
+  existing trainer authorization/consent/freeze systems.
 - Hotkey manager wiring quick slots to physical keys (reusing
-  `cheat-system/trainer-hotkey-*`).
+  `cheat-system/trainer-hotkey-*`) — Increment 5.
 - Generic Wisp renderer / collapsed-expanded UI / group navigation.
 - User customization editor, reset/restore flows.
 - Creator metadata tooling and validation UI.
