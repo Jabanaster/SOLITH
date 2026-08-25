@@ -27,4 +27,15 @@ export const WISP_PROFILE_LIMITS = {
   maxQuickSlot: 6,
   minPriority: 0,
   maxPriority: 1000,
+
+  /** Increment 2 — user override arrays/maps are bounded by the same domain size a profile itself is bounded by. */
+  maxOverrideGroupOrderEntries: 20,
+  maxOverrideActionOrderGroups: 20,
+  maxOverrideActionsPerGroupOrder: 32,
+  maxOverrideHiddenActions: 64,
+  maxOverrideSlotAssignments: 64,
+  maxOverrideActionGroupOverrides: 64,
+
+  /** Increment 2 — bounded persisted-file size, checked before JSON.parse. */
+  maxPersistedFileBytes: 131072,
 } as const;

@@ -2,6 +2,7 @@ import { issue, type WispProfileValidationIssue } from './errors.js';
 import { WISP_PROFILE_LIMITS } from './limits.js';
 import { migrateWispProfileToCurrentVersion } from './migrations.js';
 import { WISP_PROFILE_SCHEMA_VERSION, WISP_SUPPORTED_PROFILE_SCHEMA_VERSIONS, WispGameProfileSchema } from './schema.js';
+import { scanForExecutableMetadata } from './security-scan.js';
 import type { WispGameProfile } from './types.js';
 
 /**
@@ -15,53 +16,6 @@ import type { WispGameProfile } from './types.js';
  */
 
 export type WispProfileValidation = { ok: true; profile: WispGameProfile } | { ok: false; issues: WispProfileValidationIssue[] };
-
-/**
- * Field-name blocklist — defense-in-depth alongside the `.strict()` zod
- * schemas (Section 13). `.strict()` alone would already reject any of these
- * as an "unrecognized key," but that surfaces as a generic
- * WISP_PROFILE_SCHEMA_INVALID; this pass exists to give the security-relevant
- * case its own distinct, testable WISP_PROFILE_EXECUTABLE_METADATA_REJECTED
- * code and to catch it before spending cycles on a full parse.
- */
-const EXECUTABLE_METADATA_KEY_BLOCKLIST = new Set([
-  'script',
-  'javascript',
-  'js',
-  'command',
-  'shell',
-  'powershell',
-  'exec',
-  'eval',
-  'rawaddress',
-  'address',
-  'pointeraddress',
-  'ipcchannel',
-  'processid',
-  'nativecode',
-  'binarypayload',
-]);
-
-const MAX_SCAN_DEPTH = 8;
-
-function scanForExecutableMetadata(value: unknown, path: string, depth: number): WispProfileValidationIssue | null {
-  if (depth > MAX_SCAN_DEPTH || value === null || typeof value !== 'object') return null;
-  if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) {
-      const found = scanForExecutableMetadata(value[i], `${path}[${i}]`, depth + 1);
-      if (found) return found;
-    }
-    return null;
-  }
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (EXECUTABLE_METADATA_KEY_BLOCKLIST.has(key.toLowerCase())) {
-      return issue('WISP_PROFILE_EXECUTABLE_METADATA_REJECTED', `field "${key}" is not permitted in declarative Adaptive Wisp profile data`, `${path}.${key}`);
-    }
-    const found = scanForExecutableMetadata(child, `${path}.${key}`, depth + 1);
-    if (found) return found;
-  }
-  return null;
-}
 
 function byteLength(raw: unknown): number {
   try {
@@ -78,7 +32,7 @@ function extractSchemaVersion(raw: unknown): number | null {
 }
 
 export function validateWispGameProfile(raw: unknown): WispProfileValidation {
-  const blocked = scanForExecutableMetadata(raw, 'profile', 0);
+  const blocked = scanForExecutableMetadata(raw, 'profile');
   if (blocked) return { ok: false, issues: [blocked] };
 
   if (byteLength(raw) > WISP_PROFILE_LIMITS.maxSerializedProfileBytes) {

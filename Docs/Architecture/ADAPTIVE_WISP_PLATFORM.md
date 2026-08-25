@@ -165,15 +165,106 @@ current version) never mutates the input.
 `WISP_PROFILE_EXECUTABLE_METADATA_REJECTED`,
 `WISP_PROFILE_ALREADY_REGISTERED`.
 
-## 13. Planned next layers (PLANNED — not implemented)
+## 13. Local persistence (implemented, Increment 2)
+
+`src/core/adaptive-wisp/persistence.ts`. One JSON document per game —
+`WispUserState { schemaVersion, gameId, selectedProfileId?, override? }`
+(Section 35's "one coherent per-game document" choice: a selection write and
+an override write can never land inconsistently against each other).
+
+- **Storage root:** `<userDataRoot>/adaptive-wisp/user-state/<sha256(gameId)>.json`
+  (`userDataRoot` from `src/shared/app-paths.ts` — `%APPDATA%\Solith` when
+  packaged, `<project>/data` in dev/test). The filename is a SHA-256 hash of
+  the canonical `gameId`, never the raw string, so a hostile-looking gameId
+  cannot path-traverse.
+- **Atomic writes:** write-temp-then-`renameOrCopyAcrossDevices` (reusing
+  `src/core/safety/exdev-safe-rename.ts` — no second unsafe persistence
+  framework). A failed save never touches the previously-valid file.
+- **Read size limit:** `WISP_PROFILE_LIMITS.maxPersistedFileBytes` (128 KB),
+  enforced via `fs.stat` before the file is ever read into memory.
+- **Malformed/corrupt data:** missing file → `state: null` (not an error).
+  Malformed JSON, schema-invalid data, or a gameId mismatch inside the file
+  → `WISP_PERSISTENCE_CORRUPT`, with exactly one `.corrupt` sibling copy
+  preserved as evidence (overwritten on each new corruption, never chained).
+  An unsupported future schema version → `WISP_PERSISTENCE_VERSION_UNSUPPORTED`.
+  The original file is never overwritten by the recovery path itself.
+- **Concurrency:** a small per-file-path async write queue
+  (`persistence.ts`'s `enqueue`) serializes saves so an older concurrent
+  write can never clobber a newer one landing first.
+- **Deterministic serialization:** keys are recursively sorted before
+  `JSON.stringify` (a plain array replacer was tried first and rejected —
+  it filters by key name at every nesting level, which would silently strip
+  fields from the nested `override` object; see the regression test in
+  `tests/adaptive-wisp-persistence.test.ts`).
+- **No secrets, no network:** configuration only — no catalog private key,
+  no credentials, no telemetry, no community download (Section 15/57).
+
+## 14. User override model (implemented, Increment 2)
+
+`src/core/adaptive-wisp/user-state-schema.ts` — `WispUserOverride`, schema
+version `WISP_USER_STATE_SCHEMA_VERSION = 1`, versioned independently of the
+profile schema. Fields: `baseProfileId?`, `groupOrder?`,
+`actionOrderByGroup?`, `slotAssignments?` (`number | null`),
+`hiddenActions?`, `actionGroupOverrides?`, `preferredGroupId?`,
+`preferredQuickSlotCount?`, `updatedAt?`. No physical hotkey mapping (that's
+a later increment). Bounded by dedicated `WISP_PROFILE_LIMITS` entries;
+validated with the same `.strict()` + executable-metadata blocklist
+discipline as a profile (`security-scan.ts`, extracted from Increment 1's
+`validation.ts` with zero behavior change).
+
+An override can only reorder/hide/reslot/regroup actions and groups that
+already exist in the resolved base profile — it has no field that could
+define a new trainer entry, address, command, or IPC channel. "Hiding" an
+action reuses the existing `WispActionDefinition.enabled` field rather than
+deleting it, so the profile stays internally consistent.
+
+## 15. Deterministic profile resolver (implemented, Increment 2)
+
+`src/core/adaptive-wisp/profile-resolver.ts` (pure — no I/O, no registry
+calls, no live session) + `resolution-policy.ts` (centralized precedence)
++ `user-state-service.ts` (the thin non-pure layer wiring registry +
+persistence + resolver together).
+
+**Precedence** (`WISP_DEFAULT_SOURCE_PRECEDENCE`): explicit
+`selectedProfileId` (any source) beats everything when the target exists
+and is applicable. Otherwise: `user` > `creator` > `builtin` > `generated`.
+`community` is deliberately absent from automatic precedence — a community
+profile is only ever a candidate via explicit `selectedProfileId` (Section
+39); it never auto-wins merely by being registered.
+
+**Applicability:** `gameId` must match exactly. A profile that sets
+`trainerId`/`tableId` constrains matching to that exact value; a profile
+that leaves them unset applies generally. `tableVersion` is informational
+metadata only at this increment — no semver range logic was invented
+(Section 20); this is the documented, deliberate scope limit.
+
+**Specificity tie-break** (`specificityScore`): within the same source
+rank, game+table+trainer beats game+table beats game+trainer beats
+game-only; remaining ties break on ascending `profileId` string compare —
+never registry/map insertion order.
+
+**Override overlay:** applied after the base profile is chosen, always
+against a `structuredClone` of the resolved profile — the registry's stored
+object and the caller's input array are never mutated (tested explicitly).
+A stale reference (an override pointing at an action/group the creator
+profile no longer has) is ignored and counted, never a resolution failure —
+this is how creator-profile updates stay resilient: known user ordering is
+preserved, newly added actions are appended deterministically, removed
+actions' stale references are dropped silently.
+
+**Resolution diagnostics:** structured codes
+(`WISP_RESOLUTION_NO_PROFILE`, `WISP_RESOLUTION_SELECTED_PROFILE_NOT_FOUND`,
+`_INAPPLICABLE`, one `_SELECTED` code per source,
+`WISP_RESOLUTION_OVERRIDE_APPLIED` / `_PARTIALLY_APPLIED` / `_INVALID`) —
+see `resolution-types.ts`.
+
+## 16. Planned next layers (PLANNED — not implemented)
 
 None of the following exist yet:
 
-- **Increment 2 (next):** versioned local profile persistence; deterministic
-  profile resolver (user > creator > community > builtin > generated
-  precedence).
-- Runtime trainer-entry binding (resolving `entryId` against a live attached
-  session, with stale/session-generation rejection).
+- **Increment 3 (next):** canonical trainer-entry runtime binding —
+  resolving `entryId` against a live attached session, with
+  stale/session-generation rejection.
 - Action execution / control-type adapters actually invoking anything.
 - Hotkey manager wiring quick slots to physical keys (reusing
   `cheat-system/trainer-hotkey-*`).
