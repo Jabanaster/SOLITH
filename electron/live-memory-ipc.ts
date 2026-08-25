@@ -1499,6 +1499,24 @@ if (process.env.SOLITH_TEST_BUILD === '1') {
   (globalThis as Record<string, unknown>).__solithTestHasSessionForOwner = __testHasSessionForOwner;
 }
 
+/**
+ * Adaptive Wisp Increment 4B — the one seam through which a main-process,
+ * non-IPC caller (the Wisp production execution adapter) can reach the
+ * currently authorized session. Not registered with ipcMain and not exposed
+ * to any preload/renderer surface — this stays main-process-only.
+ *
+ * Sessions are owned per-renderer-sender-id (one window attaches one game),
+ * so "the current session" is only unambiguous when exactly one is attached.
+ * Zero attached sessions, or more than one, both fail closed to null rather
+ * than guessing — Adaptive Wisp must never pick an arbitrary session.
+ */
+export function getActiveLiveMemorySessionBundle(): { manager: MemoryManager; session: LiveMemorySession } | null {
+  const attached = [...sessions.values()].filter((bundle) => bundle.session.isAttached());
+  if (attached.length !== 1) return null;
+  const [bundle] = attached;
+  return { manager: bundle.manager, session: bundle.session };
+}
+
 function memoryAuditFilePath(): string {
   return path.join(app.getPath('userData'), 'logs', 'memory-audit.jsonl');
 }

@@ -73,6 +73,7 @@ export { createCheatSystemEntryLookup } from './cheat-system-entry-lookup.js';
 // Increment 4 — safe action execution routing through SOLITH's existing trainer/consent/freeze pipeline.
 export type { WispGameIdentityBridge } from './game-identity-bridge.js';
 export { createExplicitGameIdentityBridge } from './game-identity-bridge.js';
+export { createCatalogGameIdentityBridge } from './catalog-game-identity-bridge.js';
 export type { WispExecutionDiagnostic, WispExecutionDiagnosticCode } from './execution-errors.js';
 export { executionDiagnostic } from './execution-errors.js';
 export type {

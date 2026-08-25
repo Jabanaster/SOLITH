@@ -34,6 +34,7 @@ const ALLOWED_EXTERNAL_IMPORTS: Record<string, string[]> = {
   'persistence.ts': ['../safety/exdev-safe-rename.js'],
   'session-monitor-context-provider.ts': ['../v2/session-monitor.js'],
   'cheat-system-entry-lookup.ts': ['../cheat-system/game-registry.js', '../cheat-system/types.js'],
+  'catalog-game-identity-bridge.ts': ['../canonical-games/store.js'],
 };
 
 describe('adaptive-wisp domain foundation stays pure (no runtime/IPC/memory imports)', () => {
@@ -64,6 +65,10 @@ describe('adaptive-wisp domain foundation stays pure (no runtime/IPC/memory impo
     for (const expected of ['game-identity-bridge.ts', 'execution-errors.ts', 'execution-types.ts', 'trainer-execution-adapter.ts', 'wisp-action-executor.ts']) {
       assert.ok(files.includes(expected), `expected ${expected} to exist in src/core/adaptive-wisp`);
     }
+  });
+
+  test('adaptive-wisp module directory contains the expected Increment 4B identity bridge file', () => {
+    assert.ok(files.includes('catalog-game-identity-bridge.ts'), 'expected catalog-game-identity-bridge.ts to exist in src/core/adaptive-wisp');
   });
 
   for (const file of files) {

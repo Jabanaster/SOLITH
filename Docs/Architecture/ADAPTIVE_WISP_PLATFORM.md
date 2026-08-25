@@ -391,25 +391,16 @@ wiring, rather than a duplicate registry.
 The pure executor core (control semantics, revalidation, value/preset
 validation, consent pass-through) is implemented and fully tested against
 injected fake adapters — no real commercial game process required, per the
-spec's own test-fixture policy. **A real `WispTrainerExecutionAdapter`
-implementation wiring these interfaces to `MemoryManager`/`LiveMemorySession`
-is intentionally not included in this increment.** Building that safely
-requires touching the live-memory write/consent/freeze pipeline directly,
-which deserves its own focused, independently reviewed pass rather than
-being folded into the same commit as the architecture — "architecture
-correctness beats fake completeness" (spec Section 66). This is the single
-highest-priority Increment 4 follow-up.
+spec's own test-fixture policy. Increment 4B (Section 21) closes most, but
+not all, of this gap — see there for current state.
 
 ## 20. Planned next layers (PLANNED — not implemented)
 
 None of the following exist yet:
 
-- **Real live-memory execution adapter** wiring `WispTrainerExecutionAdapter`
-  to `MemoryManager`/`LiveMemorySession` — see Section 19.
-- **Real game-identity bridge data** populating
-  `createExplicitGameIdentityBridge` — see Section 18.
 - Hotkey manager wiring quick slots to physical keys (reusing
-  `cheat-system/trainer-hotkey-*`) — Increment 5.
+  `cheat-system/trainer-hotkey-*`) — Increment 5, blocked until Section 21's
+  async-confirmation gap closes.
 - Generic Wisp renderer / collapsed-expanded UI / group navigation.
 - User customization editor, reset/restore flows.
 - Creator metadata tooling and validation UI.
@@ -420,3 +411,94 @@ None of the following exist yet:
 
 None of the above is implied to exist by this document — only the sections
 above marked "(implemented)" are real.
+
+## 21. Increment 4B — production execution adapter + real identity bridge (PARTIAL)
+
+**Real production adapter.** `src/core/live-memory/adaptive-wisp-live-adapter.ts`
+implements `WispTrainerExecutionAdapter` for real, delegating every operation
+to `MemoryManager` / `LiveMemorySession` / `src/core/consent/write-consent.ts`.
+It lives outside `src/core/adaptive-wisp/` deliberately — that directory's
+static boundary test forbids any import containing "live-memory" or "freeze",
+so this file is the seam, not a boundary violation. No raw memory access,
+process attach, or handle ownership occurs in this file or anywhere else in
+Adaptive Wisp — every read/write/freeze call is a pass-through to an existing
+canonical method (`session.readValue`, `manager.proposeWrite`,
+`session.proposeFreeze`, `session.stopFreeze`, `consumeWriteConsent`).
+
+**Address-resolution finding.** Auditing the real write path (not just the
+identity question) surfaced that `cheat-system/game-registry.ts`'s
+`GameConfig.cheats[]` — the catalog Increment 3's entry lookup binds against —
+carries no memory address/pointer data at all; it is display/discovery
+metadata only. The catalog that actually resolves an entry to a
+`LiveMemoryAddress` is schema.v1 (`trainer-catalog` `memoryFeatures`, via
+`resolveLiveControlFromSchema` + `LiveMemorySession.resolveControl`), keyed by
+`catalogGameId` — control ids there are always `"<catalogGameId>:<featureId>"`.
+Increment 3's binding-time entry lookup and Increment 4B's real
+execution-time address resolution therefore use two different catalogs; the
+former is fine for degraded-availability/display purposes, but only the
+latter can back a real write.
+
+**Real game identity bridge — closed, correctly.** `CanonicalGame` already
+carries an authoritative, already-populated field for exactly the namespace
+real writes need: `catalogGameId` (bridges to `trainer_catalog_games`). This
+is Option A from the Increment 4B spec ("canonical game records already store
+the exact catalog ID — use it directly"): `src/core/adaptive-wisp/
+catalog-game-identity-bridge.ts`'s `createCatalogGameIdentityBridge()` looks
+this up by primary key via `getCanonicalGame()` — exact match only, fail
+closed to `null` when absent, zero fuzzy/display-name matching. This
+supersedes Increment 4's placeholder `createExplicitGameIdentityBridge`
+(still present, still usable for manual-override callers) for real execution.
+The cheat-system `GameConfig.cheats[]` namespace named in Increment 4's
+original Blocker B remains genuinely unbridged — but per the finding above,
+that catalog cannot back a real write regardless, so this is no longer a
+blocker for real execution.
+
+**Session authority.** `electron/live-memory-ipc.ts` exports
+`getActiveLiveMemorySessionBundle()` — the one seam through which a
+main-process, non-IPC caller can reach the currently authorized session.
+Fails closed to `null` when zero or more than one session is attached (never
+guesses). Not registered with `ipcMain`, not reachable from any preload or
+renderer. `electron/adaptive-wisp-execution-composition.ts` is the single
+factory point (`getAdaptiveWispExecutionAdapter()`) composing the real
+adapter from this accessor plus the real identity bridge — also not
+IPC-exposed.
+
+**Remaining blocker: confirmWrite/confirmFreeze are synchronous by contract,
+the canonical confirm path is not.** `WispTrainerExecutionAdapter.confirmWrite`
+/`confirmFreeze` are synchronous (`executeWispAction` calls them without
+`await`). The real canonical confirm path is asynchronous end-to-end
+(`MemoryManager.confirmWrite`/`freezeStart` are `async`, involving a real
+native write and an awaited snapshot-listener hook). This adapter does not
+fake synchronicity with a blocking-wait shim — that is an unsafe shortcut the
+spec rules out. Consent consumption itself is real and fully proven
+(`consumeWriteConsent` is genuinely synchronous, and replay/wrong-token
+rejection is tested end-to-end), but the confirmed write/freeze cannot
+complete through this interface: `confirmWrite`/`confirmFreeze` consume the
+consent token for real, then return `{ok: false, status: 'failed', reason:
+'async_confirmation_not_yet_wired: ...'}` rather than fabricate success.
+Closing this requires widening `WispTrainerExecutionAdapter.confirmWrite`/
+`confirmFreeze` (and `executeWispAction`) to `async` — a change to the
+already-committed Increment 4 executor architecture, out of this pass's
+narrow scope (no unrelated executor changes were authorized). **This is the
+single highest-priority remaining blocker before Increment 4 can be marked
+COMPLETE.**
+
+**Consent binding convention.** Since Wisp never mints consent, whoever
+issues consent for a Wisp-originated proposal must reconstruct an identical
+binding to what this adapter reconstructs at confirm time. The one field
+identity evidence alone can't supply is `sessionKey`; this adapter fixes it
+to the constant `ADAPTIVE_WISP_CONSENT_SESSION_KEY = 'adaptive-wisp'`,
+documented for whoever wires the future issuing caller.
+
+**Verified for real (against the real fake-driver-backed `MemoryManager`/
+`LiveMemorySession`/consent stack, plus a real SQL-backed canonical-games/
+trainer-catalog DB for identity/address resolution):** `getCurrentState`,
+`proposeWrite` (stages, never writes early), `proposeFreeze`, `stopFreeze`
+(delegates to the same canonical freeze, not a second one), consent replay
+rejection, wrong-token rejection, cross-game / unmapped-identity fail-closed
+rejection, no-active-session fail-closed rejection.
+
+**Not verified in this pass:** an actual completed write or freeze against a
+real target process (blocked by the async-boundary finding above), and the
+full packaged "HP+10 end-to-end" acceptance scenario from the spec's Final
+Acceptance section — both require the confirm-path fix first.
