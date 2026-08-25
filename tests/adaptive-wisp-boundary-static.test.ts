@@ -60,6 +60,12 @@ describe('adaptive-wisp domain foundation stays pure (no runtime/IPC/memory impo
     }
   });
 
+  test('adaptive-wisp module directory contains the expected Increment 4 execution files', () => {
+    for (const expected of ['game-identity-bridge.ts', 'execution-errors.ts', 'execution-types.ts', 'trainer-execution-adapter.ts', 'wisp-action-executor.ts']) {
+      assert.ok(files.includes(expected), `expected ${expected} to exist in src/core/adaptive-wisp`);
+    }
+  });
+
   for (const file of files) {
     test(`${file} imports nothing from a forbidden runtime/IPC/memory/hotkey module`, () => {
       const contents = readFileSync(path.join(dir, file), 'utf8');
@@ -72,10 +78,11 @@ describe('adaptive-wisp domain foundation stays pure (no runtime/IPC/memory impo
     });
   }
 
-  test('no execution/write/freeze APIs are exported (Section 46 — no execution yet)', () => {
-    const contents = readFileSync(path.join(dir, 'index.ts'), 'utf8');
-    for (const forbiddenExport of ['executeWispAction', 'toggleWispAction', 'setWispValue', 'freezeWispValue']) {
-      assert.ok(!contents.includes(forbiddenExport), `index.ts must not export ${forbiddenExport} yet — Increment 4's concern`);
+  test('Increment 4 execution routing is exported but never exposed to renderer/IPC (Section 57)', () => {
+    for (const file of files) {
+      const contents = readFileSync(path.join(dir, file), 'utf8');
+      assert.ok(!contents.includes('ipcMain.handle'), `${file} must not register an IPC handler — execution stays core-only until an explicit later increment`);
+      assert.ok(!/wisp-execute/i.test(contents), `${file} must not define a "wisp-execute"-style IPC channel yet`);
     }
   });
 

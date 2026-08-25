@@ -69,3 +69,26 @@ export type { WispRawAttachIdentity, WispSessionContextProvider, WispSessionGene
 export { createWispSessionGenerationTracker } from './session-context.js';
 export { createSessionMonitorContextProvider } from './session-monitor-context-provider.js';
 export { createCheatSystemEntryLookup } from './cheat-system-entry-lookup.js';
+
+// Increment 4 — safe action execution routing through SOLITH's existing trainer/consent/freeze pipeline.
+export type { WispGameIdentityBridge } from './game-identity-bridge.js';
+export { createExplicitGameIdentityBridge } from './game-identity-bridge.js';
+export type { WispExecutionDiagnostic, WispExecutionDiagnosticCode } from './execution-errors.js';
+export { executionDiagnostic } from './execution-errors.js';
+export type {
+  WispActionExecutionRequest,
+  WispActionExecutionResult,
+  WispActionExecutionStatus,
+  WispCycleRequest,
+  WispFreezeRequest,
+  WispIncrementRequest,
+  WispMomentaryRequest,
+  WispMultiplierRequest,
+  WispSafeDisplayValue,
+  WispSetRequest,
+  WispToggleRequest,
+} from './execution-types.js';
+export { validateWispExecutionRequestShape } from './execution-types.js';
+export type { WispCanonicalProposal, WispCanonicalWriteOutcome, WispTrainerEntryState, WispTrainerExecutionAdapter } from './trainer-execution-adapter.js';
+export type { WispActionExecutorDeps } from './wisp-action-executor.js';
+export { executeWispAction, validateValueForDataType } from './wisp-action-executor.js';

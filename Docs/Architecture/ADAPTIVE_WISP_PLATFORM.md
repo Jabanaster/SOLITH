@@ -324,13 +324,90 @@ yet (`executeWispAction`/`toggleWispAction`/`setWispValue`/`freezeWispValue`
 are not implemented — Increment 4's job), enforced by a static test asserting
 `index.ts` exports none of them.
 
-## 18. Planned next layers (PLANNED — not implemented)
+## 18. Safe action execution routing (implemented, Increment 4 — architecture PARTIAL, see Section 19)
+
+Answers "should this action actually happen right now?" and, if so, routes
+it through SOLITH's existing trainer/consent/freeze pipeline — Adaptive
+Wisp still never writes memory itself.
+
+**Game-identity bridge (`game-identity-bridge.ts`):** audit confirmed no
+authoritative mapping exists between canonical-games' `CanonicalGameId`
+(`canonical:<hash>`) and cheat-system's `GameId` (hand-authored literals
+like `'palworld'`) — `CanonicalGame.catalogGameId` bridges to
+`trainer_catalog_games`, a third, unrelated namespace. Per the spec's
+explicit prohibition, this is **not** solved with display-name, fuzzy, or
+executable-name matching, or an unproven cast — any of those could silently
+defeat cross-game isolation. `createExplicitGameIdentityBridge(mapping)` is
+a narrow, deterministic, exact-match-only lookup: unknown canonical id →
+`null`, always. **The real production mapping data is not populated by this
+increment** — wiring canonical-game registration to record its
+cheat-system `GameId` is a follow-up integration task; this module provides
+and tests the bridge contract, not the real data.
+
+**Execution request/result (`execution-types.ts`, `execution-errors.ts`):**
+a strict discriminated union by `control` (toggle/freeze/set/increment/
+multiplier/cycle/momentary) — no generic `execute(operation, payload)`
+escape hatch. No variant carries an address, pointer, pid, or process
+handle; `validateWispExecutionRequestShape()` is the runtime backstop
+proving a request with one of those keys is rejected even if a caller adds
+one, mirroring `security-scan.ts`'s blocklist discipline.
+
+**Canonical execution adapter (`trainer-execution-adapter.ts`):** audit
+found SOLITH has no separate enable/disable/momentary primitives —
+`useGameCheatSession.ts`'s toggle/set/momentary all funnel through the same
+`proposeWrite`→consent→`confirmWrite` sequence (`MemoryManager`). The
+injected `WispTrainerExecutionAdapter` interface mirrors that reality (one
+write pipeline, one freeze pipeline) instead of inventing parallel
+`enable()`/`disable()`/`set()` methods that would need a duplicate real
+implementation. `supportsControls` on its returned state is the
+**authoritative** compatibility source — the executor never lets profile
+metadata override it.
+
+**Executor (`wisp-action-executor.ts`):** `executeWispAction(request,
+actionDefinition, binding, currentContext, deps)` — revalidates the binding
+via `validateWispBinding()` (Increment 3, never a looser second rule),
+checks the identity bridge, re-resolves the entry, checks control
+compatibility, computes/validates the requested value (own `LiveValueType`
+range/NaN/Infinity/overflow validation — no reusable validator existed
+upstream per audit), proposes the write/freeze, and returns `pending-consent`
+until a consent token already obtained through SOLITH's existing workflow
+is supplied — Wisp never mints one. `increment`/`multiplier`/`cycle` are
+computed client-side (current value + validated preset/delta) then routed
+through the same `set`-equivalent write, since no dedicated canonical
+increment/multiplier/cycle operation exists. `momentary` is a safe
+validated set gated by a required preset — never a generic callback.
+`freeze`-disable is not consent-gated (per audit), routed directly to
+`stopFreeze`.
+
+**No second lifecycle registry:** Wisp-initiated freeze cleanup on
+detach/process-exit/session-generation-change is **not** implemented here —
+it relies on the canonical freeze tick's own continuous
+`verifyAttachedProcessIdentity()` re-check (confirmed by audit: every tick
+re-verifies identity before writing) plus the existing session-cleanup
+wiring, rather than a duplicate registry.
+
+## 19. Increment 4 scope limitation — real adapter wiring not included
+
+The pure executor core (control semantics, revalidation, value/preset
+validation, consent pass-through) is implemented and fully tested against
+injected fake adapters — no real commercial game process required, per the
+spec's own test-fixture policy. **A real `WispTrainerExecutionAdapter`
+implementation wiring these interfaces to `MemoryManager`/`LiveMemorySession`
+is intentionally not included in this increment.** Building that safely
+requires touching the live-memory write/consent/freeze pipeline directly,
+which deserves its own focused, independently reviewed pass rather than
+being folded into the same commit as the architecture — "architecture
+correctness beats fake completeness" (spec Section 66). This is the single
+highest-priority Increment 4 follow-up.
+
+## 20. Planned next layers (PLANNED — not implemented)
 
 None of the following exist yet:
 
-- **Increment 4 (next):** action execution adapter that revalidates a
-  binding immediately before use and routes operations through SOLITH's
-  existing trainer authorization/consent/freeze systems.
+- **Real live-memory execution adapter** wiring `WispTrainerExecutionAdapter`
+  to `MemoryManager`/`LiveMemorySession` — see Section 19.
+- **Real game-identity bridge data** populating
+  `createExplicitGameIdentityBridge` — see Section 18.
 - Hotkey manager wiring quick slots to physical keys (reusing
   `cheat-system/trainer-hotkey-*`) — Increment 5.
 - Generic Wisp renderer / collapsed-expanded UI / group navigation.
