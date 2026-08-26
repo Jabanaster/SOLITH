@@ -28,13 +28,13 @@ export interface WispActionExecutorDeps {
   trainerAdapter: WispTrainerExecutionAdapter;
 }
 
-export function executeWispAction(
+export async function executeWispAction(
   request: WispActionExecutionRequest,
   actionDefinition: WispActionDefinition,
   binding: WispRuntimeBinding,
   currentContext: WispRuntimeContext | null,
   deps: WispActionExecutorDeps,
-): WispActionExecutionResult {
+): Promise<WispActionExecutionResult> {
   const shape = validateWispExecutionRequestShape(request);
   if (shape.ok === false) {
     return reject(request.actionId, executionDiagnostic('WISP_EXECUTION_REQUEST_SHAPE_REJECTED', `execution request contains a forbidden field "${shape.rejectedKey}"`, { actionId: request.actionId }));
@@ -80,15 +80,25 @@ export function executeWispAction(
   return handleWrite(request, actionDefinition, binding, state, deps);
 }
 
-function handleFreeze(
+async function handleFreeze(
   request: Extract<WispActionExecutionRequest, { control: 'freeze' }>,
   actionDefinition: WispActionDefinition,
   binding: WispRuntimeBinding,
   state: WispTrainerEntryState,
   deps: WispActionExecutorDeps,
-): WispActionExecutionResult {
+): Promise<WispActionExecutionResult> {
   if (!request.enable) {
     const outcome = deps.trainerAdapter.stopFreeze(binding.gameId, binding.entryId);
+    return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_FREEZE_FAILED');
+  }
+
+  // Increment 4C: if the caller already holds a consent token bound to a
+  // specific prior proposal, confirm that exact proposal — never re-propose
+  // and confirm a different one under the same token (the real canonical
+  // consent binding hashes in the exact proposalId, so a mismatch always
+  // fails closed; re-proposing here would just waste the round-trip).
+  if (request.consentToken !== undefined && request.proposalId !== undefined) {
+    const outcome = await deps.trainerAdapter.confirmFreeze(request.proposalId, request.consentToken);
     return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_FREEZE_FAILED');
   }
 
@@ -107,11 +117,18 @@ function handleFreeze(
 
   if (request.consentToken === undefined) return pendingConsent(request.actionId, binding, proposal.proposalId);
 
-  const outcome = deps.trainerAdapter.confirmFreeze(proposal.proposalId, request.consentToken);
+  const outcome = await deps.trainerAdapter.confirmFreeze(proposal.proposalId, request.consentToken);
   return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_FREEZE_FAILED');
 }
 
-function handleWrite(request: WispActionExecutionRequest, actionDefinition: WispActionDefinition, binding: WispRuntimeBinding, state: WispTrainerEntryState, deps: WispActionExecutorDeps): WispActionExecutionResult {
+async function handleWrite(request: WispActionExecutionRequest, actionDefinition: WispActionDefinition, binding: WispRuntimeBinding, state: WispTrainerEntryState, deps: WispActionExecutorDeps): Promise<WispActionExecutionResult> {
+  // Increment 4C: confirm the exact prior proposal when the caller already
+  // holds a token bound to one — see the matching comment in handleFreeze.
+  if (request.consentToken !== undefined && request.proposalId !== undefined) {
+    const outcome = await deps.trainerAdapter.confirmWrite(request.proposalId, request.consentToken);
+    return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_TRAINER_FAILED');
+  }
+
   const computed = computeRequestedValue(request, actionDefinition, state);
   if (computed.ok === false) return computed.result(request.actionId, binding);
 
@@ -120,7 +137,7 @@ function handleWrite(request: WispActionExecutionRequest, actionDefinition: Wisp
 
   if (request.consentToken === undefined) return pendingConsent(request.actionId, binding, proposal.proposalId);
 
-  const outcome = deps.trainerAdapter.confirmWrite(proposal.proposalId, request.consentToken);
+  const outcome = await deps.trainerAdapter.confirmWrite(proposal.proposalId, request.consentToken);
   return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_TRAINER_FAILED');
 }
 
@@ -202,7 +219,13 @@ function fromWriteOutcome(actionId: string, binding: WispRuntimeBinding, outcome
 }
 
 function pendingConsent(actionId: string, binding: WispRuntimeBinding, proposalId: string): WispActionExecutionResult {
-  return { ok: false, actionId, status: 'pending-consent', diagnostic: executionDiagnostic('WISP_EXECUTION_CONSENT_REQUIRED', `proposal "${proposalId}" awaits an existing-workflow consent token`, { actionId, entryId: binding.entryId, gameId: binding.gameId }) };
+  return {
+    ok: false,
+    actionId,
+    status: 'pending-consent',
+    proposalId,
+    diagnostic: executionDiagnostic('WISP_EXECUTION_CONSENT_REQUIRED', `proposal "${proposalId}" awaits an existing-workflow consent token`, { actionId, entryId: binding.entryId, gameId: binding.gameId }),
+  };
 }
 
 function rejectInvalidPreset(actionId: string, binding: WispRuntimeBinding, presetId: string | undefined): WispActionExecutionResult {

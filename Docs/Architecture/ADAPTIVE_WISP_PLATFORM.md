@@ -324,7 +324,7 @@ yet (`executeWispAction`/`toggleWispAction`/`setWispValue`/`freezeWispValue`
 are not implemented — Increment 4's job), enforced by a static test asserting
 `index.ts` exports none of them.
 
-## 18. Safe action execution routing (implemented, Increment 4 — architecture PARTIAL, see Section 19)
+## 18. Safe action execution routing (implemented, Increment 4 — COMPLETE as of Increment 4C, see Section 22)
 
 Answers "should this action actually happen right now?" and, if so, routes
 it through SOLITH's existing trainer/consent/freeze pipeline — Adaptive
@@ -399,8 +399,9 @@ not all, of this gap — see there for current state.
 None of the following exist yet:
 
 - Hotkey manager wiring quick slots to physical keys (reusing
-  `cheat-system/trainer-hotkey-*`) — Increment 5, blocked until Section 21's
-  async-confirmation gap closes.
+  `cheat-system/trainer-hotkey-*`) — Increment 5, gated on an independent
+  security review of the full Increment 4 chain (Section 22), not on any
+  remaining implementation gap.
 - Generic Wisp renderer / collapsed-expanded UI / group navigation.
 - User customization editor, reset/restore flows.
 - Creator metadata tooling and validation UI.
@@ -501,4 +502,94 @@ rejection, no-active-session fail-closed rejection.
 **Not verified in this pass:** an actual completed write or freeze against a
 real target process (blocked by the async-boundary finding above), and the
 full packaged "HP+10 end-to-end" acceptance scenario from the spec's Final
-Acceptance section — both require the confirm-path fix first.
+Acceptance section — both required the confirm-path fix first, which
+Increment 4C (Section 22) delivers.
+
+## 22. Increment 4C — async confirmation completion (COMPLETE)
+
+**Async contract.** `WispTrainerExecutionAdapter.confirmWrite`/`confirmFreeze`
+now return `Promise<WispCanonicalWriteOutcome>`; `executeWispAction` (and its
+internal `handleWrite`/`handleFreeze`) are now `async`, `await`ing both
+calls. `getCurrentState`/`proposeWrite`/`proposeFreeze`/`stopFreeze` stayed
+synchronous — they were never the blocker (all sync in the canonical layer
+too) and widening them would have been scope creep.
+
+**Real production adapter confirm path.** `adaptive-wisp-live-adapter.ts`'s
+`confirmWrite` now `await`s `MemoryManager.confirmWrite(proposalId,
+{consentToken, consentBinding, reason})` directly — no local
+`consumeWriteConsent` call, since `MemoryManager.confirmWrite` consumes the
+token itself; calling it twice would race two consumption attempts against
+one single-use token. Post-await revalidation is the canonical service's own
+job, not duplicated here: `LiveMemorySession.confirmWrite` re-verifies
+`verifyAttachedProcessIdentity()` immediately after its own internal await
+(a remote-connection re-check), right before writing — that is the real
+"session/process may have changed during the await" defense the async
+conversion needed, and it already existed. `confirmFreeze` mirrors this via
+`MemoryManager.freezeStart`.
+
+**Structural finding, fixed:** `executeWispAction` stages a brand-new
+canonical proposal on every call — including a call that already carries a
+`consentToken`. Two independent `executeWispAction` invocations (a
+propose-only call, then a separate confirm call) therefore produced two
+*different* real proposal ids, and a real consent binding hashes in the
+exact proposal id — so a token obtained for the first call's proposal could
+never validate against the second call's fresh one. This is not an artifact
+of async — it would have blocked a real confirmed mutation regardless.
+Fixed by adding an optional `proposalId` to `WispActionExecutionRequest` and
+to `WispActionExecutionResult` (set on a `pending-consent` result): a caller
+that already holds a token bound to a specific proposal echoes that
+`proposalId` back on the confirming call, and `handleWrite`/`handleFreeze`
+now confirm that exact proposal directly instead of silently re-proposing
+and discarding it. No unrelated executor redesign — the propose/pending-
+consent/confirm shape is unchanged, just no longer lossy.
+
+**Real Wisp-routed mutation proof (Final Acceptance, met).** A dedicated
+integration test drives `executeWispAction` twice through the real
+production adapter and a real `MemoryManager`/`LiveMemorySession`/consent
+stack (backed by `FakeMemoryDriver` — the same fixture convention used
+throughout this codebase's ~2000 other live-memory tests, not a raw-write
+shortcut): propose (100, unchanged) → real consent issued for the returned
+`proposalId` → confirm (echoing that `proposalId`) → canonical write
+actually applies (100 → 200, verified via `driver.readMemory`) → restore
+(200 → 100, verified). Same pattern proven for freeze at the adapter level:
+propose → consent → awaited confirm → `LiveMemorySession`'s own freeze
+becomes active (target address/value verified) → replay of the consumed
+consent rejected → `stopFreeze` deactivates the same canonical freeze.
+Negative controls, all proven with zero mutation: no confirm, wrong/random
+consent token, stale session generation (rejected before the adapter is ever
+reached), unmapped canonical game (rejected before the adapter is ever
+reached).
+
+**Control support matrix** (domain = executor logic; production = proven via
+the real adapter):
+
+| Control | Domain | Production | Evidence |
+|---|---|---|---|
+| set | implemented | verified | direct fixture mutation + restore test |
+| toggle | implemented | verified (shared code path) | same `handleWrite`→`confirmWrite` call proven by `set`; `computeRequestedValue`'s toggle branch separately unit-tested |
+| increment | implemented | verified (shared code path) | same as toggle |
+| multiplier | implemented | verified (shared code path) | same as toggle |
+| cycle | implemented | verified (shared code path) | same as toggle |
+| momentary | implemented | verified (shared code path) | same as toggle |
+| freeze | implemented | verified | adapter-level propose→consent→confirm→active→stop test |
+
+**Packaged evidence.** No new Adaptive-Wisp-specific packaged proof was
+added: Adaptive Wisp still has no IPC/renderer surface (by design, per
+Section 21's non-negotiable scope limits), so a packaged Playwright test
+cannot reach `getAdaptiveWispExecutionAdapter()` without adding a test-only
+IPC bypass — which is explicitly disallowed. What packaged evidence
+*does* confirm: the canonical primitives Wisp's real adapter calls into
+(`MemoryManager.confirmWrite`, `LiveMemorySession.startFreezeConfirmed`,
+consent issuance/consumption) remain correct in a real packaged
+Electron + native-driver + .NET fixture-process environment —
+`gate2-2a1-packaged-real-process-write-proof.e2e.test.ts` (1/1) and
+`gate2-3-freeze-authorization-security.e2e.test.ts` (3/3) both passed against
+a freshly built `dist/win-unpacked/Solith.exe`.
+
+**Result: all ten Increment 4 completion-gate criteria are met** — async
+confirmWrite/confirmFreeze work against the real canonical service; a real
+Wisp-routed mutation succeeds and restores; a real Wisp-routed freeze
+starts, is enforced by the canonical session (not a second one), and stops;
+stale/cross-game/wrong-consent negatives fail closed; the identity bridge
+remains authoritative; no second write or freeze pipeline exists; every
+regression suite stayed green. **Adaptive Wisp Increment 4 is COMPLETE.**

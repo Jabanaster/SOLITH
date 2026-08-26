@@ -22,6 +22,16 @@ interface WispActionExecutionRequestBase {
   profileId: WispProfileId;
   /** Pass-through only — Wisp never mints a consent token itself (Section 21); this is either absent (first call, propose-only) or a token already obtained through SOLITH's existing consent workflow. */
   consentToken?: string;
+  /**
+   * Increment 4C — when confirming, the exact proposalId the caller obtained
+   * from the prior propose-only call's `pendingConsent` result. Every
+   * executor call stages a fresh canonical proposal; without this, a
+   * consent token obtained for that first proposal could never validate
+   * against a second, independently re-proposed one (a real canonical
+   * consent binding hashes in the exact proposalId). Absent on the
+   * propose-only call; required alongside `consentToken` to confirm.
+   */
+  proposalId?: string;
 }
 
 export interface WispToggleRequest extends WispActionExecutionRequestBase {
@@ -69,6 +79,8 @@ export interface WispActionExecutionResult {
   status: WispActionExecutionStatus;
   currentValue?: WispSafeDisplayValue;
   diagnostic?: WispExecutionDiagnostic;
+  /** Set only on a `pending-consent` result — the caller must echo this back as the request's `proposalId` on the confirming call (Section 10, Increment 4C). */
+  proposalId?: string;
 }
 
 const REQUEST_SHAPE_FORBIDDEN_KEYS = new Set(['address', 'pointer', 'pid', 'processhandle', 'handle', 'rawaddress', 'pointeraddress', 'processid']);

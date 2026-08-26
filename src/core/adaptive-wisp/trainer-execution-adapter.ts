@@ -40,11 +40,19 @@ export interface WispTrainerExecutionAdapter {
 
   /** Stages a write (enable/disable/set/increment/multiplier/cycle/momentary-as-set all route here). Returns null when the entry cannot accept a write proposal at all (missing/incompatible). */
   proposeWrite(gameId: CanonicalGameId, entryId: CanonicalTrainerEntryId, requestedValue: WispSafeDisplayValue): WispCanonicalProposal | null;
-  /** Consumes a consent token already obtained through SOLITH's existing consent workflow — Wisp never mints one (Section 21). */
-  confirmWrite(proposalId: string, consentToken: string): WispCanonicalWriteOutcome;
+  /**
+   * Consumes a consent token already obtained through SOLITH's existing consent
+   * workflow — Wisp never mints one (Section 21). Async (Increment 4C): the
+   * canonical confirm path performs a real native write plus an awaited
+   * remote-connection re-check, and re-verifies process identity AFTER that
+   * await, immediately before writing — this method must reach that same
+   * canonical call, not a synchronous stand-in.
+   */
+  confirmWrite(proposalId: string, consentToken: string): Promise<WispCanonicalWriteOutcome>;
 
   proposeFreeze(gameId: CanonicalGameId, entryId: CanonicalTrainerEntryId, value: WispSafeDisplayValue, intervalMs?: number): WispCanonicalProposal | null;
-  confirmFreeze(proposalId: string, consentToken: string): WispCanonicalWriteOutcome;
+  /** Async (Increment 4C) — mirrors confirmWrite; reaches the real canonical freeze-start call. */
+  confirmFreeze(proposalId: string, consentToken: string): Promise<WispCanonicalWriteOutcome>;
   /** Freeze-stop is not consent-gated in the canonical path (per audit) — direct call, no proposal phase. */
   stopFreeze(gameId: CanonicalGameId, entryId: CanonicalTrainerEntryId): WispCanonicalWriteOutcome;
 }

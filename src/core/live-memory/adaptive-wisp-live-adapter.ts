@@ -1,5 +1,5 @@
 /**
- * Adaptive Wisp Increment 4B — production `WispTrainerExecutionAdapter`.
+ * Adaptive Wisp Increment 4B/4C — production `WispTrainerExecutionAdapter`.
  *
  * Lives outside src/core/adaptive-wisp/ deliberately: that directory's static
  * boundary test (tests/adaptive-wisp-boundary-static.test.ts) forbids any
@@ -36,7 +36,7 @@ import type { MemoryManager } from './memory-manager.js';
 import { MAX_FREEZE_DURATION_MS, type LiveMemorySession } from './live-memory-session.js';
 import type { LiveMemoryAddress, LiveValueType } from './types.js';
 import { resolveLiveControlFromSchema } from './dual-read-controls.js';
-import { consumeWriteConsent, type WriteConsentBinding } from '../consent/write-consent.js';
+import type { WriteConsentBinding } from '../consent/write-consent.js';
 
 export interface LiveMemoryWispSessionBundle {
   manager: MemoryManager;
@@ -189,21 +189,16 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       }
     },
 
-    // NOTE (Increment 4B finding — see ADAPTIVE_WISP_PLATFORM.md): the canonical
-    // confirm path (MemoryManager.confirmWrite / LiveMemorySession.confirmWrite)
-    // is async — it performs a real native write plus an awaited snapshot-listener
-    // hook. WispTrainerExecutionAdapter.confirmWrite/confirmFreeze are SYNCHRONOUS
-    // by contract (executeWispAction calls them without await). This adapter will
-    // not fake synchronicity (blocking-wait shims are unsafe and were explicitly
-    // ruled out — Section 69's "no unsafe shortcuts" applies here). Consent
-    // consumption itself IS synchronous and is proven for real below (replay,
-    // expiry, wrong-session, wrong-token all correctly reject before the async
-    // boundary), but the actual confirmed write cannot complete through this
-    // synchronous interface. Closing this requires widening
-    // WispTrainerExecutionAdapter.confirmWrite/confirmFreeze (and executeWispAction)
-    // to async — out of this pass's scope (no unrelated executor changes authorized)
-    // and reported as the single highest-priority remaining Increment 4 blocker.
-    confirmWrite(proposalId, consentToken): WispCanonicalWriteOutcome {
+    // Increment 4C: reaches the real, async canonical confirm path.
+    // MemoryManager.confirmWrite consumes the consent token itself (single
+    // call, single consumption) — this adapter builds and passes the binding
+    // but never calls consumeWriteConsent directly, so there is exactly one
+    // consumption attempt, not two racing against each other. The canonical
+    // session re-verifies process identity AFTER its own internal await
+    // (remote-connection re-check), immediately before writing — that is the
+    // real "revalidate after await" defense; this adapter does not duplicate
+    // it, per Section 7's "canonical service remains authoritative" guidance.
+    async confirmWrite(proposalId, consentToken): Promise<WispCanonicalWriteOutcome> {
       const bundle = getSession();
       if (!bundle) return { ok: false, status: 'rejected', reason: 'no_active_session' };
       const identityError = bundle.session.verifyAttachedProcessIdentity();
@@ -220,16 +215,15 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       });
       if (!consentBinding) return { ok: false, status: 'rejected', reason: 'incomplete_process_identity' };
 
-      const consumed = consumeWriteConsent(consentToken, consentBinding);
-      if (consumed.ok === false) {
-        return { ok: false, status: 'rejected', reason: `consent_denied:${consumed.reason}` };
+      const result = await bundle.manager.confirmWrite(proposalId, {
+        consentToken,
+        consentBinding,
+        reason: 'adaptive_wisp_confirm',
+      });
+      if (result.success === false) {
+        return { ok: false, status: 'rejected', reason: result.error ?? 'confirm_write_failed' };
       }
-
-      return {
-        ok: false,
-        status: 'failed',
-        reason: 'async_confirmation_not_yet_wired: canonical confirmWrite is async; WispTrainerExecutionAdapter.confirmWrite must become async before this can complete a real write',
-      };
+      return { ok: true, status: 'applied', currentValue: result.manifest?.valueAfter };
     },
 
     proposeFreeze(gameId, entryId, value, intervalMs): WispCanonicalProposal | null {
@@ -249,8 +243,10 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       }
     },
 
-    // Same async-boundary finding as confirmWrite above — see note there.
-    confirmFreeze(proposalId, consentToken): WispCanonicalWriteOutcome {
+    // Increment 4C: reaches the real canonical freeze-start call. Same
+    // single-consumption rationale as confirmWrite above — MemoryManager.freezeStart
+    // consumes the token itself.
+    async confirmFreeze(proposalId, consentToken): Promise<WispCanonicalWriteOutcome> {
       const bundle = getSession();
       if (!bundle) return { ok: false, status: 'rejected', reason: 'no_active_session' };
       const identityError = bundle.session.verifyAttachedProcessIdentity();
@@ -268,16 +264,11 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       });
       if (!consentBinding) return { ok: false, status: 'rejected', reason: 'incomplete_process_identity' };
 
-      const consumed = consumeWriteConsent(consentToken, consentBinding);
-      if (consumed.ok === false) {
-        return { ok: false, status: 'rejected', reason: `consent_denied:${consumed.reason}` };
+      const result = await bundle.manager.freezeStart(proposalId, { consentToken, consentBinding });
+      if (result.success === false) {
+        return { ok: false, status: 'rejected', reason: result.error ?? 'freeze_start_failed' };
       }
-
-      return {
-        ok: false,
-        status: 'failed',
-        reason: 'async_confirmation_not_yet_wired: canonical freeze start goes through MemoryManager.freezeStart (async); WispTrainerExecutionAdapter.confirmFreeze must become async before a real freeze can start',
-      };
+      return { ok: true, status: 'frozen', currentValue: pending.value };
     },
 
     stopFreeze(gameId, entryId): WispCanonicalWriteOutcome {
