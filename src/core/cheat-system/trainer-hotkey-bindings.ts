@@ -6,7 +6,8 @@ import { getSetting, setSetting } from '../settings/index.js';
 export type TrainerHotkeyAction =
   | 'toggle_overlay'
   | 'hide_overlay'
-  | `cheat_slot_${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
+  | `cheat_slot_${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`
+  | `wisp_slot_${1 | 2 | 3 | 4 | 5 | 6}`;
 
 export const DEFAULT_TRAINER_HOTKEYS: Record<string, string> = {
   toggle_overlay: 'Control+Shift+O',

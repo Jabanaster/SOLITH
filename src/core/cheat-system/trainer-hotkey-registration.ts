@@ -41,7 +41,45 @@ export function getTrainerHotkeyEntries(bindings: Record<string, string>): Train
     });
   }
 
+  // Increment 5 — Adaptive Wisp quick slots. Deliberately no default
+  // accelerator (see DEFAULT_TRAINER_HOTKEYS) so they never silently collide
+  // with the existing cheat_slot_1..6 F1-F6 defaults; only a user-configured
+  // binding reaches this list. Merging into the SAME entries array/call as
+  // cheat_slot means conflict detection and dedup-by-accelerator (the
+  // registration engine's ownedTrainerShortcuts set) apply uniformly across
+  // both hotkey families for free.
+  for (let i = 1; i <= 6; i += 1) {
+    const action = `wisp_slot_${i}` as TrainerHotkeyAction;
+    const accelerator = bindings[action];
+    if (!accelerator) continue;
+    entries.push({
+      action,
+      accelerator,
+      description: `activate Wisp quick slot ${i}`,
+    });
+  }
+
   return entries.filter((entry) => entry.accelerator.trim().length > 0);
+}
+
+/**
+ * Excludes every entry whose accelerator is claimed by more than one action
+ * (Increment 5, Section 21/22/47/48). The registration engine below has no
+ * cross-entry conflict detection of its own — given two entries that share
+ * one accelerator in the same call, whichever is processed second silently
+ * takes over the first's registration via the owned-shortcut re-bind path.
+ * That is fine when it is the SAME action re-registering its own key (a
+ * remap), but wrong when two DIFFERENT actions collide — nothing should
+ * silently steal a key from another action. Filtering conflicts out here,
+ * before registration, keeps that guarantee for every hotkey family that
+ * reuses this engine, without changing register/unregister's own behavior.
+ */
+export function filterOutConflictingEntries(entries: TrainerHotkeyEntry[]): TrainerHotkeyEntry[] {
+  const countByAccelerator = new Map<string, number>();
+  for (const entry of entries) {
+    countByAccelerator.set(entry.accelerator, (countByAccelerator.get(entry.accelerator) ?? 0) + 1);
+  }
+  return entries.filter((entry) => countByAccelerator.get(entry.accelerator) === 1);
 }
 
 export function registerTrainerHotkeyEntries(

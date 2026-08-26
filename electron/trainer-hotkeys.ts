@@ -10,11 +10,14 @@ import {
   type TrainerHotkeyAction,
 } from '../src/core/cheat-system/trainer-hotkey-bindings.js';
 import {
+  filterOutConflictingEntries,
   getTrainerHotkeyEntries,
   registerTrainerHotkeyEntries,
   unregisterTrainerHotkeyEntries,
 } from '../src/core/cheat-system/trainer-hotkey-registration.js';
 import { hideTrainerOverlay, toggleTrainerOverlay } from './trainer-overlay.js';
+import { getAdaptiveWispQuickSlotController } from './adaptive-wisp-hotkey-composition.js';
+import { isWispQuickSlot } from '../src/core/adaptive-wisp/hotkey-types.js';
 
 let registered = false;
 
@@ -31,7 +34,12 @@ export function registerTrainerHotkeys(): void {
   if (!isTrainerCapabilityEnabled('v2HotkeysEnabled')) return;
 
   const bindings = getTrainerHotkeyBindings();
-  const entries = getTrainerHotkeyEntries(bindings);
+  const wispEnabled = isTrainerCapabilityEnabled('v2AdaptiveWispHotkeysEnabled');
+  const filteredBindings = wispEnabled ? bindings : Object.fromEntries(Object.entries(bindings).filter(([action]) => !action.startsWith('wisp_slot_')));
+
+  // Section 21/22/47/48 — deterministic conflict handling, no silently
+  // stolen key, for every hotkey family (see filterOutConflictingEntries).
+  const entries = filterOutConflictingEntries(getTrainerHotkeyEntries(filteredBindings));
   const result = registerTrainerHotkeyEntries(entries, globalShortcut, getTrainerHotkeyCallback, console);
 
   registered = result.registered.length > 0 || result.failed.length > 0;
@@ -137,6 +145,28 @@ function getTrainerHotkeyCallback(action: TrainerHotkeyAction): () => void {
       hideTrainerOverlay();
       broadcastHotkey('hide_overlay');
     };
+  }
+
+  const wispSlotMatch = /^wisp_slot_(\d+)$/.exec(action);
+  if (wispSlotMatch) {
+    const slot = Number(wispSlotMatch[1]);
+    if (isWispQuickSlot(slot)) {
+      // Increment 5 — the ONLY thing a Wisp quick-slot hotkey does: hand off
+      // to the already-reviewed Increment 4 executor via the quick-slot
+      // controller. No memory write, freeze, process attach, or consent
+      // minting happens here or anywhere in the controller (Section 3/10).
+      return () => {
+        // globalShortcut callbacks are synchronous void — this is the
+        // unavoidable outermost async boundary (not the internal
+        // executeWispAction/confirmWrite chain, which stays fully awaited
+        // inside the controller). Caught, never left as an unhandled
+        // rejection; a caught error is treated the same as any other
+        // fail-closed diagnostic — no mutation either way.
+        getAdaptiveWispQuickSlotController()
+          .activate(slot)
+          .catch((error: unknown) => console.warn('[adaptive-wisp-hotkeys] activation failed', error));
+      };
+    }
   }
 
   return () => broadcastHotkey(action);

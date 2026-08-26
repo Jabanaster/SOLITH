@@ -93,3 +93,14 @@ export { validateWispExecutionRequestShape } from './execution-types.js';
 export type { WispCanonicalProposal, WispCanonicalWriteOutcome, WispTrainerEntryState, WispTrainerExecutionAdapter } from './trainer-execution-adapter.js';
 export type { WispActionExecutorDeps } from './wisp-action-executor.js';
 export { executeWispAction, validateValueForDataType } from './wisp-action-executor.js';
+
+// Increment 5 — logical quick slots + existing trainer-hotkey integration.
+export type { WispHotkeyDiagnostic, WispHotkeyDiagnosticCode } from './hotkey-errors.js';
+export { hotkeyDiagnostic } from './hotkey-errors.js';
+export type { WispHotkeyActivationResult, WispQuickSlot } from './hotkey-types.js';
+export { WISP_QUICK_SLOT_COUNT, isWispQuickSlot } from './hotkey-types.js';
+export { resolveWispQuickSlotAction } from './quick-slot-resolution.js';
+export type { WispActiveProfileProvider, WispActiveProfileProviderDeps, WispActiveWispProfileSnapshot } from './active-profile-provider.js';
+export { createWispActiveProfileProvider } from './active-profile-provider.js';
+export type { WispQuickSlotController, WispQuickSlotControllerDeps, WispHotkeyBuildRequestResult } from './quick-slot-controller.js';
+export { createWispQuickSlotController, buildDefaultRequest } from './quick-slot-controller.js';

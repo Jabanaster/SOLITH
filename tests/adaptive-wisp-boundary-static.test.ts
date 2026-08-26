@@ -71,6 +71,12 @@ describe('adaptive-wisp domain foundation stays pure (no runtime/IPC/memory impo
     assert.ok(files.includes('catalog-game-identity-bridge.ts'), 'expected catalog-game-identity-bridge.ts to exist in src/core/adaptive-wisp');
   });
 
+  test('adaptive-wisp module directory contains the expected Increment 5 quick-slot files', () => {
+    for (const expected of ['hotkey-errors.ts', 'hotkey-types.ts', 'quick-slot-resolution.ts', 'active-profile-provider.ts', 'quick-slot-controller.ts']) {
+      assert.ok(files.includes(expected), `expected ${expected} to exist in src/core/adaptive-wisp`);
+    }
+  });
+
   for (const file of files) {
     test(`${file} imports nothing from a forbidden runtime/IPC/memory/hotkey module`, () => {
       const contents = readFileSync(path.join(dir, file), 'utf8');

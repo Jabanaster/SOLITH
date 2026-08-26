@@ -228,6 +228,8 @@ export interface Settings {
   trainerCapabilitiesUnlocked?: boolean;
   v2FreeformMemoryEnabled: boolean;
   v2RemoteCatalogSyncEnabled: boolean;
+  /** Adaptive Wisp quick-slot hotkey activation (Increment 5). Default: false — opt-in, unlike the other v2* capabilities. */
+  v2AdaptiveWispHotkeysEnabled?: boolean;
   trainerRemoteSyncCompleted?: boolean;
   /** Opt-in Solith Definition Hub synchronization. Default: false. */
   communitySyncEnabled: boolean;

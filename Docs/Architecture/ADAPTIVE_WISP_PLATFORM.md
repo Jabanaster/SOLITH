@@ -593,3 +593,152 @@ starts, is enforced by the canonical session (not a second one), and stops;
 stale/cross-game/wrong-consent negatives fail closed; the identity bridge
 remains authoritative; no second write or freeze pipeline exists; every
 regression suite stayed green. **Adaptive Wisp Increment 4 is COMPLETE.**
+
+Increment 4 subsequently passed an **independent security review**
+(`review/adaptive-wisp-increment4-security`, review artifact `4a8ca91`,
+verdict `INDEPENDENT INCREMENT 4 SECURITY REVIEW — PASS`) that independently
+re-derived and freshly proved same-session reattach safety, PID-reuse safety
+(via live process-identity re-query, not the Wisp-layer generation tracker
+alone), full Wisp-routed freeze composition through `executeWispAction`, and
+proposal/action-swap resistance — closing the three evidence gaps this
+section had left open. Security status: `SECURITY-VERIFIED WITH NON-
+BLOCKING RESIDUALS` (R1: freeze tick-enforcement/duplicate-confirmation not
+separately re-proven through Wisp, but unchanged canonical mechanisms; R2:
+`CanonicalGame.catalogGameId` uniqueness is a canonical-games integrity
+dependency outside Increment 4's scope). Gate: `INCREMENT 5 AUTHORIZED FROM
+SECURITY PERSPECTIVE`.
+
+## 23. Increment 5 — logical quick slots + existing trainer-hotkey integration (COMPLETE)
+
+**Logical slots were not a new concept.** `WispActionDefinition.slot`
+(Increment 1) and `WispUserState.slotAssignments` (Increment 2) already
+modeled "this action lives in slot N," including user-override precedence
+over creator recommendations. Increment 5 adds no second slot system —
+`resolveWispQuickSlotAction(boundProfile, slot)` is a one-line lookup against
+the already-bound profile's `slot` field, nothing more.
+
+**Physical key ↔ logical slot is genuinely new**, and lives entirely in the
+existing trainer-hotkey persistence/registration layer (Increment 5, Section
+5/25/91 — no parallel hotkey engine was built): `TrainerHotkeyAction` gained
+`wisp_slot_1`..`wisp_slot_6`, stored in the same `trainerHotkeyBindings`
+settings key `getTrainerHotkeyBindings`/`setTrainerHotkeyBindings` already
+manage, and `getTrainerHotkeyEntries` emits them into the exact same entries
+array `cheat_slot_1..12` already flows through, so both families are
+registered, conflict-checked, and cleaned up by the one existing engine
+(`registerTrainerHotkeyEntries`/`unregisterTrainerHotkeyEntries`). Wisp slots
+deliberately have **no default accelerator** — `cheat_slot_1..6` already
+default to F1-F6, and shipping the same defaults for Wisp would guarantee an
+immediate, silent-feeling out-of-the-box collision; a Wisp slot only
+registers once a user (via a future settings surface) explicitly binds a key.
+
+**Discovered finding, mitigated at the caller (not the shared engine):** the
+existing registration engine has no cross-entry conflict detection of its
+own — given two entries sharing one accelerator in the same registration
+call, whichever is processed second silently takes over the first's
+registration (correct for the same action's own remap, wrong for two
+different actions colliding). This pre-existing characteristic had simply
+never been exercised, since no two `cheat_slot_N` defaults ever collided.
+Increment 5 adds `filterOutConflictingEntries` (pure, in
+`trainer-hotkey-registration.ts`) and calls it in `registerTrainerHotkeys()`
+before every registration pass: any accelerator claimed by more than one
+action — cheat/cheat, cheat/wisp, or wisp/wisp — registers for **neither**
+until a human resolves the conflict. No key is ever silently reassigned,
+matching the spec's own "do not silently steal a key" requirement, and this
+protects the pre-existing `cheat_slot` family too, not just Wisp.
+
+**Feature flag.** A new `v2AdaptiveWispHotkeysEnabled` capability was added
+to `unlock-trainer-capabilities.ts`, deliberately **defaulting to `false`**
+— every other `v2*` capability defaults to enabled-unless-disabled, but Wisp
+hotkeys are a new privileged-execution surface (activation reaches the
+reviewed Increment 4 executor and can stage a real canonical proposal),
+unlike the existing overlay/broadcast-only trainer hotkeys, so reusing the
+default-on policy would have auto-enabled it without product precedent.
+
+**Activation flow (exact, real code path):**
+
+```
+physical key (globalShortcut, via the existing trainer-hotkey engine)
+→ getTrainerHotkeyCallback('wisp_slot_N') in electron/trainer-hotkeys.ts
+→ getAdaptiveWispQuickSlotController().activate(N)
+→ WispActiveProfileProvider.getActiveBoundProfile()   (resolved FRESH every call — Section 8)
+    → resolveWispProfileForGame (Increment 2, unchanged)
+    → bindResolvedProfile (Increment 3, unchanged)
+→ resolveWispQuickSlotAction(boundProfile, N)
+→ buildDefaultRequest(...)                             (no arbitrary input — Section 37)
+→ executeWispAction(...)                                (Increment 4, unchanged, independently reviewed)
+→ existing consent/write/freeze system
+```
+
+**Use-time resolution, not registration-time.** The controller re-resolves
+the active profile and re-fetches the runtime context on every single
+activation — never a cached action object. A game switch between two
+activations changes what slot 1 resolves to; a session-generation change
+between resolution and the executor call is caught by `executeWispAction`'s
+own `validateWispBinding` (proven by a dedicated race test, not merely
+assumed).
+
+**Pending-consent policy (Section 34, policy B).** The controller tracks, in
+memory only, which actions currently have an outstanding proposal. A second
+press on the same pending action is suppressed (`WISP_HOTKEY_EXECUTION_
+PENDING_CONSENT`) rather than creating a second independent proposal or
+reusing the first's token. The suppression clears once a result is terminal
+(applied/rejected/stale/unavailable/failed), so a later legitimate retry is
+never permanently blocked. Freeze additionally tracks a per-action discrete
+enable/disable intent that flips on every *reached* activation (Section 36
+— no keydown/keyup hold semantics).
+
+**Honest, load-bearing limitation — no hotkey confirms yet.** Every hotkey
+activation is, structurally, a *first press* (no `consentToken`) — there is
+no consent-dialog surface wired to Adaptive Wisp anywhere yet (by design;
+Increment 5 explicitly excludes renderer/UI work). This means a hotkey press
+today reaches `pending-consent` and stops there; it cannot yet complete a
+real mutation end-to-end from a physical key press. This is safe (nothing
+mutates without human-granted consent) and exactly matches the letter of the
+spec ("no auto-confirm," Section 33), but it should not be read as "hotkeys
+fully work" — they safely stage a proposal and nothing more until a future
+increment wires a real consent surface to this proposal.
+
+**Second honest limitation — no live "current canonical game" yet.**
+Auditing the codebase for this increment surfaced that no production code
+anywhere resolves "which canonical game is currently attached" from a live
+process — `session-monitor-context-provider.ts`'s `getActiveGameContext`
+callback (Increment 3) has never had a real caller, and no other
+main-process module tracks a "current canonical game" concept. Building that
+resolver here would mean inventing new, unreviewed identity-mapping logic
+outside this increment's scope. `electron/adaptive-wisp-hotkey-composition.ts`
+wires everything else for real and documents this gap plainly:
+`getActiveGameContext` returns "no active game" until a future increment
+supplies a real implementation — which the whole reviewed chain already
+treats as the safe, harmless "no active session" case. The hotkey/slot layer
+itself is fully wired and fully tested against real `bindResolvedProfile`/
+`resolveWispProfileForGame` calls; only the "what game is the user in"
+bridge is a stand-in.
+
+**No direct write/freeze/attach/consent path.** Static tests
+(`adaptive-wisp-hotkey-boundary-static.test.ts`) prove `electron/trainer-
+hotkeys.ts` and `electron/adaptive-wisp-hotkey-composition.ts` import none of
+`memory-manager`, `live-memory-session`, `write-consent`, `freeze-
+concurrency-registry`, `child_process`, or `shell`, and that the domain
+hotkey files (`hotkey-errors.ts`, `hotkey-types.ts`, `quick-slot-
+resolution.ts`, `active-profile-provider.ts`, `quick-slot-controller.ts`)
+import neither `electron`, `ipcMain`, nor `globalShortcut` directly. No new
+IPC channel was added (Section 56).
+
+**Residual R1 (carried from the Increment 4 review) — closed at the hotkey
+layer.** A dedicated test proves two rapid hotkey presses on the same freeze
+action produce exactly one proposal (`calls.proposeFreeze === 1`) and never
+reach `confirmFreeze` at all from this layer — the canonical freeze registry
+can never be asked to start two workers for one hotkey-triggered action,
+because the pending-consent suppression prevents a second proposal from ever
+being staged.
+
+**Residual R2 (carried from the Increment 4 review) — unaffected.** The
+hotkey layer introduces no alternate identity route; it resolves games
+exclusively through `resolveWispProfileForGame`/`bindResolvedProfile`
+(Increment 2/3, unchanged) and never touches `CanonicalGame.catalogGameId`
+directly.
+
+**Explicitly not implemented:** Wisp renderer, Wisp action buttons, a hotkey
+editor UI, user customization UI, creator UI, community networking,
+automatic profile generation. Increment 5 is input/runtime infrastructure
+only, tested through services/controllers — no UI shipped.
