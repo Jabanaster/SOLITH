@@ -432,6 +432,272 @@ describe('REVIEW-GRADE — Increment 5 control activation dispatch (Section 72)'
     assert.equal(calls.proposeWrite, 0);
   });
 
+});
+
+describe('Increment 5 closeout, Phase A — pending-state lifecycle', () => {
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => { resolve = r; });
+    return { promise, resolve };
+  }
+
+  test('pending state clears on detach; reattach does not inherit it', async () => {
+    let attached = true;
+    const { adapter, calls } = fakeAdapter({ states: { 'game-alpha:xp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] } } });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:xp': entryDescriptor('xp') },
+      getCurrentContext: () => (attached ? { gameId: 'game-alpha', sessionId: 's1', sessionGeneration: 1 } : null),
+      adapter,
+    });
+
+    const first = await controller.activate(2);
+    assert.equal(first.executionStatus, 'pending-consent');
+    assert.equal(calls.proposeWrite, 1);
+
+    attached = false;
+    const detachedResult = await controller.activate(2);
+    assert.equal((detachedResult.diagnostic as { code: string }).code, 'WISP_HOTKEY_NO_ACTIVE_SESSION');
+
+    attached = true;
+    const afterReattach = await controller.activate(2);
+    assert.equal(afterReattach.executionStatus, 'pending-consent', 'the pre-detach pending entry must not survive reattach');
+    assert.equal(calls.proposeWrite, 2, 'reattach must independently re-propose, proving the old pending entry was cleared rather than shadowed');
+  });
+
+  test('freeze enable/disable intent clears on detach', async () => {
+    let attached = true;
+    const { adapter, calls } = fakeAdapter({
+      states: { 'game-alpha:hp': { frozen: false, currentValue: 100, dataType: 'int32', supportsControls: ['freeze'] } },
+      proposeFreeze: () => null, // always terminal/unavailable — never enters the pending map, so intent flips freely across repeated presses without pending-consent suppression masking the toggle
+    });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:hp': entryDescriptor('hp') },
+      getCurrentContext: () => (attached ? { gameId: 'game-alpha', sessionId: 's1', sessionGeneration: 1 } : null),
+      adapter,
+    });
+
+    const first = await controller.activate(1);
+    assert.equal(first.executionStatus, 'unavailable');
+    assert.equal(calls.proposeFreeze, 1, 'first press must be enable:true, reaching proposeFreeze');
+    assert.equal(calls.stopFreeze, 0);
+
+    attached = false;
+    await controller.activate(1);
+    attached = true;
+
+    const afterReattach = await controller.activate(1);
+    assert.equal(afterReattach.executionStatus, 'unavailable');
+    assert.equal(calls.proposeFreeze, 2, 'post-detach press must again be enable:true (proposeFreeze), not enable:false (stopFreeze) — the pre-detach intent must not survive');
+    assert.equal(calls.stopFreeze, 0, 'if the intent had survived detach, this press would have flipped to enable:false and called stopFreeze instead');
+  });
+
+  test('repeated detach is idempotent and harmless', async () => {
+    const { adapter, calls } = fakeAdapter();
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:hp': entryDescriptor('hp') },
+      getCurrentContext: () => null,
+      adapter,
+    });
+    const results = await Promise.all([controller.activate(1), controller.activate(1), controller.activate(1)]);
+    for (const r of results) assert.equal((r.diagnostic as { code: string }).code, 'WISP_HOTKEY_NO_ACTIVE_SESSION');
+    assert.equal(calls.proposeFreeze + calls.proposeWrite + calls.confirmFreeze + calls.confirmWrite + calls.stopFreeze, 0, 'repeated detach reads must never touch the trainer adapter');
+  });
+
+  test('unchanged context preserves legitimate pending state across repeated reads', async () => {
+    const { adapter, calls } = fakeAdapter({
+      states: {
+        'game-alpha:hp': { frozen: false, currentValue: 100, dataType: 'int32', supportsControls: ['freeze'] },
+        'game-alpha:xp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] },
+      },
+    });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:hp': entryDescriptor('hp'), 'game-alpha:xp': entryDescriptor('xp') },
+      getCurrentContext: () => ({ gameId: 'game-alpha', sessionId: 's1', sessionGeneration: 1 }),
+      adapter,
+    });
+
+    const hp = await controller.activate(1);
+    assert.equal(hp.executionStatus, 'pending-consent');
+    // Repeated reads of an UNCHANGED context (pressing an unrelated slot)
+    // must not disturb HP's pending entry.
+    await controller.activate(2);
+    await controller.activate(2);
+    const hpAgain = await controller.activate(1);
+    assert.equal((hpAgain.diagnostic as { code: string }).code, 'WISP_HOTKEY_EXECUTION_PENDING_CONSENT', 'HP must still be suppressed as pending — unrelated reads of the same context must not have cleared it');
+    assert.equal(calls.proposeFreeze, 1);
+  });
+
+  test('session ID change clears pending state even when gameId is unchanged', async () => {
+    let sessionId = 's1';
+    const { adapter, calls } = fakeAdapter({ states: { 'game-alpha:xp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] } } });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:xp': entryDescriptor('xp') },
+      getCurrentContext: () => ({ gameId: 'game-alpha', sessionId, sessionGeneration: 1 }),
+      adapter,
+    });
+    const first = await controller.activate(2);
+    assert.equal(first.executionStatus, 'pending-consent');
+    sessionId = 's2';
+    const afterSessionChange = await controller.activate(2);
+    assert.equal(afterSessionChange.executionStatus, 'pending-consent', 'a new sessionId must not inherit the old session\'s pending entry');
+    assert.equal(calls.proposeWrite, 2);
+  });
+
+  test('session-generation change (reattach/PID replacement) clears pending state', async () => {
+    let generation = 1;
+    const { adapter, calls } = fakeAdapter({ states: { 'game-alpha:xp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] } } });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:xp': entryDescriptor('xp') },
+      getCurrentContext: () => ({ gameId: 'game-alpha', sessionId: 's1', sessionGeneration: generation }),
+      adapter,
+    });
+    const first = await controller.activate(2);
+    assert.equal(first.executionStatus, 'pending-consent');
+    generation = 2;
+    const afterGenerationChange = await controller.activate(2);
+    assert.equal(afterGenerationChange.executionStatus, 'pending-consent', 'a session-generation bump (process replaced/PID reused) must not inherit the old generation\'s pending entry');
+    assert.equal(calls.proposeWrite, 2);
+  });
+
+  test('game switch A -> B -> A does not restore old state', async () => {
+    let currentGame = 'game-alpha';
+    const { adapter, calls } = fakeAdapter({
+      states: {
+        'game-alpha:hp': { frozen: false, currentValue: 100, dataType: 'int32', supportsControls: ['freeze'] },
+        'game-beta:minerals': { frozen: false, currentValue: 10, dataType: 'int32', supportsControls: ['set'] },
+      },
+    });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile(), 'game-beta': betaProfile() },
+      entries: { 'game-alpha:hp': entryDescriptor('hp'), 'game-beta:minerals': entryDescriptor('minerals') },
+      getCurrentContext: () => ({ gameId: currentGame, sessionId: `${currentGame}-session`, sessionGeneration: 1 }),
+      adapter,
+    });
+
+    const alphaFirst = await controller.activate(1);
+    assert.equal(alphaFirst.executionStatus, 'pending-consent');
+    assert.equal(calls.proposeFreeze, 1);
+
+    currentGame = 'game-beta';
+    await controller.activate(1);
+
+    currentGame = 'game-alpha';
+    const alphaAgain = await controller.activate(1);
+    assert.equal(alphaAgain.executionStatus, 'pending-consent', 'returning to GAME_ALPHA must not restore its pre-switch pending entry');
+    assert.equal(calls.proposeFreeze, 2, 'the second GAME_ALPHA HP activation must independently re-propose');
+  });
+
+  test('profile replacement (same game/session, different profile identity) clears pending state', async () => {
+    let useV2 = false;
+    const v1Profile = alphaProfile({ profileId: 'alpha-profile-v1', actions: [{ id: 'a-x', entryId: 'xp', label: 'XP', controlType: 'set', slot: 2, presets: [{ id: 'p1', label: 'Full', value: 999 }] }] });
+    const v2Profile = alphaProfile({ profileId: 'alpha-profile-v2', actions: [{ id: 'a-x', entryId: 'xp', label: 'XP', controlType: 'set', slot: 2, presets: [{ id: 'p1', label: 'Full', value: 999 }] }] });
+    const { adapter, calls } = fakeAdapter({ states: { 'game-alpha:xp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] } } });
+    const entryLookup = fixtureLookup({ 'game-alpha:xp': entryDescriptor('xp') });
+    const activeProfileProvider = createWispActiveProfileProvider({
+      getCurrentContext: () => ({ gameId: 'game-alpha', sessionId: 's1', sessionGeneration: 1 }),
+      resolveProfile: async () => ({ ok: true, profile: useV2 ? v2Profile : v1Profile }),
+      entryLookup,
+    });
+    const controller = createWispQuickSlotController({
+      activeProfileProvider,
+      getCurrentContext: () => ({ gameId: 'game-alpha', sessionId: 's1', sessionGeneration: 1 }),
+      executorDeps: { entryLookup, identityBridge: createExplicitGameIdentityBridge({ 'game-alpha': 'cheat-alpha' }), trainerAdapter: adapter },
+    });
+
+    const first = await controller.activate(2);
+    assert.equal(first.executionStatus, 'pending-consent');
+    assert.equal(calls.proposeWrite, 1);
+
+    useV2 = true;
+    const afterProfileSwap = await controller.activate(2);
+    assert.equal(afterProfileSwap.executionStatus, 'pending-consent', 'a profile-identity change must not inherit the prior profile\'s pending entry for the same actionId');
+    assert.equal(calls.proposeWrite, 2);
+  });
+
+  test('late completion from an old game cannot corrupt the newer game\'s state', async () => {
+    let currentGame = 'game-alpha';
+    const alphaGate = deferred<{ ok: true; profile: WispGameProfile }>();
+    const { adapter, calls } = fakeAdapter({
+      states: {
+        'game-alpha:hp': { frozen: false, currentValue: 100, dataType: 'int32', supportsControls: ['freeze'] },
+        'game-beta:minerals': { frozen: false, currentValue: 10, dataType: 'int32', supportsControls: ['set'] },
+      },
+    });
+    const entryLookup = fixtureLookup({ 'game-alpha:hp': entryDescriptor('hp'), 'game-beta:minerals': entryDescriptor('minerals') });
+    const activeProfileProvider = createWispActiveProfileProvider({
+      getCurrentContext: () => ({ gameId: currentGame, sessionId: `${currentGame}-session`, sessionGeneration: 1 }),
+      resolveProfile: async (context) => {
+        if (context.gameId === 'game-alpha') return alphaGate.promise;
+        return { ok: true as const, profile: betaProfile() };
+      },
+      entryLookup,
+    });
+    const controller = createWispQuickSlotController({
+      activeProfileProvider,
+      getCurrentContext: () => ({ gameId: currentGame, sessionId: `${currentGame}-session`, sessionGeneration: 1 }),
+      executorDeps: { entryLookup, identityBridge: createExplicitGameIdentityBridge({ 'game-alpha': 'cheat-alpha', 'game-beta': 'cheat-beta' }), trainerAdapter: adapter },
+    });
+
+    // Slow GAME_ALPHA activation starts and suspends inside resolveProfile.
+    const slowAlpha = controller.activate(1);
+
+    // Before it resolves, the user switches to GAME_BETA and successfully
+    // activates its own slot 1 — this must reset controller state for the
+    // new context.
+    currentGame = 'game-beta';
+    const betaResult = await controller.activate(1);
+    assert.equal(betaResult.actionId, 'b-minerals');
+    assert.equal(calls.proposeWrite, 1);
+
+    // Now let the stale GAME_ALPHA resolution complete. Its binding no
+    // longer matches the current (GAME_BETA) context, so Increment 4's own
+    // validateWispBinding rejects it as stale — but even independent of
+    // that, this late completion must not be allowed to write a ghost
+    // pending entry for GAME_ALPHA into the controller's maps.
+    alphaGate.resolve({ ok: true, profile: alphaProfile() });
+    const staleAlphaResult = await slowAlpha;
+    assert.equal(staleAlphaResult.executionStatus, 'stale', `expected the late GAME_ALPHA completion to be rejected as stale by Increment 4\'s binding check: ${JSON.stringify(staleAlphaResult)}`);
+    assert.equal(calls.proposeFreeze, 0, 'the late completion must never reach proposeFreeze once the context has moved on');
+
+    // Switching back to GAME_ALPHA (fresh session, i.e. a real reattach)
+    // must not find a ghost pending entry left behind by the late completion.
+    currentGame = 'game-alpha';
+    const freshAlpha = await controller.activate(1);
+    assert.equal(freshAlpha.executionStatus, 'pending-consent', 'GAME_ALPHA must be able to propose independently — no ghost pending state from the stale completion');
+    assert.equal(calls.proposeFreeze, 1);
+  });
+
+  test('dispose() clears pending and freeze-intent state without touching the trainer adapter (feature-disable / shutdown)', async () => {
+    const { adapter, calls } = fakeAdapter({ states: { 'game-alpha:xp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] } } });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaProfile() },
+      entries: { 'game-alpha:xp': entryDescriptor('xp') },
+      getCurrentContext: () => ({ gameId: 'game-alpha', sessionId: 's1', sessionGeneration: 1 }),
+      adapter,
+    });
+
+    const first = await controller.activate(2);
+    assert.equal(first.executionStatus, 'pending-consent');
+    const callsBeforeDispose = calls.proposeWrite + calls.confirmWrite + calls.proposeFreeze + calls.confirmFreeze + calls.stopFreeze;
+
+    controller.dispose();
+    controller.dispose(); // idempotent — must not throw or double-mutate
+
+    assert.equal(calls.proposeWrite + calls.confirmWrite + calls.proposeFreeze + calls.confirmFreeze + calls.stopFreeze, callsBeforeDispose, 'dispose() must never call the trainer adapter — no write, freeze, confirm, or stop');
+
+    const afterDispose = await controller.activate(2);
+    assert.equal(afterDispose.executionStatus, 'pending-consent', 'dispose() must clear the pending entry so the same action can be re-proposed');
+    assert.equal(calls.proposeWrite, 2);
+  });
+});
+
+describe('REVIEW-GRADE — Increment 5 control activation dispatch (Section 72), continued', () => {
   test('freeze dispatches enable:true on the first activation (discrete, not keydown/keyup)', () => {
     const freezeIntent = new Map<string, boolean>();
     const action: WispActionDefinition = { id: 'a-hp', entryId: 'hp', label: 'HP', controlType: 'freeze' };

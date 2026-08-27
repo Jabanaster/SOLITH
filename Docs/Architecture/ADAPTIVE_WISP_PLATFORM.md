@@ -742,3 +742,188 @@ directly.
 editor UI, user customization UI, creator UI, community networking,
 automatic profile generation. Increment 5 is input/runtime infrastructure
 only, tested through services/controllers — no UI shipped.
+
+**Superseded by Section 24:** the independent Increment 5 review (below)
+found and closed two real defects in this section's design — a cross-game
+state-key collision and a missing pending-state lifecycle — plus a reporting
+error in this document's own original test-count claim. Section 24 is the
+authoritative, corrected account; read it alongside this section rather than
+in place of it.
+
+## 24. Increment 5 closeout — independent review findings, pending-state lifecycle, conflict-filtering boundary hardening, and evidence corrections
+
+This section documents the full independent-review-and-remediation pass
+performed on top of the Increment 5 implementation frozen at `2ec5593`, in
+isolation on `review/adaptive-wisp-increment5-hotkeys`, across two
+remediation commits (`14c899d`, then the closeout commit recorded in this
+section's final subsection).
+
+### 24.1 Corrected test-count history (replaces the "51 new tests" claim)
+
+The original Increment 5 report claimed "51 new tests across five new files"
+plus "two assertions added to an existing test." Independently recounting
+during the review found this attribution wrong, though the aggregate total
+it fed into was correct:
+
+| Stage | New/changed tests | Running total |
+|---|---|---|
+| Pre-Increment-5 baseline | — | 1,996 |
+| 5 new Increment 5 files (45 tests: 5+5+10+19+6) + 11 new cases in the existing `adaptive-wisp-boundary-static.test.ts` (10 dynamic per-file loop iterations for the 5 new source files + 1 new explicit test) | +56 | 2,052 |
+| Review remediation commit `14c899d` (2 cross-game regression tests + 4 `buildTrainerHotkeyRegistrationPlan` tests) | +6 | 2,058 |
+| This closeout (Phase A: 10 pending-state lifecycle tests; Phase B: 7 conflict-filtering-boundary adversarial tests; Phase C: 5 lifecycle-integration tests in a new file) | +22 | 2,080 |
+
+The original "51/two assertions" breakdown is superseded by this table; the
+1,996→2,052 aggregate delta it was built from was always correct.
+
+### 24.2 Finding 1 (Medium, fixed in `14c899d`) — cross-game `actionId` collision
+
+`pendingProposalByAction`/`freezeEnableIntentByAction` were keyed by bare
+`actionId`, which is only unique within one profile. Two different games'
+profiles declaring the same `actionId` string could false-suppress or
+inherit freeze intent across a game switch. Fixed by keying both maps
+`${gameId}:${actionId}`. See Section 23's "Discovered finding" text — that
+text describes the *conflict-filtering* finding, not this one; this finding
+was not previously documented in Section 23 and is recorded here for the
+first time in full.
+
+### 24.3 Finding 2 (Low, fixed in `14c899d`) — untested `registerTrainerHotkeys()` composition
+
+`registerTrainerHotkeys()` composed three decisions (flag gating, entry
+building, conflict filtering) that were each unit-tested individually but
+never exercised together as the real function calls them. Fixed by
+extracting `buildTrainerHotkeyRegistrationPlan(bindings, {wispEnabled})`
+(pure, electron-free) into `trainer-hotkey-registration.ts`; the real
+function now calls it, and it is directly tested.
+
+### 24.4 Finding 3 (Medium, fixed in this closeout) — pending-state lifecycle gap
+
+Confirmed real defect: after the `14c899d` game-scoping fix, the controller's
+`pendingProposalByKey`/`freezeEnableIntentByKey` maps were still never
+explicitly cleared on detach, reattach, game switch, session-ID change,
+session-generation change, or profile replacement — they only ever grew or
+were overwritten by a *matching* key. This was harmless for cross-game
+collisions (already isolated by the composite key) but meant a stale entry
+for an abandoned game/session/profile persisted in memory indefinitely, and
+nothing guaranteed a *late-completing* activation from an old context
+couldn't write a stale entry back in after a newer context had already
+"moved on."
+
+**Fix — `src/core/adaptive-wisp/quick-slot-controller.ts`:** every
+`activate()` call now computes a `contextIdentityKey` (`gameId:sessionId:
+sessionGeneration` — deliberately built only from fields the existing
+session-monitor/session-context architecture already produces; no new
+identity authority was introduced, and no bare PID or executable substring
+is used) and a profile-identity key (`bound.profileId`), and resets both
+maps whenever either changes since the last activation. An `epoch` counter
+increments on every reset; each activation captures the epoch it started
+under and refuses to write its result into the maps if the epoch has since
+moved on — this closes the late-completion race without adding a second
+session authority or any polling: the check runs exactly when the hotkey
+layer already reads context (use-time), never on a timer.
+
+**Why not a push-based subscription:** `SessionMonitorService` (the existing
+session authority) exposes no event/subscribe API — only a poll-style
+`getStatus()` — confirmed by source audit before choosing this design. Per
+this closeout's own instruction not to invent a second session authority,
+and given the hotkey layer's only interaction with context is already
+use-time (on each key press, not continuously), reusing the existing
+use-time read as the identity-comparison point is the smallest correct
+design; no new lifecycle interface, event emitter, or polling loop was
+added.
+
+**`dispose()`** was added to `WispQuickSlotController` for the transitions
+that are not naturally observed through an `activate()` call at all —
+feature disable and application shutdown. `electron/trainer-hotkeys.ts`'s
+`unregisterTrainerHotkeys()` (the single call site for both real app
+shutdown, from `main.ts`, and every feature-disable/rebind refresh, via
+`refreshTrainerHotkeys()`) now calls
+`disposeAdaptiveWispQuickSlotController()` unconditionally, before its own
+early-return, so it fires even when Wisp was enabled but nothing was ever
+actually registered.
+
+Ten new tests in `tests/adaptive-wisp-quick-slot-controller.test.ts` prove:
+pending/freeze-intent state clears on detach; reattach does not inherit
+either; repeated detach is idempotent and touches the trainer adapter zero
+times; an unchanged context preserves legitimate pending state across
+unrelated reads; a session-ID change, a session-generation change, and a
+full game-switch-and-back each independently clear state; a profile-identity
+change (same game/session) clears state; a late completion from an
+abandoned game cannot write a ghost pending entry after a newer game has
+already activated; and `dispose()` clears both maps, is idempotent, and
+never calls the trainer adapter.
+
+### 24.5 Finding 4 (Low, fixed in this closeout) — conflict filtering was correct but not unavoidable
+
+The prior review found production always calls `filterOutConflictingEntries`
+before registration, but the lower-level `registerTrainerHotkeyEntries` was
+still exported and callable directly with unfiltered entries — a future
+caller could bypass the safety by mistake.
+
+**Fix — `src/core/cheat-system/trainer-hotkey-registration.ts`:**
+`registerTrainerHotkeyEntries` now normalizes (trims, drops
+blank/whitespace-only) and conflict-filters its input internally,
+unconditionally, regardless of what the caller already did — this is now
+the single production entry point that reaches `globalShortcut`, and no
+unfiltered primitive is exposed. Conflict comparison was also hardened to be
+case-insensitive (`f1`/`F1` are the same key for grouping purposes; the
+accelerator string actually registered is only trimmed, never case-altered,
+so a valid binding is never silently normalized into a different one).
+
+Seven new adversarial tests in `tests/adaptive-wisp-hotkey-registration.test.ts`
+prove: a three-way collision is fully excluded even when
+`registerTrainerHotkeyEntries` is called directly with raw, unfiltered
+input; duplicate accelerators under different action IDs are excluded as a
+group; blank/whitespace-only accelerators never reach the shortcut API and
+are not reported as active; leading/trailing whitespace is trimmed before
+registration; case-variant accelerators collide regardless of input order;
+Electron rejecting every accelerator surfaces every entry as failed; and a
+registration attempt after disposal behaves identically to a fresh start.
+
+Five new lifecycle-integration tests in the new file
+`tests/adaptive-wisp-hotkey-lifecycle-integration.test.ts` drive the real
+composed `registerTrainerHotkeys()`/`unregisterTrainerHotkeys()`/
+`refreshTrainerHotkeys()` sequences (via `buildTrainerHotkeyRegistrationPlan`
++ `registerTrainerHotkeyEntries` + `unregisterTrainerHotkeyEntries`, in the
+exact order the real electron/trainer-hotkeys.ts wrappers use — that file
+itself cannot be imported outside a running Electron process, the same
+reason `buildTrainerHotkeyRegistrationPlan` exists) end-to-end: a full
+disable → refresh → re-enable → refresh cycle leaves exactly one
+registration per accelerator and unrelated trainer shortcuts untouched; a
+remap across multiple refresh cycles never accumulates callbacks; shutdown
+unregisters every owned shortcut, is idempotent, and is structurally
+incapable of touching propose/confirm/write/freeze/attach (the fake
+shortcut API used has no such methods); a real three-way collision batch
+excludes all three regardless of input order; and blank/whitespace Wisp
+bindings never reach the shortcut API in the real composed plan.
+
+### 24.6 What remains explicitly out of scope and unproven
+
+Unchanged from Section 23 and the Increment 5 review — restated here
+precisely rather than re-labeled as resolved by this closeout:
+
+- **No live canonical-game resolver** — `getActiveGameContext()` in
+  `electron/adaptive-wisp-hotkey-composition.ts` still always returns
+  `{gameId: null}`. This is Increment 6's objective, not this closeout's.
+- **No profile-registry population** — `createWispProfileRegistry()` is
+  still always constructed empty in production; nothing bundles a real
+  profile into it yet. Also Increment 6's objective.
+- **No consent-completion surface** — every hotkey activation is still,
+  structurally, a first press with no `consentToken`; it stops at
+  `pending-consent`.
+- **Real OS-level `globalShortcut.register` for `wisp_slot_N` specifically**
+  remains unproven. `registerTrainerHotkeys()` genuinely runs during real
+  Electron startup (confirmed: `electron/main.ts` calls it at boot and calls
+  `unregisterTrainerHotkeys()` at shutdown), and the Playwright
+  `electron-consent-boundary.e2e.test.ts` suite does boot the real compiled
+  main process — proving the general hotkey system (which includes the
+  unchanged `cheat_slot_1..12`/`toggle_overlay`/`hide_overlay` defaults)
+  registers real `globalShortcut` entries. It proves nothing `wisp_slot`
+  -specific, because no `wisp_slot` binding exists by default and
+  `v2AdaptiveWispHotkeysEnabled` defaults to `false`. No test in this
+  repository simulates an actual physical OS key press for any hotkey,
+  Wisp or otherwise, and none was added here — per this closeout's own
+  instruction against manufacturing passing evidence with a privileged
+  test-only bypass.
+- **Packaged (`dist:dir`) build evidence** was not re-collected this pass —
+  only the dev bundle plus its 29-check verifier and the Playwright suite
+  ran. The last packaged-build pass was during the Increment 4 review.

@@ -180,6 +180,102 @@ describe('Adaptive Wisp quick-slot hotkeys reuse the existing trainer-hotkey eng
   });
 });
 
+describe('Increment 5 closeout, Phase B — conflict filtering is unavoidable at the API boundary', () => {
+  afterEach(() => {
+    resetTrainerHotkeysForTests();
+  });
+
+  test('three-way collision: all three colliding entries are excluded, unrelated entries still register, regardless of registerTrainerHotkeyEntries being called directly with UNFILTERED entries', () => {
+    const entries = [
+      { action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: 'F1', description: 'a' },
+      { action: 'wisp_slot_2' as TrainerHotkeyAction, accelerator: 'F1', description: 'b' },
+      { action: 'wisp_slot_3' as TrainerHotkeyAction, accelerator: 'F1', description: 'c' },
+      { action: 'wisp_slot_4' as TrainerHotkeyAction, accelerator: 'Numpad4', description: 'd' },
+    ];
+    const { api } = createShortcutApi();
+    const { logger } = createLogger();
+    // Deliberately calling the low-level function with RAW, unfiltered
+    // entries — the whole point of Phase B is that this must still be safe.
+    const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    assert.equal(result.registered.filter((e) => e.accelerator === 'F1').length, 0, 'no member of the three-way collision may register, even though registerTrainerHotkeyEntries was called directly with unfiltered input');
+    assert.equal(result.registered.filter((e) => e.action === 'wisp_slot_4').length, 1, 'the unrelated, non-conflicting entry must still register');
+  });
+
+  test('duplicate accelerators with different action IDs are excluded; duplicate entries with the identical action ID are treated as one conflicting group too', () => {
+    const entries = [
+      { action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: 'F2', description: 'x' },
+      { action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: 'F2', description: 'x-dup' },
+    ];
+    const { api } = createShortcutApi();
+    const { logger } = createLogger();
+    const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    assert.equal(result.registered.length, 0, 'two entries claiming the same accelerator are excluded as a conflicting group even when they share one action ID');
+  });
+
+  test('empty and whitespace-only accelerators never reach the shortcut API and are not reported as active', () => {
+    const entries = [
+      { action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: '', description: 'blank' },
+      { action: 'wisp_slot_2' as TrainerHotkeyAction, accelerator: '   ', description: 'whitespace-only' },
+      { action: 'wisp_slot_3' as TrainerHotkeyAction, accelerator: 'Numpad3', description: 'valid' },
+    ];
+    const { api, calls } = createShortcutApi();
+    const { logger } = createLogger();
+    const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    assert.equal(calls.register.length, 1, 'only the one valid accelerator may ever reach the shortcut API');
+    assert.equal(result.registered.length, 1);
+    assert.equal(result.registered[0].action, 'wisp_slot_3');
+    assert.ok(result.failed.every((f) => f.action !== 'wisp_slot_1' && f.action !== 'wisp_slot_2'), 'blank/whitespace entries are dropped silently, not reported as a registration failure');
+  });
+
+  test('leading/trailing whitespace is trimmed before reaching the shortcut API, per one documented policy', () => {
+    const entries = [{ action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: '  F5  ', description: 'padded' }];
+    const { api, calls } = createShortcutApi();
+    const { logger } = createLogger();
+    const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    assert.deepEqual(calls.register, ['F5'], 'the accelerator handed to the shortcut API must be trimmed, not the padded original');
+    assert.equal(result.registered[0]?.accelerator, 'F5');
+  });
+
+  test('case-variant accelerators are treated as the same key for conflict purposes — no array-order winner', () => {
+    const entriesAscending = [
+      { action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: 'f6', description: 'lower' },
+      { action: 'wisp_slot_2' as TrainerHotkeyAction, accelerator: 'F6', description: 'upper' },
+    ];
+    const entriesDescending = [...entriesAscending].reverse();
+    for (const entries of [entriesAscending, entriesDescending]) {
+      const { api } = createShortcutApi();
+      const { logger } = createLogger();
+      const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+      assert.equal(result.registered.length, 0, `case-only variants of the same key must both be excluded regardless of input order: ${JSON.stringify(entries)}`);
+    }
+  });
+
+  test('Electron rejecting every accelerator surfaces every entry as failed, none marked active', () => {
+    const entries = [
+      { action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: 'Numpad1', description: 'a' },
+      { action: 'wisp_slot_2' as TrainerHotkeyAction, accelerator: 'Numpad2', description: 'b' },
+    ];
+    const { api } = createShortcutApi({ reject: ['Numpad1', 'Numpad2'] });
+    const { logger } = createLogger();
+    const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    assert.equal(result.registered.length, 0);
+    assert.equal(result.failed.length, 2);
+  });
+
+  test('registration attempt after disposal (unregisterTrainerHotkeyEntries) registers cleanly with no leftover ownership', () => {
+    const { api, registered } = createShortcutApi();
+    const { logger } = createLogger();
+    const entries = [{ action: 'wisp_slot_1' as TrainerHotkeyAction, accelerator: 'Numpad9', description: 'a' }];
+    registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    unregisterTrainerHotkeyEntries(api, logger);
+    unregisterTrainerHotkeyEntries(api, logger); // duplicate cleanup must be harmless
+    assert.ok(!registered.has('Numpad9'));
+    const result = registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
+    assert.equal(result.registered.length, 1);
+    assert.ok(registered.has('Numpad9'));
+  });
+});
+
 describe('buildTrainerHotkeyRegistrationPlan — the real composed decision registerTrainerHotkeys() makes (Increment 5 review remediation)', () => {
   // review-discovered test-integrity gap: registerTrainerHotkeys() in
   // electron/trainer-hotkeys.ts composes feature-flag gating + entry

@@ -43,6 +43,17 @@ function getActiveGameContext(): { gameId: CanonicalGameId | null } {
 
 let cached: WispQuickSlotController | null = null;
 
+/**
+ * Clears the production controller's pending-consent/freeze-intent state
+ * (Increment 5 closeout, Phase A) without ever constructing the controller
+ * if it does not exist yet — shutdown and feature-disable must not have the
+ * side effect of lazily standing up Wisp hotkey infrastructure that was
+ * never otherwise touched this session.
+ */
+export function disposeAdaptiveWispQuickSlotController(): void {
+  if (cached) cached.dispose();
+}
+
 /** Returns the single production Adaptive Wisp quick-slot hotkey controller instance. */
 export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
   if (!cached) {

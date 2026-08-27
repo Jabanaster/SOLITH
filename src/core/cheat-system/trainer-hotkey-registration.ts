@@ -59,27 +59,62 @@ export function getTrainerHotkeyEntries(bindings: Record<string, string>): Train
     });
   }
 
-  return entries.filter((entry) => entry.accelerator.trim().length > 0);
+  return entries.map((entry) => ({ ...entry, accelerator: entry.accelerator.trim() })).filter((entry) => entry.accelerator.length > 0);
+}
+
+/**
+ * Canonical comparison key for an accelerator (Increment 5 closeout, Phase
+ * B). Trims whitespace and normalizes case — Electron's accelerator parser
+ * treats key names case-insensitively (`Ctrl+A` and `CTRL+a` both bind the
+ * same physical key), so two entries differing only in case are the SAME
+ * conflict, not two independent bindings. Used ONLY for comparison/grouping;
+ * the accelerator string actually handed to Electron is never case-altered
+ * (only trimmed), so a valid binding is never silently normalized into a
+ * different one.
+ */
+function acceleratorComparisonKey(accelerator: string): string {
+  return accelerator.trim().toUpperCase();
 }
 
 /**
  * Excludes every entry whose accelerator is claimed by more than one action
- * (Increment 5, Section 21/22/47/48). The registration engine below has no
- * cross-entry conflict detection of its own — given two entries that share
- * one accelerator in the same call, whichever is processed second silently
- * takes over the first's registration via the owned-shortcut re-bind path.
- * That is fine when it is the SAME action re-registering its own key (a
- * remap), but wrong when two DIFFERENT actions collide — nothing should
- * silently steal a key from another action. Filtering conflicts out here,
- * before registration, keeps that guarantee for every hotkey family that
- * reuses this engine, without changing register/unregister's own behavior.
+ * (Increment 5, Section 21/22/47/48; hardened Increment 5 closeout, Phase B
+ * to also catch blank/whitespace-only accelerators and case-only
+ * duplicates). The registration engine below has no cross-entry conflict
+ * detection of its own — given two entries that share one accelerator in the
+ * same call, whichever is processed second silently takes over the first's
+ * registration via the owned-shortcut re-bind path. That is fine when it is
+ * the SAME action re-registering its own key (a remap), but wrong when two
+ * DIFFERENT actions collide — nothing should silently steal a key from
+ * another action. Filtering conflicts out here, before registration, keeps
+ * that guarantee for every hotkey family that reuses this engine, without
+ * changing register/unregister's own behavior. Grouping is by array
+ * position only insofar as `entries` order never affects WHICH entries
+ * survive — the count-based algorithm below excludes every member of a
+ * conflicting group regardless of where each appears in the input.
  */
 export function filterOutConflictingEntries(entries: TrainerHotkeyEntry[]): TrainerHotkeyEntry[] {
-  const countByAccelerator = new Map<string, number>();
+  const countByKey = new Map<string, number>();
   for (const entry of entries) {
-    countByAccelerator.set(entry.accelerator, (countByAccelerator.get(entry.accelerator) ?? 0) + 1);
+    const key = acceleratorComparisonKey(entry.accelerator);
+    if (key.length === 0) continue;
+    countByKey.set(key, (countByKey.get(key) ?? 0) + 1);
   }
-  return entries.filter((entry) => countByAccelerator.get(entry.accelerator) === 1);
+  return entries.filter((entry) => {
+    const key = acceleratorComparisonKey(entry.accelerator);
+    return key.length > 0 && countByKey.get(key) === 1;
+  });
+}
+
+/**
+ * Defense-in-depth normalization applied at the registration API boundary
+ * itself (Increment 5 closeout, Phase B) — trims accelerators and drops any
+ * that are blank/whitespace-only, independent of whether the caller already
+ * did so via getTrainerHotkeyEntries. Callers must not be responsible for
+ * remembering to sanitize before calling registerTrainerHotkeyEntries.
+ */
+function normalizeEntries(entries: TrainerHotkeyEntry[]): TrainerHotkeyEntry[] {
+  return entries.map((entry) => ({ ...entry, accelerator: entry.accelerator.trim() })).filter((entry) => entry.accelerator.length > 0);
 }
 
 /**
@@ -97,16 +132,28 @@ export function buildTrainerHotkeyRegistrationPlan(bindings: Record<string, stri
   return filterOutConflictingEntries(getTrainerHotkeyEntries(filteredBindings));
 }
 
+/**
+ * The ONLY production entry point that reaches `globalShortcut` (Increment 5
+ * closeout, Phase B — "make conflict filtering unavoidable"). Enforces
+ * normalization and conflict-exclusion itself, unconditionally, regardless
+ * of whether the caller already ran entries through
+ * getTrainerHotkeyEntries/filterOutConflictingEntries/
+ * buildTrainerHotkeyRegistrationPlan first — a caller cannot bypass this by
+ * forgetting to pre-filter, and a lower-level unfiltered primitive is not
+ * exposed anywhere in this module. Idempotent to call twice with the same
+ * already-filtered input (re-filtering filtered entries is a no-op).
+ */
 export function registerTrainerHotkeyEntries(
   entries: TrainerHotkeyEntry[],
   shortcutApi: TrainerShortcutApi,
   callbackForAction: (action: TrainerHotkeyAction) => () => void,
   logger: TrainerHotkeyLogger = console,
 ): { registered: TrainerHotkeyEntry[]; failed: Array<TrainerHotkeyEntry & { reason: string }> } {
+  const safeEntries = filterOutConflictingEntries(normalizeEntries(entries));
   const registered: TrainerHotkeyEntry[] = [];
   const failed: Array<TrainerHotkeyEntry & { reason: string }> = [];
 
-  for (const entry of entries) {
+  for (const entry of safeEntries) {
     if (ownedTrainerShortcuts.has(entry.accelerator)) {
       shortcutApi.unregister(entry.accelerator);
       ownedTrainerShortcuts.delete(entry.accelerator);

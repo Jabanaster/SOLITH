@@ -15,7 +15,7 @@ import {
   unregisterTrainerHotkeyEntries,
 } from '../src/core/cheat-system/trainer-hotkey-registration.js';
 import { hideTrainerOverlay, toggleTrainerOverlay } from './trainer-overlay.js';
-import { getAdaptiveWispQuickSlotController } from './adaptive-wisp-hotkey-composition.js';
+import { disposeAdaptiveWispQuickSlotController, getAdaptiveWispQuickSlotController } from './adaptive-wisp-hotkey-composition.js';
 import { isWispQuickSlot } from '../src/core/adaptive-wisp/hotkey-types.js';
 
 let registered = false;
@@ -45,6 +45,16 @@ export function registerTrainerHotkeys(): void {
 }
 
 export function unregisterTrainerHotkeys(): void {
+  // Increment 5 closeout, Phase A — clear the Wisp quick-slot controller's
+  // own pending/freeze-intent state on every unregister, unconditionally,
+  // BEFORE the early-return below. This function is the single call site
+  // for both real application shutdown (main.ts) and every feature-disable
+  // /rebind refresh (refreshTrainerHotkeys always unregisters fully before
+  // re-registering), so it is the correct place to guarantee Wisp state
+  // never survives either transition — independent of whether any OS-level
+  // accelerator was ever actually registered (`registered` can be false
+  // even with Wisp enabled, e.g. zero bindings configured).
+  disposeAdaptiveWispQuickSlotController();
   if (!registered) return;
   unregisterTrainerHotkeyEntries(globalShortcut, console);
   registered = false;

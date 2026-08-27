@@ -30,6 +30,33 @@ export interface WispQuickSlotControllerDeps {
 
 export interface WispQuickSlotController {
   activate(slot: WispQuickSlot): Promise<WispHotkeyActivationResult>;
+  /**
+   * Clears all controller-owned presentation state (pending-consent map,
+   * freeze-intent map) and forgets the last-observed context/profile
+   * identity, without touching consent, memory, freeze, or attach state
+   * (Increment 5 closeout, Phase A). Safe to call multiple times (idempotent)
+   * and safe to call when no activation has ever occurred. Intended for
+   * feature-disable and application-shutdown composition call sites — see
+   * electron/trainer-hotkeys.ts's unregisterTrainerHotkeys().
+   */
+  dispose(): void;
+}
+
+/**
+ * Identity of the authority context an activation's presentation state
+ * (pending-consent, freeze-intent) is scoped to. `null` means "no active
+ * context" (detached/no session). Built ONLY from fields the existing
+ * session-monitor/live-memory architecture already produces (gameId,
+ * sessionId, sessionGeneration — see runtime-types.ts) plus the resolved
+ * profile's own identity — never a bare PID, executable substring, or
+ * display name (Increment 5 closeout, Phase A "Context identity").
+ * sessionGeneration already changes whenever verified process identity
+ * changes (session-context.ts's tracker keys generation on (pid,
+ * processStartTime)), so a separate process-identity field is unnecessary.
+ */
+function contextIdentityKey(context: WispRuntimeContext | null): string | null {
+  if (!context) return null;
+  return `${context.gameId}:${context.sessionId}:${context.sessionGeneration}`;
 }
 
 export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps): WispQuickSlotController {
@@ -41,19 +68,81 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
   // remediation). A bare-actionId key would let a pending/intent entry from
   // one game silently apply to an unrelated action in a different game after
   // a switch. Cleared whenever an activation reaches a terminal (non-pending)
-  // result so a later legitimate retry is never permanently blocked.
-  const pendingProposalByKey = new Map<string, string>();
+  // result so a later legitimate retry is never permanently blocked, AND
+  // whenever the authority context transitions (see below).
+  let pendingProposalByKey = new Map<string, string>();
   // Discrete freeze enable/disable intent per action (Section 36 — no
   // keydown/keyup hold semantics; each deliberate press flips the intent).
   // Same game-scoped key rationale as above.
-  const freezeEnableIntentByKey = new Map<string, boolean>();
+  let freezeEnableIntentByKey = new Map<string, boolean>();
+
+  // Increment 5 closeout, Phase A — deterministic pending-state lifecycle.
+  // `lastContextIdentity`/`lastProfileIdentity` remember the authority
+  // context and bound-profile identity the CURRENT contents of the two maps
+  // above were built under. `epoch` increments every time either map is
+  // reset by a detected transition; an in-flight activation captures the
+  // epoch it started under and refuses to write into the maps if the epoch
+  // has since moved on — this is what prevents a late-completing activation
+  // from an old game/session/profile from resurrecting state that a newer
+  // activation already correctly cleared (the race the closeout spec calls
+  // out explicitly: "a late result from an old session must not recreate
+  // deleted state").
+  let lastContextIdentity: string | null = null;
+  let lastProfileIdentity: string | null = null;
+  let epoch = 0;
+
+  function resetPresentationState(): void {
+    pendingProposalByKey = new Map<string, string>();
+    freezeEnableIntentByKey = new Map<string, boolean>();
+    epoch += 1;
+  }
+
+  /**
+   * Re-synchronizes controller-owned state against the CURRENT authority
+   * context before doing anything else in an activation. Idempotent — an
+   * unchanged identity (including two consecutive detached reads) is a
+   * no-op, so legitimate pending state survives repeated reads with no
+   * transition. Returns the epoch this call observed, for the caller to
+   * compare against after any subsequent await.
+   */
+  function syncContextIdentity(context: WispRuntimeContext | null): number {
+    const identity = contextIdentityKey(context);
+    if (identity !== lastContextIdentity) {
+      resetPresentationState();
+      lastContextIdentity = identity;
+      lastProfileIdentity = null; // profile identity is only meaningful within one context; force re-check below
+    }
+    return epoch;
+  }
+
+  function syncProfileIdentity(profileId: string): number {
+    if (profileId !== lastProfileIdentity) {
+      resetPresentationState();
+      lastProfileIdentity = profileId;
+    }
+    return epoch;
+  }
 
   return {
     async activate(slot: WispQuickSlot): Promise<WispHotkeyActivationResult> {
+      // Use-time resolution (Section 8) — read context fresh on every
+      // activation and reconcile controller state against it BEFORE
+      // resolving a profile, so a transitioned context never proceeds on
+      // stale presentation state, and a legitimate unchanged context is
+      // never disturbed.
+      const contextForIdentity = deps.getCurrentContext();
+      const epochAfterContextSync = syncContextIdentity(contextForIdentity);
+
       const snapshot = await deps.activeProfileProvider.getActiveBoundProfile();
       if (!snapshot) {
         return { slot, executed: false, diagnostic: hotkeyDiagnostic('WISP_HOTKEY_NO_ACTIVE_SESSION', 'no active Wisp session/profile is currently bound') };
       }
+
+      // Profile-replacement cleanup: even when gameId/session are unchanged,
+      // a re-resolved profile with a different profileId (e.g. active table
+      // or table version changed) must not inherit the prior profile's
+      // pending/freeze state.
+      const epochAfterProfileSync = syncProfileIdentity(snapshot.bound.profileId);
 
       const boundAction = resolveWispQuickSlotAction(snapshot.bound, slot);
       if (!boundAction) {
@@ -71,6 +160,7 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
       }
 
       const stateKey = `${snapshot.bound.gameId}:${boundAction.actionId}`;
+      const epochAtActivation = Math.max(epochAfterContextSync, epochAfterProfileSync);
 
       // Section 34 policy B — suppress a duplicate proposal for the same
       // action while one is already pending, rather than silently letting
@@ -111,10 +201,21 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
       const currentContext = deps.getCurrentContext();
       const result = await executeWispAction(request, actionDefinition, boundAction.binding, currentContext, deps.executorDeps);
 
-      if (result.status === 'pending-consent' && result.proposalId) {
-        pendingProposalByKey.set(stateKey, result.proposalId);
-      } else {
-        pendingProposalByKey.delete(stateKey);
+      // Epoch guard: if the authority context/profile transitioned WHILE
+      // this activation's executeWispAction call was in flight, the maps
+      // above have already been reset for the new epoch by a later
+      // activate() call's syncContextIdentity/syncProfileIdentity. Writing
+      // this late result into them under the OLD stateKey would silently
+      // resurrect state the newer activation correctly cleared. The request
+      // still executed for real (executeWispAction's own validateWispBinding
+      // is the authority on whether the mutation itself was allowed) — only
+      // this controller's own bookkeeping is skipped.
+      if (epoch === epochAtActivation) {
+        if (result.status === 'pending-consent' && result.proposalId) {
+          pendingProposalByKey.set(stateKey, result.proposalId);
+        } else {
+          pendingProposalByKey.delete(stateKey);
+        }
       }
 
       return {
@@ -125,6 +226,12 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
         executionStatus: result.status,
         diagnostic: result.diagnostic,
       };
+    },
+
+    dispose(): void {
+      resetPresentationState();
+      lastContextIdentity = null;
+      lastProfileIdentity = null;
     },
   };
 }
