@@ -142,6 +142,21 @@ export function getCanonicalGame(id: string): CanonicalGame | null {
   return row ? parseCanonicalGameRow(row) : null;
 }
 
+/**
+ * Exact reverse lookup: which canonical game (if any) currently claims a
+ * given `catalogGameId` (Adaptive Wisp Increment 6 Tasks 1-4 remediation).
+ * `catalogGameId` is only ever set by the existing canonical-games
+ * migration path (canonical-games/migration.ts, unchanged) from real
+ * install-discovery evidence — never by this function, and never by
+ * Adaptive Wisp. Exact primary-column match only; returns null (not a
+ * best guess) when no canonical game has been linked to that catalog
+ * identity yet.
+ */
+export function findCanonicalGameByCatalogGameId(catalogGameId: string): CanonicalGame | null {
+  const row = db.prepare('SELECT * FROM canonical_games WHERE catalogGameId = ?').get(catalogGameId) as Record<string, unknown> | undefined;
+  return row ? parseCanonicalGameRow(row) : null;
+}
+
 export function listInstallationsForGame(canonicalGameId: string): GameInstallation[] {
   const rows = db
     .prepare('SELECT * FROM game_installations WHERE canonicalGameId = ? ORDER BY launcher')

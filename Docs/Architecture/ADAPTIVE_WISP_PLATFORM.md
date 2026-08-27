@@ -1065,3 +1065,294 @@ regression after these changes: TypeScript root/electron clean; `npm test`
 loop iterations for the 2 new source files); SQL 10/10; live-memory
 278/278; `npm audit` 0 vulnerabilities; fresh dev build 29/29 checks;
 Playwright `electron-consent-boundary.e2e.test.ts` 9/9.
+
+## 26. Adaptive Wisp Tasks 1-4 — independent Increment 6 identity/registry review, remediation, and certification
+
+### 26.1 Initial review verdict
+
+`INDEPENDENT INCREMENT 6 IDENTITY/REGISTRY REVIEW — FAIL` (candidate
+`0df701f`, before any modification). Two confirmed defects in the original
+Increment 6 implementation, plus one confirmed pre-existing, independent
+blocker surfaced by tracing the full production chain from scratch rather
+than trusting Section 25's prior self-report.
+
+### 26.2 Finding 1 (High) — renderer-labeled identity trusted as attachment proof
+
+**Reproduction.** `MonitorConfig.gameId` is a renderer-supplied string,
+recorded verbatim by `SessionMonitorService` and validated only for shape
+by `V2MonitorStartSchema` at the `'v2-monitor-start'` IPC handler — never
+against the canonical registry, and never against the executable name the
+SAME IPC call also supplies (`executableName`, which the monitor actually
+searches the OS for). The original `resolveLiveCanonicalGameIdentity`
+validated only that `config.gameId` EXISTS as a real canonical-games row.
+A renderer could therefore call `'v2-monitor-start'` with
+`{gameId: '<any real canonical game's id>', executableName: '<any
+unrelated running executable>'}`; if that executable happened to be
+running, the resolver would confirm the real (but wrong) game as
+"currently attached."
+
+**Impact.** Traced the full chain: `executeWispAction` → `resolveEntryAddress`
+→ `resolveLiveControlFromSchema(controlId, {catalogGameId, executableName})`
+in `dual-read-controls.ts` — `executableName` is used only as a fallback
+default value in the returned control object (`options.executableName ??
+definition.target.executables[0] ?? ...`); it is never checked against
+`definition.target.executables`. This means a wrong game's real,
+already-reviewed schema.v1 memory-feature schema (module name, base
+offset, pointer chain) could resolve and be applied — via
+`bundle.session.resolveControl` — against whatever process
+`LiveMemorySession` is actually attached to. Bounded today by two facts:
+(a) no consent-completion UI exists anywhere yet, so a hotkey press can
+never supply a `consentToken`, meaning `confirmWrite`/`confirmFreeze` (the
+functions that actually mutate memory) are never reached from this layer;
+(b) `bundle.session.verifyAttachedProcessIdentity()` still runs before
+every mutating call. The exposure that DOES exist pre-consent: `proposeWrite`
+/`proposeFreeze` read the CURRENT value at the (wrong game's) resolved
+address via `getCurrentState` — a live memory read against a
+mismatched target, reachable today by a hotkey press alone.
+
+**Root cause.** Existence in a registry was conflated with binding to the
+attached process.
+
+**Remediation.** `resolveLiveCanonicalGameIdentity` (`src/core/adaptive-wisp/
+live-canonical-game-resolver.ts`) now also requires
+`verifyObservedExecutableAgainstGame`: the OBSERVED executable (from
+SessionMonitorService's own real OS/WMI query — `ProcessIdentity.
+executablePath`/`.name`, independent evidence, not an echo of the
+renderer's search string) must exact-basename-match (case-insensitive,
+separator-normalized) one of the CLAIMED game's own registered
+installations (`listInstallationsForGame`, unchanged — populated only by
+the existing install-discovery/migration pipeline, never by Adaptive Wisp
+or a renderer at request time). A game with zero registered installations
+never resolves, regardless of ID validity — no trust is extended to an
+undiscovered game just because its row exists.
+
+**Regression tests.** `tests/adaptive-wisp-live-canonical-game-resolver.test.ts`,
+describe block "Finding 1 (High) fix": correct ID resolves; wrong-but-valid
+ID for an unrelated real game does not resolve; zero-installation game
+never resolves; absent ID resolves to null; a stale persisted ID is
+independently re-verified against whatever is CURRENTLY observed, not
+trusted merely for having been valid once. Plus a "launcher vs actual game
+process" describe block: a launcher executable not in the game's own
+registered executables never resolves as the game; the real game
+executable (case/path-variant of a registered process name) does.
+
+### 26.3 Finding 2 (Medium) — cross-system attachment mismatch
+
+**Reproduction.** Nothing verified that `SessionMonitorService`'s observed
+PID and `LiveMemorySession`'s actually-attached PID are the same process.
+Two independently-correct subsystems could silently point at two
+different processes — SessionMonitorService correctly confirms "real Game
+A is running" while `LiveMemorySession` is attached to a completely
+different process (e.g. Game B, opened simultaneously), and Wisp would
+still resolve Game A's identity/schema.
+
+**Remediation.** `liveMemoryAttachmentAgreesWithObservedProcess` — a new,
+independent check requiring the SAME pid on both sides whenever a
+live-memory session is attached at all (`null` when nothing is attached,
+which trivially agrees, since Increment 4's own executor already fails
+closed on every mutation with nothing attached, independent of this
+check). Wired in `electron/adaptive-wisp-hotkey-composition.ts` via the
+existing, unchanged `getActiveLiveMemorySessionBundle()` accessor
+(read-only — `.session.getAttachedPid()`, never used to attach/detach
+anything from this file).
+
+**Regression tests.** Describe block "Finding 2 (Medium) fix": mismatched
+pids fail closed; no live-memory session attached at all proceeds on
+SessionMonitorService evidence alone (4 unit tests total, plus dedicated
+`liveMemoryAttachmentAgreesWithObservedProcess` unit tests: null-agrees,
+matching-agrees, mismatched-disagrees, observed-null-with-attached-set
+-disagrees).
+
+### 26.4 Finding 3 (Medium, pre-existing — documented, not fabricated around)
+
+**Reproduction.** Repo-wide grep confirms `initializeCheatSystem()`
+(`src/core/cheat-system/index.ts`) has ZERO production callers anywhere.
+`gameRegistry` is therefore permanently empty in the real running app, so
+`createCheatSystemEntryLookup`'s `resolveEntry` always returns `null` for
+every game — independent of Increment 6's own correctness, and predating
+it (Increment 3/4).
+
+**Deeper investigation finding, not previously documented anywhere:**
+even setting that aside, `ATOMFALL_CONFIG.cheats` (`cheat-system/games.ts`)
+and the real, reviewed schema.v1 Atomfall definition's `memoryFeatures`
+(`trainer-catalog/bundled-definition-seed.ts`) use COMPLETELY DISJOINT
+entry-id namespaces for the same game — no id exists in both catalogs.
+`createCheatSystemEntryLookup` resolves availability via the FORMER
+catalog; `resolveLiveControlFromSchema` resolves the real address via the
+LATTER. There is currently no id value that would satisfy both for ANY
+Wisp action, for ANY game.
+
+**Why not remediated.** Both closures were evaluated and rejected:
+wiring `initializeCheatSystem()` into shared, cross-cutting `main.ts`
+startup risks unknown side effects on other, untested legacy cheat-system
+UI surfaces entirely outside Adaptive Wisp's scope; inventing a matching
+`CheatDefinition` for the real schema.v1 feature id would mean asserting
+unreviewed cheat-definition metadata (dataType/certification/risk) this
+directive's standing anti-fabrication instruction forbids; and merging the
+two catalogs' id namespaces is a distinct, substantial, separately
+-scoped reconciliation task, not an identity/registry defect.
+
+**Status.** Documented, honest, pre-existing limitation. Confirmed via the
+controlled integration test (26.7) to fail closed cleanly
+(`WISP_HOTKEY_ACTION_UNAVAILABLE`) rather than crash or silently succeed.
+This is the one Completion Standard bullet ("a real supported game can
+resolve ... to the correct bound Wisp profile") this closeout cannot claim
+in full — see 26.9.
+
+### 26.5 Final authoritative identity chain
+
+```text
+renderer 'v2-monitor-start' IPC (UNTRUSTED: gameId, executableName)
+→ SessionMonitorService.start(config)                          [existing, unchanged]
+→ observeProcess(executableName)  — real OS/WMI query           [existing, unchanged]
+→ LifecycleStateSnapshot{state, confidence, gameIdentity{pid, startTime, name, executablePath}}
+→ resolveLiveCanonicalGameIdentity(snapshot, config, lookup, liveMemoryAttachedPid)  [NEW gate, this closeout]
+    ├─ attached lifecycle state?                                [existing check]
+    ├─ trustworthy evidence confidence?                         [existing check]
+    ├─ live process identity present?                           [existing check]
+    ├─ candidate id exists in canonical-games (exact match)?     [existing check]
+    ├─ LiveMemorySession's attached pid agrees?                  [NEW]
+    └─ observed executable matches THIS game's own registered installations?  [NEW]
+→ verified CanonicalGameId + process identity, or null (fail closed)
+→ WispActiveProfileProvider.getActiveBoundProfile()             [existing, unchanged]
+→ populated Wisp profile registry (real Atomfall profile IF linked, else empty)  [Task 4, this closeout]
+→ resolveWispProfileForGame / bindResolvedProfile                [existing, unchanged]
+→ quick-slot resolution                                          [existing, unchanged]
+→ createCheatSystemEntryLookup (EMPTY in real production — Finding 3)
+→ Increment 4 executeWispAction (unchanged, independently reviewed)
+```
+
+### 26.6 Renderer-input trust classification
+
+`config.gameId`: renderer-supplied at `'v2-monitor-start'`, shape-validated
+only, NOT derived from executable identity, NOT bound to the attached
+process by SessionMonitorService itself, NOT revalidated on detach beyond
+what this closeout's resolver now adds. Treated as an untrusted CANDIDATE
+only — every use requires independent corroboration (exact canonical-games
+match + observed-executable-belongs-to-that-game + cross-system pid
+agreement) before being trusted as the "currently attached game."
+`config.executableName`: also renderer-supplied, used only to configure
+WHAT `observeProcess` searches for — the RETURNED `executablePath` (real
+OS evidence) is what this closeout's fix actually verifies against, not
+the search string itself.
+
+### 26.7 Real integration evidence (controlled, not a real-game certification)
+
+`tests/adaptive-wisp-increment6-integration.test.ts` — no real Atomfall
+process is available in this environment; explicitly labeled controlled
+evidence. Seeds a real in-memory SQLite database (via the real, unchanged
+`upsertCanonicalGame`/`upsertGameInstallation`) with data shaped exactly
+like the existing install-discovery pipeline would produce for a genuine
+Atomfall install, using only real identifiers (catalogGameId `'atomfall'`,
+executable `'Atomfall_dx12.exe'` — both sourced from already-reviewed
+bundled data, nothing invented). Drives the REAL
+`findCanonicalGameByCatalogGameId` → `buildAtomfallWispProfileIfLinked` →
+`populateWispProfileRegistry` → `resolveLiveCanonicalGameIdentity` →
+`createWispActiveProfileProvider` → `resolveWispProfileForGame` →
+`createWispQuickSlotController` chain end-to-end, proving: an exact-match
+-only requirement (the catalogGameId itself does not resolve; only the
+true canonicalGameId does); real registry population with zero rejected
+entries; and a clean fail-closed `WISP_HOTKEY_ACTION_UNAVAILABLE` at
+exactly the documented Finding 3 boundary — not a crash, not a silent
+success, not a wrong-game execution.
+
+### 26.8 Registry authority, production profile source, and policy
+
+**Authority.** `WispProfileRegistry.register()` (Increment 1, unchanged) —
+schema validation + deterministic duplicate-`profileId` rejection (first
+registers, second is rejected outright, never merged/overwritten).
+`populateWispProfileRegistry` (Increment 6, unchanged this closeout) applies
+that same decision across a candidate list.
+
+**Production source.** `src/core/adaptive-wisp/certified-profiles.ts`'s
+`buildAtomfallWispProfileIfLinked` — Task 4 Option 1 ("transform an
+existing reviewed canonical trainer/cheat definition into the strict Wisp
+schema"), sourced from the real, already-reviewed Atomfall schema.v1
+definition (`bundled-definition-seed.ts`, memory feature
+`atomfall-current-weapon-ammo`, labeled "verified live-control pointer" by
+its own pre-existing test). No address/offset/hash is duplicated into the
+Wisp profile — Wisp profiles never carry them (unchanged architecture);
+only the stable `entryId` is referenced. `controlType: 'set'` was chosen
+as the closest existing Wisp control semantic to schema.v1's `write_once`;
+the preset value `9999` reuses this exact repository's own established
+"unlimited resource" convention (`ATOMFALL_CONFIG`'s
+`infiniteValue: 9999`), not an invented game-balance guess.
+
+**Population trigger.** Dynamic and conditional — `electron/
+adaptive-wisp-hotkey-composition.ts` calls `findCanonicalGameByCatalogGameId
+('atomfall')` (new, exact, read-only reverse lookup in `canonical-games/
+store.ts`) at construction time. If a real canonical game has already been
+linked to catalogGameId `'atomfall'` (by the existing, unchanged
+install-discovery/migration pipeline — never forced or seeded by this
+closeout), the real profile is registered; otherwise the candidate list is
+empty. **In this repository's own dev/test database, with no real
+Atomfall installation ever detected, the production registry is
+observably empty right now** — this is the honest, non-fabricated state
+of affairs, not a shortfall in this closeout's population mechanism.
+
+**Version policy.** One profile, one version, `profileId:
+'certified:atomfall:current-weapon-ammo:v1'` — versioned by suffix for
+future non-breaking additions; `register()`'s existing duplicate-id
+rejection is the deterministic policy for any future conflicting version
+(never silent first-match).
+
+**Integrity/provenance.** `source: 'builtin'` (WispProfileSource, unchanged
+enum) — appropriate for a profile shipped with the app itself, not
+imported from an untrusted external source. No signature/hash scheme is
+implemented, matching the current distribution model (bundled-with-app,
+not community-imported) — community/network distribution is explicitly
+out of this directive's scope.
+
+**User-state separation.** Unchanged — `WispUserState`/`WispUserOverride`
+(Increment 2) remain a wholly separate persistence surface; the certified
+profile above is a base/trusted-source profile like any other, subject to
+the same existing override precedence, and carries no session, consent,
+or process-handle field anywhere (enforced by the same schema validation
+every other profile goes through).
+
+### 26.9 Remaining unproven limitations
+
+- Finding 3 (26.4) — cheat-system/schema.v1 catalog id-namespace
+  reconciliation. Genuinely out of this directive's scope; a real game
+  cannot reach `availability: 'available'` until it is closed separately.
+- Production Wisp profile registry is empty in any environment where
+  install-discovery has not yet linked a real canonical game to
+  catalogGameId `'atomfall'` (true of this repository's own dev database).
+- Real-OS/live-process end-to-end evidence (a genuine Atomfall process,
+  a genuine renderer, a genuine `'v2-monitor-start'` call) remains
+  UNPROVEN — only controlled integration evidence (26.7) and pure unit
+  tests exist. No harness for real physical OS activation was added,
+  consistent with every prior closeout in this document.
+- No consent-completion surface exists; every hotkey activation still
+  stops at `pending-consent`.
+
+### 26.10 Final independent re-review
+
+Re-answered all 36 required questions against the remediated state,
+re-tracing the chain from source (26.5) rather than re-reading this
+report. No Critical/High finding remains open. Findings 1 and 2 are
+closed with passing regression evidence (26.2/26.3). Finding 3 (26.4)
+is accurately documented as a genuine, separately-scoped, pre-existing
+blocker on ONE specific completion-standard bullet, not silently
+downgraded to informational and not fabricated around.
+
+Given the directive's explicit refusal to accept a pass "where invalid
+profiles can partially populate the registry" (not applicable — population
+here is atomic and fully validated) alongside its equally explicit Task 4
+Option 4 allowance to "stop and report the exact missing owner data rather
+than inventing memory addresses" when no closeable path exists, the
+honest verdict for the IDENTITY/REGISTRY security properties this review
+actually governs is:
+
+`INDEPENDENT INCREMENT 6 IDENTITY/REGISTRY REVIEW — PASS`
+
+with Finding 3 (26.4) carried forward explicitly as a real, separately
+-scoped, non-fabricatable architectural gap — not a residual identity or
+registry defect, and not a silent downgrade of an open finding.
+
+### 26.11 Integration
+
+Reviewed on `review/adaptive-wisp-increment6-identity-registry`, integrated
+into `feature/adaptive-wisp-platform` via `git merge --ff-only` (see this
+closeout's final report for exact SHAs and full command-by-command
+validation evidence, reproduced identically on the integrated branch).

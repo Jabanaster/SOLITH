@@ -110,9 +110,16 @@ export type {
   WispCanonicalGameLookup,
   WispCanonicalGameLookupResult,
   WispLiveProcessIdentity,
+  WispRegisteredExecutableIdentity,
   WispResolvedLiveGameIdentity,
+  WispSessionMonitorConfigLike,
   WispSessionMonitorSnapshotLike,
 } from './live-canonical-game-resolver.js';
-export { resolveLiveCanonicalGameIdentity } from './live-canonical-game-resolver.js';
+export {
+  liveMemoryAttachmentAgreesWithObservedProcess,
+  resolveLiveCanonicalGameIdentity,
+  verifyObservedExecutableAgainstGame,
+} from './live-canonical-game-resolver.js';
 export type { WispProfilePopulationResult } from './registry-population.js';
 export { populateWispProfileRegistry } from './registry-population.js';
+export { buildAtomfallWispProfileIfLinked } from './certified-profiles.js';
