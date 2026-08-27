@@ -1,27 +1,24 @@
 /**
- * Adaptive Wisp Increment 5 — production quick-slot hotkey composition.
+ * Adaptive Wisp Increment 5/6 — production quick-slot hotkey composition.
  *
  * One well-defined construction point for the real WispQuickSlotController,
  * mirroring adaptive-wisp-execution-composition.ts's pattern: not registered
  * with ipcMain, imported by no preload script, reachable from no renderer.
  * The only caller is electron/trainer-hotkeys.ts's wisp_slot_N callback.
  *
- * Known limitation (documented, not silently worked around): resolving
- * "which canonical game is currently attached" from a live process has no
- * existing production implementation anywhere in the repository yet (audited
- * this increment — session-monitor-context-provider.ts's getActiveGameContext
- * callback has never had a real caller, and no other main-process module
- * tracks a "current canonical game" concept). Inventing that resolution here
- * would mean introducing new, unreviewed identity-mapping logic outside this
- * increment's scope — exactly what Increment 4's own review forbids doing
- * casually (no fuzzy/executable-substring/cast-based mapping). Until a future
- * increment supplies a real implementation, getActiveGameContext returns "no
- * active game," which the whole reviewed chain already treats as the safe,
- * harmless "no active session" case (Increment 5 spec, Section 18) — Wisp
- * quick-slot hotkeys are wired end-to-end and fully tested, but will no-op
- * in the running app until that gap is closed.
+ * Increment 6 replaced the Increment 5 stub (`getActiveGameContext` always
+ * returning `{gameId: null}`) with a real resolver — see getActiveGameContext
+ * below. `createWispProfileRegistry()` is still populated with an EMPTY
+ * candidate list (see populateWispProfileRegistry's own doc comment): this
+ * repository has no bundled/authoritative Wisp profile data anywhere, and
+ * inventing one to make this look more finished than it is would violate
+ * this closeout's explicit anti-fabrication rule. The registry, resolver,
+ * and hotkey layer are all real and fully wired; the app still has no real
+ * profile to resolve into a bound action until a future increment supplies
+ * one.
  */
 import { getSessionMonitor } from '../src/core/v2/session-monitor.js';
+import { getCanonicalGame } from '../src/core/canonical-games/store.js';
 import type { CanonicalGameId } from '../src/core/adaptive-wisp/types.js';
 import { createSessionMonitorContextProvider } from '../src/core/adaptive-wisp/session-monitor-context-provider.js';
 import { createCatalogGameIdentityBridge } from '../src/core/adaptive-wisp/catalog-game-identity-bridge.js';
@@ -29,16 +26,39 @@ import { createCheatSystemEntryLookup } from '../src/core/adaptive-wisp/cheat-sy
 import { createWispActiveProfileProvider } from '../src/core/adaptive-wisp/active-profile-provider.js';
 import { createWispQuickSlotController, type WispQuickSlotController } from '../src/core/adaptive-wisp/quick-slot-controller.js';
 import { createWispProfileRegistry } from '../src/core/adaptive-wisp/registry.js';
+import { populateWispProfileRegistry } from '../src/core/adaptive-wisp/registry-population.js';
+import { resolveLiveCanonicalGameIdentity, type WispCanonicalGameLookupResult } from '../src/core/adaptive-wisp/live-canonical-game-resolver.js';
 import { resolveWispProfileForGame } from '../src/core/adaptive-wisp/user-state-service.js';
 import { getAdaptiveWispExecutionAdapter } from './adaptive-wisp-execution-composition.js';
 import { app } from 'electron';
 
 /**
- * See the known-limitation note above — always reports no active game until
- * a real attached-process -> canonical-game resolver exists.
+ * Exact, non-fuzzy lookup against the real canonical-games store (SQLite
+ * primary-key query — see canonical-games/store.ts's getCanonicalGame). The
+ * pure resolver this feeds never sees the database itself, only this
+ * injected function, so the resolver stays testable without a DB.
+ */
+function lookupCanonicalGame(candidateId: string): WispCanonicalGameLookupResult | null {
+  const game = getCanonicalGame(candidateId);
+  if (!game) return null;
+  return { canonicalGameId: game.id as CanonicalGameId };
+}
+
+/**
+ * Increment 6 — real attached-process -> canonical-game resolution. Reads
+ * the V2 Session Monitor's current status (read-only; never start()/stop()
+ * from here, per Section 50 of Increment 3) and hands it to the pure
+ * resolver along with the exact canonical-games lookup above. Returns "no
+ * active game" on every failure/ambiguity path (no monitor session running,
+ * unattached lifecycle state, stale/contradictory evidence confidence, or a
+ * candidate id that does not match any real canonical game) — the whole
+ * reviewed hotkey chain already treats that as the safe, harmless "no
+ * active session" case.
  */
 function getActiveGameContext(): { gameId: CanonicalGameId | null } {
-  return { gameId: null };
+  const status = getSessionMonitor().getStatus();
+  const resolved = resolveLiveCanonicalGameIdentity(status.snapshot, status.config, lookupCanonicalGame);
+  return { gameId: resolved?.gameId ?? null };
 }
 
 let cached: WispQuickSlotController | null = null;
@@ -58,11 +78,12 @@ export function disposeAdaptiveWispQuickSlotController(): void {
 export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
   if (!cached) {
     const registry = createWispProfileRegistry();
-    const contextProvider = createSessionMonitorContextProvider(() => {
-      // Read-only status check (Section 50 of Increment 3) — never start()/stop().
-      getSessionMonitor().getStatus();
-      return getActiveGameContext();
-    });
+    // See this file's top-of-file comment — no authoritative profile source
+    // exists in this repository yet, so this is an honest empty population,
+    // not a placeholder. populateWispProfileRegistry itself is real,
+    // independently tested infrastructure.
+    populateWispProfileRegistry(registry, []);
+    const contextProvider = createSessionMonitorContextProvider(() => getActiveGameContext());
     const identityBridge = createCatalogGameIdentityBridge();
     const entryLookup = createCheatSystemEntryLookup(identityBridge);
     const activeProfileProvider = createWispActiveProfileProvider({

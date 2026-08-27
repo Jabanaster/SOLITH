@@ -104,3 +104,15 @@ export type { WispActiveProfileProvider, WispActiveProfileProviderDeps, WispActi
 export { createWispActiveProfileProvider } from './active-profile-provider.js';
 export type { WispQuickSlotController, WispQuickSlotControllerDeps, WispHotkeyBuildRequestResult } from './quick-slot-controller.js';
 export { createWispQuickSlotController, buildDefaultRequest } from './quick-slot-controller.js';
+
+// Increment 6 — live canonical-game resolution + profile-registry population.
+export type {
+  WispCanonicalGameLookup,
+  WispCanonicalGameLookupResult,
+  WispLiveProcessIdentity,
+  WispResolvedLiveGameIdentity,
+  WispSessionMonitorSnapshotLike,
+} from './live-canonical-game-resolver.js';
+export { resolveLiveCanonicalGameIdentity } from './live-canonical-game-resolver.js';
+export type { WispProfilePopulationResult } from './registry-population.js';
+export { populateWispProfileRegistry } from './registry-population.js';

@@ -927,3 +927,141 @@ precisely rather than re-labeled as resolved by this closeout:
 - **Packaged (`dist:dir`) build evidence** was not re-collected this pass —
   only the dev bundle plus its 29-check verifier and the Playwright suite
   ran. The last packaged-build pass was during the Increment 4 review.
+
+## 25. Increment 6 — live canonical-game resolution and profile-registry population (IMPLEMENTED, NOT YET INDEPENDENTLY REVIEWED)
+
+### 25.1 Architecture decision — which existing authority is reused, and why
+
+Investigation before implementation (per this increment's own "investigate
+first" requirement) found:
+
+- **Canonical game registry**: `src/core/canonical-games/store.ts`'s
+  `getCanonicalGame(id)` — an exact SQLite primary-key lookup (`WHERE id =
+  ?`), already the sole authority `catalog-game-identity-bridge.ts`
+  (Increment 4B, unchanged) uses to bridge a `CanonicalGameId` to a
+  `catalogGameId`. No second canonical-game concept exists anywhere in the
+  codebase; none was created here.
+- **Process/session monitor**: `src/core/v2/session-monitor.ts`'s
+  `SessionMonitorService` — already tracks live process identity (`pid` +
+  ISO `startTime`, PID-reuse-aware) via `getStatus().snapshot.gameIdentity`,
+  for whichever game a renderer explicitly started monitoring via the
+  `'v2-monitor-start'` IPC channel (`MonitorConfig.gameId`, a
+  renderer-supplied string recorded verbatim in `getStatus().config`).
+  Audited and confirmed: `getSessionMonitor().start()` has no other
+  production caller, `config.gameId` is validated only for shape by
+  `V2MonitorStartSchema` — never against the canonical registry — so it must
+  be treated as an untrusted candidate, never as identity proof on its own.
+- **Cheat-system registry / executable metadata**: audited
+  (`cheat-system/game-registry.ts`) — confirmed, as the Increment 4B bridge
+  already documented, that it has no field linking a `GameConfig` to a
+  canonical game, so it plays no role in this resolution path.
+- **Profile schemas/loaders**: `src/core/adaptive-wisp/registry.ts`'s
+  `WispProfileRegistry.register()` (Increment 1, unchanged) already performs
+  full schema validation and deterministic duplicate-`profileId` rejection.
+  Audited for a bundled/authoritative profile data source: none exists
+  anywhere in the repository — `WispGameProfile` objects exist only in test
+  fixtures.
+- **Duplicate/conflicting registry concepts**: none found. `createWispProfileRegistry`
+  had exactly one production caller before this increment
+  (`electron/adaptive-wisp-hotkey-composition.ts`) and still does;
+  `resolveWispProfileForGame` likewise.
+
+**Decision**: build a pure resolver (`live-canonical-game-resolver.ts`) that
+takes SessionMonitorService's own status fields as plain data (no import of
+`v2/session-monitor.js` itself, preserving the adaptive-wisp domain's static
+purity boundary — see `adaptive-wisp-hotkey-boundary-static.test.ts`) plus
+an injected exact-match lookup function, and returns either a verified
+canonical game + process identity, or `null`. The Electron composition layer
+wires the real `getCanonicalGame` DB call and the real `getSessionMonitor()`
+read into that pure function. No second session authority, no second
+canonical-game registry, and no fuzzy/executable-substring/display-name/cast
+-based identity mapping were introduced anywhere.
+
+### 25.2 Implementation summary
+
+- **`src/core/adaptive-wisp/live-canonical-game-resolver.ts`** (new, pure,
+  no I/O): `resolveLiveCanonicalGameIdentity(snapshot, config, lookup)`.
+  Fails closed (returns `null`) unless ALL of: the snapshot exists; its
+  `state` is one of `game_running`/`observing`/`external_session_observed`/
+  `solith_session_connected`/`session_ended_game_running` (a real process
+  confirmed present, distinct from the disabled/idle/game_not_running/
+  game_exited/stale_evidence/error/stopped states that mean "nothing is
+  attached"); its evidence `confidence` is NOT `stale`/`contradictory`/
+  `unavailable`; a live `gameIdentity` (pid + startTime) is present; and the
+  session's own `config.gameId` candidate string resolves via the injected
+  exact-match `lookup` to a real canonical game. Never trims, normalizes, or
+  otherwise massages the candidate id before passing it to `lookup` — an
+  unrecognized or blank candidate resolves to `null`, never a near-miss.
+- **`src/core/adaptive-wisp/registry-population.ts`** (new, pure):
+  `populateWispProfileRegistry(registry, candidates)` applies
+  `registry.register()`'s existing validation/dedup decision across a
+  candidate list and reports which indices registered vs. were rejected and
+  why. Does not invent any new validation or conflict policy of its own —
+  every decision is `WispProfileRegistry.register()`'s, unchanged.
+- **`electron/adaptive-wisp-hotkey-composition.ts`** (modified):
+  `getActiveGameContext()` now calls `getSessionMonitor().getStatus()` and
+  `resolveLiveCanonicalGameIdentity(status.snapshot, status.config,
+  lookupCanonicalGame)`, where `lookupCanonicalGame` is a two-line wrapper
+  around the real `getCanonicalGame`. `createWispProfileRegistry()` is
+  populated via `populateWispProfileRegistry(registry, [])` — an
+  intentionally EMPTY candidate list, documented in-file, because no
+  authoritative profile source exists yet (see 25.4). The redundant
+  pre-emptive `getSessionMonitor().getStatus()` call that Increment 5 made
+  purely to satisfy a "read-only status check" comment was removed — the
+  real resolver now performs that same read for a real purpose.
+
+### 25.3 Files changed
+
+`src/core/adaptive-wisp/live-canonical-game-resolver.ts` (new),
+`src/core/adaptive-wisp/registry-population.ts` (new),
+`src/core/adaptive-wisp/index.ts` (new exports),
+`electron/adaptive-wisp-hotkey-composition.ts` (modified),
+`tests/adaptive-wisp-live-canonical-game-resolver.test.ts` (new, 28 tests),
+`tests/adaptive-wisp-registry-population.test.ts` (new, 6 tests),
+`package.json` (both new test files added to the `test` script).
+
+### 25.4 What Increment 6 does NOT change or claim
+
+- **The profile registry is still empty in the running app.** No
+  authoritative Wisp profile data exists anywhere in this repository.
+  `populateWispProfileRegistry` is real and independently tested
+  infrastructure, called in production with `[]`. Until a future increment
+  supplies bundled/authoritative profile data, `resolveWispProfileForGame`
+  will still return "no profile" for every real game, even now that
+  `getActiveGameContext` can correctly identify one.
+- **No consent-completion surface was added.** Unchanged from Increment 5 —
+  every hotkey activation still stops at `pending-consent`.
+- **No renderer, Wisp UI, hotkey editor, creator/community functionality, or
+  Increment 4 architectural change was made.**
+- **Real end-to-end evidence remains unproven.** All 28 resolver tests and 6
+  population tests are pure unit tests against injected dependencies — none
+  of them start a real `SessionMonitorService`, touch the real SQLite
+  canonical-games table, or drive a real game process. This is consistent
+  with the rest of this document's evidence discipline: real-OS/live-process
+  evidence for `wisp_slot_N` end-to-end remains `UNPROVEN`, unchanged from
+  Section 24.6.
+- **This implementation has not yet been independently reviewed.** Per this
+  increment's own stop condition, it must not be called complete until that
+  separate, later-authorized review occurs.
+
+### 25.5 Test evidence
+
+28 new tests in `tests/adaptive-wisp-live-canonical-game-resolver.test.ts`
+cover: a recognized attached game resolving correctly; an unrecognized
+candidate id; no snapshot; no config; no live process identity; every
+unattached lifecycle state (7 states) rejecting; every attached lifecycle
+state (5 states) accepting; every rejected confidence value (3 values)
+rejecting; every accepted confidence value (3 values) accepting; a game
+switch resolving the new game; detach-then-reattach resolving independently
+of stale memory; PID reuse/process replacement being reported transparently
+rather than conflated; a blank candidate id rejecting; and no
+substring/fuzzy matching. 6 new tests in
+`tests/adaptive-wisp-registry-population.test.ts` cover: an empty candidate
+list; a valid profile; an invalid profile; duplicate profile identity
+(deterministic first-wins rejection, not silent merge); a mixed valid/invalid
+list; and an empty-registry resolution still failing closed. Full repository
+regression after these changes: TypeScript root/electron clean; `npm test`
+2,118/2,118 (was 2,080/2,080 — +38 = 34 new tests + 4 dynamic boundary-test
+loop iterations for the 2 new source files); SQL 10/10; live-memory
+278/278; `npm audit` 0 vulnerabilities; fresh dev build 29/29 checks;
+Playwright `electron-consent-boundary.e2e.test.ts` 9/9.
