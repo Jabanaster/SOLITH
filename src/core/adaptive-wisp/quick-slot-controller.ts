@@ -34,13 +34,19 @@ export interface WispQuickSlotController {
 
 export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps): WispQuickSlotController {
   // Per-action, in-memory only — never persisted (Section 27), never keyed
-  // by session/PID (Section 45). Cleared whenever an activation reaches a
-  // terminal (non-pending) result so a later legitimate retry is never
-  // permanently blocked.
-  const pendingProposalByAction = new Map<string, string>();
+  // by session/PID (Section 45). Keyed by `${gameId}:${actionId}`, not bare
+  // actionId — actionId is only unique WITHIN one profile; two different
+  // games' profiles may coincidentally declare the same actionId string for
+  // two entirely unrelated actions (review-discovered finding, Increment 5
+  // remediation). A bare-actionId key would let a pending/intent entry from
+  // one game silently apply to an unrelated action in a different game after
+  // a switch. Cleared whenever an activation reaches a terminal (non-pending)
+  // result so a later legitimate retry is never permanently blocked.
+  const pendingProposalByKey = new Map<string, string>();
   // Discrete freeze enable/disable intent per action (Section 36 — no
   // keydown/keyup hold semantics; each deliberate press flips the intent).
-  const freezeEnableIntentByAction = new Map<string, boolean>();
+  // Same game-scoped key rationale as above.
+  const freezeEnableIntentByKey = new Map<string, boolean>();
 
   return {
     async activate(slot: WispQuickSlot): Promise<WispHotkeyActivationResult> {
@@ -64,11 +70,13 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
         };
       }
 
+      const stateKey = `${snapshot.bound.gameId}:${boundAction.actionId}`;
+
       // Section 34 policy B — suppress a duplicate proposal for the same
       // action while one is already pending, rather than silently letting
       // a second proposal race the first (never auto-consume the first
       // proposal's consent for a second one either way — each is independent).
-      if (pendingProposalByAction.has(boundAction.actionId)) {
+      if (pendingProposalByKey.has(stateKey)) {
         return {
           slot,
           actionId: boundAction.actionId,
@@ -89,10 +97,11 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
         };
       }
 
-      const built = buildDefaultRequest(boundAction.actionId, snapshot.bound.profileId, actionDefinition, freezeEnableIntentByAction);
+      const built = buildDefaultRequest(boundAction.actionId, stateKey, snapshot.bound.profileId, actionDefinition, freezeEnableIntentByKey);
       if (built.ok === false) {
         return { slot, actionId: boundAction.actionId, profileId: snapshot.bound.profileId, executed: false, diagnostic: built.diagnostic };
       }
+      const request = built.request;
 
       // Re-fetch context immediately before executing — use-time resolution,
       // not the context snapshot the profile/binding were resolved against a
@@ -100,12 +109,12 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
       // validateWispBinding is the authority here; this just ensures we hand
       // it the freshest possible context rather than a stale local copy.
       const currentContext = deps.getCurrentContext();
-      const result = await executeWispAction(built.request, actionDefinition, boundAction.binding, currentContext, deps.executorDeps);
+      const result = await executeWispAction(request, actionDefinition, boundAction.binding, currentContext, deps.executorDeps);
 
       if (result.status === 'pending-consent' && result.proposalId) {
-        pendingProposalByAction.set(boundAction.actionId, result.proposalId);
+        pendingProposalByKey.set(stateKey, result.proposalId);
       } else {
-        pendingProposalByAction.delete(boundAction.actionId);
+        pendingProposalByKey.delete(stateKey);
       }
 
       return {
@@ -131,8 +140,15 @@ export type WispHotkeyBuildRequestResult = { ok: true; request: WispActionExecut
  * Exported for direct unit testing of the per-control default-request
  * semantics (Section 72) without needing to drive the whole controller /
  * pending-consent suppression dance.
+ *
+ * `intentKey` (game-scoped, e.g. `${gameId}:${actionId}`) is deliberately
+ * separate from `actionId` (the request's real action identity) — using the
+ * bare actionId as the freeze-intent map key let a stale intent from one
+ * game's action silently apply to a different game's action that happens to
+ * declare the same actionId string (review-discovered finding, Increment 5
+ * remediation).
  */
-export function buildDefaultRequest(actionId: string, profileId: string, actionDefinition: WispActionDefinition, freezeEnableIntentByAction: Map<string, boolean>): WispHotkeyBuildRequestResult {
+export function buildDefaultRequest(actionId: string, intentKey: string, profileId: string, actionDefinition: WispActionDefinition, freezeEnableIntentByKey: Map<string, boolean>): WispHotkeyBuildRequestResult {
   switch (actionDefinition.controlType) {
     case 'toggle':
       return { ok: true, request: { control: 'toggle', actionId, profileId } };
@@ -141,8 +157,8 @@ export function buildDefaultRequest(actionId: string, profileId: string, actionD
       return { ok: true, request: { control: 'cycle', actionId, profileId } };
 
     case 'freeze': {
-      const enable = freezeEnableIntentByAction.get(actionId) ?? true;
-      freezeEnableIntentByAction.set(actionId, !enable);
+      const enable = freezeEnableIntentByKey.get(intentKey) ?? true;
+      freezeEnableIntentByKey.set(intentKey, !enable);
       return { ok: true, request: { control: 'freeze', actionId, profileId, enable } };
     }
 

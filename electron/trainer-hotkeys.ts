@@ -10,8 +10,7 @@ import {
   type TrainerHotkeyAction,
 } from '../src/core/cheat-system/trainer-hotkey-bindings.js';
 import {
-  filterOutConflictingEntries,
-  getTrainerHotkeyEntries,
+  buildTrainerHotkeyRegistrationPlan,
   registerTrainerHotkeyEntries,
   unregisterTrainerHotkeyEntries,
 } from '../src/core/cheat-system/trainer-hotkey-registration.js';
@@ -35,11 +34,11 @@ export function registerTrainerHotkeys(): void {
 
   const bindings = getTrainerHotkeyBindings();
   const wispEnabled = isTrainerCapabilityEnabled('v2AdaptiveWispHotkeysEnabled');
-  const filteredBindings = wispEnabled ? bindings : Object.fromEntries(Object.entries(bindings).filter(([action]) => !action.startsWith('wisp_slot_')));
 
   // Section 21/22/47/48 — deterministic conflict handling, no silently
-  // stolen key, for every hotkey family (see filterOutConflictingEntries).
-  const entries = filterOutConflictingEntries(getTrainerHotkeyEntries(filteredBindings));
+  // stolen key, for every hotkey family; feature-flag gating for wisp_slot_*
+  // (see buildTrainerHotkeyRegistrationPlan, unit-tested directly).
+  const entries = buildTrainerHotkeyRegistrationPlan(bindings, { wispEnabled });
   const result = registerTrainerHotkeyEntries(entries, globalShortcut, getTrainerHotkeyCallback, console);
 
   registered = result.registered.length > 0 || result.failed.length > 0;

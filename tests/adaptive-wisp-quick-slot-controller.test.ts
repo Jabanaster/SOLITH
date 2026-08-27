@@ -152,6 +152,57 @@ describe('REVIEW-GRADE — Increment 5 game switching (Sections 17, 61)', () => 
     assert.equal(calls.proposeWrite, 1, 'the Beta activation must reach proposeWrite (Minerals is a set control), proving HP was never re-invoked');
     assert.equal(calls.proposeFreeze, 1, 'HP (freeze) must not fire again after the game switch');
   });
+
+  test('REGRESSION (review-discovered): a pending action in GAME_ALPHA does not falsely suppress an identically-named actionId in GAME_BETA', async () => {
+    // Two different games' profiles coincidentally declare the SAME
+    // actionId string ("a-shared") for two entirely unrelated actions.
+    // actionId is only unique within one profile — nothing in the domain
+    // model guarantees global uniqueness across different games' profiles.
+    let currentGame = 'game-alpha';
+    const alphaShared = { schemaVersion: WISP_PROFILE_SCHEMA_VERSION, profileId: 'alpha-profile', gameId: 'game-alpha', source: 'builtin' as const, groups: [], actions: [{ id: 'a-shared', entryId: 'hp', label: 'HP', controlType: 'set' as const, slot: 1, presets: [{ id: 'p1', label: 'Full', value: 999 }] }] };
+    const betaShared = { schemaVersion: WISP_PROFILE_SCHEMA_VERSION, profileId: 'beta-profile', gameId: 'game-beta', source: 'builtin' as const, groups: [], actions: [{ id: 'a-shared', entryId: 'minerals', label: 'Minerals', controlType: 'set' as const, slot: 1, presets: [{ id: 'p1', label: 'Full', value: 500 }] }] };
+    const { adapter, calls } = fakeAdapter({
+      states: {
+        'game-alpha:hp': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] },
+        'game-beta:minerals': { frozen: false, currentValue: 0, dataType: 'int32', supportsControls: ['set'] },
+      },
+    });
+    const controller = controllerFor({
+      profiles: { 'game-alpha': alphaShared, 'game-beta': betaShared },
+      entries: { 'game-alpha:hp': entryDescriptor('hp'), 'game-beta:minerals': entryDescriptor('minerals') },
+      getCurrentContext: () => ({ gameId: currentGame, sessionId: `${currentGame}-session`, sessionGeneration: 1 }),
+      adapter,
+    });
+
+    // GAME_ALPHA's a-shared goes pending.
+    const alphaResult = await controller.activate(1);
+    assert.equal(alphaResult.executionStatus, 'pending-consent');
+    assert.equal(calls.proposeWrite, 1);
+
+    // Switch to GAME_BETA — its OWN a-shared (a different real action) must
+    // NOT be suppressed as "already pending" just because Alpha's identically
+    // -named actionId is pending.
+    currentGame = 'game-beta';
+    const betaResult = await controller.activate(1);
+    assert.equal(betaResult.executionStatus, 'pending-consent', `GAME_BETA's a-shared must independently propose, not be suppressed by GAME_ALPHA's pending state: ${JSON.stringify(betaResult)}`);
+    assert.equal(calls.proposeWrite, 2, 'GAME_BETA activation must reach proposeWrite independently of GAME_ALPHA\'s pending proposal');
+  });
+
+  test('REGRESSION (review-discovered): freeze enable/disable intent does not leak across games sharing an actionId', () => {
+    const freezeIntent = new Map<string, boolean>();
+    const alphaAction: WispActionDefinition = { id: 'a-shared', entryId: 'hp', label: 'HP', controlType: 'freeze' };
+    const betaAction: WispActionDefinition = { id: 'a-shared', entryId: 'shield', label: 'Shield', controlType: 'freeze' };
+
+    const alphaFirst = buildDefaultRequest('a-shared', 'game-alpha:a-shared', 'p1', alphaAction, freezeIntent);
+    assert.equal(alphaFirst.ok, true);
+    if (alphaFirst.ok && alphaFirst.request.control === 'freeze') assert.equal(alphaFirst.request.enable, true, 'GAME_ALPHA first press must be enable:true');
+
+    // GAME_BETA's identically-named action must ALSO start at enable:true —
+    // it must not inherit GAME_ALPHA's now-flipped (enable:false) intent.
+    const betaFirst = buildDefaultRequest('a-shared', 'game-beta:a-shared', 'p1', betaAction, freezeIntent);
+    assert.equal(betaFirst.ok, true);
+    if (betaFirst.ok && betaFirst.request.control === 'freeze') assert.equal(betaFirst.request.enable, true, 'GAME_BETA must not inherit GAME_ALPHA\'s freeze intent for the same actionId string');
+  });
 });
 
 describe('REVIEW-GRADE — Increment 5 detached/stale/reattach (Sections 18, 62)', () => {
@@ -384,11 +435,11 @@ describe('REVIEW-GRADE — Increment 5 control activation dispatch (Section 72)'
   test('freeze dispatches enable:true on the first activation (discrete, not keydown/keyup)', () => {
     const freezeIntent = new Map<string, boolean>();
     const action: WispActionDefinition = { id: 'a-hp', entryId: 'hp', label: 'HP', controlType: 'freeze' };
-    const first = buildDefaultRequest('a-hp', 'p1', action, freezeIntent);
+    const first = buildDefaultRequest('a-hp', 'game-alpha:a-hp', 'p1', action, freezeIntent);
     assert.equal(first.ok, true);
     if (first.ok && first.request.control === 'freeze') assert.equal(first.request.enable, true);
 
-    const second = buildDefaultRequest('a-hp', 'p1', action, freezeIntent);
+    const second = buildDefaultRequest('a-hp', 'game-alpha:a-hp', 'p1', action, freezeIntent);
     assert.equal(second.ok, true);
     if (second.ok && second.request.control === 'freeze') assert.equal(second.request.enable, false, 'a second discrete activation must flip toward stop — Section 36');
   });

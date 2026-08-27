@@ -82,6 +82,21 @@ export function filterOutConflictingEntries(entries: TrainerHotkeyEntry[]): Trai
   return entries.filter((entry) => countByAccelerator.get(entry.accelerator) === 1);
 }
 
+/**
+ * Pure composition of the three decisions `registerTrainerHotkeys()` (in
+ * electron/trainer-hotkeys.ts) makes before ever touching `globalShortcut`:
+ * drop wisp_slot_* bindings entirely when the feature is disabled, build the
+ * entries list, then filter out cross-entry conflicts. Extracted so this
+ * exact composed decision is unit-testable without importing 'electron'
+ * (review-discovered test-integrity gap, Increment 5 remediation — the
+ * individual pieces were tested, but nothing exercised them wired together
+ * the way the real function actually calls them).
+ */
+export function buildTrainerHotkeyRegistrationPlan(bindings: Record<string, string>, options: { wispEnabled: boolean }): TrainerHotkeyEntry[] {
+  const filteredBindings = options.wispEnabled ? bindings : Object.fromEntries(Object.entries(bindings).filter(([action]) => !action.startsWith('wisp_slot_')));
+  return filterOutConflictingEntries(getTrainerHotkeyEntries(filteredBindings));
+}
+
 export function registerTrainerHotkeyEntries(
   entries: TrainerHotkeyEntry[],
   shortcutApi: TrainerShortcutApi,

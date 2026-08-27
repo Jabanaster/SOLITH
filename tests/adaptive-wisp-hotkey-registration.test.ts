@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import {
+  buildTrainerHotkeyRegistrationPlan,
   filterOutConflictingEntries,
   getTrainerHotkeyEntries,
   registerTrainerHotkeyEntries,
@@ -176,5 +177,39 @@ describe('Adaptive Wisp quick-slot hotkeys reuse the existing trainer-hotkey eng
     registerTrainerHotkeyEntries(entries, api, noopCallback, logger);
 
     assert.equal(calls.unregister.filter((a) => a === 'F1').length, 3, 'each cycle unregisters exactly once, never leaking a duplicate live registration');
+  });
+});
+
+describe('buildTrainerHotkeyRegistrationPlan — the real composed decision registerTrainerHotkeys() makes (Increment 5 review remediation)', () => {
+  // review-discovered test-integrity gap: registerTrainerHotkeys() in
+  // electron/trainer-hotkeys.ts composes feature-flag gating + entry
+  // building + conflict filtering, but nothing exercised that composition
+  // directly — only its individual pieces were tested. Extracting the pure
+  // decision into buildTrainerHotkeyRegistrationPlan (which the real
+  // function now calls) closes that gap without needing to mock 'electron'.
+
+  test('when the Wisp feature flag is disabled, wisp_slot_* bindings are excluded even if bound', () => {
+    const bindings = { toggle_overlay: 'Control+Shift+O', hide_overlay: 'Control+Shift+\\', wisp_slot_1: 'Numpad1' };
+    const plan = buildTrainerHotkeyRegistrationPlan(bindings, { wispEnabled: false });
+    assert.ok(!plan.some((e) => e.action === 'wisp_slot_1'), 'a disabled feature must not register any wisp_slot entry, regardless of binding');
+    assert.ok(plan.some((e) => e.action === 'toggle_overlay'), 'existing trainer hotkeys must be unaffected by the Wisp flag');
+  });
+
+  test('when the Wisp feature flag is enabled, a bound wisp_slot_* entry is included', () => {
+    const bindings = { toggle_overlay: 'Control+Shift+O', hide_overlay: 'Control+Shift+\\', wisp_slot_1: 'Numpad1' };
+    const plan = buildTrainerHotkeyRegistrationPlan(bindings, { wispEnabled: true });
+    assert.ok(plan.some((e) => e.action === 'wisp_slot_1' && e.accelerator === 'Numpad1'));
+  });
+
+  test('conflict filtering still applies inside the real composed plan when the flag is enabled', () => {
+    const bindings = { toggle_overlay: 'Control+Shift+O', hide_overlay: 'Control+Shift+\\', cheat_slot_1: 'F1', wisp_slot_1: 'F1' };
+    const plan = buildTrainerHotkeyRegistrationPlan(bindings, { wispEnabled: true });
+    assert.ok(!plan.some((e) => e.accelerator === 'F1'), 'the colliding accelerator must not appear in the real registration plan at all');
+  });
+
+  test('disabling the flag cannot be bypassed by a conflict-free binding — the entry never reaches the plan to begin with', () => {
+    const bindings = { toggle_overlay: 'Control+Shift+O', hide_overlay: 'Control+Shift+\\', wisp_slot_1: 'Numpad1', wisp_slot_2: 'Numpad2' };
+    const disabledPlan = buildTrainerHotkeyRegistrationPlan(bindings, { wispEnabled: false });
+    assert.equal(disabledPlan.filter((e) => e.action.startsWith('wisp_slot_')).length, 0);
   });
 });
