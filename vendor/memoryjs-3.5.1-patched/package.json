@@ -4,7 +4,6 @@
   "description": "Node add-on for memory reading and writing! (vendored copy, patched — see NOTES.md)",
   "main": "index.js",
   "scripts": {
-    "install": "npm run build",
     "build": "node ./scripts/install.js",
     "build32": "node-gyp clean configure build --arch=ia32",
     "build64": "node-gyp clean configure build --arch=x64",
@@ -25,7 +24,6 @@
   ],
   "author": "Rob--",
   "license": "MIT",
-  "gypfile": true,
   "bugs": {
     "url": "https://github.com/Rob--/memoryjs/issues"
   },
