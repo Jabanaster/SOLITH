@@ -63,12 +63,16 @@ async function createFrame(win: Page, id: string, url: string, parent?: Frame): 
       iframe.id = frameId;
       await new Promise<void>((resolve, reject) => {
         const timer = window.setTimeout(() => reject(new Error(`iframe load timeout: ${frameId}`)), 15_000);
-        iframe.addEventListener('load', () => {
+        const checkDone = () => {
           window.clearTimeout(timer);
           resolve();
-        }, { once: true });
+        };
+        iframe.addEventListener('load', checkDone, { once: true });
         document.body.appendChild(iframe);
         iframe.src = frameUrl;
+        if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+          checkDone();
+        }
       });
     },
     { frameId: id, frameUrl: url },
