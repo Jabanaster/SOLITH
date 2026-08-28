@@ -1,10 +1,10 @@
 import type { WispActionDefinition } from './types.js';
 import type { WispActionExecutionRequest, WispSafeDisplayValue } from './execution-types.js';
 import { executeWispAction, type WispActionExecutorDeps } from './wisp-action-executor.js';
-import type { WispRuntimeContext } from './runtime-types.js';
+import type { BoundWispAction, BoundWispProfile, WispRuntimeContext } from './runtime-types.js';
 import { hotkeyDiagnostic } from './hotkey-errors.js';
 import { resolveWispQuickSlotAction } from './quick-slot-resolution.js';
-import type { WispActiveProfileProvider } from './active-profile-provider.js';
+import type { WispActiveProfileProvider, WispActiveWispProfileSnapshot } from './active-profile-provider.js';
 import type { WispHotkeyActivationResult, WispQuickSlot } from './hotkey-types.js';
 
 /**
@@ -26,10 +26,51 @@ export interface WispQuickSlotControllerDeps {
   activeProfileProvider: WispActiveProfileProvider;
   getCurrentContext: () => WispRuntimeContext | null;
   executorDeps: WispActionExecutorDeps;
+  /**
+   * Phase 1 consent completion — fired the moment an activation stages a new
+   * `pending-consent` proposal, with everything the consent layer needs to
+   * create its own renderer-facing `WispConsentProposal` (see
+   * src/core/adaptive-wisp/consent/). This controller stays unaware of that
+   * domain model on purpose (Section 6's "no second competing consent
+   * system" cuts both ways — the consent layer must not duplicate THIS
+   * controller's activation/binding logic, and this controller must not
+   * duplicate the consent layer's proposal/audit logic).
+   */
+  onPendingConsent?: (info: WispPendingConsentInfo) => void;
+  /**
+   * Fired whenever this controller's own epoch-guarded presentation state is
+   * reset by a detected context/profile transition (detach, reattach, PID
+   * change, session-generation change, game change, profile change —
+   * Section 22). `previousContextIdentity`/`previousProfileIdentity` are the
+   * identity keys the state was scoped to BEFORE the reset, so the consent
+   * layer can invalidate every `WispConsentProposal` that was bound to that
+   * now-stale identity.
+   */
+  onPresentationStateReset?: (previous: { contextIdentity: string | null; profileIdentity: string | null }) => void;
+}
+
+export interface WispPendingConsentInfo {
+  slot: WispQuickSlot;
+  lowLevelProposalId: string;
+  request: WispActionExecutionRequest;
+  requestedValue: WispSafeDisplayValue;
+  boundAction: BoundWispAction;
+  actionDefinition: WispActionDefinition;
+  boundProfile: BoundWispProfile;
+  context: WispRuntimeContext;
 }
 
 export interface WispQuickSlotController {
   activate(slot: WispQuickSlot): Promise<WispHotkeyActivationResult>;
+  /**
+   * Phase 1 consent completion — re-resolves the CURRENT binding/context
+   * fresh (Section 10's requery/reverify steps) and, if a matching pending
+   * activation is still on file for this slot, replays the EXACT original
+   * request (never rebuilt — Section 7's "approval must not resubmit or
+   * override the value") with the given one-use consent token attached.
+   * Returns the same shape as activate() so callers treat both uniformly.
+   */
+  confirmPending(slot: WispQuickSlot, lowLevelProposalId: string, consentToken: string): Promise<WispHotkeyActivationResult>;
   /**
    * Clears all controller-owned presentation state (pending-consent map,
    * freeze-intent map) and forgets the last-observed context/profile
@@ -59,6 +100,11 @@ function contextIdentityKey(context: WispRuntimeContext | null): string | null {
   return `${context.gameId}:${context.sessionId}:${context.sessionGeneration}`;
 }
 
+interface PendingActivation {
+  lowLevelProposalId: string;
+  request: WispActionExecutionRequest;
+}
+
 export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps): WispQuickSlotController {
   // Per-action, in-memory only — never persisted (Section 27), never keyed
   // by session/PID (Section 45). Keyed by `${gameId}:${actionId}`, not bare
@@ -69,8 +115,10 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
   // one game silently apply to an unrelated action in a different game after
   // a switch. Cleared whenever an activation reaches a terminal (non-pending)
   // result so a later legitimate retry is never permanently blocked, AND
-  // whenever the authority context transitions (see below).
-  let pendingProposalByKey = new Map<string, string>();
+  // whenever the authority context transitions (see below). Values now carry
+  // the exact request that was proposed (Phase 1) so confirmPending() can
+  // replay it verbatim rather than rebuilding it.
+  let pendingActivationByKey = new Map<string, PendingActivation>();
   // Discrete freeze enable/disable intent per action (Section 36 — no
   // keydown/keyup hold semantics; each deliberate press flips the intent).
   // Same game-scoped key rationale as above.
@@ -92,9 +140,16 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
   let epoch = 0;
 
   function resetPresentationState(): void {
-    pendingProposalByKey = new Map<string, string>();
+    const previous = { contextIdentity: lastContextIdentity, profileIdentity: lastProfileIdentity };
+    pendingActivationByKey = new Map<string, PendingActivation>();
     freezeEnableIntentByKey = new Map<string, boolean>();
     epoch += 1;
+    // Phase 1 consent completion — notify AFTER the local reset so a
+    // synchronous listener that calls back into this controller never
+    // observes half-reset state.
+    if (previous.contextIdentity !== null || previous.profileIdentity !== null) {
+      deps.onPresentationStateReset?.(previous);
+    }
   }
 
   /**
@@ -123,67 +178,88 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
     return epoch;
   }
 
-  return {
-    async activate(slot: WispQuickSlot): Promise<WispHotkeyActivationResult> {
-      // Use-time resolution (Section 8) — read context fresh on every
-      // activation and reconcile controller state against it BEFORE
-      // resolving a profile, so a transitioned context never proceeds on
-      // stale presentation state, and a legitimate unchanged context is
-      // never disturbed.
-      const contextForIdentity = deps.getCurrentContext();
-      const epochAfterContextSync = syncContextIdentity(contextForIdentity);
+  type ResolvedActivationTarget =
+    | { ok: false; result: WispHotkeyActivationResult }
+    | { ok: true; snapshot: WispActiveWispProfileSnapshot; boundAction: BoundWispAction; actionDefinition: WispActionDefinition; stateKey: string; epochAtActivation: number };
 
-      const snapshot = await deps.activeProfileProvider.getActiveBoundProfile();
-      if (!snapshot) {
-        return { slot, executed: false, diagnostic: hotkeyDiagnostic('WISP_HOTKEY_NO_ACTIVE_SESSION', 'no active Wisp session/profile is currently bound') };
-      }
+  /**
+   * Shared resolution prefix for both `activate()` and `confirmPending()`
+   * (Section 10 requires approval to requery/reverify session, PID,
+   * executable identity, game, profile, and binding fresh — reusing this one
+   * code path is what guarantees confirmPending() re-derives all of that the
+   * same way activate() does, rather than trusting anything cached).
+   */
+  async function resolveActivationTarget(slot: WispQuickSlot): Promise<ResolvedActivationTarget> {
+    const contextForIdentity = deps.getCurrentContext();
+    const epochAfterContextSync = syncContextIdentity(contextForIdentity);
 
-      // Profile-replacement cleanup: even when gameId/session are unchanged,
-      // a re-resolved profile with a different profileId (e.g. active table
-      // or table version changed) must not inherit the prior profile's
-      // pending/freeze state.
-      const epochAfterProfileSync = syncProfileIdentity(snapshot.bound.profileId);
+    const snapshot = await deps.activeProfileProvider.getActiveBoundProfile();
+    if (!snapshot) {
+      return { ok: false, result: { slot, executed: false, diagnostic: hotkeyDiagnostic('WISP_HOTKEY_NO_ACTIVE_SESSION', 'no active Wisp session/profile is currently bound') } };
+    }
 
-      const boundAction = resolveWispQuickSlotAction(snapshot.bound, slot);
-      if (!boundAction) {
-        return { slot, profileId: snapshot.bound.profileId, executed: false, diagnostic: hotkeyDiagnostic('WISP_HOTKEY_SLOT_EMPTY', `quick slot ${slot} has no assigned action`, { slot }) };
-      }
+    // Profile-replacement cleanup: even when gameId/session are unchanged,
+    // a re-resolved profile with a different profileId (e.g. active table
+    // or table version changed) must not inherit the prior profile's
+    // pending/freeze state.
+    const epochAfterProfileSync = syncProfileIdentity(snapshot.bound.profileId);
 
-      if (!boundAction.binding || boundAction.availability !== 'available') {
-        return {
+    const boundAction = resolveWispQuickSlotAction(snapshot.bound, slot);
+    if (!boundAction) {
+      return { ok: false, result: { slot, profileId: snapshot.bound.profileId, executed: false, diagnostic: hotkeyDiagnostic('WISP_HOTKEY_SLOT_EMPTY', `quick slot ${slot} has no assigned action`, { slot }) } };
+    }
+
+    if (!boundAction.binding || boundAction.availability !== 'available') {
+      return {
+        ok: false,
+        result: {
           slot,
           actionId: boundAction.actionId,
           profileId: snapshot.bound.profileId,
           executed: false,
           diagnostic: hotkeyDiagnostic('WISP_HOTKEY_ACTION_UNAVAILABLE', `quick slot ${slot} action "${boundAction.actionId}" is not currently available (${boundAction.availability})`, { slot, actionId: boundAction.actionId }),
-        };
-      }
+        },
+      };
+    }
 
-      const stateKey = `${snapshot.bound.gameId}:${boundAction.actionId}`;
-      const epochAtActivation = Math.max(epochAfterContextSync, epochAfterProfileSync);
+    const actionDefinition = snapshot.rawProfile.actions.find((a) => a.id === boundAction.actionId) ?? null;
+    if (!actionDefinition) {
+      return {
+        ok: false,
+        result: {
+          slot,
+          actionId: boundAction.actionId,
+          profileId: snapshot.bound.profileId,
+          executed: false,
+          diagnostic: hotkeyDiagnostic('WISP_HOTKEY_ACTION_UNAVAILABLE', `quick slot ${slot} action "${boundAction.actionId}" has no matching action definition`, { slot, actionId: boundAction.actionId }),
+        },
+      };
+    }
+
+    const stateKey = `${snapshot.bound.gameId}:${boundAction.actionId}`;
+    const epochAtActivation = Math.max(epochAfterContextSync, epochAfterProfileSync);
+    return { ok: true, snapshot, boundAction, actionDefinition, stateKey, epochAtActivation };
+  }
+
+  return {
+    async activate(slot: WispQuickSlot): Promise<WispHotkeyActivationResult> {
+      // Use-time resolution (Section 8) — see resolveActivationTarget's own
+      // doc comment for why this prefix is shared with confirmPending().
+      const resolved = await resolveActivationTarget(slot);
+      if (resolved.ok === false) return resolved.result;
+      const { snapshot, boundAction, actionDefinition, stateKey, epochAtActivation } = resolved;
 
       // Section 34 policy B — suppress a duplicate proposal for the same
       // action while one is already pending, rather than silently letting
       // a second proposal race the first (never auto-consume the first
       // proposal's consent for a second one either way — each is independent).
-      if (pendingProposalByKey.has(stateKey)) {
+      if (pendingActivationByKey.has(stateKey)) {
         return {
           slot,
           actionId: boundAction.actionId,
           profileId: snapshot.bound.profileId,
           executed: false,
           diagnostic: hotkeyDiagnostic('WISP_HOTKEY_EXECUTION_PENDING_CONSENT', `quick slot ${slot} action "${boundAction.actionId}" already has a pending consent proposal`, { slot, actionId: boundAction.actionId }),
-        };
-      }
-
-      const actionDefinition = snapshot.rawProfile.actions.find((a) => a.id === boundAction.actionId) ?? null;
-      if (!actionDefinition) {
-        return {
-          slot,
-          actionId: boundAction.actionId,
-          profileId: snapshot.bound.profileId,
-          executed: false,
-          diagnostic: hotkeyDiagnostic('WISP_HOTKEY_ACTION_UNAVAILABLE', `quick slot ${slot} action "${boundAction.actionId}" has no matching action definition`, { slot, actionId: boundAction.actionId }),
         };
       }
 
@@ -199,7 +275,7 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
       // validateWispBinding is the authority here; this just ensures we hand
       // it the freshest possible context rather than a stale local copy.
       const currentContext = deps.getCurrentContext();
-      const result = await executeWispAction(request, actionDefinition, boundAction.binding, currentContext, deps.executorDeps);
+      const result = await executeWispAction(request, actionDefinition, boundAction.binding!, currentContext, deps.executorDeps);
 
       // Epoch guard: if the authority context/profile transitioned WHILE
       // this activation's executeWispAction call was in flight, the maps
@@ -211,11 +287,59 @@ export function createWispQuickSlotController(deps: WispQuickSlotControllerDeps)
       // is the authority on whether the mutation itself was allowed) — only
       // this controller's own bookkeeping is skipped.
       if (epoch === epochAtActivation) {
-        if (result.status === 'pending-consent' && result.proposalId) {
-          pendingProposalByKey.set(stateKey, result.proposalId);
+        if (result.status === 'pending-consent' && result.proposalId && result.requestedValue !== undefined && currentContext) {
+          pendingActivationByKey.set(stateKey, { lowLevelProposalId: result.proposalId, request });
+          deps.onPendingConsent?.({
+            slot,
+            lowLevelProposalId: result.proposalId,
+            request,
+            requestedValue: result.requestedValue,
+            boundAction,
+            actionDefinition,
+            boundProfile: snapshot.bound,
+            context: currentContext,
+          });
         } else {
-          pendingProposalByKey.delete(stateKey);
+          pendingActivationByKey.delete(stateKey);
         }
+      }
+
+      return {
+        slot,
+        actionId: boundAction.actionId,
+        profileId: snapshot.bound.profileId,
+        executed: true,
+        executionStatus: result.status,
+        diagnostic: result.diagnostic,
+      };
+    },
+
+    async confirmPending(slot: WispQuickSlot, lowLevelProposalId: string, consentToken: string): Promise<WispHotkeyActivationResult> {
+      const resolved = await resolveActivationTarget(slot);
+      if (resolved.ok === false) return resolved.result;
+      const { snapshot, boundAction, actionDefinition, stateKey, epochAtActivation } = resolved;
+
+      const pending = pendingActivationByKey.get(stateKey);
+      if (!pending || pending.lowLevelProposalId !== lowLevelProposalId) {
+        return {
+          slot,
+          actionId: boundAction.actionId,
+          profileId: snapshot.bound.profileId,
+          executed: false,
+          diagnostic: hotkeyDiagnostic('WISP_HOTKEY_EXECUTION_PENDING_CONSENT', `quick slot ${slot} action "${boundAction.actionId}" has no matching pending consent proposal — it may already be resolved or the session has changed`, { slot, actionId: boundAction.actionId }),
+        };
+      }
+
+      // Replay the ORIGINAL request verbatim, only adding the token/proposal
+      // id — never rebuilt (Section 7: approval must reference only the
+      // proposal id, never resubmit or override value/address/game/action).
+      const confirmRequest: WispActionExecutionRequest = { ...pending.request, consentToken, proposalId: lowLevelProposalId };
+
+      const currentContext = deps.getCurrentContext();
+      const result = await executeWispAction(confirmRequest, actionDefinition, boundAction.binding!, currentContext, deps.executorDeps);
+
+      if (epoch === epochAtActivation) {
+        pendingActivationByKey.delete(stateKey);
       }
 
       return {

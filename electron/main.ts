@@ -44,6 +44,7 @@ import {
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
+import { registerWispConsentIpc } from './wisp-consent-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { disposeCheatSystemInitialization, initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
@@ -99,6 +100,7 @@ protocol.registerSchemesAsPrivileged([
 // Registered once at module level, same as the other IPC handlers below, so
 // it is never duplicated on window recreation.
 registerLiveMemoryIpc();
+registerWispConsentIpc();
 registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();

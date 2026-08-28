@@ -1604,6 +1604,27 @@ function applySchema(): void {
     )
   `);
 
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS wisp_consent_audit_log (
+      eventId TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      proposalId TEXT NOT NULL,
+      eventType TEXT NOT NULL,
+      canonicalGameId TEXT NOT NULL,
+      profileId TEXT NOT NULL,
+      actionId TEXT NOT NULL,
+      entryId TEXT NOT NULL,
+      operationType TEXT NOT NULL,
+      requestedValueSummary TEXT NOT NULL,
+      decision TEXT,
+      decisionAt TEXT,
+      executionStatus TEXT,
+      failureCategory TEXT,
+      sessionRef TEXT NOT NULL,
+      readbackStatus TEXT
+    )
+  `);
+
   reconcileCatalogOrphans();
 }
 

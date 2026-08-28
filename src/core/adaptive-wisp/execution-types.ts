@@ -81,6 +81,17 @@ export interface WispActionExecutionResult {
   diagnostic?: WispExecutionDiagnostic;
   /** Set only on a `pending-consent` result — the caller must echo this back as the request's `proposalId` on the confirming call (Section 10, Increment 4C). */
   proposalId?: string;
+  /**
+   * Set only on a `pending-consent` result — the exact value/freeze-target
+   * this proposal will apply on confirm, as already computed by
+   * `computeRequestedValue`/the freeze preset lookup (Phase 1 consent
+   * completion). Exists so a renderer consent dialog can show the real
+   * requested value for every control type (including toggle/cycle/
+   * increment/multiplier, whose final value depends on current state and is
+   * not present on the original request) without a second, potentially
+   * divergent recomputation of the same logic.
+   */
+  requestedValue?: WispSafeDisplayValue;
 }
 
 const REQUEST_SHAPE_FORBIDDEN_KEYS = new Set(['address', 'pointer', 'pid', 'processhandle', 'handle', 'rawaddress', 'pointeraddress', 'processid']);

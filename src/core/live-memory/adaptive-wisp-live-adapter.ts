@@ -127,6 +127,50 @@ function buildConsentBinding(
   };
 }
 
+/**
+ * Phase 1 consent completion — resolves the exact `WriteConsentBinding` an
+ * approval must mint a token against, BEFORE the actual confirm call.
+ * Extracted from confirmWrite/confirmFreeze's own binding construction below
+ * (same fields, same order) rather than reimplemented, so the binding this
+ * function returns is byte-for-byte what `buildConsentBinding` will
+ * independently reconstruct inside confirmWrite/confirmFreeze at consume
+ * time — any divergence would make `consumeWriteConsent`'s bindingHash check
+ * fail closed, which is the correct fail-safe outcome, but a legitimate
+ * approval must produce a matching hash. This is the "future caller" this
+ * file's own top-of-file comment already anticipated needing to mint a token
+ * using `ADAPTIVE_WISP_CONSENT_SESSION_KEY`.
+ */
+export function resolveAdaptiveWispConsentBinding(
+  getSession: LiveMemoryWispSessionAccessor,
+  operation: Extract<WriteConsentBinding['operation'], 'live_memory_confirm_write' | 'live_memory_freeze_start'>,
+  lowLevelProposalId: string,
+): WriteConsentBinding | null {
+  const bundle = getSession();
+  if (!bundle) return null;
+  if (bundle.session.verifyAttachedProcessIdentity()) return null;
+
+  if (operation === 'live_memory_confirm_write') {
+    const pending = bundle.session.getPendingWriteProposal(lowLevelProposalId);
+    if (!pending) return null;
+    return buildConsentBinding(operation, bundle, lowLevelProposalId, {
+      address: pending.target.address.toString(),
+      dataType: pending.target.dataType,
+      currentValue: pending.currentValue,
+      requestedValue: pending.requestedValue,
+    });
+  }
+
+  const pending = bundle.session.getPendingFreezeProposal(lowLevelProposalId);
+  if (!pending) return null;
+  return buildConsentBinding(operation, bundle, lowLevelProposalId, {
+    address: pending.target.address.toString(),
+    dataType: pending.target.dataType,
+    freezeValue: pending.value,
+    freezeIntervalMs: pending.intervalMs,
+    freezeMaxDurationMs: MAX_FREEZE_DURATION_MS,
+  });
+}
+
 function isFrozenTarget(session: LiveMemorySession, address: LiveMemoryAddress): boolean {
   const status = session.getFreezeStatus();
   return (

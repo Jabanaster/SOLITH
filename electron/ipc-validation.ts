@@ -795,3 +795,7 @@ export function validateSaveDataFileAccess(gameId: string, filePath: string): Ip
 export const ArtworkCacheRefreshSchema = z.object({
   catalogGameIds: z.array(z.string().min(1).max(120)).max(POPULAR_TRAINER_LIMIT).optional(),
 });
+
+/** Adaptive Wisp Phase 1 consent IPC (Section 14) — every mutating channel accepts only this. `.strict()` rejects unknown fields, including any attempted address/value/game/action override. */
+export const WispConsentProposalIdSchema = z.object({ proposalId: z.string().min(1).max(200) }).strict();
+export const WispConsentEmptyPayloadSchema = z.object({}).strict();

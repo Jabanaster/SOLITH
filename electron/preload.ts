@@ -128,6 +128,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-confirm-write', payload),
   liveMemoryRollback: (payload: { proposalId: string }) =>
     ipcRenderer.invoke('live-memory-rollback', payload),
+
+  // Adaptive Wisp Phase 1 consent completion (Section 15) — deliberately the
+  // smallest possible surface: every call is either a bare proposalId or no
+  // payload at all. No address, value, game, or action identity is ever
+  // accepted from the renderer; the backend fixed all of that at proposal
+  // creation and re-verifies it fresh on approve.
+  wispConsentListPending: () => ipcRenderer.invoke('wisp:consent:list-pending'),
+  wispConsentGet: (payload: { proposalId: string }) => ipcRenderer.invoke('wisp:consent:get', payload),
+  wispConsentApprove: (payload: { proposalId: string }) => ipcRenderer.invoke('wisp:consent:approve', payload),
+  wispConsentReject: (payload: { proposalId: string }) => ipcRenderer.invoke('wisp:consent:reject', payload),
+  wispConsentCancel: (payload: { proposalId: string }) => ipcRenderer.invoke('wisp:consent:cancel', payload),
+  onWispConsentQueueChanged: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on('wisp:consent:queue-changed', listener);
+    return () => ipcRenderer.removeListener('wisp:consent:queue-changed', listener);
+  },
+  onWispConsentProposalUpdated: (callback: (proposal: unknown) => void) => {
+    const listener = (_event: unknown, proposal: unknown) => callback(proposal);
+    ipcRenderer.on('wisp:consent:proposal-updated', listener);
+    return () => ipcRenderer.removeListener('wisp:consent:proposal-updated', listener);
+  },
   liveMemoryScanFirst: (payload: {
     dataType: string;
     targetValue: number;

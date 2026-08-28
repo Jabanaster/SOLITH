@@ -2,6 +2,18 @@ declare module 'xml2js';
 declare module '*.css';
 declare module 'sql.js';
 
+/** Renderer-safe shape mirroring WispConsentProposalView (src/core/adaptive-wisp/consent/proposal-types.ts) — duplicated here, not imported, so this ambient declaration file never references a backend module path. */
+interface WispConsentProposalViewShape {
+  proposalId: string;
+  operationType: 'write' | 'freeze';
+  createdAt: string;
+  expiresAt: string;
+  canonicalGameId: string;
+  actionId: string;
+  safeDescription: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired' | 'executing' | 'succeeded' | 'failed' | 'invalidated' | 'consumed';
+}
+
 interface Window {
   electronAPI: {
     e2eTrainerState: string | null;
@@ -135,6 +147,13 @@ interface Window {
     }>;
     liveMemoryConfirmWrite: (payload: { proposalId: string; consentToken: string }) => Promise<any>;
     liveMemoryRollback: (payload: { proposalId: string }) => Promise<{ success: boolean; error?: string }>;
+    wispConsentListPending: () => Promise<{ success: boolean; proposals?: WispConsentProposalViewShape[]; error?: string }>;
+    wispConsentGet: (payload: { proposalId: string }) => Promise<{ success: boolean; proposal?: WispConsentProposalViewShape; error?: string }>;
+    wispConsentApprove: (payload: { proposalId: string }) => Promise<{ success: boolean; proposal?: WispConsentProposalViewShape; executionStatus?: string; error?: string; message?: string }>;
+    wispConsentReject: (payload: { proposalId: string }) => Promise<{ success: boolean; proposal?: WispConsentProposalViewShape; error?: string; message?: string }>;
+    wispConsentCancel: (payload: { proposalId: string }) => Promise<{ success: boolean; proposal?: WispConsentProposalViewShape; error?: string; message?: string }>;
+    onWispConsentQueueChanged: (callback: () => void) => () => void;
+    onWispConsentProposalUpdated: (callback: (proposal: WispConsentProposalViewShape) => void) => () => void;
     liveMemoryScanFirst: (payload: {
       dataType: string;
       targetValue: number;

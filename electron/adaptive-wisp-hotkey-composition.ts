@@ -52,8 +52,12 @@ import { buildAtomfallWispProfileIfLinked } from '../src/core/adaptive-wisp/cert
 import { initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
 import { resolveLiveCanonicalGameIdentity, type WispCanonicalGameLookupResult } from '../src/core/adaptive-wisp/live-canonical-game-resolver.js';
 import { resolveWispProfileForGame } from '../src/core/adaptive-wisp/user-state-service.js';
-import { getAdaptiveWispExecutionAdapter } from './adaptive-wisp-execution-composition.js';
+import { getAdaptiveWispExecutionAdapter, mintAdaptiveWispConsentToken } from './adaptive-wisp-execution-composition.js';
 import { getActiveLiveMemorySessionBundle } from './live-memory-ipc.js';
+import { createWispConsentProposalStore } from '../src/core/adaptive-wisp/consent/proposal-store.js';
+import { createWispConsentService, type WispConsentService } from '../src/core/adaptive-wisp/consent/consent-service.js';
+import { recordWispConsentAuditEvent } from '../src/core/adaptive-wisp/consent/audit-log.js';
+import { broadcastWispConsentQueueChanged } from './wisp-consent-ipc.js';
 import { app } from 'electron';
 
 /**
@@ -93,6 +97,7 @@ function getActiveGameContext(): { gameId: CanonicalGameId | null } {
 }
 
 let cached: WispQuickSlotController | null = null;
+let cachedConsentService: WispConsentService | null = null;
 
 /**
  * Clears the production controller's pending-consent/freeze-intent state
@@ -100,9 +105,29 @@ let cached: WispQuickSlotController | null = null;
  * if it does not exist yet — shutdown and feature-disable must not have the
  * side effect of lazily standing up Wisp hotkey infrastructure that was
  * never otherwise touched this session.
+ *
+ * Phase 1 consent completion — also invalidates every non-terminal
+ * `WispConsentProposal` (Section 23 shutdown wiring: "invalidate pending
+ * proposals" before disposing the quick-slot controller itself), so a
+ * proposal shown in a renderer dialog can never be approved after this.
  */
 export function disposeAdaptiveWispQuickSlotController(): void {
+  cachedConsentService?.handlePresentationStateReset();
   if (cached) cached.dispose();
+}
+
+/**
+ * Returns the single production Adaptive Wisp consent-completion service
+ * (Phase 1). Constructing it lazily standing up the SAME cached quick-slot
+ * controller this file already owns — there is exactly one controller and
+ * exactly one consent service per process, wired together at construction
+ * (see getAdaptiveWispQuickSlotController's own doc comment for why they are
+ * built as one unit rather than two independently-composed singletons).
+ */
+export function getAdaptiveWispConsentService(): WispConsentService {
+  getAdaptiveWispQuickSlotController();
+  if (!cachedConsentService) throw new Error('unreachable: constructing the quick-slot controller always constructs its consent service in the same step');
+  return cachedConsentService;
 }
 
 /**
@@ -147,6 +172,26 @@ export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
         identityBridge,
         trainerAdapter: getAdaptiveWispExecutionAdapter(),
       },
+      // Read lazily (not captured as a direct reference) because
+      // cachedConsentService is assigned AFTER `cached` below — neither
+      // callback is ever invoked synchronously during construction, only on
+      // a later real activation, by which point both singletons exist.
+      onPendingConsent: (info) => {
+        cachedConsentService?.handlePendingConsent(info);
+        broadcastWispConsentQueueChanged(info);
+      },
+      onPresentationStateReset: (previous) => {
+        cachedConsentService?.handlePresentationStateReset();
+        broadcastWispConsentQueueChanged(previous);
+      },
+    });
+
+    const store = createWispConsentProposalStore();
+    cachedConsentService = createWispConsentService({
+      store,
+      quickSlotController: cached,
+      mintConsentToken: (input) => mintAdaptiveWispConsentToken(input),
+      recordAuditEvent: (input) => recordWispConsentAuditEvent(input),
     });
   }
   return cached;

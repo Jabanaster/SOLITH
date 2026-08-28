@@ -36,6 +36,7 @@ import { useNotifications } from './hooks/useNotifications.js';
 import { NotificationBell } from './components/NotificationBell.js';
 import { NotificationCenter } from './components/NotificationCenter.js';
 import { ToastHost } from './components/ToastHost.js';
+import { WispConsentQueue } from './components/WispConsentQueue.js';
 import type { Settings, NotificationAction } from '../shared/types/index.js';
 import { type View, isValidView } from './nav-views.js';
 
@@ -645,6 +646,7 @@ const App: React.FC = () => {
       )}
 
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
+      <WispConsentQueue />
 
       {showOpeningCinematic && (
         <OpeningCinematic

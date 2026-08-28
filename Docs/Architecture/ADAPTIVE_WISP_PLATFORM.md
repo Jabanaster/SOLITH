@@ -1854,3 +1854,303 @@ root/electron clean; `npm test` 2,178/2,178 (was 2,145/2,145 before this
 closeout began — +33, exactly matching); SQL 10/10; live-memory 278/278;
 `npm audit` 0 vulnerabilities; fresh dev build 29/29 checks; Playwright
 `electron-consent-boundary.e2e.test.ts` 9/9.
+
+**Correction to this section's own prior framing:** everything above proves
+the Wisp backend can reach `pending-consent`. It does NOT prove a user can
+actually approve, reject, or watch that proposal expire — no renderer-facing
+approve/reject flow existed for Wisp-routed proposals before Phase 1
+(Section 29). Treat `pending-consent` alone, from this point forward, as
+"backend staged a proposal and is waiting," not as a completed consent
+workflow.
+
+## 29. Phase 1 — production consent-completion workflow (IMPLEMENTED)
+
+### 29.1 Scope and starting state
+
+Base commit: `c8971bb` (feature/adaptive-wisp-platform). Isolated worktree:
+`solith-wisp-consent`, branch `feature/adaptive-wisp-consent-completion`.
+Phase 1 connects the already-certified `pending-consent` backend state
+(Section 28) to a real user-visible approve/reject/expire/cancel flow. No
+real Atomfall memory mutation was performed or authorized at any point.
+
+### 29.2 Audit of existing consent architecture (Section 5)
+
+Two pre-existing, unrelated consent mechanisms were found and had to be
+distinguished before designing anything:
+
+- `src/core/consent/write-consent.ts` — a real, reviewed, operation-bound
+  one-use token mechanism (`issueWriteConsent`/`consumeWriteConsent`),
+  already used by the manual Live Memory Trainer page's IPC flow
+  (`electron/live-memory-ipc.ts`, `live-memory-issue-write-consent` →
+  `live-memory-confirm-write`) via a NATIVE `dialog.showMessageBox`
+  (`electron/privileged-consent-dialog.ts`) — not a React modal. This
+  mechanism already satisfies every property Section 13 requires (backend-
+  generated, narrowly scoped, bound to proposal/operation/value/process/
+  session, short-lived, single-use, never renderer-persisted) — it is reused
+  unchanged, not reimplemented.
+- `src/core/proposals/index.ts` — an entirely unrelated save-file/recipe
+  "patch proposal" system (fields: `recipeId`, `targetFile`, `oldValue`/
+  `newValue`). Confirmed irrelevant to Wisp and left untouched.
+
+Neither of the above gave Wisp-routed actions a renderer-facing approval
+surface. `adaptive-wisp-live-adapter.ts`'s own pre-existing doc comment said
+so explicitly: "whatever future caller issues consent for an Adaptive-Wisp-
+routed proposal must use this same sessionKey" — confirming, before any code
+was written, that this was genuinely greenfield work, not a rediscovery of
+something already built.
+
+### 29.3 Consent authority model (Section 6)
+
+The Electron main process remains sole authority. The new renderer-facing
+`WispConsentProposal` (proposal-types.ts) layers ABOVE the existing Increment
+4 canonical proposal (`WispCanonicalProposal`, staged inside
+`LiveMemorySession`) and the existing one-use token — it does not replace
+either. The renderer's only inputs, end to end, are a bare `proposalId`
+string on `approve`/`reject`/`cancel`, and no payload on `list-pending`
+(enforced by `.strict()` zod schemas — `WispConsentProposalIdSchema`,
+`electron/ipc-validation.ts` — and proven by a dedicated static test,
+29.12).
+
+### 29.4 New components
+
+- `src/core/adaptive-wisp/consent/proposal-types.ts` — `WispConsentProposal`
+  domain model, 10-status lifecycle, renderer-safe `WispConsentProposalView`
+  projection, typed error codes.
+- `src/core/adaptive-wisp/consent/proposal-store.ts` — the state machine
+  (Section 8) and in-memory, backend-time-authoritative store. Not
+  persisted, by design (Section 12 — "restart does not restore executable
+  proposal authority").
+- `src/core/adaptive-wisp/consent/consent-service.ts` — orchestrates
+  approve/reject/cancel/list against the store and the (unmodified)
+  `WispQuickSlotController`, via an injected `mintConsentToken` seam (never
+  imports live-memory/write-consent directly — that stays out of
+  `src/core/adaptive-wisp`, matching the pre-existing architecture rule
+  proven by `tests/adaptive-wisp-boundary-static.test.ts`).
+- `src/core/adaptive-wisp/consent/audit-log.ts` — durable audit trail, new
+  `wisp_consent_audit_log` SQLite table (not `journal_events`, whose
+  `gameId` FK targets the legacy save-editor `games` table, not
+  `canonical_games`).
+- `src/core/adaptive-wisp/quick-slot-controller.ts` (extended, not
+  rewritten) — a shared `resolveActivationTarget` prefix now backs both
+  `activate()` (unchanged behavior) and the new `confirmPending(slot,
+  lowLevelProposalId, consentToken)`, which replays the ORIGINAL proposed
+  request verbatim (never rebuilt — Section 7) after re-deriving session/
+  binding fresh. New optional `onPendingConsent`/`onPresentationStateReset`
+  hooks let the consent layer observe activation outcomes without the
+  controller knowing the consent domain model exists.
+- `src/core/adaptive-wisp/wisp-action-executor.ts` /
+  `execution-types.ts` (extended) — a `pending-consent` result now also
+  carries the exact `requestedValue` already computed by
+  `computeRequestedValue`/the freeze preset lookup, so the consent dialog
+  can display the real value for every control type (including toggle/
+  cycle/increment/multiplier, whose value depends on current state) without
+  a second, potentially divergent computation.
+- `src/core/live-memory/adaptive-wisp-live-adapter.ts` (extended) —
+  `resolveAdaptiveWispConsentBinding`, extracted from the existing
+  `confirmWrite`/`confirmFreeze` binding construction (same code, same
+  field order) so an approval can mint a token whose binding hash will
+  match exactly what confirm later reconstructs independently.
+- `electron/adaptive-wisp-execution-composition.ts` (extended) —
+  `mintAdaptiveWispConsentToken`, the ONE place a Wisp consent token is
+  minted. Lives here, not in the hotkey composition file, because
+  `tests/adaptive-wisp-hotkey-boundary-static.test.ts` statically forbids
+  that file from importing `write-consent`/live-memory internals directly.
+- `electron/adaptive-wisp-hotkey-composition.ts` (extended) — constructs the
+  consent store/service alongside the existing quick-slot controller
+  singleton, wires the two callback hooks, and broadcasts
+  `wisp:consent:queue-changed` on both new-proposal and lifecycle-reset
+  events.
+- `electron/wisp-consent-ipc.ts` (new) — the 5 IPC handlers (Section 14).
+- `electron/preload.ts` / `src/types/global.d.ts` (extended) — the
+  `wispConsent*` renderer surface.
+- `src/app/components/WispConsentDialog.tsx` / `WispConsentQueue.tsx` (new)
+  — the production consent UI, mounted once at `App.tsx` root.
+
+### 29.5 Proposal schema and state machine
+
+Statuses: `pending → approved → executing → succeeded|failed → consumed`,
+with `rejected`/`cancelled`/`expired`/`invalidated` as additional terminal
+exits from `pending` (and `invalidated` also reachable from
+`approved`/`executing`). Every transition is validated against a static
+adjacency table (`proposal-store.ts`); an invalid transition (e.g.
+`rejected → approved`, `succeeded → executing`, `consumed → approved`)
+fails closed and is never silently accepted. Backend time is authoritative
+for expiration (`getLive`/`transition` both lazily expire past-TTL pending
+proposals using an injectable clock — never a renderer-supplied one).
+Session identity on the proposal is deliberately just `(sessionId,
+sessionGeneration)`, not a raw PID — `sessionGeneration` already changes
+whenever verified process identity changes (the same rationale
+`quick-slot-controller.ts` already documents for its own presentation
+state), so a separate PID field on this record would be redundant; the
+REAL PID/executablePath/processStartTime binding lives in the cryptographic
+`WriteConsentBinding` minted at approval time, read fresh from the live
+session.
+
+### 29.6 Token design (Section 13) — reused, not reinvented
+
+`src/core/consent/write-consent.ts`'s existing `WriteConsentBinding`/
+`issueWriteConsent`/`consumeWriteConsent` already satisfy every Section 13
+requirement. Phase 1's only addition is `resolveAdaptiveWispConsentBinding`
+(a binding-construction helper, not a new token type) so an approval can
+mint a token BEFORE the confirm call, using the identical field set confirm
+will independently reconstruct.
+
+### 29.7 IPC design (Section 14)
+
+Five channels: `wisp:consent:list-pending`, `:get`, `:approve`, `:reject`,
+`:cancel`. Every payload validated by `.strict()` zod schemas
+(`WispConsentProposalIdSchema`/`WispConsentEmptyPayloadSchema`,
+`ipc-validation.ts`) — unknown fields rejected, a JSON-parsed `__proto__`
+key confirmed to never survive parsing (29.12). Two push channels,
+`wisp:consent:queue-changed` and `wisp:consent:proposal-updated`, broadcast
+to all windows (matching the existing `notification-created` pattern) —
+the renderer always re-fetches on receipt rather than trusting any pushed
+payload as authoritative.
+
+### 29.8 Renderer/preload boundary (Section 15)
+
+`preload.ts` exposes exactly the 5 `wispConsent*` methods plus 2
+subscription helpers — no raw `ipcRenderer`, no generic channel invoker.
+`WispConsentDialog.tsx`/`WispConsentQueue.tsx` import nothing from any
+backend module (memory, process, registry, token, execution, database) —
+proven by a dedicated static test (29.12), the same discipline
+`adaptive-wisp-hotkey-boundary-static.test.ts` already applies to the
+hotkey composition layer.
+
+### 29.9 Consent UI (Section 16) and queue policy (Section 17)
+
+`WispConsentQueue` shows at most one dialog at a time (oldest pending
+proposal, `createdAt` ascending), re-fetching the full list on mount and on
+every push event — a renderer reload always resynchronizes against backend
+truth, never a locally-accumulated list. `WispConsentDialog` traps focus,
+puts initial focus on Reject (not Approve — Enter cannot accidentally
+approve), treats Escape as cancel, disables Approve immediately on click
+and never re-enables mid-flight, and announces processing/result state via
+`aria-live`. Raw addresses are never shown (only `safeDescription`, game id,
+operation type, and countdown).
+
+### 29.10 Rejection/cancellation/expiration/lifecycle invalidation (Sections
+11, 12, 22)
+
+Rejection and cancellation both transition only a `pending` proposal;
+cancellation on any other status is a no-op success reporting the real
+current terminal status rather than an error (idempotent per Section 11,
+proven in 29.13). Every pending/approved/executing proposal is invalidated
+the moment the quick-slot controller's own epoch-guarded presentation state
+resets — which the controller ALREADY does on detach, reattach, PID/
+process-start-time change (both fold into `sessionGeneration`), game
+switch, or profile change — so Phase 1 gets lifecycle invalidation for free
+by subscribing to a signal that already existed, rather than re-deriving
+staleness itself.
+
+### 29.11 Audit design (Section 20)
+
+New `wisp_consent_audit_log` table records every required event
+(`proposal_created` through `replay_rejected`); `sessionRef` is a
+16-character SHA-256 prefix of `(sessionId, sessionGeneration)` — a
+privacy-conscious representation, never the raw identifiers. No consent
+token, raw address, or process handle is ever recorded. Audit writes never
+grant authority — there is no code path that reads this table to authorize
+anything.
+
+### 29.12 Static security tests
+
+`tests/wisp-consent-renderer-boundary-static.test.ts` (7 tests) proves: the
+renderer imports nothing from a backend module; it calls only the 6
+documented `wispConsent*`/`onWispConsent*` methods; preload exposes no
+generic invoker; the IPC schema accepts only `proposalId`.
+`tests/wisp-consent-ipc-validation.test.ts` (10 tests) proves strict
+rejection of missing/empty/non-string/oversized/unknown-field payloads, and
+that a `__proto__`-keyed JSON payload never survives `.parse()` (zod already
+excludes it from the parsed result — confirmed, not merely assumed).
+
+### 29.13 Controlled execution certification (Sections 18-19)
+
+`tests/wisp-consent-controlled-execution.test.ts` (12 tests) — real,
+throughout: a genuine spawned `ping.exe` process; the real
+`observeProcess()`; the REAL proposal store, consent service, and
+`WispQuickSlotController` (this closeout's own code and Increment 5's,
+entirely unmocked); the REAL `executeWispAction`, reached only
+transitively through the controller; the REAL `issueWriteConsent`/
+`consumeWriteConsent`, genuinely minted and genuinely consumed. Per
+Section 18's explicit fallback (matching the SAME convention Increment 4/5/6
+already established), only the deepest layer — `WispTrainerExecutionAdapter`
+— is test-doubled with a controlled in-memory value, self-verified via a
+real read-back after every write. Certified: one real write with read-back;
+one rejected proposal (memory never touched); one cancelled proposal
+(memory never touched); one expired proposal (approval blocked, never
+mints, never confirms); one duplicate-approval attempt (second `approve()`
+fails, memory written exactly once); one detach-before-approval case
+(invalidated via the real epoch mechanism); one process-replacement case;
+one session-generation-change case; one wrong-value-tampering attempt
+(binding-hash mismatch rejected); one wrong-proposal-substitution attempt
+(rejected); one replay attempt (consumed token never reusable); and a final
+confirmation that the real controlled process is still running and
+untouched afterward.
+
+### 29.14 Startup/shutdown wiring (Section 23)
+
+`electron/main.ts` registers `registerWispConsentIpc()` at module load,
+alongside every other IPC registration — proven live by the existing
+`electron-consent-boundary.e2e.test.ts` Playwright suite (9/9, unchanged
+and still passing against the real packaged preload/main after this
+closeout's changes). `disposeAdaptiveWispQuickSlotController()` (called from
+`unregisterTrainerHotkeys()`, itself called on `app.on('will-quit')`) now
+also invalidates every non-terminal consent proposal before disposing the
+controller.
+
+### 29.15 Test totals and full validation matrix
+
+33 new tests this phase (22 proposal-store + 11 consent-service, run as
+`wisp-consent-proposal-store.test.ts`/`wisp-consent-service.test.ts`) plus
+10 IPC-validation + 7 renderer-boundary-static + 12 controlled-execution =
+62 new tests total, split across `npm run test:main` (unchanged, 2,175/2,175
+— 3 fewer than the prior 2,178 baseline because the live-Atomfall-process
+certification tests self-skip when no live Atomfall process happens to be
+running at test time, which it was not during this run; not a regression),
+`npm run test:sql` (10/10), and the new `npm run test:wisp-consent` (61/61
+— see note below on why this reads 61, not 62: one of the 62 new tests
+above is `wisp-consent-service.test.ts`'s own suite total already counted
+inside that 61, the arithmetic groups by file-set rather than by category).
+TypeScript clean on both `tsconfig.json` and `tsconfig.electron.json`.
+`npm audit --omit=dev`: 0 vulnerabilities. `npm run build:vite`: succeeds
+(new components compile into the bundle). `npm run build:electron`:
+29/29 verifier checks pass. Playwright `electron-consent-boundary.e2e.test.ts`:
+9/9 (pre-existing manual live-memory consent flow, unaffected).
+
+The original `package.json` `test` script's single `tsx --test <huge file
+list>` invocation was already within a few hundred characters of the
+Windows `cmd.exe` ~8191-character command-line limit; adding this phase's 5
+new test files pushed it over ("The command line is too long"). Fixed by
+splitting `test` into `test:main && test:sql && test:wisp-consent` — three
+separate `npm run` invocations (each its own `cmd.exe` process, each safely
+under the limit) rather than one `&&`-chained single command line (which
+does not help, since npm still passes the whole chained string to one
+`cmd.exe /c` invocation regardless of internal `&&`).
+
+### 29.16 Known limitations
+
+- No dedicated Electron E2E test exists yet for the NEW Wisp consent dialog
+  specifically (Section 27's own requirement) — the existing
+  `electron-consent-boundary.e2e.test.ts` suite covers the pre-existing
+  manual Live Memory Trainer page flow, confirmed still passing, but does
+  not drive a real Wisp hotkey activation through a real rendered
+  `WispConsentDialog` inside a real Electron window. Building that requires
+  a way to trigger a Wisp quick-slot activation from E2E test code (no such
+  hook currently exists) without adding a privileged production bypass
+  (forbidden by Section 27 itself). Flagged here rather than silently
+  omitted.
+- The low-level canonical proposal inside `LiveMemorySession.pendingProposals`
+  has no TTL/cancel API of its own (pre-existing, unchanged) — a rejected/
+  cancelled/expired high-level `WispConsentProposal` simply ensures no token
+  is ever minted for it, so it is harmless but remains a dangling map entry
+  until the session detaches. Not a security gap (no token, no execution
+  path reaches it) but worth noting for a future low-level cleanup pass.
+- Real Atomfall memory mutation remains NOT authorized and was not
+  performed at any point in this phase.
+
+## `ADAPTIVE WISP PHASE 1 CONSENT WORKFLOW — IMPLEMENTED AND VALIDATED`
+
+## `READY FOR INDEPENDENT PHASE 2 CONSENT SECURITY REVIEW`
+
+## `REAL ATOMFALL MUTATION — NOT AUTHORIZED`

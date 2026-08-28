@@ -115,7 +115,7 @@ async function handleFreeze(
   const proposal = deps.trainerAdapter.proposeFreeze(binding.gameId, binding.entryId, value, request.intervalMs);
   if (proposal === null) return unavailable(request.actionId, executionDiagnostic('WISP_EXECUTION_CONTROL_UNSUPPORTED', 'freeze could not be proposed for this entry', { actionId: request.actionId, entryId: binding.entryId, gameId: binding.gameId }));
 
-  if (request.consentToken === undefined) return pendingConsent(request.actionId, binding, proposal.proposalId);
+  if (request.consentToken === undefined) return pendingConsent(request.actionId, binding, proposal.proposalId, value);
 
   const outcome = await deps.trainerAdapter.confirmFreeze(proposal.proposalId, request.consentToken);
   return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_FREEZE_FAILED');
@@ -135,7 +135,7 @@ async function handleWrite(request: WispActionExecutionRequest, actionDefinition
   const proposal = deps.trainerAdapter.proposeWrite(binding.gameId, binding.entryId, computed.value);
   if (proposal === null) return unavailable(request.actionId, executionDiagnostic('WISP_EXECUTION_CONTROL_UNSUPPORTED', `control "${request.control}" could not be proposed for this entry`, { actionId: request.actionId, entryId: binding.entryId, gameId: binding.gameId, controlType: request.control }));
 
-  if (request.consentToken === undefined) return pendingConsent(request.actionId, binding, proposal.proposalId);
+  if (request.consentToken === undefined) return pendingConsent(request.actionId, binding, proposal.proposalId, computed.value);
 
   const outcome = await deps.trainerAdapter.confirmWrite(proposal.proposalId, request.consentToken);
   return fromWriteOutcome(request.actionId, binding, outcome, 'WISP_EXECUTION_TRAINER_FAILED');
@@ -218,12 +218,13 @@ function fromWriteOutcome(actionId: string, binding: WispRuntimeBinding, outcome
   return { ok: false, actionId, status: outcome.status, diagnostic: executionDiagnostic(code, outcome.reason, { actionId, entryId: binding.entryId, gameId: binding.gameId }) };
 }
 
-function pendingConsent(actionId: string, binding: WispRuntimeBinding, proposalId: string): WispActionExecutionResult {
+function pendingConsent(actionId: string, binding: WispRuntimeBinding, proposalId: string, requestedValue: WispSafeDisplayValue): WispActionExecutionResult {
   return {
     ok: false,
     actionId,
     status: 'pending-consent',
     proposalId,
+    requestedValue,
     diagnostic: executionDiagnostic('WISP_EXECUTION_CONSENT_REQUIRED', `proposal "${proposalId}" awaits an existing-workflow consent token`, { actionId, entryId: binding.entryId, gameId: binding.gameId }),
   };
 }
