@@ -119,6 +119,7 @@ async function launchApp(tag: string, extraEnv: Record<string, string> = {}): Pr
 async function cleanupApp(ctx: AppCtx | null): Promise<void> {
   if (!ctx) return;
   await ctx.app.close().catch(() => {});
+  try { ctx.app.process()?.kill('SIGKILL'); } catch { /* best-effort */ }
   try { fs.rmSync(ctx.userData, { recursive: true, force: true }); } catch { /* best-effort */ }
   try { fs.rmSync(ctx.appData, { recursive: true, force: true }); } catch { /* best-effort */ }
 }

@@ -50,6 +50,7 @@ async function launchApp(tag: string, testBuildValue?: string): Promise<AppConte
 async function cleanupApp(ctx: AppContext | null): Promise<void> {
   if (!ctx) return;
   await ctx.app.close().catch(() => {});
+  try { ctx.app.process()?.kill('SIGKILL'); } catch { /* best-effort */ }
   fs.rmSync(ctx.userData, { recursive: true, force: true });
   fs.rmSync(ctx.appData, { recursive: true, force: true });
 }
