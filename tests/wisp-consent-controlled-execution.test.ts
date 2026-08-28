@@ -169,6 +169,7 @@ function buildHarness(sessionIdentity: { pid: number; executablePath: string; pr
       if (requestedValue === undefined) return null;
       return mint(input, requestedValue);
     },
+    releaseLowLevelAuthority: () => {},
     recordAuditEvent: () => {},
   });
 
@@ -254,6 +255,7 @@ describe('Phase 1 controlled execution certification (real process, real consent
       store,
       quickSlotController: h.controller,
       mintConsentToken: () => ({ tokenId: 'unused', expiresAt: new Date().toISOString() }),
+      releaseLowLevelAuthority: () => {},
       recordAuditEvent: () => {},
       ttlMs: 500,
       nowMs: () => fakeNow,

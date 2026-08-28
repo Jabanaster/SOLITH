@@ -79,12 +79,25 @@ interface ResolvedControl {
   dataType: LiveValueType;
 }
 
+/**
+ * Optional Phase 2 E2E seam (see electron/adaptive-wisp-e2e-controlled-fixture.ts) —
+ * consulted BEFORE the real schema.v1 catalog lookup. Always undefined in
+ * production composition; only a SOLITH_TEST_BUILD-gated caller ever supplies
+ * one, and that function itself no-ops outside a test build. Real catalog
+ * resolution is otherwise completely unchanged.
+ */
+export type WispControlledAddressOverride = (gameId: CanonicalGameId, entryId: CanonicalTrainerEntryId) => ResolvedControl | null;
+
 function resolveEntryAddress(
   bundle: LiveMemoryWispSessionBundle,
   identityBridge: WispGameIdentityBridge,
   gameId: CanonicalGameId,
   entryId: CanonicalTrainerEntryId,
+  controlledOverride?: WispControlledAddressOverride,
 ): ResolvedControl | null {
+  const overridden = controlledOverride?.(gameId, entryId);
+  if (overridden) return overridden;
+
   const catalogGameId = identityBridge.resolveCheatSystemGameId(gameId);
   if (!catalogGameId) return null;
 
@@ -214,6 +227,7 @@ function isFrozenTarget(session: LiveMemorySession, address: LiveMemoryAddress):
 export function createLiveMemoryWispTrainerExecutionAdapter(
   getSession: LiveMemoryWispSessionAccessor,
   identityBridge: WispGameIdentityBridge,
+  controlledOverride?: WispControlledAddressOverride,
 ): WispTrainerExecutionAdapter {
   return {
     getCurrentState(gameId, entryId): WispTrainerEntryState | null {
@@ -221,7 +235,7 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       if (!bundle) return null;
       if (bundle.session.verifyAttachedProcessIdentity()) return null;
 
-      const resolved = resolveEntryAddress(bundle, identityBridge, gameId, entryId);
+      const resolved = resolveEntryAddress(bundle, identityBridge, gameId, entryId, controlledOverride);
       if (!resolved) return null;
 
       let currentValue: WispSafeDisplayValue | undefined;
@@ -245,7 +259,7 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       if (bundle.session.verifyAttachedProcessIdentity()) return null;
       if (typeof requestedValue !== 'number' || !Number.isFinite(requestedValue)) return null;
 
-      const resolved = resolveEntryAddress(bundle, identityBridge, gameId, entryId);
+      const resolved = resolveEntryAddress(bundle, identityBridge, gameId, entryId, controlledOverride);
       if (!resolved) return null;
 
       try {
@@ -301,7 +315,7 @@ export function createLiveMemoryWispTrainerExecutionAdapter(
       if (bundle.session.verifyAttachedProcessIdentity()) return null;
       if (typeof value !== 'number' || !Number.isFinite(value)) return null;
 
-      const resolved = resolveEntryAddress(bundle, identityBridge, gameId, entryId);
+      const resolved = resolveEntryAddress(bundle, identityBridge, gameId, entryId, controlledOverride);
       if (!resolved) return null;
 
       try {

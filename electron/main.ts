@@ -45,6 +45,7 @@ import {
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
 import { registerWispConsentIpc } from './wisp-consent-ipc.js';
+import { registerWispE2ETestIpc } from './wisp-e2e-test-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { disposeCheatSystemInitialization, initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
@@ -101,6 +102,13 @@ protocol.registerSchemesAsPrivileged([
 // it is never duplicated on window recreation.
 registerLiveMemoryIpc();
 registerWispConsentIpc();
+// Phase 2 remediation, Gap A — test-only Wisp E2E activation seam. Registered
+// ONLY when SOLITH_TEST_BUILD=1 (see wisp-e2e-test-ipc.ts's own doc comment);
+// a normal production process never calls this, so ipcMain never has these
+// channels at all outside a test build.
+if (process.env.SOLITH_TEST_BUILD === '1') {
+  registerWispE2ETestIpc();
+}
 registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();

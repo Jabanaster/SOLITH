@@ -54,6 +54,7 @@ import { resolveLiveCanonicalGameIdentity, type WispCanonicalGameLookupResult } 
 import { resolveWispProfileForGame } from '../src/core/adaptive-wisp/user-state-service.js';
 import { getAdaptiveWispExecutionAdapter, mintAdaptiveWispConsentToken, releaseAdaptiveWispConsentToken } from './adaptive-wisp-execution-composition.js';
 import { getActiveLiveMemorySessionBundle } from './live-memory-ipc.js';
+import { buildControlledE2EWispProfileIfLinked, createE2EAugmentedEntryLookup, E2E_CONTROLLED_CATALOG_GAME_ID } from './adaptive-wisp-e2e-controlled-fixture.js';
 import { createWispConsentProposalStore } from '../src/core/adaptive-wisp/consent/proposal-store.js';
 import { createWispConsentService, type WispConsentService } from '../src/core/adaptive-wisp/consent/consent-service.js';
 import { recordWispConsentAuditEvent } from '../src/core/adaptive-wisp/consent/audit-log.js';
@@ -137,10 +138,26 @@ export function getAdaptiveWispConsentService(): WispConsentService {
  * file's top-of-file comment and certified-profiles.ts's own doc comment.
  */
 function buildProductionProfileCandidates(): unknown[] {
+  const candidates: unknown[] = [];
+
   const atomfallCanonical = findCanonicalGameByCatalogGameId('atomfall');
-  if (!atomfallCanonical) return [];
-  const profile = buildAtomfallWispProfileIfLinked(atomfallCanonical.id as CanonicalGameId);
-  return profile ? [profile] : [];
+  if (atomfallCanonical) {
+    const profile = buildAtomfallWispProfileIfLinked(atomfallCanonical.id as CanonicalGameId);
+    if (profile) candidates.push(profile);
+  }
+
+  // Phase 2 remediation, Gap A — buildControlledE2EWispProfileIfLinked itself
+  // no-ops outside SOLITH_TEST_BUILD=1, and findCanonicalGameByCatalogGameId
+  // only ever finds a match if a real row was seeded with this exact
+  // catalogGameId (never true in a real user's database) — zero effect on
+  // production.
+  const controlledCanonical = findCanonicalGameByCatalogGameId(E2E_CONTROLLED_CATALOG_GAME_ID);
+  if (controlledCanonical) {
+    const controlledProfile = buildControlledE2EWispProfileIfLinked(controlledCanonical.id as CanonicalGameId);
+    if (controlledProfile) candidates.push(controlledProfile);
+  }
+
+  return candidates;
 }
 
 /** Returns the single production Adaptive Wisp quick-slot hotkey controller instance. */
@@ -157,7 +174,10 @@ export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
     populateWispProfileRegistry(registry, buildProductionProfileCandidates());
     const contextProvider = createSessionMonitorContextProvider(() => getActiveGameContext());
     const identityBridge = createCatalogGameIdentityBridge();
-    const entryLookup = createCheatSystemEntryLookup(identityBridge);
+    // createE2EAugmentedEntryLookup returns `entryLookup` completely
+    // untouched outside SOLITH_TEST_BUILD=1 (Gap A — see
+    // adaptive-wisp-e2e-controlled-fixture.ts's doc comment).
+    const entryLookup = createE2EAugmentedEntryLookup(createCheatSystemEntryLookup(identityBridge));
     const activeProfileProvider = createWispActiveProfileProvider({
       getCurrentContext: () => contextProvider.getCurrentContext(),
       resolveProfile: (context) => resolveWispProfileForGame(registry, app.getPath('userData'), context),

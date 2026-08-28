@@ -149,6 +149,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('wisp:consent:proposal-updated', listener);
     return () => ipcRenderer.removeListener('wisp:consent:proposal-updated', listener);
   },
+  // Phase 2 remediation, Gap A — test-only Wisp E2E activation seam. Only
+  // exposed as functions when SOLITH_TEST_BUILD=1; otherwise `typeof
+  // window.electronAPI.wispE2ETestActivateSlot === 'undefined'`, matching the
+  // same production-absence assertion style as the existing
+  // electron-consent-boundary.e2e.test.ts's mintWriteConsent check.
+  ...(process.env.SOLITH_TEST_BUILD === '1'
+    ? {
+        wispE2ETestActivateSlot: (payload: { slot: number }) => ipcRenderer.invoke('wisp:e2e:test-activate-slot', payload),
+        wispE2ETestSetControlledAddress: (payload: { addressDecimal: string }) =>
+          ipcRenderer.invoke('wisp:e2e:test-set-controlled-address', payload),
+      }
+    : {}),
   liveMemoryScanFirst: (payload: {
     dataType: string;
     targetValue: number;

@@ -18,15 +18,23 @@ import {
 import { issueWriteConsent } from '../src/core/consent/write-consent.js';
 import { createCatalogGameIdentityBridge } from '../src/core/adaptive-wisp/catalog-game-identity-bridge.js';
 import type { WispTrainerExecutionAdapter } from '../src/core/adaptive-wisp/trainer-execution-adapter.js';
+import { resolveE2EControlledAddress } from './adaptive-wisp-e2e-controlled-fixture.js';
 
 let cached: WispTrainerExecutionAdapter | null = null;
 
-/** Returns the single production Adaptive Wisp execution adapter instance. */
+/**
+ * Returns the single production Adaptive Wisp execution adapter instance.
+ * The third constructor argument is the Phase 2 E2E controlled-address seam
+ * (adaptive-wisp-e2e-controlled-fixture.ts) — it always resolves to null
+ * outside a SOLITH_TEST_BUILD=1 process and for every real game/entryId, so
+ * this is zero behavior change for production.
+ */
 export function getAdaptiveWispExecutionAdapter(): WispTrainerExecutionAdapter {
   if (!cached) {
     cached = createLiveMemoryWispTrainerExecutionAdapter(
       (): LiveMemoryWispSessionBundle | null => getActiveLiveMemorySessionBundle(),
       createCatalogGameIdentityBridge(),
+      resolveE2EControlledAddress,
     );
   }
   return cached;
