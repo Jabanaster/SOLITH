@@ -49,6 +49,7 @@ import { createWispQuickSlotController, type WispQuickSlotController } from '../
 import { createWispProfileRegistry } from '../src/core/adaptive-wisp/registry.js';
 import { populateWispProfileRegistry } from '../src/core/adaptive-wisp/registry-population.js';
 import { buildAtomfallWispProfileIfLinked } from '../src/core/adaptive-wisp/certified-profiles.js';
+import { initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
 import { resolveLiveCanonicalGameIdentity, type WispCanonicalGameLookupResult } from '../src/core/adaptive-wisp/live-canonical-game-resolver.js';
 import { resolveWispProfileForGame } from '../src/core/adaptive-wisp/user-state-service.js';
 import { getAdaptiveWispExecutionAdapter } from './adaptive-wisp-execution-composition.js';
@@ -120,6 +121,13 @@ function buildProductionProfileCandidates(): unknown[] {
 /** Returns the single production Adaptive Wisp quick-slot hotkey controller instance. */
 export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
   if (!cached) {
+    // Defensive: guarantee cheat-system is initialized before any Wisp
+    // action lookup, regardless of call order. Real startup already calls
+    // this in electron/main.ts before registerTrainerHotkeys(); this call
+    // is idempotent (returns the cached result once 'ready') and only
+    // matters for a caller that somehow reaches a hotkey activation before
+    // that startup sequence has run.
+    initializeCheatSystemOnce();
     const registry = createWispProfileRegistry();
     populateWispProfileRegistry(registry, buildProductionProfileCandidates());
     const contextProvider = createSessionMonitorContextProvider(() => getActiveGameContext());

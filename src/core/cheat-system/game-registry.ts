@@ -49,6 +49,15 @@ class GameRegistryImpl implements GameRegistry {
 
     return installed;
   }
+
+  size(): number {
+    return this.games.size;
+  }
+
+  /** Test-only reset — never called from production or exposed via IPC (see initialization.ts's resetCheatSystemInitializationForTests). */
+  clearForTests(): void {
+    this.games.clear();
+  }
 }
 
 // Singleton instance

@@ -46,6 +46,7 @@ import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
+import { disposeCheatSystemInitialization, initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
@@ -428,6 +429,21 @@ app.whenReady().then(async () => {
 
     const { unlockTrainerCapabilities } = await import('../src/core/settings/unlock-trainer-capabilities.js');
     unlockTrainerCapabilities();
+
+    // Cheat-system initialization must run before registerTrainerHotkeys()
+    // — Wisp hotkey actions resolve availability through the cheat-system
+    // entry lookup, which was permanently empty in production before this
+    // closeout (initializeCheatSystem had zero real callers). Failure is
+    // logged, not thrown — an initialization failure here must not prevent
+    // the rest of app startup (unrelated trainer hotkeys/overlay features)
+    // from working.
+    const cheatSystemInit = initializeCheatSystemOnce();
+    if (cheatSystemInit.state !== 'ready') {
+      console.error('[cheat-system] initialization failed:', cheatSystemInit.error);
+    } else if (cheatSystemInit.mappingDiagnostics.length > 0) {
+      console.warn('[cheat-system] mapping diagnostics:', cheatSystemInit.mappingDiagnostics);
+    }
+
     registerTrainerHotkeys();
 
     // Non-critical and network-bound (remote catalog sync): measured at
@@ -488,6 +504,7 @@ app.on('before-quit', (event) => {
 
 app.on('will-quit', () => {
   unregisterTrainerHotkeys();
+  disposeCheatSystemInitialization();
   destroyTrainerOverlay();
   destroyWispOverlay();
   stopCommunitySyncPolling();

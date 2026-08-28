@@ -799,6 +799,32 @@ const atomfallCheats: CheatDefinition[] = [
     verified: true,
     riskLevel: 'safe',
   },
+  // Catalog-reconciliation closeout: the ONLY cheat entry in this file whose
+  // id is deliberately the SAME as a real schema.v1 memory-feature id
+  // (trainer-catalog/bundled-definition-seed.ts's ATOMFALL_VERIFIED_AMMO_FEATURE).
+  // Every field below is copied from that already-reviewed feature's own
+  // metadata (dataType, defaultValue, certificationLevel) — nothing here is
+  // invented, and no address/offset/pointer data is duplicated (that stays
+  // exclusively in schema.v1, resolved at execution time by
+  // resolveLiveControlFromSchema/resolveEntryAddress, unchanged). This is
+  // the smallest correct cheat entry needed to reconcile the two catalogs
+  // for Adaptive Wisp's certified profile — see certified-profiles.ts.
+  {
+    id: 'atomfall-current-weapon-ammo',
+    name: 'Set Current Weapon Ammo',
+    description: 'Sets the currently equipped weapon\'s ammo count via a verified live-memory pointer',
+    category: 'Weapons',
+    valueType: 'int32',
+    defaultValue: 99,
+    requiresDiscovery: false,
+    certLevel: 'L3_Certified',
+    certificationLevel: 'L3',
+    tags: ['verified', 'reconciled'],
+    source: COMMON_SOURCES.communityResearch(),
+    verified: true,
+    riskLevel: 'safe',
+    notes: 'Reconciled with schema.v1 memory feature "atomfall-current-weapon-ammo" (Adaptive Wisp catalog-reconciliation closeout). Same id, deliberately, so cheat-system entry lookup and schema.v1 address resolution agree on identity.',
+  },
   mk({
     id: 'undetected',
     name: 'Undetected',

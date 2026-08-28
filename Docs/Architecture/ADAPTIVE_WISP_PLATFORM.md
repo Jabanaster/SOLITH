@@ -1356,3 +1356,229 @@ Reviewed on `review/adaptive-wisp-increment6-identity-registry`, integrated
 into `feature/adaptive-wisp-platform` via `git merge --ff-only` (see this
 closeout's final report for exact SHAs and full command-by-command
 validation evidence, reproduced identically on the integrated branch).
+
+## 27. Catalog reconciliation and real production-composition certification
+
+This section documents the closeout that turned Finding 3 (26.4) — "the
+certified Atomfall action can never become `available` because cheat-system
+and schema.v1 use disconnected id namespaces, and `initializeCheatSystem()`
+has zero production callers" — from a carried-forward, non-fabricatable gap
+into a closed, evidence-backed chain, without inventing any address, offset,
+signature, or executable hash.
+
+### 27.1 Initial audit findings
+
+Confirmed by source (not assumed):
+
+- `initializeCheatSystem()` (`cheat-system/index.ts`) had **zero** production
+  callers anywhere in the repository. `gameRegistry` was therefore always
+  empty in the real running app.
+- `cheat-system/games.ts`'s `atomfallCheats` used ids like `infinite-health`,
+  `unlimited-ammo`, `undetected` — none matched
+  `trainer-catalog/bundled-definition-seed.ts`'s real, already-reviewed
+  schema.v1 memory feature `atomfall-current-weapon-ammo`.
+- `certified-profiles.ts`'s Wisp action referenced `entryId:
+  'atomfall-current-weapon-ammo'` — a real, stable id, but one with no
+  matching cheat-system entry, so `createCheatSystemEntryLookup` always
+  returned `availability: 'missing-entry'`.
+- Real Atomfall is **not installed anywhere on this machine** — verified by
+  a real filesystem scan of every local Steam library (`C:\Program Files
+  (x86)\Steam\steamapps\common`, `D:\SteamLibrary\steamapps\common`,
+  `E:\SteamLibrary\steamapps\common`); none contains an Atomfall
+  installation directory.
+
+Initial verdict: **CATALOG/PRODUCTION CLOSEOUT AUDIT — FAIL** (production
+initialization had no caller; the registry was empty; ids were disconnected;
+the action was unavailable) — matching the directive's own explicit
+pass-blocking criteria.
+
+### 27.2 Identifier reconciliation (Requirement 1)
+
+`cheat-system/games.ts`'s `atomfallCheats` gained exactly one new entry,
+`id: 'atomfall-current-weapon-ammo'`, with every field copied verbatim from
+the real, already-reviewed schema.v1 feature
+(`ATOMFALL_VERIFIED_AMMO_FEATURE` in `bundled-definition-seed.ts`):
+`dataType: 'int32'` → `valueType: 'int32'`, `defaultValue: 99` (unchanged —
+the certified profile's preset was corrected from an earlier, less careful
+`9999` to this real value), `certificationLevel: 'L3'`. No address, offset,
+or pointer data is duplicated — that remains exclusively in schema.v1,
+resolved at execution time by `resolveLiveControlFromSchema`
+(Increment 4, unchanged).
+
+Mapping table for Atomfall:
+
+| Concept | Identifier | Source file | Runtime consumer |
+|---|---|---|---|
+| Canonical game | `'atomfall'` (real production id, when a real install links it) | `canonical-games/store.ts` | `catalog-game-identity-bridge.ts` |
+| Catalog game | `'atomfall'` (`CanonicalGame.catalogGameId`) | `canonical-games/store.ts` | `catalog-game-identity-bridge.ts`, `resolveLiveControlFromSchema` |
+| Cheat definition (game) | `'atomfall'` (`GameConfig.gameId`) | `cheat-system/games.ts` | `game-registry.ts` |
+| Cheat entry/action | `'atomfall-current-weapon-ammo'` | `cheat-system/games.ts` (this closeout) | `cheat-system-entry-lookup.ts` |
+| Memory feature | `'atomfall-current-weapon-ammo'` (same string, deliberately) | `trainer-catalog/bundled-definition-seed.ts` | `resolveLiveControlFromSchema` |
+| Wisp profile | `'certified:atomfall:current-weapon-ammo:v1'` | `adaptive-wisp/certified-profiles.ts` | `WispProfileRegistry` |
+| Wisp action | `'atomfall-current-weapon-ammo'` | `adaptive-wisp/certified-profiles.ts` | `quick-slot-controller.ts` |
+| Installation record | none in shipping data (Atomfall not installed anywhere reachable) | `canonical-games/store.ts` (`game_installations`) | Increment 6 live resolver |
+| Executable identity | `'atomfall_dx12.exe'` (from the real schema.v1 feature's `resolution.moduleName`) | `bundled-definition-seed.ts` | schema.v1 resolution only — not yet backed by a real installation record |
+
+No unrelated ids were opportunistically made identical; the reconciliation
+is exactly the one link the directive's own Atomfall-reconciliation section
+names.
+
+### 27.3 Production initialization (Requirements 2, 3)
+
+New module `src/core/cheat-system/initialization.ts`:
+`initializeCheatSystemOnce()` — synchronous by design (no real async I/O
+occurs anywhere in it), which makes "concurrent callers share one attempt"
+and "shutdown cannot land ready state after a later dispose" true by
+JavaScript's single-threaded run-to-completion semantics rather than by a
+promise-memoization race guard that could itself contain a bug. Structural
+validation (`validateGameRegistryStructure` — no duplicate gameId, no
+duplicate cheat id within a game) always runs BEFORE any `registerGame`
+call, so a hypothetical future structural defect in `ALL_GAMES` would leave
+the registry untouched (atomic), never partially populated. State machine:
+`uninitialized → initializing → ready | failed`, plus `disposed` via
+`disposeCheatSystemInitialization()`. Wired into the real production
+startup: `electron/main.ts`'s `app.whenReady()` handler now calls
+`initializeCheatSystemOnce()` immediately after `initDatabase()` and
+`unlockTrainerCapabilities()`, before `registerTrainerHotkeys()` — exactly
+matching the directive's own required lifecycle order. Also called
+defensively (idempotently) inside
+`getAdaptiveWispQuickSlotController()`, so ordering can never matter.
+`disposeCheatSystemInitialization()` is called from `main.ts`'s
+`will-quit` handler, alongside `unregisterTrainerHotkeys()`.
+
+### 27.4 Real production registry population (Requirement 4)
+
+Fourteen tests in `tests/cheat-system-initialization.test.ts` query the REAL
+`gameRegistry` singleton via `getGameConfig`/`listAvailableGames` — the same
+functions every real production caller uses — never by inspecting the
+`ALL_GAMES` source array directly. Proven: first initialization populates
+exactly `ALL_GAMES.length` games; repeated initialization returns the
+identical cached result object (no duplicate registration); lookups before
+initialization return `undefined`; disposal clears the real registry (not
+merely a local flag) and reinitialization after disposal fully repopulates
+it; the real `ALL_GAMES` passes structural validation; synthetic duplicate
+-id inputs fail it deterministically.
+
+### 27.5 Atomfall installation discovery (Requirement 5) — genuine owner-data blocker
+
+The pre-existing, unchanged `tests/install-discovery-steam.test.ts` already
+proves the general Steam-installation-discovery pipeline is real (a
+temp-filesystem Stardew Valley fixture, real VDF parsing, real path
+normalization). Proving that pipeline identifies **Atomfall** specifically
+would require either a real installed copy, or an owner-supplied
+authoritative identifier for it (a real Steam AppID, GOG product id, or a
+verified executable hash) to build a legitimate fixture manifest against.
+Inventing a Steam AppID or manifest for Atomfall would be fabricating game
+mapping data, which every governing directive in this project explicitly
+forbids. **This is reported as a genuine, unresolved owner-data blocker,
+not fabricated or worked around.** Everything downstream that does NOT
+require a real Atomfall installation record was still completed and proven
+for real (27.6-27.8).
+
+### 27.6 Real production Wisp-registry population, availability, and pending-consent (Requirements 6, 7, 8)
+
+`tests/adaptive-wisp-production-composition.test.ts` — 5 tests, using a REAL
+on-disk temporary SQLite database (`resetForTesting(tempDbPath)`, production
+schema/migrations, NOT `:memory:`), the REAL `initializeCheatSystemOnce()`,
+the REAL `gameRegistry`, the REAL `WispProfileRegistry`/
+`populateWispProfileRegistry`/`buildAtomfallWispProfileIfLinked`, and the
+REAL `catalog-game-identity-bridge`/`cheat-system-entry-lookup`/
+`active-profile-provider`/`quick-slot-controller` — querying the real
+on-disk DB at every step. The ONLY test double in the entire chain is the
+`WispTrainerExecutionAdapter` (the outermost live-memory I/O boundary this
+directive explicitly forbids exercising for real), matching Increment 4/5's
+own pre-existing test-double convention for that exact seam.
+
+A canonical game id `canonical:certification-fixture-atomfall` (deliberately
+**not** the real production Atomfall canonical id — isolated certification
+data, per the directive's own instruction) with `catalogGameId: 'atomfall'`
+was inserted into the real on-disk DB, so this test exercises the REAL
+reconciled Atomfall cheat-entry/memory-feature chain, not a fabricated one.
+Proven: the certified profile enters the real registry; the real
+`catalog-game-identity-bridge` resolves it to the real `'atomfall'`
+cheat-system id; the action resolves to `availability: 'available'` through
+the real entry lookup (no fallback, no mock, no override); activation
+reaches `pending-consent`; exactly one proposal is created; a repeat
+activation while pending is suppressed; no confirm/mutation occurs. Negative
+cases: missing cheat-system initialization, an unlinked canonical game
+(no profile at all — no fallback to any registered profile), and an
+unreconciled entryId (no fallback/first match) all correctly resolve to
+unavailable/null.
+
+### 27.7 Real OS-process, real-filesystem, real-on-disk-DB certification (Requirement 9) — controlled process, clearly labeled
+
+`tests/adaptive-wisp-process-backed-certification.test.ts` — 4 tests, Option
+B (controlled real process) per the directive's own explicit fallback,
+since real Atomfall is unavailable (27.5). Real, with no substitution
+anywhere: a genuine `ping.exe -n 12 127.0.0.1` child process (Windows
+system binary, no admin privileges, loopback-only, verified not already
+running before the test to avoid a false match); the REAL
+`observeProcess()` implementation (an actual `Get-CimInstance Win32_Process`
+query via a real PowerShell child process — confirmed the independently
+-queried pid matches Node's own `spawn()`-returned pid, proving genuine
+independent OS-level inspection, not a trusted echo); a REAL on-disk SQLite
+database; the REAL `canonical-games` store
+(`upsertCanonicalGame`/`upsertGameInstallation`/`listInstallationsForGame`,
+real SQL, real persistence — confirmed by reading the row back); and the
+REAL, unchanged `resolveLiveCanonicalGameIdentity` resolver. Proven: the
+real resolver correctly resolves the controlled canonical game from the
+real observed process and real on-disk installation record; a wrong claimed
+game (registered installation is `notepad.exe`, observed process is
+`ping.exe`) is correctly rejected — proving the executable cross-check
+(the exact defect Increment 6's identity remediation closed) is real, not a
+rubber stamp; the process is terminated and the real observer confirms it
+is gone. This is explicitly labeled controlled-process certification
+throughout — never relabeled as real Atomfall certification.
+
+### 27.8 Documentation and evidence corrections
+
+This section (27) replaces every earlier claim that Tasks 1-4 were fully,
+unconditionally complete with the accurate state: the identity/registry
+security review (26) passed unconditionally on its own terms, but the
+broader "certified Atomfall action reaches pending-consent in the real
+running app" claim was NOT true until this closeout, and even now the
+Atomfall-specific installation-discovery link (27.5) remains a genuine,
+reported owner-data blocker rather than a closed item.
+
+### 27.9 Test totals
+
+New this closeout: 14 (`cheat-system-initialization.test.ts`) + 5
+(`adaptive-wisp-production-composition.test.ts`) + 4
+(`adaptive-wisp-process-backed-certification.test.ts`) = 23. Full repository
+regression: TypeScript root/electron clean; `npm test` 2,168/2,168 (was
+2,145/2,145 — +23, exactly matching); SQL 10/10; live-memory 278/278; `npm
+audit` 0 vulnerabilities; fresh dev build 29/29 checks; Playwright
+`electron-consent-boundary.e2e.test.ts` 9/9.
+
+### 27.10 Remaining limitations
+
+- **Atomfall installation-discovery mapping remains unproven** (27.5) —
+  requires either a real installed copy or an owner-supplied authoritative
+  identifier (Steam AppID / GOG id / verified executable hash) to build a
+  legitimate discovery fixture. No shipping installation record exists for
+  Atomfall today; the certified action only becomes reachable once a real
+  installation links a real canonical `'atomfall'` game (proven, in 27.6,
+  using an isolated certification-only canonical id instead).
+- Every other Increment 5/6 limitation already recorded in Sections 24.6
+  and 26.9 remains unchanged and is not re-litigated here.
+
+### 27.11 Final verdict
+
+Per this directive's own explicit instruction ("If owner-provided Atomfall
+installation data is genuinely required and unavailable, finish every other
+item and end with a blocked verdict. Do not fabricate evidence or issue a
+false pass."):
+
+`INDEPENDENT TASKS 1-4 CLOSEOUT REVIEW — BLOCKED`
+
+`ADAPTIVE WISP TASKS 1-4 — NOT COMPLETE`
+
+blocked strictly on: a real Atomfall installation, or an owner-supplied
+authoritative Steam AppID / GOG product id / verified executable hash for
+Atomfall, to legitimately exercise real installation discovery for that
+specific game. Every other requirement in this directive (initializer
+wiring, idempotent/atomic/fail-closed state machine, real registry
+population, real Wisp-registry population, real availability, real
+pending-consent, real OS-process/filesystem/on-disk-DB certification via
+the authorized controlled-process fallback, and this independent re-review)
+is genuinely complete and evidence-backed.
