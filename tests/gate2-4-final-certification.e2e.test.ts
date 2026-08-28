@@ -53,7 +53,14 @@ interface FixtureHandle {
 
 function readStatus(statusPath: string): { pid: number; addressHex: string; value: number } {
   for (let i = 0; i < 30; i++) {
-    try { return JSON.parse(fs.readFileSync(statusPath, 'utf8')); } catch { /* transient partial write */ }
+    try {
+      const text = fs.readFileSync(statusPath, 'utf8');
+      if (text.trim().endsWith('}')) {
+        return JSON.parse(text);
+      }
+    } catch { /* transient partial write */ }
+    const sab = new SharedArrayBuffer(4);
+    Atomics.wait(new Int32Array(sab), 0, 0, 10);
   }
   throw new Error('could not read fixture status');
 }
