@@ -171,6 +171,31 @@ export function resolveAdaptiveWispConsentBinding(
   });
 }
 
+/**
+ * Phase 2 remediation — the release counterpart to
+ * `resolveAdaptiveWispConsentBinding`. When a high-level `WispConsentProposal`
+ * terminates without ever reaching a successful confirm (rejected, cancelled,
+ * expired, invalidated, or a confirm attempt that failed), the low-level
+ * staged proposal this function targets must not remain sitting in
+ * `LiveMemorySession.pendingProposals`/`pendingFreezeProposals` indefinitely
+ * (Section 9 — "Terminal high-level proposals must not leave reusable
+ * low-level authority"). A missing/already-consumed session or proposal is a
+ * safe no-op — this function only ever narrows authority, never grants it.
+ */
+export function releaseAdaptiveWispConsentAuthority(
+  getSession: LiveMemoryWispSessionAccessor,
+  operation: Extract<WriteConsentBinding['operation'], 'live_memory_confirm_write' | 'live_memory_freeze_start'>,
+  lowLevelProposalId: string,
+): void {
+  const bundle = getSession();
+  if (!bundle) return;
+  if (operation === 'live_memory_confirm_write') {
+    bundle.session.discardPendingWrite(lowLevelProposalId);
+  } else {
+    bundle.session.discardPendingFreeze(lowLevelProposalId);
+  }
+}
+
 function isFrozenTarget(session: LiveMemorySession, address: LiveMemoryAddress): boolean {
   const status = session.getFreezeStatus();
   return (

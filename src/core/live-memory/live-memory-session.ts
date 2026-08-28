@@ -860,6 +860,19 @@ export class LiveMemorySession {
     return this.pendingProposals.get(proposalId);
   }
 
+  /**
+   * Releases a staged write proposal without executing it — the terminal-cleanup
+   * counterpart to confirmWrite's own success-path delete. For a caller whose
+   * own higher-level proposal was rejected, cancelled, expired, invalidated, or
+   * whose confirm attempt failed, the entry must not remain reusable/replayable
+   * or accumulate unboundedly. Idempotent: discarding an unknown or
+   * already-consumed proposalId is a safe no-op.
+   */
+  discardPendingWrite(proposalId: string): void {
+    this.pendingProposals.delete(proposalId);
+    this.pendingRawBefore.delete(proposalId);
+  }
+
   /** Re-checks write consent (waiver), then executes a previously staged proposal. */
   async confirmWrite(proposalId: string): Promise<ConfirmWriteResult> {
     if (this.revoking) return { success: false, error: 'cleanup_in_progress' };
@@ -1093,6 +1106,11 @@ export class LiveMemorySession {
   /** Look up a staged freeze proposal (for consent binding). */
   getPendingFreezeProposal(proposalId: string): FreezeProposal | undefined {
     return this.pendingFreezeProposals.get(proposalId);
+  }
+
+  /** Releases a staged freeze proposal without starting it. See discardPendingWrite. Idempotent. */
+  discardPendingFreeze(proposalId: string): void {
+    this.pendingFreezeProposals.delete(proposalId);
   }
 
   /**

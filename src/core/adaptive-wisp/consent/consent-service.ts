@@ -43,6 +43,13 @@ export interface WispConsentServiceDeps {
   quickSlotController: WispQuickSlotController;
   /** Injected seam — mints a one-use write-consent token bound to the exact low-level canonical proposal, or null if the underlying session/proposal no longer resolves (Section 10 re-verification). */
   mintConsentToken: (input: { lowLevelProposalId: string; operationType: 'write' | 'freeze' }) => WispConsentTokenArtifact | null;
+  /**
+   * Injected seam — releases (discards) the staged low-level write/freeze
+   * proposal when this service's own high-level proposal terminates without
+   * a successful confirm (reject/cancel/expire/invalidate/failed-confirm).
+   * A missing session or already-consumed low-level proposal is a safe no-op.
+   */
+  releaseLowLevelAuthority: (input: { lowLevelProposalId: string; operationType: 'write' | 'freeze' }) => void;
   recordAuditEvent: (input: {
     eventType: WispConsentAuditEventTypeLike;
     proposal: WispConsentProposal;
@@ -88,6 +95,30 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
   const ttlMs = deps.ttlMs ?? DEFAULT_TTL_MS;
   const now = () => deps.nowMs?.() ?? Date.now();
 
+  function releaseFor(proposal: WispConsentProposal): void {
+    deps.releaseLowLevelAuthority({ lowLevelProposalId: proposal.lowLevelProposalId, operationType: proposal.operationType });
+  }
+
+  /**
+   * Backend-time lazy expiration (Section 12) currently happens silently
+   * inside the store's own getLive/transition. This wrapper makes the
+   * transition observable to the service layer so an expiry that nobody
+   * happened to look at is still audited and releases its low-level
+   * authority (Section 9/12 — "expired" is a required audit event, and a
+   * rejected/cancelled/expired proposal must not remain indefinitely as
+   * reusable low-level authority).
+   */
+  function getLiveAndReap(proposalId: string): WispConsentProposal | null {
+    const before = deps.store.get(proposalId);
+    const wasPending = before?.status === 'pending';
+    const live = deps.store.getLive(proposalId, now());
+    if (wasPending && live && live.status === 'expired') {
+      deps.recordAuditEvent({ eventType: 'expired', proposal: live });
+      releaseFor(live);
+    }
+    return live;
+  }
+
   return {
     handlePendingConsent(info: WispPendingConsentInfo): void {
       const nowMs = now();
@@ -114,10 +145,20 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
       // identity the controller has already decided is stale (Section 22) —
       // invalidate all of them rather than trying to re-derive which ones
       // still apply to the new context.
-      const invalidated = deps.store.list().filter((p) => p.status === 'pending' || p.status === 'approved' || p.status === 'executing');
-      deps.store.invalidateWhere((p) => invalidated.includes(p));
-      for (const proposal of invalidated) {
+      const toInvalidate = deps.store.list().filter((p) => p.status === 'pending' || p.status === 'approved' || p.status === 'executing');
+      // Capture pre-invalidation status: invalidateWhere mutates these same
+      // object references in place, so this must be read BEFORE it runs.
+      const originalStatus = new Map(toInvalidate.map((p) => [p.proposalId, p.status]));
+      deps.store.invalidateWhere((p) => toInvalidate.includes(p));
+      for (const proposal of toInvalidate) {
         deps.recordAuditEvent({ eventType: 'invalidated', proposal });
+        // 'executing' means a real confirmWrite/confirmFreeze call may
+        // already be in flight against the low-level proposal — releasing it
+        // here would race that call. It is left alone; the in-flight call
+        // independently re-verifies process identity and will fail closed on
+        // its own if the session really did go stale (Section 7).
+        const wasExecuting = originalStatus.get(proposal.proposalId) === 'executing';
+        if (!wasExecuting) releaseFor(proposal);
       }
     },
 
@@ -125,16 +166,18 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
       return deps.store
         .list()
         .filter((p) => p.status === 'pending')
+        .map((p) => getLiveAndReap(p.proposalId))
+        .filter((p): p is WispConsentProposal => p !== null && p.status === 'pending')
         .map(toProposalView);
     },
 
     get(proposalId: string): WispConsentProposalView | null {
-      const proposal = deps.store.getLive(proposalId, now());
+      const proposal = getLiveAndReap(proposalId);
       return proposal ? toProposalView(proposal) : null;
     },
 
     async approve(proposalId: string): Promise<WispConsentActionResult> {
-      const live = deps.store.getLive(proposalId, now());
+      const live = getLiveAndReap(proposalId);
       if (!live) return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_NOT_FOUND', `no proposal "${proposalId}" exists`) };
       if (live.status === 'expired') return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_EXPIRED', 'this proposal has expired') };
       if (live.status !== 'pending') return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_NOT_PENDING', `proposal is "${live.status}", not pending`) };
@@ -142,7 +185,10 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
       const token = deps.mintConsentToken({ lowLevelProposalId: live.lowLevelProposalId, operationType: live.operationType });
       if (!token) {
         const invalidated = deps.store.transition(proposalId, 'invalidated', now());
-        if (invalidated.ok) deps.recordAuditEvent({ eventType: 'invalidated', proposal: invalidated.proposal, failureCategory: 'session_no_longer_resolves' });
+        if (invalidated.ok) {
+          deps.recordAuditEvent({ eventType: 'invalidated', proposal: invalidated.proposal, failureCategory: 'session_no_longer_resolves' });
+          releaseFor(invalidated.proposal);
+        }
         return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_SESSION_CHANGED', 'the underlying session/proposal no longer resolves — it may have detached or changed') };
       }
 
@@ -165,6 +211,14 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
           executionStatus: execution.executionStatus,
           failureCategory: succeeded ? undefined : execution.diagnostic?.code,
         });
+        // A successful confirm already deleted the low-level entry itself
+        // (LiveMemorySession.confirmWrite/startFreezeConfirmed). A failed
+        // confirm attempt does not — several of its own failure paths
+        // (consent-guard block, identity mismatch, full rollback ledger)
+        // intentionally leave the entry alone for that file's OTHER callers'
+        // retry semantics, so Wisp must release it explicitly here instead of
+        // changing that shared file's behavior (Section 9).
+        if (!succeeded) releaseFor(finalTransition.proposal);
         const consumed = deps.store.transition(proposalId, 'consumed', now());
         if (consumed.ok) deps.recordAuditEvent({ eventType: succeeded ? 'execution_succeeded' : 'execution_failed', proposal: consumed.proposal, executionStatus: execution.executionStatus });
       }
@@ -174,16 +228,17 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
     },
 
     reject(proposalId: string): WispConsentActionResult {
-      const live = deps.store.getLive(proposalId, now());
+      const live = getLiveAndReap(proposalId);
       if (!live) return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_NOT_FOUND', `no proposal "${proposalId}" exists`) };
       const result = deps.store.transition(proposalId, 'rejected', now());
       if (result.ok === false) return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_NOT_PENDING', result.reason) };
       deps.recordAuditEvent({ eventType: 'rejected', proposal: result.proposal, decision: 'rejected' });
+      releaseFor(result.proposal);
       return { ok: true, proposal: toProposalView(result.proposal) };
     },
 
     cancel(proposalId: string): WispConsentActionResult {
-      const live = deps.store.getLive(proposalId, now());
+      const live = getLiveAndReap(proposalId);
       if (!live) return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_NOT_FOUND', `no proposal "${proposalId}" exists`) };
       // Cancellation is idempotent (Section 11) — cancelling an
       // already-terminal proposal is a harmless no-op success, not an error.
@@ -191,6 +246,7 @@ export function createWispConsentService(deps: WispConsentServiceDeps): WispCons
       const result = deps.store.transition(proposalId, 'cancelled', now());
       if (result.ok === false) return { ok: false, diagnostic: consentDiagnostic('WISP_CONSENT_PROPOSAL_NOT_PENDING', result.reason) };
       deps.recordAuditEvent({ eventType: 'cancelled', proposal: result.proposal, decision: 'cancelled' });
+      releaseFor(result.proposal);
       return { ok: true, proposal: toProposalView(result.proposal) };
     },
   };

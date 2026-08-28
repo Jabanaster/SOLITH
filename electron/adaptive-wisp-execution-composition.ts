@@ -12,6 +12,7 @@ import { getActiveLiveMemorySessionBundle } from './live-memory-ipc.js';
 import {
   createLiveMemoryWispTrainerExecutionAdapter,
   resolveAdaptiveWispConsentBinding,
+  releaseAdaptiveWispConsentAuthority,
   type LiveMemoryWispSessionBundle,
 } from '../src/core/live-memory/adaptive-wisp-live-adapter.js';
 import { issueWriteConsent } from '../src/core/consent/write-consent.js';
@@ -48,4 +49,15 @@ export function mintAdaptiveWispConsentToken(input: { lowLevelProposalId: string
   if (!binding) return null;
   const artifact = issueWriteConsent(binding);
   return { tokenId: artifact.tokenId, expiresAt: artifact.expiresAt };
+}
+
+/**
+ * Phase 2 remediation — the release counterpart to `mintAdaptiveWispConsentToken`.
+ * Called by the consent service whenever a Wisp proposal terminates without a
+ * successful confirm, so the staged low-level write/freeze proposal does not
+ * outlive the high-level decision that ended it (Section 9 cleanup).
+ */
+export function releaseAdaptiveWispConsentToken(input: { lowLevelProposalId: string; operationType: 'write' | 'freeze' }): void {
+  const operation = input.operationType === 'freeze' ? ('live_memory_freeze_start' as const) : ('live_memory_confirm_write' as const);
+  releaseAdaptiveWispConsentAuthority(() => getActiveLiveMemorySessionBundle(), operation, input.lowLevelProposalId);
 }

@@ -52,7 +52,7 @@ import { buildAtomfallWispProfileIfLinked } from '../src/core/adaptive-wisp/cert
 import { initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
 import { resolveLiveCanonicalGameIdentity, type WispCanonicalGameLookupResult } from '../src/core/adaptive-wisp/live-canonical-game-resolver.js';
 import { resolveWispProfileForGame } from '../src/core/adaptive-wisp/user-state-service.js';
-import { getAdaptiveWispExecutionAdapter, mintAdaptiveWispConsentToken } from './adaptive-wisp-execution-composition.js';
+import { getAdaptiveWispExecutionAdapter, mintAdaptiveWispConsentToken, releaseAdaptiveWispConsentToken } from './adaptive-wisp-execution-composition.js';
 import { getActiveLiveMemorySessionBundle } from './live-memory-ipc.js';
 import { createWispConsentProposalStore } from '../src/core/adaptive-wisp/consent/proposal-store.js';
 import { createWispConsentService, type WispConsentService } from '../src/core/adaptive-wisp/consent/consent-service.js';
@@ -191,6 +191,7 @@ export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
       store,
       quickSlotController: cached,
       mintConsentToken: (input) => mintAdaptiveWispConsentToken(input),
+      releaseLowLevelAuthority: (input) => releaseAdaptiveWispConsentToken(input),
       recordAuditEvent: (input) => recordWispConsentAuditEvent(input),
     });
   }

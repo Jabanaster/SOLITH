@@ -110,6 +110,35 @@ describe('LiveMemorySession', () => {
     assert.equal(result.manifest?.valueAfter, 9999);
   });
 
+  test('discardPendingWrite removes a staged proposal so it can no longer be confirmed', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    assert.ok(session.getPendingWriteProposal(proposal.proposalId));
+
+    session.discardPendingWrite(proposal.proposalId);
+
+    assert.equal(session.getPendingWriteProposal(proposal.proposalId), undefined);
+    const result = await session.confirmWrite(proposal.proposalId);
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /Unknown or expired proposal/i);
+    assert.equal(driver.getValue(0x1000n), 100, 'a discarded proposal must never actually write memory');
+  });
+
+  test('discardPendingWrite on an unknown/already-consumed proposalId is a safe no-op', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE, CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    assert.doesNotThrow(() => session.discardPendingWrite('never-existed'));
+
+    const proposal = session.proposeWrite(HEALTH_ADDR, 9999);
+    await session.confirmWrite(proposal.proposalId);
+    assert.doesNotThrow(() => session.discardPendingWrite(proposal.proposalId), 'discarding an already-confirmed (already-deleted) proposalId must not throw');
+  });
+
   test('confirmWrite proceeds when connection count rises between propose and confirm (Trust Shift)', async () => {
     const driver = new FakeMemoryDriver({ '4096': 100 });
     // First call (attach) clean, second call (confirmWrite) online — still allowed with waiver.
@@ -487,6 +516,31 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('LiveMemorySession freeze', () => {
+  test('discardPendingFreeze removes a staged freeze proposal so it can no longer be started', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    const proposal = session.proposeFreeze(HEALTH_ADDR, 9999);
+    assert.ok(session.getPendingFreezeProposal(proposal.proposalId));
+
+    session.discardPendingFreeze(proposal.proposalId);
+
+    assert.equal(session.getPendingFreezeProposal(proposal.proposalId), undefined);
+    const result = session.startFreezeConfirmed(proposal.proposalId);
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /Unknown or already-consumed freeze proposal/i);
+    assert.equal(session.getFreezeStatus().active, false, 'a discarded freeze proposal must never actually start freezing');
+  });
+
+  test('discardPendingFreeze on an unknown proposalId is a safe no-op', async () => {
+    const driver = new FakeMemoryDriver({ '4096': 100 });
+    const session = makeSession(driver, [CLEAN_EVIDENCE]);
+    await session.attach({ pid: 1234, executableName: 'demo.exe' }, true);
+
+    assert.doesNotThrow(() => session.discardPendingFreeze('never-existed'));
+  });
+
   test('startFreeze fails when no process is attached', () => {
     const driver = new FakeMemoryDriver();
     const session = makeSession(driver, [CLEAN_EVIDENCE]);
