@@ -11,9 +11,18 @@ import { WispConsentDialog } from './WispConsentDialog.js';
  * (Section 26: "renderer reload and pending-state resynchronization") —
  * never trusts a locally-accumulated list, since the backend is the sole
  * authority on what is actually still pending.
+ *
+ * `active` is deliberately "sticky": once a proposal is shown, it stays
+ * shown — even after it leaves the backend's pending list — until the user
+ * closes it. A same-tick refresh() right after approve()/reject() would
+ * otherwise remove the just-decided proposal from `pending` and unmount the
+ * dialog before its own success/failure state (Section 16's live-region
+ * outcome announcement) ever rendered. `pending` still drives which
+ * proposal gets picked up NEXT.
  */
 export function WispConsentQueue() {
   const [pending, setPending] = useState<WispConsentProposalViewShape[]>([]);
+  const [active, setActive] = useState<WispConsentProposalViewShape | null>(null);
 
   const refresh = useCallback(async () => {
     const result = await window.electronAPI.wispConsentListPending();
@@ -30,23 +39,35 @@ export function WispConsentQueue() {
     };
   }, [refresh]);
 
-  const current = pending[0];
-  if (!current) return null;
+  useEffect(() => {
+    if (active) return;
+    if (pending[0]) setActive(pending[0]);
+  }, [pending, active]);
+
+  const dismissAndAdvance = useCallback(
+    (proposalId: string, action: (payload: { proposalId: string }) => Promise<unknown>) => {
+      action({ proposalId }).finally(() => {
+        setActive(null);
+        refresh();
+      });
+    },
+    [refresh],
+  );
+
+  if (!active) return null;
 
   return (
     <WispConsentDialog
-      proposal={current}
+      proposal={active}
       onApprove={async (proposalId) => {
         const result = await window.electronAPI.wispConsentApprove({ proposalId });
-        await refresh();
-        return { ok: result.success && result.executionStatus !== undefined && !['rejected', 'stale', 'unavailable', 'failed'].includes(result.executionStatus), message: result.message ?? result.error };
+        return {
+          ok: result.success && result.executionStatus !== undefined && !['rejected', 'stale', 'unavailable', 'failed'].includes(result.executionStatus),
+          message: result.message ?? result.error,
+        };
       }}
-      onReject={(proposalId) => {
-        window.electronAPI.wispConsentReject({ proposalId }).then(refresh);
-      }}
-      onCancel={(proposalId) => {
-        window.electronAPI.wispConsentCancel({ proposalId }).then(refresh);
-      }}
+      onReject={(proposalId) => dismissAndAdvance(proposalId, window.electronAPI.wispConsentReject)}
+      onCancel={(proposalId) => dismissAndAdvance(proposalId, window.electronAPI.wispConsentCancel)}
     />
   );
 }

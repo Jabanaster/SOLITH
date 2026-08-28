@@ -207,12 +207,19 @@ export function getAdaptiveWispQuickSlotController(): WispQuickSlotController {
     });
 
     const store = createWispConsentProposalStore();
+    // SOLITH_WISP_CONSENT_TTL_MS: same "configurable TTL via env, unset by
+    // default" pattern already established by privileged-consent-dialog.ts's
+    // SOLITH_CONSENT_TTL_MS — lets the E2E exercise real expiration without a
+    // 30-second wait. A shorter TTL is strictly the safer direction; the
+    // renderer can never influence this, only a real process-launch env var.
+    const envTtlMs = Number(process.env.SOLITH_WISP_CONSENT_TTL_MS ?? '');
     cachedConsentService = createWispConsentService({
       store,
       quickSlotController: cached,
       mintConsentToken: (input) => mintAdaptiveWispConsentToken(input),
       releaseLowLevelAuthority: (input) => releaseAdaptiveWispConsentToken(input),
       recordAuditEvent: (input) => recordWispConsentAuditEvent(input),
+      ttlMs: Number.isFinite(envTtlMs) && envTtlMs > 0 ? Math.floor(envTtlMs) : undefined,
     });
   }
   return cached;
