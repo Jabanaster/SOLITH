@@ -158,7 +158,88 @@ function commonInstallRoots(): string[] {
   ];
 }
 
-function findFirstExecutable(installPath: string): string | undefined {
+/**
+ * Bounded search depth/breadth for `findGameExecutable` below (catalog
+ * -reconciliation closeout, Requirement 2 root-cause fix). Depth 5 and an
+ * 8,000-entry cap comfortably cover real Xbox/Game-Pass package layouts
+ * (verified against a real installed title: ~2,000 files total under its
+ * `Content/` tree, real binary 2 levels deep) without becoming an
+ * unbounded recursive filesystem walk.
+ */
+const GAME_EXECUTABLE_SEARCH_MAX_DEPTH = 5;
+const GAME_EXECUTABLE_SEARCH_MAX_ENTRIES = 8000;
+
+/**
+ * Finds the real game executable inside an install folder, searching
+ * bounded-depth subdirectories — NOT just the top level.
+ *
+ * Root cause fix (catalog-reconciliation closeout): the previous
+ * single-level `findFirstExecutable` never found executables nested under
+ * a game's own subfolders, which is exactly how Xbox/Microsoft Store
+ * package installs are laid out (an `appxmanifest.xml`/
+ * `MicrosoftGame.config` at the install root, with the actual game and
+ * launcher binaries under `Content/bin/` and `Content/Launcher/`
+ * respectively) — confirmed against a real installed title during this
+ * closeout. A shallow, single-directory scan structurally cannot find such
+ * a layout regardless of which library roots are configured.
+ *
+ * When multiple real executables are found (a launcher stub alongside the
+ * actual game binary is common), the LARGEST by file size is preferred —
+ * a small helper/launcher executable is reliably orders of magnitude
+ * smaller than the real packaged game binary in every case inspected
+ * during this closeout (a ~100KB launch helper and a ~1.8MB launcher
+ * alongside a ~330MB real game binary for the one real title verified).
+ * This is a size heuristic on REAL discovered files, not an assumption
+ * about any specific game's filename.
+ */
+function findGameExecutable(installPath: string): string | undefined {
+  const candidates: Array<{ path: string; size: number }> = [];
+  let scanned = 0;
+
+  function walk(dir: string, depth: number): void {
+    if (depth > GAME_EXECUTABLE_SEARCH_MAX_DEPTH || scanned > GAME_EXECUTABLE_SEARCH_MAX_ENTRIES) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (scanned > GAME_EXECUTABLE_SEARCH_MAX_ENTRIES) return;
+      scanned += 1;
+      const full = path.join(dir, entry.name);
+      if (entry.isFile()) {
+        if (!EXECUTABLE_RE.test(entry.name)) continue;
+        try {
+          candidates.push({ path: full, size: fs.statSync(full).size });
+        } catch { /* unreadable — skip, do not fail the whole scan */ }
+        continue;
+      }
+      if (entry.isDirectory() && !NON_GAME_PATH_RE.test(entry.name)) {
+        walk(full, depth + 1);
+      }
+    }
+  }
+
+  walk(installPath, 0);
+  if (candidates.length === 0) return undefined;
+  candidates.sort((a, b) => b.size - a.size);
+  return candidates[0].path;
+}
+
+/**
+ * Single-level executable lookup for the "root itself is one game's install
+ * folder" case ONLY (see `scanShallowRoot`). Deliberately NOT the bounded
+ * -depth `findGameExecutable` — that recursive search must never be run
+ * against a LIBRARY root (many sibling game folders, e.g. `Z:\Games`),
+ * because it would walk across every sibling folder and could pick up an
+ * executable belonging to a completely different game (a real defect this
+ * closeout found and fixed: scanning a library root that recursed found
+ * one game's real binary and mis-attributed it to the library root itself,
+ * which then shadowed that game's own correct per-child record during
+ * deduplication by `canonicalExecutablePath` equality).
+ */
+function findImmediateExecutable(installPath: string): string | undefined {
   try {
     const entries = fs.readdirSync(installPath, { withFileTypes: true });
     const exe = entries.find((entry) => entry.isFile() && EXECUTABLE_RE.test(entry.name));
@@ -178,7 +259,7 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
       return results;
     }
 
-    const rootExe = findFirstExecutable(resolvedRoot);
+    const rootExe = findImmediateExecutable(resolvedRoot);
     if (rootExe) {
       const rejected = rejectManualCandidate(resolvedRoot, rootExe);
       if (rejected) { failures.push({ location: resolvedRoot, reason: 'rejected_non_game:' + rejected }); } else results.push({
@@ -193,7 +274,7 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const child = path.join(resolvedRoot, entry.name);
-      const executablePath = findFirstExecutable(child);
+      const executablePath = findGameExecutable(child);
       if (!executablePath) continue;
       const rejected = rejectManualCandidate(child, executablePath);
       if (rejected) { failures.push({ location: child, reason: 'rejected_non_game:' + rejected }); continue; }

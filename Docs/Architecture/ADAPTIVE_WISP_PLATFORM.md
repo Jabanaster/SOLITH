@@ -1582,3 +1582,260 @@ population, real Wisp-registry population, real availability, real
 pending-consent, real OS-process/filesystem/on-disk-DB certification via
 the authorized controlled-process fallback, and this independent re-review)
 is genuinely complete and evidence-backed.
+
+**Superseded by Section 28** — the "Atomfall is not installed anywhere on
+this machine" conclusion above was WRONG. It only checked default Steam
+library locations; a real installation exists on a custom library root.
+Section 28 is the corrected, authoritative account.
+
+## 28. Correction — real Atomfall installation found; discovery fixed; real certification
+
+Section 27's conclusion that Atomfall was not installed was based on a scan
+of only three default Steam library paths. A real installation exists at
+`Z:\Games\Atomfall` — a custom, non-default library root on a mapped fixed
+drive, which no prior scan in this project ever checked.
+
+### 28.1 Real installation evidence
+
+- **Installation root**: `Z:\Games\Atomfall`
+- **Primary game executable**: `Z:\Games\Atomfall\Content\bin\Atomfall_dx12.exe`
+  (~332.6 MB) — matches schema.v1's `ATOMFALL_VERIFIED_AMMO_FEATURE.resolution.moduleName`
+  (`'atomfall_dx12.exe'`) exactly (case-insensitive), and matches
+  `cheat-system/games.ts`'s pre-existing `ATOMFALL_CONFIG.aliases` entry
+  (`'Atomfall_dx12.exe'`) exactly.
+- **Launcher executable** (different from the game): `Z:\Games\Atomfall\Content\Launcher\Atomfall.exe`
+  (~1.8 MB); a third executable, `Content\gamelaunchhelper.exe` (~100 KB), is
+  the package's `Application Id="Game"` entry point per its manifest.
+- **Platform/store**: Microsoft Store / Xbox PC (Game Pass-style package) —
+  confirmed by real `Z:\Games\Atomfall\Content\appxmanifest.xml` and
+  `MicrosoftGame.config` files, NOT a Steam install (no `appmanifest_*.acf`
+  anywhere under `Z:\Games`).
+- **Manifest/product identifier**: `appxmanifest.xml`'s `<Identity Name="Rebellion.Windscale" Publisher="CN=9136491E-6A28-4C39-989B-12D6D89FB1B3" Version="1.23.105.0" ProcessorArchitecture="x64" />`;
+  `DisplayName: Atomfall`; `PublisherDisplayName: Rebellion`. Confirmed
+  installed package family name via `Get-AppxPackage`:
+  `Rebellion.Windscale_2vbwqmt31j4mr`, install location
+  `C:\Program Files\WindowsApps\Rebellion.Windscale_1.23.105.0_x64__2vbwqmt31j4mr`.
+- **Alternate executables**: the launcher and launch-helper above; no other
+  `.exe` files exist under the install tree.
+- **Junction/symlink/mount check**: `Z:` is a real, distinct fixed volume
+  (confirmed via `Get-Volume`/`Get-PSDrive` — label "Games", ~822 GB used /
+  1040 GB free, `DriveType: Fixed`), not a junction, symlink, or `subst`
+  mount of another drive. No canonical-path substitution was needed.
+- **File-version/SHA-256/signature metadata**: NOT collected this pass —
+  out of scope for what the identity/discovery chain below actually needed
+  (exact executable path plus the pre-existing schema.v1 module-name link
+  was sufficient to prove reconciliation); collecting and publishing a
+  SHA-256 or Authenticode signature dump of a third-party commercial game
+  binary was judged unnecessary evidence for this closeout and was not
+  performed.
+
+### 28.2 Why discovery missed it — root cause
+
+Two distinct defects, both in `src/core/install-discovery/index.ts`:
+
+1. **Scan-depth limitation (the actual miss).** `scanShallowRoot`'s
+   per-child-folder executable lookup (`findFirstExecutable`, since
+   renamed/removed) only read the immediate top level of each game folder
+   with a single `fs.readdirSync`. Atomfall's real binary sits two levels
+   deeper (`Content/bin/`) — a layout common to Xbox/Microsoft Store
+   packages, which nest everything under a `Content/` folder rather than
+   placing the executable at the install root the way most Steam titles
+   do. A single-level scan structurally cannot find such a layout
+   regardless of which library roots are configured — this was never a
+   filtering/rejection bug, it simply never looked deep enough to find a
+   candidate to filter in the first place.
+2. **A second defect found and fixed while fixing the first.** The initial
+   fix applied a new bounded-depth recursive search
+   (`findGameExecutable` — depth capped at 5, entries capped at 8,000) to
+   BOTH the per-child-folder case AND the "root itself is one game"
+   case. Applied to a LIBRARY root (`Z:\Games`, containing 16 sibling game
+   folders), the root-level recursive search walked across sibling
+   folders, found Atomfall's real binary as the single largest executable
+   anywhere in the whole library tree, and mis-attributed it to the
+   library root itself (`Z:\Games`) as if the whole library were "one
+   game." That spurious root-level record shared the same
+   `canonicalExecutablePath` as the correct per-child Atomfall record, and
+   — because it was pushed to the results array FIRST — won
+   `deduplicateConcreteInstalls`'s dedup-by-executable-path check,
+   silently shadowing the correct record. Root-cause diagnosis for this
+   second defect required instrumenting the real discovery pipeline with
+   temporary trace logging (removed after diagnosis) rather than guessing
+   from re-reading the code, since the interaction between two independent
+   private functions was not obvious from inspection alone.
+
+Fix: the root-level "root itself is one game" case now uses a NEW, narrow,
+single-level-only helper (`findImmediateExecutable`) preserving the
+original, correct, non-recursive behavior for that specific case — recursion
+is reserved exclusively for the per-child-folder case, which by construction
+never crosses into a sibling folder (each child's search starts fresh from
+that one child's own directory).
+
+Neither `Z:\Games` nor any other machine-specific path was hardcoded into
+shipping code. Certification used the existing, pre-existing, real
+production `InstallDiscoveryOptions.userSelectedRoots` mechanism (a
+user-facing "add a custom library folder" option, unrelated to this
+closeout) — `previewInstallDiscoveryScan({ userSelectedRoots: ['Z:\\Games'] })`
+— exactly matching this directive's own instruction to use "the real
+configuration path for certification."
+
+### 28.3 Real chain proven
+
+`tests/install-discovery-atomfall-real.test.ts` (4 tests, real-environment
+-dependent — skips itself when `Z:\Games\Atomfall` is absent, e.g. on any
+other machine or CI) proves, end to end, using a real on-disk temporary
+SQLite database and the real, unmodified production functions at every
+step:
+
+```text
+real Z:\Games\Atomfall installation (filesystem)
+→ previewInstallDiscoveryScan({ userSelectedRoots: ['Z:\\Games'] })  (real discovery, fixed)
+→ catalogGameId: 'atomfall'  (real catalog match via the Atomfall_dx12.exe alias)
+→ commitInstallDiscoveryRecords(...)  (real persistence to installed_games)
+→ ensureCanonicalGamesMigrated(...)  (real, pre-existing migration to canonical_games/game_installations)
+→ findCanonicalGameByCatalogGameId('atomfall')  (real canonical game row)
+→ listInstallationsForGame(...)  (real installation record, real executablePath)
+→ initializeCheatSystemOnce()  (real cheat registry, with this closeout's earlier reconciled entry)
+→ buildAtomfallWispProfileIfLinked(...) + populateWispProfileRegistry(...)  (real Wisp registry)
+→ availability: 'available'  (real entry lookup, real bound profile)
+→ controller.activate(1) → executionStatus: 'pending-consent'  (real executor, zero mutation)
+```
+
+Idempotency proven: repeating discovery + commit + migration does not
+duplicate the installation record. A negative case proves no other real
+installation on this machine is misidentified as Atomfall.
+`tests/install-discovery-nested-executable.test.ts` (3 tests, portable,
+fixture-backed) separately regression-covers both defects from 28.2 with
+controlled temp-directory fixtures — a nested-executable game is
+discovered; two sibling nested games are each attributed to their own
+folder and never to the library root or each other; a single-game root
+still resolves via the shallow single-level path.
+
+### 28.4 Real live-process certification — attempted, genuinely blocked
+
+A live, running `Atomfall_dx12.exe` GAME process (as opposed to the
+installation-discovery evidence above, which needs no running process at
+all) was attempted twice and is honestly reported as unproven this pass:
+
+- Launching `Atomfall_dx12.exe` directly (bypassing the package's Xbox/
+  Microsoft Store activation context) was attempted twice. Both times the
+  process starts (a real PID is assigned — 44556, then 25416, both
+  independently confirmed via `Get-Process`) and exits on its own within
+  roughly a minute, with no window ever appearing and no crash dialog —
+  consistent with the executable performing an APPX/package-identity
+  license check that fails when launched outside its proper activation
+  context, though the exact failure was not diagnosed further (no crash
+  log was produced to inspect).
+- The proper activation path —
+  `explorer.exe shell:AppsFolder\Rebellion.Windscale_2vbwqmt31j4mr!Game`
+  — DOES work: it real-launches `gamelaunchhelper.exe` (real PID 25556),
+  which in turn real-launches `Content\Launcher\Atomfall.exe` (real PID
+  30468, confirmed alive via `Get-Process`). This is a real, correctly
+  -activated process — but it is the pre-game launcher/EULA screen, not
+  the actual game binary; reaching `Atomfall_dx12.exe` from here requires
+  clicking through that screen, which needs UI interaction this session
+  cannot perform blindly (headless commands cannot see or click a GUI).
+- Computer-use (UI automation) access was requested specifically to click
+  through that one screen, for an identity check only — no gameplay, no
+  memory read/write. **The user explicitly denied this request.** Per this
+  project's own standing safety discipline, that denial is respected as a
+  hard stop, not worked around by any other means (there is no scriptable
+  way to accept an EULA/menu screen without either UI automation or
+  simulating package activation internals, and the latter would cross into
+  exactly the kind of "reproduce owner-only activation/licensing behavior"
+  fabrication every governing directive in this project forbids).
+- Both launched real processes (the two direct `Atomfall_dx12.exe` attempts
+  and the launcher) were confirmed fully exited/terminated afterward — no
+  orphan processes, no game files modified, no anti-cheat interaction, no
+  injection, no memory access of any kind.
+
+Given this, `tests/install-discovery-atomfall-real.test.ts`'s
+pending-consent test asserts a controlled context (`sessionId:
+'real-atomfall-cert'`) rather than reading it from a live game process —
+identical in spirit to the pattern already established by
+`adaptive-wisp-process-backed-certification.test.ts`'s use of `ping.exe`
+for Increment 6's identity resolver. Every other link in the chain (28.3)
+is real: real installation, real discovery, real registries, real
+availability computation, real (non-mocked) executor routing. Only the
+single fact "a live Atomfall game process is currently running" is
+asserted rather than independently observed by this specific test.
+
+### 28.5 Final verdict (supersedes 27.11)
+
+The original Atomfall-not-installed conclusion is withdrawn. Real
+installation discovery, real catalog reconciliation, real registry
+population, real availability, and real pending-consent are now all proven
+against the REAL Atomfall installation on this machine — not a controlled
+fixture, not a substitute canonical id. The only remaining gap is a live,
+running game process, which requires either manual play-through by the
+owner or a UI-automation grant the owner has declined.
+
+`INDEPENDENT TASKS 1-4 CLOSEOUT REVIEW — BLOCKED`
+
+`ADAPTIVE WISP TASKS 1-4 — NOT COMPLETE`
+
+blocked strictly on: a live, running `Atomfall_dx12.exe` process, reachable
+only by the owner manually clicking through the game's own launcher/EULA
+screen (or granting UI-automation access to do so on their behalf) — not on
+missing installation data, which is now real and fully evidenced. Every
+other requirement in this directive is genuinely complete: the discovery
+root cause is fixed and regression-tested; the real Atomfall installation
+is discovered, committed, and migrated through real production code; the
+real cheat/Wisp registries populate from it; the certified action resolves
+`available`; the real executor reaches `pending-consent` with zero
+mutation; and this section's own re-review (28.6) re-answers all 36
+mandatory questions against the corrected state.
+
+### 28.6 Independent re-review — 36 mandatory questions, corrected state
+
+1. Does production call `initializeCheatSystem()`? **PASS** — via `initializeCheatSystemOnce()`, `electron/main.ts`'s `app.whenReady()` handler.
+2. Does it run before any Wisp lookup? **PASS** — before `registerTrainerHotkeys()`; also called defensively inside `getAdaptiveWispQuickSlotController()`.
+3. Is initialization idempotent? **PASS** — second call after success returns the identical cached result (test-proven).
+4. Is it atomic? **PASS** — structural validation runs before any `registerGame` call.
+5. Does it fail closed? **PASS** — a structural failure leaves the registry untouched.
+6. Can partial initialization appear ready? **PASS (no)** — `registerGame` never throws for the real static `ALL_GAMES`; the only failure path is pre-registration.
+7. Can concurrent initialization duplicate entries? **PASS (no)** — synchronous, no `await`, no interleaving possible by construction.
+8. Does shutdown invalidate initialization? **PASS** — `disposeCheatSystemInitialization()` clears the real registry and state.
+9. Is the production cheat registry populated? **PASS** — real, test-queried via `getGameConfig`/`listAvailableGames`.
+10. Is the Atomfall cheat definition present? **PASS**.
+11. Is the reconciled cheat entry present? **PASS** — `atomfall-current-weapon-ammo`, fields copied from the real schema.v1 feature.
+12. Is the memory-feature mapping explicit? **PASS** — same id, deliberately, documented.
+13. Can string coincidence establish a mapping? **PASS (no)** — the id was deliberately chosen to match, not coincidental, and is the ONLY such case in the file.
+14. Can ambiguous mappings load? **PASS (no)** — structural validation rejects duplicate ids.
+15. Does real installation discovery create the Atomfall mapping? **PASS** — corrected this section; `Z:\Games\Atomfall` discovered for real.
+16. Does the mapping persist on disk correctly? **PASS** — real on-disk SQLite, confirmed by reading the row back after commit + migration.
+17. Does an unrelated executable fail? **PASS** — `install-discovery-nested-executable.test.ts` and `adaptive-wisp-process-backed-certification.test.ts` both prove a wrong executable is rejected.
+18. Does the certified profile enter the production registry? **PASS** — real `populateWispProfileRegistry` call, real registry instance.
+19. Does production use that exact registry instance? **PASS** — same registry object threaded through `active-profile-provider`/`quick-slot-controller` in the test and in the real composition file.
+20. Does the certified action become available? **PASS** — real entry lookup, real bound profile, `availability: 'available'`.
+21. Can unavailable actions reach execution? **PASS (no)** — `quick-slot-controller.ts`'s availability gate returns early before ever calling the executor.
+22. Does the complete path reach pending consent? **PASS** — proven with the real Atomfall installation and real registries.
+23. Can it bypass consent? **PASS (no)** — no `consentToken` is ever set by the hotkey layer.
+24. Does it perform a mutation before confirmation? **PASS (no)** — `confirmWrite` call count is asserted zero in every test.
+25. Can stale session state survive detach? **PASS (no)** — unchanged from the Increment 5/6 lifecycle proofs (Sections 24, 26).
+26. Can PID reuse preserve availability? **PASS (no)** — unchanged from Increment 6's identity remediation (Section 26).
+27. Can a different executable inherit the profile? **PASS (no)** — proven directly this closeout (28.3's negative test; process-backed cert's wrong-executable test).
+28. Can renderer input determine authority? **PASS (no)** — unchanged from Section 26's remediation; this closeout did not touch that boundary.
+29. Can reinitialization reuse pending consent? **PASS (no)** — no consent token is ever held by the hotkey layer to reuse; reinitializing the cheat registry is orthogonal to the (Increment 5) consent-suppression map, unaffected either way.
+30. Does the real certification use an OS process? **PASS for installation discovery** (no process needed) **/ PARTIAL for a live game process** — two real launch attempts, both real OS processes, neither reached the game binary in a stable, observable state (28.4).
+31. Does it use real process inspection? **PASS** — `observeProcess()` (real `Get-CimInstance`) used in the controlled-process certification; `Get-Process`/`Get-AppxPackage` used directly to confirm the real Atomfall/launcher process states in 28.4.
+32. Does it use a real filesystem? **PASS** — real `Z:\Games\Atomfall` tree inspected end to end.
+33. Does it use an on-disk production-schema database? **PASS** — `resetForTesting(tempDbPath)`, not `:memory:`, in every certification test this closeout.
+34. Does it avoid test-only registry substitution? **PASS** — every registry (`gameRegistry`, `WispProfileRegistry`, `canonical_games`/`game_installations`) is the real production implementation; only the outermost `WispTrainerExecutionAdapter` I/O boundary is a test double, matching pre-existing Increment 4/5 convention.
+35. Are temporary processes and files cleaned up? **PASS** — both real Atomfall/launcher processes confirmed exited via `Get-Process`; all temp SQLite directories removed in each test's `after()`.
+36. Are all remaining limitations accurately classified? **PASS** — the live-game-process gap is documented as environment/consent-blocked (28.4), not silently dropped or reclassified as resolved.
+
+Every applicable question passes. Question 30 is the one genuinely
+environment/consent-dependent item this directive's own Section 15 allows
+to remain `UNPROVEN`/partial without invalidating everything else — and per
+that same section's instruction, the final gate remains BLOCKED because
+this specific directive required it, not because any other item failed.
+
+### 28.7 Test totals (this correction)
+
+New this pass: 4 (`install-discovery-atomfall-real.test.ts`) + 3
+(`install-discovery-nested-executable.test.ts`) = 7. Combined with 27.9's
+23, this closeout's cumulative total is 30 new tests. Full repository
+regression: TypeScript root/electron clean; `npm test` 2,175/2,175 (was
+2,145/2,145 before this closeout began — +30, exactly matching); SQL
+10/10; live-memory 278/278; `npm audit` 0 vulnerabilities; fresh dev build
+29/29 checks; Playwright `electron-consent-boundary.e2e.test.ts` 9/9.
