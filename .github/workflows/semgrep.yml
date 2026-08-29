@@ -30,4 +30,4 @@ jobs:
       - name: Install Semgrep
         run: python -m pip install --disable-pip-version-check semgrep
       - name: Run Semgrep
-        run: semgrep scan --config auto --error --metrics=off .
+        run: semgrep scan --config p/default --error --metrics=off .
