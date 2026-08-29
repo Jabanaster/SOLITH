@@ -22,7 +22,7 @@ jobs:
       - name: Orphan / boundary check
         run: npm run orphan-check
       - name: Build application and installer
-        run: npm run build
+        run: npm run build -- --publish never
       - name: Run tests
         run: npm test | Tee-Object -FilePath npm-test.log
       - name: Electron smoke test
