@@ -1,0 +1,43 @@
+name: OSV-Scanner
+
+on:
+  pull_request:
+    branches: [master]
+  merge_group:
+    branches: [master]
+  push:
+    branches: [master]
+  schedule:
+    - cron: "37 11 * * 1"
+  workflow_dispatch:
+
+jobs:
+  scan-pr:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    permissions:
+      actions: read
+      security-events: write
+      contents: read
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@8deb546fdb875b9996d27d4950be7312dac076a1 # v2.5.0
+    with:
+      upload-sarif: false
+      fail-on-vuln: true
+      scan-args: |-
+        --lockfile=package-lock.json
+        --lockfile=solith-hub-backend/package-lock.json
+        --lockfile=native/solith-readonly-scanner/Cargo.lock
+
+  scan-full:
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      actions: read
+      security-events: write
+      contents: read
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@8deb546fdb875b9996d27d4950be7312dac076a1 # v2.5.0
+    with:
+      upload-sarif: false
+      fail-on-vuln: true
+      scan-args: |-
+        --lockfile=package-lock.json
+        --lockfile=solith-hub-backend/package-lock.json
+        --lockfile=native/solith-readonly-scanner/Cargo.lock
