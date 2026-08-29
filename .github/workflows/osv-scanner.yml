@@ -16,24 +16,26 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     permissions:
       actions: read
-      security-events: write
       contents: read
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.5.0
     with:
+      upload-sarif: false
+      fail-on-vuln: true
       scan-args: |-
-        --include-git-root
-        -r
-        ./
+        --lockfile=package-lock.json
+        --lockfile=solith-hub-backend/package-lock.json
+        --lockfile=native/solith-readonly-scanner/Cargo.lock
 
   scan-full:
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     permissions:
       actions: read
-      security-events: write
       contents: read
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.0
     with:
+      upload-sarif: false
+      fail-on-vuln: true
       scan-args: |-
-        --include-git-root
-        -r
-        ./
+        --lockfile=package-lock.json
+        --lockfile=solith-hub-backend/package-lock.json
+        --lockfile=native/solith-readonly-scanner/Cargo.lock
