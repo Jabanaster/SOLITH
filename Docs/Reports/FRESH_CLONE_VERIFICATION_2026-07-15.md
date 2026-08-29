@@ -2,7 +2,7 @@
 
 **Status:** PASS baseline for CI Fast count drift check  
 **Tags locked:** `v2.1-shell-polish` @ `0928d29` · `v2.2-wemod-adoption` @ `6ddefb8`  
-**Stabilization note:** Catalog search isolation fix keeps `npm test` green at **803/803** (verified 2026-07-21 after inert CT registry suite wired into CI).
+**Stabilization note:** Catalog search isolation fix keeps `npm test` green at **1210/1210** (verified 2026-08-29 after additional suites were integrated into CI).
 
 ## Context
 
@@ -22,7 +22,7 @@ Reproducibility gate for Windows checkout: run clean-tree commands on repo root
 | Gate | Result | Notes |
 |------|--------|-------|
 | `npx tsc --noEmit` | **PASS** | exit 0 |
-| `npm test` | **PASS** | 803/803 |
+| `npm test` | **PASS** | 1210/1210 |
 | `npm run build:electron` | **PASS** | 19/19 verify-electron-output (`preload.cjs`) |
 | `npm run build` | **PASS** | historical pack at gate; re-run before release |
 | `npm run test:accessibility` | **PASS** | exit 0 (historical evidence) |
