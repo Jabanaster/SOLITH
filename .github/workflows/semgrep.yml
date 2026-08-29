@@ -29,5 +29,9 @@ jobs:
           python-version: "3.12"
       - name: Install Semgrep
         run: python -m pip install --disable-pip-version-check semgrep
-      - name: Run Semgrep
-        run: semgrep scan --config p/default --error --metrics=off .
+      - name: Run Semgrep on pull-request changes
+        if: ${{ github.event_name == 'pull_request' }}
+        run: semgrep scan --config p/default --error --metrics=off --baseline-commit "${{ github.event.pull_request.base.sha }}" .
+      - name: Run full Semgrep audit
+        if: ${{ github.event_name != 'pull_request' }}
+        run: semgrep scan --config p/default --metrics=off .
