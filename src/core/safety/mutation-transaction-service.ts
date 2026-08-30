@@ -293,21 +293,34 @@ export function runMutationTransaction(request: MutationRequest): TransactionRec
     });
 
     // 15-17. Re-run P0.5 authorization immediately before replacement; abort if
-    // anything about the target changed externally since step 4.
+    // anything about the target changed externally since step 4. Identity
+    // (dev/ino) alone is not enough — MP-P0.6: a same-inode in-place rewrite by
+    // an external process (same dev/ino, different bytes) would pass identity
+    // revalidation but silently discard that process's edit when we replace.
+    // The plan's step 16 explicitly requires verifying "expected preimage" in
+    // addition to identity, so re-hash the live content here too.
     maybeInject(request, 'pre_replace_revalidation');
     const revalidation = reauthorizeBeforeCommit(canonicalPath, identity);
-    if (!revalidation.valid) {
+    let preimageChanged = false;
+    if (revalidation.valid) {
+      const liveHash = sha256(fs.readFileSync(canonicalPath));
+      preimageChanged = liveHash !== originalHash;
+    }
+    if (!revalidation.valid || preimageChanged) {
       // Replace has not happened yet — the original file is untouched, so this is
       // a genuinely safe abort, not a recovery-required state.
+      const reason = !revalidation.valid
+        ? revalidation.reason || 'identity mismatch'
+        : 'Preimage changed externally since capture (content modified in place on the same file identity).';
       persistJournal(request.durableRoot, {
         ...baseRecord,
         state: 'ABORTED',
         tempPath: undefined,
         expectedOutputHash: tempHash,
-        failureReason: `Pre-commit revalidation failed: ${revalidation.reason || 'identity mismatch'}`,
+        failureReason: `Pre-commit revalidation failed: ${reason}`,
         updatedAt: new Date().toISOString(),
       });
-      throw new TransactionAbortedError(transactionId, 'pre_replace_revalidation', revalidation.reason || 'Pre-commit revalidation failed.');
+      throw new TransactionAbortedError(transactionId, 'pre_replace_revalidation', reason);
     }
 
     persistJournal(request.durableRoot, {

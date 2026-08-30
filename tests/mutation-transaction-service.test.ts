@@ -191,6 +191,27 @@ describe('MP-P0.4 MutationTransactionService', () => {
       const journal = readJournalFile(dRoot, capturedTxId);
       assert.equal(journal.state, 'ABORTED');
     });
+
+    test('9b. MP-P0.6 — same-identity in-place content rewrite (no unlink, same inode) is rejected at pre-replace', () => {
+      // Distinct from test 8/9: this tampers WITHOUT unlink/recreate, so dev/ino
+      // stay identical — only the preimage hash check (added for MP-P0.6) can
+      // catch this. Proves identity-only revalidation was insufficient.
+      const target = makeTarget('auth-9b.txt', 'preimage-9b');
+      const dRoot = freshDurableRoot();
+      let tampered = false;
+      const request: MutationRequest = {
+        ...baseRequest({ targetPath: target, durableRoot: dRoot }),
+        injectFailure: (point) => {
+          if (point === 'pre_replace_revalidation' && !tampered) {
+            tampered = true;
+            fs.writeFileSync(target, 'rewritten-in-place-9b', 'utf8'); // no unlink — same inode
+          }
+        },
+      };
+      assert.throws(() => runMutationTransaction(request), /Preimage changed externally/);
+      assert.ok(tampered);
+      assert.equal(fs.readFileSync(target, 'utf8'), 'rewritten-in-place-9b');
+    });
   });
 
   describe('CONCURRENCY', () => {
