@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { reconcileStorageClasses } from '../src/shared/storage-classes.js';
 import {
   isAvowedAttachExecutable,
   isAvowedWingdkExecutable,
@@ -33,8 +34,12 @@ let activeSessionKey: string | null = null;
 let lastSaveResult: AvowedWingdkSnapshotResult | null = null;
 let lastConfigResult: AvowedWingdkSnapshotResult | null = null;
 
-function userDataRoot(): string {
-  return app.getPath('userData');
+// MP-P0.3 — Avowed WinGDK save/config backups are durable recovery state
+// (not disposable). All three uses of this helper feed the backup-root
+// chain (resolveAvowedWingdkBackupRoots / the status report below), so it
+// now returns the durable root rather than raw userData.
+function avowedWingdkBackupRoot(): string {
+  return reconcileStorageClasses(app.getPath('userData')).durableRoot;
 }
 
 function log(message: string, detail?: unknown): void {
@@ -76,7 +81,7 @@ function scheduleSaveSnapshot(reason: string): void {
   saveDebounceTimer = setTimeout(() => {
     saveDebounceTimer = null;
     const result = snapshotAvowedWingdkSaves({
-      userDataRoot: userDataRoot(),
+      userDataRoot: avowedWingdkBackupRoot(),
       label: `autosave-${reason}-${Date.now()}`,
     });
     lastSaveResult = result;
@@ -145,7 +150,7 @@ export function takeAvowedLaunchConfigSnapshot(force = false): AvowedWingdkSnaps
   }
 
   const result = snapshotAvowedAlabamaConfig({
-    userDataRoot: userDataRoot(),
+    userDataRoot: avowedWingdkBackupRoot(),
     label: `launch-${Date.now()}`,
   });
   lastConfigResult = result;
@@ -220,6 +225,6 @@ export function getAvowedWingdkBackupDebugState(): {
     configSnapshotDoneForSession,
     lastSaveResult,
     lastConfigResult,
-    backupRoot: path.join(userDataRoot(), 'backups', 'avowed-wingdk'),
+    backupRoot: path.join(avowedWingdkBackupRoot(), 'backups', 'avowed-wingdk'),
   };
 }

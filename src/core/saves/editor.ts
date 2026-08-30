@@ -202,8 +202,13 @@ export async function applyProposal(proposal: Proposal): Promise<{ success: bool
     transitionOperation(operationId, 'AWAITING_APPROVAL');
     
     // 6. Create backup
+    // MP-P0.3 — backups are durable recovery state, not disposable. Existing
+    // backup files/records under the old userDataRoot/backups location are
+    // untouched (createBackup stores each record's absolute backupPath at
+    // creation time, so old records keep resolving correctly) — only new
+    // backups going forward land under durable/.
     const appPaths = await getAppPaths();
-    const backupDir = path.join(appPaths.userDataRoot, 'backups');
+    const backupDir = path.join(appPaths.durableRoot, 'backups');
     backup = createBackup(proposal.gameId, proposal.targetFile, backupDir, proposal.recipeId || undefined, proposal.id, operationId);
     
     // Save backupId to operation
