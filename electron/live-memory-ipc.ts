@@ -1087,7 +1087,10 @@ export function registerLiveMemoryIpc(): void {
       const parsed = ResearchSnapshotSaveSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
-      const sessionsRoot = path.join(app.getPath('userData'), 'research-sessions');
+      // MP-P0.3 — research session snapshots are durable recovery metadata
+      // (per SOLITH_SECURITY_ROADMAP.md's explicit "local research metadata
+      // where required for recovery" durable category), not disposable.
+      const sessionsRoot = path.join(reconcileStorageClasses(app.getPath('userData')).durableRoot, 'research-sessions');
       const mod = await getLiveMemoryModule();
       const mgr = new mod.SessionSnapshotManager();
       const snap = mgr.create({

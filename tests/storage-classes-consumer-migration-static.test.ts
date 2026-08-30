@@ -11,10 +11,9 @@ import { fileURLToPath } from 'node:url';
  * this proves the actual call sites were migrated, the same pattern
  * packaged-runtime-boundary-static.test.ts uses for MP-P0.1.
  *
- * solith.db and research-sessions/ are NOT covered here — deliberately
- * still unmigrated (see SOLITH_SECURITY_ROADMAP.md's MP-P0.3 row for why:
- * solith.db requires a file-level, connection-timing-safe migration that
- * has not been built yet; research-sessions/ has not been audited).
+ * solith.db is NOT covered here — deliberately still unmigrated (see
+ * SOLITH_SECURITY_ROADMAP.md's MP-P0.3 row: it needs a file-level,
+ * connection-timing-safe migration that has not been built yet).
  */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -40,6 +39,14 @@ describe('MP-P0.3 backups/ consumer migration (static)', () => {
     assert.ok(
       !/app\.getPath\('userData'\)/.test(contents.replace(/reconcileStorageClasses\(app\.getPath\('userData'\)\)/, '')),
       'no other raw app.getPath(\'userData\') use should remain feeding the backup root',
+    );
+  });
+
+  test('electron/live-memory-ipc.ts builds sessionsRoot from reconcileStorageClasses().durableRoot', () => {
+    const contents = fs.readFileSync(path.join(ROOT, 'electron/live-memory-ipc.ts'), 'utf8');
+    assert.ok(
+      /sessionsRoot = path\.join\(reconcileStorageClasses\(app\.getPath\('userData'\)\)\.durableRoot,\s*['"]research-sessions['"]\)/.test(contents),
+      'sessionsRoot must derive from reconcileStorageClasses().durableRoot, not raw app.getPath(\'userData\')',
     );
   });
 });
