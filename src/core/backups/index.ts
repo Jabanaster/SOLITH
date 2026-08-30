@@ -6,6 +6,7 @@ import db from '../database/index.js';
 import { getGameById } from '../games/index.js';
 import { acquireFileLock, releaseFileLock } from '../safety/file-lock.js';
 import { getCanonicalPath, validatePathSafety as validateCentralPathSafety } from '../safety/path-safety.js';
+import { authorizePath, reauthorizeBeforeCommit } from '../safety/handle-path-authorization.js';
 
 // Re-export Backup type for consumers
 export type { Backup } from '../../shared/types/index.js';
@@ -237,26 +238,47 @@ export function restoreBackup(backup: Backup): boolean {
       throw new Error(`Game not found for backup: ${backup.id}`);
     }
 
-    const targetSafety = validateCentralPathSafety(targetPath, [game.path]);
-    if (!targetSafety.safe) {
-      throw new Error(targetSafety.reason || 'Target path failed containment validation.');
-    }
-
     const backupSafety = validateCentralPathSafety(backupPath);
     if (!backupSafety.safe) {
       throw new Error(backupSafety.reason || 'Backup path failed safety validation.');
+    }
+
+    // MP-P0.5 — handle-based authorization replaces the single-point-in-time
+    // lexical containment check that used to run here: opens an OS handle to
+    // the restore target, rejects any symlink/junction/mount point anywhere
+    // along the path, and binds identity (volume id + file index) to that
+    // handle. Only requires the target to already exist (restore is an
+    // overwrite of a live save file, not a fresh-create), matching the prior
+    // behavior for a missing target below.
+    let targetIdentity: import('../safety/handle-path-authorization.js').FileIdentity | undefined;
+    let authorizedTargetPath = targetPath;
+    if (fs.existsSync(targetPath)) {
+      const authorization = authorizePath(targetPath, [game.path]);
+      if (!authorization.authorized || !authorization.identity || authorization.fd === undefined || !authorization.canonicalPath) {
+        throw new Error(authorization.reason || 'Target path failed authorization.');
+      }
+      targetIdentity = authorization.identity;
+      authorizedTargetPath = authorization.canonicalPath;
+      fs.closeSync(authorization.fd);
+    } else {
+      // No existing file to authorize a handle against — fall back to the
+      // lexical containment check for the not-yet-existing-target case.
+      const targetSafety = validateCentralPathSafety(targetPath, [game.path]);
+      if (!targetSafety.safe) {
+        throw new Error(targetSafety.reason || 'Target path failed containment validation.');
+      }
     }
 
     lockAcquired = acquireFileLock(canonicalTarget);
     if (!lockAcquired) {
       throw new Error(`File "${path.basename(targetPath)}" is currently locked by another operation.`);
     }
-    
+
     // Verify backup exists
     if (!fs.existsSync(backupPath)) {
       throw new Error(`Backup file not found: ${backupPath}`);
     }
-    
+
     // Verify backup integrity
     const currentHash = computeHash(backupPath);
     if (currentHash !== backup.originalHash) {
@@ -270,7 +292,7 @@ export function restoreBackup(backup: Backup): boolean {
         throw new Error(`Restore target is not a file: ${targetPath}`);
       }
     }
-    
+
     // Restore through a sibling temp file and atomic replacement.
     tmpPath = path.join(
       path.dirname(targetPath),
@@ -280,6 +302,17 @@ export function restoreBackup(backup: Backup): boolean {
     if (targetExists) {
       fs.chmodSync(tmpPath, fs.statSync(targetPath).mode);
     }
+
+    // MP-P0.5 — re-authorize immediately before the mutating rename to close
+    // the authorize-to-commit gap: if the target was renamed, deleted and
+    // recreated, or replaced since the authorization above, abort closed.
+    if (targetIdentity) {
+      const revalidation = reauthorizeBeforeCommit(authorizedTargetPath, targetIdentity);
+      if (!revalidation.valid) {
+        throw new Error(`Pre-commit revalidation failed: ${revalidation.reason || 'identity mismatch'}`);
+      }
+    }
+
     fs.renameSync(tmpPath, targetPath);
     tmpPath = '';
     
