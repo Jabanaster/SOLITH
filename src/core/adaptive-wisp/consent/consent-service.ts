@@ -61,6 +61,20 @@ export interface WispConsentServiceDeps {
   nowMs?: () => number;
 }
 
+/**
+ * Pre-Phase-3 closeout note: `approve()`'s `ok: true` branch means only "the
+ * request was processed," NOT "the write executed." A concurrent
+ * `handlePresentationStateReset()` (detach/reattach/generation/game-switch)
+ * can invalidate a proposal after it has already moved to `'executing'`
+ * (see `approve()` below) — the subsequent `store.transition(...,
+ * finalStatus, ...)` then fails against `VALID_TRANSITIONS`, but the
+ * function still returns `ok: true` unconditionally. Every caller MUST read
+ * `execution?.executionStatus` (excluding `'rejected' | 'stale' |
+ * 'unavailable' | 'failed'`) to know whether anything actually executed —
+ * never trust `ok` alone. No unauthorized write is possible either way:
+ * `execution.executionStatus` itself comes from `confirmPending`'s own
+ * independent, fail-closed identity re-verification at write time.
+ */
 export type WispConsentActionResult =
   | { ok: true; proposal: WispConsentProposalView; execution?: WispHotkeyActivationResult }
   | { ok: false; diagnostic: WispConsentDiagnostic };

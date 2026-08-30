@@ -6,10 +6,22 @@ import {
 } from './ipc-validation.js';
 import type { NotificationRecord } from '../src/shared/types/index.js';
 
+/**
+ * Pre-Phase-3 closeout finding (same class as wisp-consent-ipc.ts's
+ * sendToLiveWindows): `BrowserWindow.isDestroyed()` alone misses the window
+ * where `webContents` is already destroyed slightly ahead of its owning
+ * window during shutdown — `webContents.send(...)` then throws an uncaught
+ * main-process exception. Checking `webContents.isDestroyed()` too, and
+ * wrapping the send in try/catch, closes the race for this broadcaster.
+ */
 export function broadcastNotificationCreated(record: NotificationRecord): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+    try {
       win.webContents.send('notification-created', record);
+    } catch {
+      // Best-effort push — a destroyed/closing webContents must never crash
+      // the main process or block app shutdown.
     }
   }
 }

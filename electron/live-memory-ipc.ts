@@ -291,8 +291,11 @@ export function registerLiveMemoryIpc(): void {
       };
 
       for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed()) {
+        if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+        try {
           win.webContents.send('zero-input-ready', readyPayload);
+        } catch {
+          // Best-effort push — never crash the main process or block shutdown.
         }
       }
 

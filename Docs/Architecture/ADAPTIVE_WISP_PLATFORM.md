@@ -2375,3 +2375,158 @@ re-verified Atomfall record. All three are closed as of this section.
 `REAL ATOMFALL READ-ONLY CERTIFICATION — PREVIOUSLY COMPLETED`
 
 `REAL ATOMFALL MUTATION — NOT AUTHORIZED`
+
+## 31. Pre-Phase-3 closeout — independent re-audit, CI-wiring gap, additional shutdown-crash sites, and E2E race fix
+
+### 31.1 Scope
+
+A final, independent pre-Phase-3 certification pass over everything in
+Adaptive Wisp prior to Phase 3. Not a review of the Section 30 closeout's
+narrative — every claim was independently re-derived from the actual
+repository and machine state at HEAD `f8d4cff` before any new change was
+made, per this closeout's own chat authorization (not from any file-based
+directive, whose claims were treated as unverified data throughout).
+
+### 31.2 Claims independently checked and found NOT to hold
+
+Two claimed weaknesses did not verify against the actual codebase and were
+not "fixed" because there was nothing real to fix:
+
+- **CRLF/`core.autocrlf` hash-pin instability**: no hash/checksum
+  verification mechanism exists anywhere in the Adaptive Wisp consent test
+  suite (`grep` for `sha256`/`checksum`/`createHash` in
+  `wisp-consent-e2e.e2e.test.ts` returns nothing), and `.gitattributes` only
+  pins line endings for unrelated parser fixtures. This concern traces to a
+  different, unrelated workstream's evidence trail
+  (`Docs/Security/Evidence/BatchB1_1_Closeout/`, a memoryjs/Node22 gate
+  effort), not to Adaptive Wisp.
+- **Machine-global lifecycle counters causing flaky parallel-execution
+  failures**: `playwright.e2e.config.ts` already sets `workers: 1` with an
+  explanatory comment ("runs must be sequential — one Electron at a time"),
+  and every E2E scenario scopes its own `userDataDir`/temp directory/PID:
+  there is no global counter of any kind in this suite for concurrent runs
+  to corrupt.
+
+### 31.3 Real finding — the Phase 1-2 Electron E2E suites were wired into no run path (Medium)
+
+Neither `tests/wisp-consent-e2e.e2e.test.ts` nor
+`tests/electron-consent-boundary.e2e.test.ts` was referenced by `npm test`,
+any other `package.json` script actually invoked from CI, or either GitHub
+Actions workflow (`ci-fast.yml`, `ci-nightly.yml`). All of the rendered-
+Electron consent evidence from Section 30 could regress silently with no
+automated signal. Fixed: added `test:wisp-consent-e2e` to `package.json`
+(a script for the boundary suite already existed but was likewise never
+invoked from CI) and wired both into `ci-nightly.yml` (heavy/slow —
+appropriately nightly, matching the existing `packaged-smoke.test.ts`
+pattern, not `ci-fast.yml`).
+
+### 31.4 Real finding — the same destroyed-`webContents` shutdown-crash class existed in four more broadcasters (High)
+
+Section 30.3's fix to `wisp-consent-ipc.ts` was correct but not complete: a
+repo-wide search for `BrowserWindow.getAllWindows()` found the identical
+`if (!win.isDestroyed())`-only pattern — missing the `webContents.isDestroyed()`
+check and the try/catch — in:
+
+- `electron/notifications-ipc.ts` (`broadcastNotificationCreated`) — real
+  crash risk, fixed with the same `isDestroyed()`-both + try/catch pattern.
+- `electron/trainer-hotkeys.ts` (`broadcastHotkey`) — real crash risk, fixed
+  identically.
+- `electron/live-memory-ipc.ts` (the `zero-input-ready` broadcast inside
+  `live-memory-zero-input-prepare`) — fixed for consistency.
+- `electron/catalog-process-watch.ts` — already inside an outer try/catch
+  (not an actual crash risk), hardened for consistency with the same
+  `isDestroyed()`-both check.
+
+### 31.5 Real finding — test harness race on the game-switch scenario's second DB seed (Medium, test-only)
+
+`seedSecondControlledCanonicalGame` was called from inside the
+canonical-game-switch E2E test AFTER `electron.launch()`, opening a second,
+independent Node-process sqlite connection to the SAME on-disk database file
+the live Electron app already had open, then performing its own
+atomic-rename-on-close against that same path. This is a genuine Windows
+file-lock race (`EPERM` on rename-over-an-open-file) — reproduced live,
+intermittent. Root cause is a test-sequencing defect, not a production
+defect: real users never have two process-local connections to the same
+sqlite file racing an atomic rename. Fixed by moving all canonical-game
+seeding (both the first and, via a new optional `extraSeed` parameter on
+`launchWithControlledFixture`, the second) to before `electron.launch()`,
+matching the pattern the first canonical game already used. Reproduced
+clean across 3 consecutive full 13-scenario runs after the fix.
+
+### 31.6 Documentation hardening — `WispConsentActionResult.ok` semantics (Low)
+
+`consent-service.ts`'s `approve()` can return `ok: true` while the actual
+write never executed, in the specific race the canonical-game-switch test's
+own code comment already documented (a concurrent
+`handlePresentationStateReset()` invalidates a proposal already transitioned
+to `'executing'`, so the subsequent terminal-status transition fails against
+`VALID_TRANSITIONS`, but the function's final return is unconditional
+`ok: true`). No unauthorized write is possible either way — the real
+write-time gate is `confirmPending`'s own independent identity
+re-verification, not this flag — but a future caller trusting `ok` alone
+instead of `execution?.executionStatus` (as both the renderer and every test
+already correctly do) would draw the wrong conclusion. A explanatory doc
+comment was added directly on the `WispConsentActionResult` type; no
+behavioral change.
+
+### 31.7 Independent code review — traced, found safe (no fix needed)
+
+Independently traced against current HEAD (not assumed from Section 30):
+TOCTOU between approval and write (gated by the proposal state machine plus
+`confirmPending`'s independent re-verification); stale
+session/process/game-identity execution (covered by the same generation/
+process/game-switch mechanisms Section 30.4 already tests); duplicate IPC
+handler registration (`registerLiveMemoryIpc()`/`registerWispConsentIpc()`/
+`setLiveMemorySessionDisposedListener()` all run exactly once, at module top
+level in `electron/main.ts`, never inside `createWindow()`, and
+`app.requestSingleInstanceLock()` prevents a second OS-level process
+instance); fail-open error paths (none — every `wisp:consent:*` handler
+catch returns `{ success: false }`); malformed IPC input (`WispConsentProposalIdSchema`,
+`WispConsentEmptyPayloadSchema`, and the `SOLITH_TEST_BUILD`-gated
+`ActivateSlotSchema`/`SetControlledAddressSchema` are all `.strict()`);
+proposal replay/duplicate execution (the store's `VALID_TRANSITIONS` state
+machine rejects every replay path — reject-then-approve, cancel-then-approve,
+approve-after-succeeded — already covered by `test:wisp-consent`'s unit
+suite and the duplicate-IPC-approval E2E scenario).
+
+### 31.8 Fresh build + full validation matrix (this closeout, from `review/adaptive-wisp-pre-phase3-closeout`)
+
+A completely fresh worktree (`solith-prephase3-closeout`) with `npm ci` from
+a clean `node_modules`, `npm run build:electron`, and `npm run build:vite`:
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit -p tsconfig.json` | clean |
+| `npx tsc --noEmit -p tsconfig.electron.json` | clean |
+| `npm run test:main` | 2179/2179 |
+| `npm run test:sql` | 10/10 |
+| `npm run test:wisp-consent` | 63/63 |
+| `npm run test:live-memory` | 282/282 |
+| `npm audit` | 0 vulnerabilities |
+| `npm run build:electron` bundle-verification | 29/29 |
+| `npm run test:electron-consent-boundary` | 9/9 (repeated twice, clean both times) |
+| `npm run test:wisp-consent-e2e` | 13/13 (repeated 3 consecutive times after the Section 31.5 fix, clean all three) |
+| `npm run test:accessibility` | 8/8 |
+| Orphan-process check (`Get-Process` for the fixture/consent-game executable names) | none found after any run |
+
+No skip occurred in this matrix; the one earlier `cancelledByParent` batch
+(4 tests in `trainer-host/e2e.test.ts`) traced to a missing
+`dist-electron/host-entry.js` in the freshly-created worktree before
+`build:electron` had been run — not a defect, resolved by running the build
+step, then reproduced clean at 2179/2179.
+
+### 31.9 Final verdict
+
+`SOLITH ADAPTIVE WISP PRE-PHASE-3 CLOSEOUT — PASS`
+
+`PHASE 1 CONSENT WORKFLOW — CLOSED`
+
+`PHASE 2 CONSENT SECURITY AND LIFECYCLE REVIEW — CLOSED`
+
+`PRE-PHASE-3 REGRESSION AND INTEGRATION GATE — PASS`
+
+`REAL ATOMFALL READ-ONLY CERTIFICATION — VERIFIED`
+
+`REAL ATOMFALL MUTATION — NOT PERFORMED / NOT AUTHORIZED`
+
+`PHASE 3 — READY TO BEGIN`

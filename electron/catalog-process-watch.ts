@@ -79,9 +79,8 @@ async function pollCatalogProcesses(): Promise<void> {
     lastNotified = key;
 
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) {
-        win.webContents.send('catalog-process-detected', payload);
-      }
+      if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+      win.webContents.send('catalog-process-detected', payload);
     }
   } catch {
     // Non-fatal — watch is best-effort

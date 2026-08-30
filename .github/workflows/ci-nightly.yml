@@ -20,3 +20,5 @@ jobs:
       - run: npx playwright install chromium
       - run: npm run test:accessibility
       - run: npx playwright test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts -g "sidebar collapse"
+      - run: npm run test:electron-consent-boundary
+      - run: npm run test:wisp-consent-e2e

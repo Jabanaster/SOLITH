@@ -265,7 +265,10 @@ function spawnAdditionalControlledFixture(gameDir: string, exeName: string): { p
   return { pid: child.pid, addressDecimal, exePath };
 }
 
-async function launchWithControlledFixture(label: string): Promise<{
+async function launchWithControlledFixture(
+  label: string,
+  extraSeed?: (userDataDir: string, exePath: string) => Promise<void>,
+): Promise<{
   ctx: LaunchCtx;
   fixturePid: number;
   fixtureAddressDecimal: string;
@@ -289,6 +292,14 @@ async function launchWithControlledFixture(label: string): Promise<{
   const addressDecimal = waitForFile(path.join(os.tmpdir(), `solith-wisp-e2e-fixture-${child.pid}.meta`));
 
   await seedControlledCanonicalGame(userDataDir, exePath);
+  // Any additional seeding (e.g. the second canonical game for the
+  // game-switch scenario) must also happen BEFORE electron.launch() — once
+  // the app is running it holds its own open handle on the same sqlite file,
+  // and a second Node-process connection performing its own atomic
+  // rename-on-close against that same path is a real Windows file-lock race
+  // (EPERM on rename-over-an-open-file), not a production code path this
+  // suite is meant to exercise.
+  if (extraSeed) await extraSeed(userDataDir, exePath);
 
   const app = await electron.launch({
     args: [MAIN_BUNDLE],
@@ -782,11 +793,10 @@ test.describe('Wisp consent — real Electron E2E (Gap A/B)', () => {
   });
 
   test('canonical-game switch: a proposal from the prior canonical-game context cannot execute after switching', async () => {
-    const launched = await launchWithControlledFixture('gameswitch');
+    const launched = await launchWithControlledFixture('gameswitch', seedSecondControlledCanonicalGame);
     if (!launched) return;
     const { ctx, fixturePid, fixtureAddressDecimal } = launched;
     try {
-      await seedSecondControlledCanonicalGame(ctx.userDataDir, path.join(os.tmpdir(), ctx.runId, 'game', CONTROLLED_FIXTURE_EXE));
       await attachAndActivate(ctx.win, fixturePid);
       await ctx.win.evaluate(
         async (addressDecimal) => (window as any).electronAPI.wispE2ETestSetControlledAddress({ addressDecimal }),

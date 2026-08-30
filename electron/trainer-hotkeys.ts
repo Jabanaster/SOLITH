@@ -20,10 +20,14 @@ import { isWispQuickSlot } from '../src/core/adaptive-wisp/hotkey-types.js';
 
 let registered = false;
 
+/** Pre-Phase-3 closeout finding — see wisp-consent-ipc.ts's sendToLiveWindows: `webContents` can be destroyed slightly ahead of its own `BrowserWindow` during shutdown; checking both flags plus try/catch prevents an uncaught main-process exception. */
 function broadcastHotkey(action: TrainerHotkeyAction): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+    try {
       win.webContents.send('trainer-hotkey', { action });
+    } catch {
+      // Best-effort push — never crash the main process or block shutdown.
     }
   }
 }
