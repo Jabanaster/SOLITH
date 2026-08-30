@@ -70,6 +70,13 @@ export async function atomicWrite(
       return { success: false, error: 'Target is not a file.' };
     }
 
+    // 3b. MP-P0.6 — capture whole-file preimage hash unconditionally (not just
+    // the single valuePath field below, which callers may omit). Re-verified at
+    // step 10b immediately before rename: identity (dev/ino) alone does not
+    // catch a same-inode in-place rewrite by an external process, which would
+    // otherwise be silently discarded by our precomputed newContent.
+    const originalWholeFileHash = crypto.createHash('sha256').update(fs.readFileSync(canonicalTarget)).digest('hex');
+
     // 5. Verify expected old value at path (if supplied) to prevent stale edits
     if (valuePath && expectedOldValue !== undefined) {
       const adapter = getAdapterForFile(canonicalTarget);
@@ -130,6 +137,13 @@ export async function atomicWrite(
     const revalidation = reauthorizeBeforeCommit(authorizedCanonicalPath, fileIdentity);
     if (!revalidation.valid) {
       throw new Error(`Pre-commit revalidation failed: ${revalidation.reason || 'identity mismatch'}`);
+    }
+
+    // 10c. MP-P0.6 — preimage hash revalidation (see step 3b). Replace has not
+    // happened yet, so this is a safe abort, not a partial/ambiguous state.
+    const liveWholeFileHash = crypto.createHash('sha256').update(fs.readFileSync(canonicalTarget)).digest('hex');
+    if (liveWholeFileHash !== originalWholeFileHash) {
+      throw new Error('Pre-commit revalidation failed: preimage changed externally since capture (content modified in place on the same file identity).');
     }
 
     // 11. Atomically replace original
