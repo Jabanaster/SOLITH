@@ -2112,15 +2112,172 @@ claimed complete or certified until it has real source implementation,
 positive tests, negative tests, and lifecycle/cleanup tests — matching this
 document's own "how to read this roadmap" completion bar above.
 
-**Full MP-Phase 3 through MP-Phase 22** (NativeHost v2 RPC/framing,
-Definition Schema v2/EvidenceGraph, Hub Trust Platform, Scanner v2, Pointer
-Map v2, Research Snapshots, Semantic Signature Engine, Cheat Engine
-interoperability, Trainer Platform v2, Wisp/Input, Save Platform v2, Engine
-Provider SPI, RPG Maker/scripted engines, AI Research Assistant, Store/Save
-Location Intelligence, Supply Chain/Release Hardening, Fuzzing, Performance
-Certification, Real-Game Certification, Final Product Experience) are
-recorded as **PLANNED, NOT STARTED**, sequenced strictly after MP-Phase 1
-and MP-Phase 2 certify — not expanded here item-by-item to avoid this
-document ballooning past its role as the security/lifecycle gate ledger;
-each MP-Phase 3+ item gets its own certification entry here only once work
-on it actually begins.
+**MP-Phase 3 through MP-Phase 11, and MP-Phase 13 through MP-Phase 22**
+(NativeHost v2 RPC/framing, Definition Schema v2/EvidenceGraph, Hub Trust
+Platform, Scanner v2, Pointer Map v2, Research Snapshots, Semantic Signature
+Engine, Cheat Engine interoperability, Trainer Platform v2, Save Platform
+v2, Engine Provider SPI, RPG Maker/scripted engines, AI Research Assistant,
+Store/Save Location Intelligence, Supply Chain/Release Hardening, Fuzzing,
+Performance Certification, Real-Game Certification, Final Product
+Experience) are recorded as **PLANNED, NOT STARTED**, sequenced strictly
+after MP-Phase 1 and MP-Phase 2 certify — not expanded here item-by-item to
+avoid this document ballooning past its role as the security/lifecycle gate
+ledger; each item gets its own certification entry here only once work on
+it actually begins.
+
+**MP-Phase 12 — Wisp Visual SDK and Input** is the one exception, expanded
+in full below: the owner supplied a materially more detailed "SOLITH / Wisp
+— Visual SDK Integration Plan" (2026-08-30) covering this exact territory
+in far greater depth than the original plan's terse "12.1 TrainerBinding /
+12.2 InputContext / 12.3 Controller / 12.4 BindingConflictGraph / 12.5 Wisp
+modes / 12.6 Overlay profiles" sketch. Per owner direction, that newer,
+more detailed plan is the authoritative version of MP-Phase 12 — its own
+phase numbering (0-5) is renamed MP-12.0 through MP-12.5 below to fit this
+document's namespace; nothing from the original terse sketch is lost — every
+item in it maps onto a concept in the merged version (TrainerBinding →
+ActionRegistry-routed commands; InputContext → per-action context gating;
+Controller → unchanged; BindingConflictGraph → ShortcutRegistry's
+ConflictResolver; Wisp modes/Overlay profiles → unchanged, now sitting
+alongside Dockview/workspace concerns).
+
+### MP-Phase 12 — Wisp Visual SDK and Input
+
+**Purpose:** unify Wisp's action system, consent-aware interaction model,
+hotkey management, runtime visualization, plugin isolation, and technical
+diagnostics into one coherent platform rather than a collection of
+independent trainer/runtime controls.
+
+**Highest-value technologies:**
+
+| Area | Recommendation | Priority |
+|---|---|---|
+| Core UI | shadcn/ui + Base UI or React Aria + Tailwind + CVA | Critical |
+| Tokens | Style Dictionary + DTCG + OKLCH | Critical |
+| Icons | Lucide | High |
+| Motion | Motion + reduced-motion policy | High |
+| Local state | Zustand | Critical |
+| Async/runtime state | TanStack Query | Critical |
+| Actions | ActionRegistry | Critical |
+| Hotkeys | ShortcutRegistry + ConflictResolver | Critical |
+| Activity | ActivityService | Critical |
+| Structured consent | StructuredPrompt / Questionnaire pattern | Critical |
+| Docking | Dockview | High |
+| Technical diagnostics | TechnicalDataSDK + LogViewer + TraceTimeline | Critical |
+| History | HistoryService | High |
+| Plugin UI | Lit + Shadow DOM + PluginProtocol | Critical long-term |
+| Plugin security | Sandbox + CSP + Trusted Types + capability manifests | Critical long-term |
+| Multi-window | WindowStateService + WindowChromeService | High |
+| Accessibility | AccessibilityContract + React Aria where useful | High |
+| Performance | Tracy + Perfetto | High |
+| GPU rendering | WebGPU only for specialized visual/debug surfaces | Optional |
+| Professional color/media | OpenColorIO/OpenImageIO | Skip |
+
+**Core architecture:**
+
+```text
+Wisp operation
+    ↓
+ActionRegistry
+    ↓
+Consent / Capability Policy
+    ↓
+ShortcutRegistry
+    ↓
+Runtime
+    ↓
+ActivityService
+    ↓
+TechnicalDataSDK / Audit
+```
+
+Every significant Wisp action resolves through the same semantic action
+layer, whether invoked by a button, hotkey, command palette, automation, AI
+surface, or plugin (e.g. `Enable Infinite Ammo`, `Attach to Game`, `Switch
+Profile`, `Resolve Binding Conflict`, `Open Runtime Diagnostics`). This is
+the concrete mechanism by which `MP-P0.9` (Wisp IPC authorization) and the
+existing Adaptive Wisp consent architecture's proposal→approval flow
+generalize into a first-class action/consent layer, rather than remaining
+one-off per-feature wiring.
+
+**Project-specific components to build:** `GameIdentityBadge`,
+`TrainerEntryCard`, `BindingConflictView`, `ConsentCard`,
+`GameSessionTimeline`, `RuntimeHealthPanel`, `HotkeyEditor`,
+`AdapterDiagnosticsPanel`, `CapabilityGrantCard`, `ProcessAttachmentStatus`.
+
+**What to incorporate:** shadcn-owned application chrome; Base UI for
+general primitives or React Aria for especially complex accessible
+controls; Style Dictionary/DTCG tokens for one visual language across
+trainer, overlay, settings, and diagnostics; ActionRegistry as the
+authoritative command layer; ShortcutRegistry with per-game profiles and
+deterministic conflict handling; ActivityService for attach/detach, game
+switching, scanning, adapter state, generation changes, and background
+work; StructuredPrompt for consent, capability approval, ambiguity
+resolution, and repair choices; TechnicalDataSDK for runtime/session/
+binding/process data; Dockview for advanced power-user workspace layouts;
+Lit/Shadow DOM for isolated trusted extension UI; sandboxed
+iframe/process/worker boundaries for untrusted plugins; Trusted Types and
+CSP for hardened host rendering; Tracy and Perfetto for stutter/performance
+investigations.
+
+**What to avoid:** routing trainer actions independently from hotkeys;
+giving plugins direct unrestricted DOM, process, filesystem, USB, HID, or
+window access; using WebGPU for ordinary app chrome; bringing
+OpenColorIO/OpenImageIO into SOLITH unless a future feature genuinely
+handles professional media; creating separate ad hoc consent dialogs per
+feature (the existing `WispConsentDialog`/`WispConsentQueue` architecture is
+the one canonical consent surface — `StructuredPrompt` generalizes it, it
+does not compete with or replace it with a second parallel dialog system).
+
+#### MP-12.0 — Visual Foundation
+
+Establish DTCG token source; add Style Dictionary build; standardize shadcn
+component ownership; standardize Lucide; add theme, density, high-contrast,
+and reduced-motion tokens; create core accessibility and presentation
+contracts. **Status: PLANNED, NOT STARTED.**
+
+#### MP-12.1 — Actions and Hotkeys
+
+Implement `ActionRegistry`; implement `ShortcutRegistry`; add
+`ConflictResolver`; move every trainer/runtime command behind
+`ActionRegistry`; add per-game hotkey profiles; ensure actions expose
+capability and consent requirements. **Status: PLANNED, NOT STARTED** — the
+existing `trainer-hotkey-registration.ts`/quick-slot-controller lifecycle
+work is a real precursor (see the Adaptive Wisp Phase 1-2 closeout above)
+but is not yet generalized into an `ActionRegistry`.
+
+#### MP-12.2 — Runtime Experience
+
+Implement `ActivityService`; implement `StructuredPrompt`; add
+`GameSessionTimeline`; add `RuntimeHealthPanel`; add `BindingConflictView`;
+add `LogViewer` and technical diagnostics. **Status: PLANNED, NOT STARTED**
+— the existing `WispConsentDialog`/`WispConsentQueue` is a real, already-
+certified precursor to `StructuredPrompt` for the consent case specifically.
+
+#### MP-12.3 — Workspace and History
+
+Add Dockview; add configurable power-user workspace; add `HistoryService`
+for editable profiles/configuration; add multi-window state and recovery.
+**Status: PLANNED, NOT STARTED.**
+
+#### MP-12.4 — Plugin Platform
+
+Implement `PluginProtocol`; add Lit-based trusted plugin surfaces; add
+sandboxed untrusted plugin surfaces; add capability manifests; add CSP/
+Trusted Types enforcement; add plugin accessibility and localization
+contracts. **Status: PLANNED, NOT STARTED** — this is the one MP-12 item
+with direct security-boundary implications; it must not begin before
+MP-Phase 1's Electron capability-matrix/hardening work (MP-P0.10/MP-P0.11)
+certifies, since a plugin sandbox built on an uncertified capability model
+inherits that gap.
+
+#### MP-12.5 — Performance Certification (Wisp)
+
+Instrument major runtime operations with Tracy; export/inspect traces with
+Perfetto; add performance budgets; add regression traces for attach,
+detach, game switch, trainer activation, and adapter reload. **Status:
+PLANNED, NOT STARTED.**
+
+**Gate:** per this document's own execution rule, no MP-Phase 12 work
+begins before MP-Phase 1 and MP-Phase 2 certify — MP-12.4 (Plugin Platform)
+additionally requires MP-P0.10/MP-P0.11 specifically, even within MP-Phase
+12's own eventual execution window.
