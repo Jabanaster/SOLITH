@@ -1218,7 +1218,7 @@ export function registerLiveMemoryIpc(): void {
         getDefaultInjectorHelpersRoot,
         setInjectorAuditSink,
       } = await import('../src/core/in-process-script/injector-launcher.js');
-      ensureInjectorAuditSink(paths.userDataRoot, setInjectorAuditSink);
+      ensureInjectorAuditSink(paths.disposableRoot, setInjectorAuditSink);
       const helpersRoot = getDefaultInjectorHelpersRoot(paths.userDataRoot);
       fs.mkdirSync(helpersRoot, { recursive: true });
       const proposal = proposeInjectorLaunch({
@@ -1370,7 +1370,7 @@ export function registerLiveMemoryIpc(): void {
         getDefaultInjectorHelpersRoot,
         setInjectorAuditSink,
       } = await import('../src/core/in-process-script/injector-launcher.js');
-      ensureInjectorAuditSink(paths.userDataRoot, setInjectorAuditSink);
+      ensureInjectorAuditSink(paths.disposableRoot, setInjectorAuditSink);
       const proposal = getInjectorProposal(parsed.proposalId);
       if (!proposal) {
         return { success: false, error: 'Unknown injector launch proposal.' };
@@ -1447,7 +1447,8 @@ if (process.env.SOLITH_TEST_BUILD === '1') {
 }
 
 function memoryAuditFilePath(): string {
-  return path.join(app.getPath('userData'), 'logs', 'memory-audit.jsonl');
+  // MP-P0.3 — audit logs are disposable (transient logs), not durable recovery state.
+  return path.join(reconcileStorageClasses(app.getPath('userData')).disposableRoot, 'logs', 'memory-audit.jsonl');
 }
 
 function refreshCrashContext(bundle: SessionBundle | undefined): void {
@@ -1763,11 +1764,12 @@ function sanitize(error: unknown, fallback: string): string {
 
 let injectorAuditSinkWired = false;
 function ensureInjectorAuditSink(
-  userDataRoot: string,
+  disposableRoot: string,
   setSink: (sink: ((entry: { at: string; op: 'propose' | 'confirm'; allowed: boolean; reason: string; proposalId?: string; exePath?: string; attachedExecutableName?: string; attachedPid?: number | null; spawnedPid?: number }) => void) | null) => void,
 ): void {
   if (injectorAuditSinkWired) return;
-  const logPath = path.join(userDataRoot, 'logs', 'injector-audit.jsonl');
+  // MP-P0.3 — injector audit logs are disposable (transient logs), not durable recovery state.
+  const logPath = path.join(disposableRoot, 'logs', 'injector-audit.jsonl');
   fs.mkdirSync(path.dirname(logPath), { recursive: true });
   setSink((entry) => {
     fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');

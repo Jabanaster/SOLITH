@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol, type IpcMainInvokeEvent } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
 import { isDevRuntime, isCompatTestRuntime } from './runtime-trust.js';
+import { reconcileStorageClasses } from '../src/shared/storage-classes.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -124,8 +125,9 @@ if (!app.isPackaged && process.env.ELECTRON_USER_DATA_PATH) {
   app.setPath('userData', process.env.ELECTRON_USER_DATA_PATH);
 }
 
-// Telemetry-free local crash_report.txt under userData/logs (Zero-Input resilience).
-const crashLogsDir = path.join(app.getPath('userData'), 'logs');
+// Telemetry-free local crash_report.txt under userData/disposable/logs
+// (MP-P0.3 — logs are disposable and safe to wipe; Zero-Input resilience).
+const crashLogsDir = path.join(reconcileStorageClasses(app.getPath('userData')).disposableRoot, 'logs');
 installLocalCrashHandlers({
   logsDir: crashLogsDir,
   appVersion: app.getVersion(),

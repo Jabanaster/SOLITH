@@ -9,6 +9,7 @@
 import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import { reconcileStorageClasses } from './storage-classes.js';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -22,6 +23,12 @@ export interface SolithAppPaths {
   userDataRoot: string;
   databasePath: string;
   demoFixtureRoot: string;
+  /** MP-P0.3 — cache/thumbnails/temporary-scans/transient-logs. Safe to wipe. */
+  disposableRoot: string;
+  /** MP-P0.3 — Recovery Ledger, transaction journal/receipts, backup ownership
+   *  metadata, trusted catalog state, definitions, recovery-required research
+   *  metadata. Must survive routine cleanup and uninstall. */
+  durableRoot: string;
 }
 
 function resolveDatabasePath(userDataRoot: string): string {
@@ -60,13 +67,16 @@ export async function getAppPaths(): Promise<SolithAppPaths> {
   }
 
   const resourcesRoot = (process as any).resourcesPath || appRoot;
+  const { disposableRoot, durableRoot } = reconcileStorageClasses(userDataRoot);
 
   return {
     appRoot,
     resourcesRoot,
     userDataRoot,
     databasePath: resolveDatabasePath(userDataRoot),
-    demoFixtureRoot: path.resolve(appRoot, 'demo-game')
+    demoFixtureRoot: path.resolve(appRoot, 'demo-game'),
+    disposableRoot,
+    durableRoot
   };
 }
 
