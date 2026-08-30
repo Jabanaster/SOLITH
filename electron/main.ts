@@ -113,6 +113,14 @@ const READY_TO_SHOW_TIMEOUT_MS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 10_000;
 })();
 
+// MP-P0.1 — relay app.isPackaged to the sandboxed preload process via env var.
+// preload.ts (sandbox:true) cannot import Electron's `app` module directly
+// (it is main-process-only and not part of the sandboxed-preload allowlist),
+// so this is the only reliable way for preload to know it is running inside a
+// real packaged install. Must be set before the renderer/preload process is
+// spawned (i.e. before createWindow()) so the child inherits it.
+process.env.SOLITH_PACKAGED = app.isPackaged ? '1' : '0';
+
 // ── Isolated userData for test runs ─────────────────────────────────────────
 // Must run before app.requestSingleInstanceLock() and app.whenReady().
 // The E2E test sets ELECTRON_USER_DATA_PATH to a temp dir so every run

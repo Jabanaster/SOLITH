@@ -1434,15 +1434,19 @@ const featureHintStore = new Map<string, Record<string, string>>();
 // lifecycle harness can verify a session was actually torn down after a
 // real renderer crash — the crashed webContents itself can no longer be
 // queried once its JS context is gone. Read-only, no security-relevant
-// side effect. Unavailable unless SOLITH_TEST_BUILD=1.
+// side effect. Unavailable unless SOLITH_TEST_BUILD=1 AND the app is not a
+// real packaged install (MP-P0.1 — an env var alone must never be enough to
+// activate a test-only seam in a shipped production build; the E2E harness
+// that actually uses this runs via `_electron.launch()` against the raw
+// entry file, where app.isPackaged is already false).
 export function __testHasSessionForOwner(senderId: number): boolean {
-  if (process.env.SOLITH_TEST_BUILD !== '1') {
-    throw new Error('__testHasSessionForOwner is only available when SOLITH_TEST_BUILD=1.');
+  if (app.isPackaged || process.env.SOLITH_TEST_BUILD !== '1') {
+    throw new Error('__testHasSessionForOwner is only available when SOLITH_TEST_BUILD=1 in an unpackaged runtime.');
   }
   return sessions.has(senderId);
 }
 
-if (process.env.SOLITH_TEST_BUILD === '1') {
+if (!app.isPackaged && process.env.SOLITH_TEST_BUILD === '1') {
   (globalThis as Record<string, unknown>).__solithTestHasSessionForOwner = __testHasSessionForOwner;
 }
 
@@ -1503,9 +1507,11 @@ function maybeStartAvowedWingdkBackups(input: {
 // certify cleanup-failure containment (one step throwing must not halt the
 // remaining steps or leave writes unblocked) against the real packaged app,
 // not only the fake-driven unit tests. Unavailable unless SOLITH_TEST_BUILD=1
-// is set in the process env — normal packaged launches never set this, so
-// the setter throws and no step is ever forced to fail.
-const IS_TEST_BUILD = process.env.SOLITH_TEST_BUILD === '1';
+// is set in the process env AND the app is not a real packaged install
+// (MP-P0.1 — see __testHasSessionForOwner above for why the env var alone is
+// not a safe gate) — normal packaged launches never activate this, so the
+// setter throws and no step is ever forced to fail.
+const IS_TEST_BUILD = !app.isPackaged && process.env.SOLITH_TEST_BUILD === '1';
 const testForcedCleanupFailureSteps = IS_TEST_BUILD ? new Set<string>() : undefined;
 
 export function __setTestForcedCleanupFailureStep(step: string): void {

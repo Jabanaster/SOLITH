@@ -2,7 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Deterministic renderer-state fixture. This is unavailable in normal builds/runs.
-  e2eTrainerState: process.env.NODE_ENV === 'test'
+  // MP-P0.1: NODE_ENV=test alone is not a safe production gate — it is a
+  // commonly-set env var outside the app's control. main.ts relays real
+  // app.isPackaged via SOLITH_PACKAGED (preload cannot import `app` directly
+  // under sandbox:true), so a genuinely packaged install never exposes this
+  // regardless of NODE_ENV.
+  e2eTrainerState: (process.env.NODE_ENV === 'test' && process.env.SOLITH_PACKAGED !== '1')
     ? (process.env.SOLITH_E2E_TRAINER_STATE ?? null)
     : null,
 
