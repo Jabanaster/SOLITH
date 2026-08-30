@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { getOverlayLayoutPreset } from '../src/core/cheat-system/overlay-layout-presets.js';
 import { registerTrustedSolithWindow, applyWindowNavigationPolicy } from './sender-validation.js';
+import { isDevRuntime } from './runtime-trust.js';
 
 const moduleFilename = fileURLToPath(import.meta.url);
 const moduleDirectory = dirname(moduleFilename);
@@ -11,9 +12,7 @@ const moduleDirectory = dirname(moduleFilename);
 let overlayWindow: BrowserWindow | null = null;
 
 function overlayUrl(): string {
-  const isDev =
-    process.argv.includes('--dev') ||
-    process.env.SOLITH_DEV === '1';
+  const isDev = isDevRuntime();
   if (isDev) {
     return 'http://localhost:3000/#trainer-overlay';
   }
@@ -77,7 +76,7 @@ export function showTrainerOverlay(gameId?: string | null): void {
   overlayWindow.loadURL(overlayUrl());
   // Packaged builds must only trust the packaged file:// route — the dev-server
   // origin is attacker-bindable on any machine and must never be trusted once shipped.
-  const isDev = process.argv.includes('--dev') || process.env.SOLITH_DEV === '1';
+  const isDev = isDevRuntime();
   const trainerOverlayAllowedUrlPrefixes = isDev
     ? ['http://localhost:3000']
     : [`file://${path.join(moduleDirectory, 'dist/index.html')}`];

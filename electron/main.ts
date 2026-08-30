@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, dialog, net, protocol, type IpcMainInvokeEvent } from 'electron';
 import type { LifecycleWiring } from '../src/core/v2/lifecycle-wiring.js';
+import { isDevRuntime, isCompatTestRuntime } from './runtime-trust.js';
 import path, { dirname } from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -115,7 +116,11 @@ const READY_TO_SHOW_TIMEOUT_MS = (() => {
 // Must run before app.requestSingleInstanceLock() and app.whenReady().
 // The E2E test sets ELECTRON_USER_DATA_PATH to a temp dir so every run
 // starts from a clean database and never touches production data.
-if (process.env.ELECTRON_USER_DATA_PATH) {
+// MP-P0.1: gated on !app.isPackaged so a real packaged/installed production
+// build can never have its userData path redirected by an environment
+// variable — E2E tests are unaffected since they run via the bare `electron`
+// binary against dist-electron/main.js, which is never "packaged".
+if (!app.isPackaged && process.env.ELECTRON_USER_DATA_PATH) {
   app.setPath('userData', process.env.ELECTRON_USER_DATA_PATH);
 }
 
@@ -292,10 +297,8 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setMenu(null);
 
-  const isDev =
-    process.argv.includes('--dev') ||
-    process.env.SOLITH_DEV === '1';
-  const isCompatTest = process.argv.includes('--compat-test');
+  const isDev = isDevRuntime();
+  const isCompatTest = isCompatTestRuntime();
 
   if (isCompatTest) {
     // Headless compat test — load production bundle
