@@ -102,6 +102,7 @@ export function authorizePath(targetPath: string, approvedRoots: string[]): Path
     return { authorized: false, reason: `Unable to open target for authorization: ${String(error)}` };
   }
 
+  let handedOff = false;
   try {
     const canonicalPath = fs.realpathSync.native(absPath).toLowerCase();
 
@@ -121,13 +122,18 @@ export function authorizePath(targetPath: string, approvedRoots: string[]): Path
     const stat = fs.fstatSync(fd);
     const identity: FileIdentity = { dev: stat.dev, ino: stat.ino };
 
+    handedOff = true;
     return { authorized: true, canonicalPath, identity, fd };
   } catch (error) {
     return { authorized: false, reason: `Authorization failed: ${String(error)}` };
   } finally {
-    // On failure we must not leak the handle. On success the caller takes ownership
-    // and is responsible for closing it — but we only reach here on the failure path
-    // because every success branch above returns before this finally runs its close.
+    // Every failure branch above (reparse-on-canonical, containment, catch-all) falls
+    // through to here with handedOff still false — close the fd we opened so it isn't
+    // leaked. Only the success return sets handedOff first, since ownership transfers
+    // to the caller there (who must close it themselves after use/revalidation).
+    if (!handedOff) {
+      fs.closeSync(fd);
+    }
   }
 }
 
