@@ -2128,29 +2128,250 @@ under the limit) rather than one `&&`-chained single command line (which
 does not help, since npm still passes the whole chained string to one
 `cmd.exe /c` invocation regardless of internal `&&`).
 
-### 29.16 Known limitations
+### 29.16 Known limitations (superseded — see Section 30)
 
-- No dedicated Electron E2E test exists yet for the NEW Wisp consent dialog
-  specifically (Section 27's own requirement) — the existing
-  `electron-consent-boundary.e2e.test.ts` suite covers the pre-existing
-  manual Live Memory Trainer page flow, confirmed still passing, but does
-  not drive a real Wisp hotkey activation through a real rendered
-  `WispConsentDialog` inside a real Electron window. Building that requires
-  a way to trigger a Wisp quick-slot activation from E2E test code (no such
-  hook currently exists) without adding a privileged production bypass
-  (forbidden by Section 27 itself). Flagged here rather than silently
-  omitted.
-- The low-level canonical proposal inside `LiveMemorySession.pendingProposals`
-  has no TTL/cancel API of its own (pre-existing, unchanged) — a rejected/
-  cancelled/expired high-level `WispConsentProposal` simply ensures no token
-  is ever minted for it, so it is harmless but remains a dangling map entry
-  until the session detaches. Not a security gap (no token, no execution
-  path reaches it) but worth noting for a future low-level cleanup pass.
+**Corrected by Section 30 below; kept here for history rather than silently
+rewritten.** At the time this section was written, none of Phase 2's
+remediation had happened yet:
+
+- ~~No dedicated Electron E2E test exists yet for the NEW Wisp consent
+  dialog~~ — closed by Section 30 (`tests/wisp-consent-e2e.e2e.test.ts`,
+  13 real rendered-dialog scenarios).
+- ~~The low-level canonical proposal ... has no TTL/cancel API of its
+  own ... remains a dangling map entry until the session detaches~~ — closed
+  by Section 30 (`discardPendingWrite`/`discardPendingFreeze` +
+  `releaseLowLevelAuthority`).
+- The `61/61` `test:wisp-consent` count in 29.15 is likewise stale — see
+  Section 30's reconciled count (63/63 as of this closeout).
 - Real Atomfall memory mutation remains NOT authorized and was not
-  performed at any point in this phase.
+  performed at any point in Phase 1 or Phase 2.
 
 ## `ADAPTIVE WISP PHASE 1 CONSENT WORKFLOW — IMPLEMENTED AND VALIDATED`
 
-## `READY FOR INDEPENDENT PHASE 2 CONSENT SECURITY REVIEW`
+## 30. Phase 2 — consent security review, lifecycle-evidence closeout, and Atomfall record correction
 
-## `REAL ATOMFALL MUTATION — NOT AUTHORIZED`
+### 30.1 Scope
+
+Two remediation passes, both reviewed here together since the second
+directly extends the first's own test suite:
+
+1. **Initial Phase 2 review** (commits `5e283e9`, `3f30f1f`, `8a3cbc8`) —
+   closed 4 documented gaps: (A) no real Electron E2E through the actual
+   `WispConsentDialog`; (B) no automated accessibility evidence; (C) no
+   deterministic low-level pending-proposal cleanup on terminal transitions;
+   (D) a test-count mismatch (62 claimed vs. 61 actual — corrected to 61
+   claimed vs. 61 actual; the earlier "62" in 29.15 double-counted one file's
+   suite total against its own category breakdown).
+2. **Final evidence closeout** (this section) — three further gaps: (1) this
+   document's own Section 29.16 still described Phase 1 as merely "ready for
+   review" and listed the two gaps Phase 2 had already closed as open; (2) no
+   rendered-Electron coverage existed yet for detach/reattach/process-
+   replacement/session-generation-change/canonical-game-switch/shutdown-
+   while-pending; (3) no independently-verified, up-to-date Atomfall
+   installation status existed alongside this document's own historical
+   Section 27/28 record.
+
+### 30.2 Independent verification performed before any change
+
+Before touching anything, the canonical branch state and the Atomfall
+installation claim were independently re-verified rather than trusted from
+either this document or an external directive:
+
+- `git rev-parse HEAD` on `feature/adaptive-wisp-platform` = `8a3cbc8`,
+  clean worktree, ancestor `d1b4018`, review commits `5e283e9`/`3f30f1f`/
+  `8a3cbc8` all present in `git log` — matched exactly.
+- `Get-AppxPackage` independently confirmed `Rebellion.Windscale`
+  (`Rebellion.Windscale_1.23.105.0_x64__2vbwqmt31j4mr`, install location
+  `C:\Program Files\WindowsApps\Rebellion.Windscale_...`) is installed on
+  this machine, and `Z:\Games\Atomfall\Content\bin\Atomfall_dx12.exe` exists
+  on disk — independently reproducing this document's own Section 28.1
+  finding rather than assuming it was still true.
+- A repo-wide search for stale "Atomfall not installed" / "owner-data
+  blocker" language found it ONLY in this document's own Section 27 (already
+  explicitly marked superseded by Section 28 at the time) and in two test
+  files' doc comments that correctly describe their OWN historical
+  before/after correction (`install-discovery-atomfall-real.test.ts`,
+  `adaptive-wisp-process-backed-certification.test.ts`) — not stale claims.
+  `README.md`, `Docs/NEXT_ACTIONS.md`, `Docs/IMPLEMENTATION_STATUS.md`, and
+  `Docs/KNOWN_ISSUES.md` already correctly describe Atomfall as installed,
+  read-only-verified, with no writable real-game pilot performed — no
+  correction was needed in any of them. This document's Section 29.16 was
+  the one genuinely stale claim (see 30.1 above), corrected there.
+
+### 30.3 Real finding — proactive detach did not close the dialog, and crashed the app on shutdown (High)
+
+**Finding.** `WispConsentQueue.tsx`'s dialog was sticky by design (Phase 2's
+own earlier fix for the premature-unmount defect), but nothing ever
+proactively invalidated a Wisp consent proposal when its underlying
+live-memory session actually detached — only the NEXT quick-slot activation
+attempt's context-identity resync would notice. Wiring a proactive
+notification (`electron/live-memory-ipc.ts`'s `disposeSession` now calls a
+`disposeAdaptiveWispQuickSlotController` listener, set once in
+`electron/main.ts`) surfaced a SECOND, more serious pre-existing defect:
+`BrowserWindow.isDestroyed()` can report `false` for a brief window after
+that window's own `webContents` has already been destroyed during app
+shutdown (Electron tears them down slightly out of sync). `wisp-consent-
+ipc.ts`'s `broadcastWispConsentQueueChanged`/`...ProposalUpdated` only
+checked the former, so `webContents.send(...)` threw "Object has been
+destroyed" as an **uncaught main-process exception** — reproduced live as a
+native Electron crash dialog that blocked `will-quit` entirely whenever a
+Wisp consent proposal was pending at shutdown (`disposeAllLiveMemorySessions
+→ disposeAdaptiveWispQuickSlotController → resetPresentationState →
+broadcastWispConsentQueueChanged → WebContents.send throws`).
+
+**Severity.** High — not itself a consent-authority bypass (the low-level
+write/freeze proposal was already released synchronously on detach via the
+pre-existing `revokePendingAuthorizationsForCleanup`, so no data-safety
+guarantee was ever broken), but an uncaught main-process exception that can
+hang app shutdown is a real availability defect.
+
+**Fix.** `electron/wisp-consent-ipc.ts`'s `sendToLiveWindows` now checks
+`win.webContents.isDestroyed()` in addition to `win.isDestroyed()`, and
+wraps the send in try/catch as defense in depth. `WispConsentQueue.tsx` was
+also reworked to distinguish an externally-invalidated proposal (backend
+`status === 'invalidated'`, checked via the newly-added, narrowly-scoped
+`wispConsentGet` call) from the dialog's own approve/reject/cancel outcome —
+closing the dialog for the former without ever risking the premature-unmount
+regression Phase 2 originally fixed for the latter.
+
+**Regression coverage.** `tests/wisp-consent-e2e.e2e.test.ts`'s "detach while
+pending" and "shutdown with a pending proposal" scenarios (30.4) — both
+previously hung/failed against the unfixed code, both pass now.
+
+### 30.4 Rendered-Electron lifecycle scenarios added
+
+All six driven through the real `WispConsentDialog` in a real `BrowserWindow`
+via the real IPC boundary, reusing the existing controlled-process fixture
+infrastructure (`electron/adaptive-wisp-e2e-controlled-fixture.ts`,
+`electron/wisp-e2e-test-ipc.ts` — unchanged, still `SOLITH_TEST_BUILD`-gated):
+
+1. **Detach while pending** — real `liveMemoryDetach()`; dialog closes
+   proactively (30.3's fix); approval fails; memory unchanged after
+   reattach-and-read verification.
+2. **Reattach/session replacement** — real detach + real reattach to the
+   SAME physical process; approving the pre-reattach proposal fails; no
+   write. (`src/core/adaptive-wisp/session-context.ts`'s generation tracker
+   resets `lastKey` to `null` on any detached observation, so even a same-pid
+   reattach bumps `sessionGeneration` — documented in the test itself.)
+3. **Session-generation change** — same real detach/reattach mechanism as
+   (2) (the only real generation-advancing lifecycle event this codebase
+   has), asserted from the angle of "the proposal is no longer pending after
+   the next real activation attempt observes the new generation."
+4. **Process replacement** — process A killed, a real, independently
+   spawned process B (own pid/startTime, same executable name — the
+   realistic "the game restarted" case) attached in its place; approving
+   process A's proposal fails; process B's memory is untouched.
+5. **Canonical-game switch** — a second real canonical game seeded against
+   the same fixture executable identity; the V2 monitor's claimed gameId is
+   switched while the SAME live process stays attached; the prior context's
+   proposal cannot execute (verified via `executionStatus`, not merely
+   `success` — `approve()`'s own `WispConsentActionResult.ok` can still be
+   `true` when the invalidation races an already-`executing` transition; the
+   real renderer already accounts for this in `WispConsentQueue.tsx`, and the
+   test now matches that same check rather than the weaker one it started
+   with).
+6. **Shutdown with a pending proposal** — real `ElectronApplication.close()`
+   with a proposal still pending and never approved; exits naturally (30.3's
+   fix); the real controlled process is confirmed still running afterward
+   (shutdown does not orphan or kill it, since Electron never owned it).
+
+Every pre-existing scenario (approval + independent read-back, reject,
+cancel/Escape, expiration, duplicate approval, production-absence,
+accessibility) was re-verified passing, unchanged.
+
+### 30.5 Test-seam security re-verification
+
+All Section 6 requirements re-confirmed unchanged: gated by
+`SOLITH_TEST_BUILD`, absent from the production preload surface when unset
+(re-verified by the "production absence" scenario plus the 5 static tests in
+`tests/wisp-e2e-test-seam-static.test.ts`), routed through the exact same
+`WispQuickSlotController.activate()`/production controller a real hotkey
+uses, and unable to accept a renderer-supplied address/token/value/
+replacement action (the E2E seam only accepts a slot number and, in test
+builds only, a raw memory address for the CONTROLLED fixture process itself —
+never a real game's address).
+
+### 30.6 Accessibility
+
+Re-ran the existing axe-core scan (unchanged methodology) against the real
+rendered dialog: zero Critical/Serious violations, reconfirmed this pass.
+Reject's initial focus, focus trapping, Escape-cancels, visible/persistent
+approval outcome, and keyboard-only operation were all re-verified via the
+rendered scenarios in 30.4 plus the pre-existing "reject" scenario. A real
+screen-reader pass was not performed — reported honestly, as before.
+
+### 30.7 Exact test-count reconciliation
+
+`npm run test:wisp-consent`: 63/63 (22 proposal-store + 13 consent-service +
+9 ipc-validation + 7 renderer-boundary-static + 12 controlled-execution;
+consent-service grew from 11 to 13 in the initial Phase 2 pass for the
+cleanup/expiry-audit fix, and the renderer-boundary-static allowlist gained
+one entry — `wispConsentGet` — for this closeout, with no new test file).
+`tests/wisp-consent-e2e.e2e.test.ts` (Playwright): 13/13 (7 pre-existing +
+6 new lifecycle scenarios, 30.4). `tests/wisp-e2e-test-seam-static.test.ts`:
+5/5, unchanged.
+
+### 30.8 Full review-worktree validation matrix
+
+Run from `G:\ACTIVE_PROJECTS\solith-review-phase1-2-final-evidence` (based on
+verified `feature/adaptive-wisp-platform` HEAD `8a3cbc8`):
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit -p tsconfig.json` | clean |
+| `npx tsc --noEmit -p tsconfig.electron.json` | clean |
+| `npm run test:main` | 2179/2179 |
+| `npm run test:sql` | 10/10 |
+| `npm run test:wisp-consent` | 63/63 |
+| `npm run test:live-memory` | 282/282 |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run build:vite` | success |
+| `npm run build:electron` | 29/29 |
+| `npx playwright test tests/electron-consent-boundary.e2e.test.ts --config playwright.e2e.config.ts` | 9/9 |
+| `npx playwright test tests/wisp-consent-e2e.e2e.test.ts --config playwright.e2e.config.ts` | 13/13 |
+
+All commands exited naturally; none were manually killed or substituted with
+a shorter timeout to force a pass (the shutdown scenario's earlier 120s
+timeout, prior to the 30.3 fix, is reported as the real failure it was, not
+hidden).
+
+### 30.9 Independent final review answers (Section 11-style questions)
+
+- Can stale approval survive detach/reattach/process replacement/generation
+  change/canonical-game switch? **No** — each fails closed, proven live
+  through the rendered dialog (30.4).
+- Can it survive shutdown? **No** — no Approve was ever sent, and
+  `confirmWrite` is the only write path; shutdown itself no longer crashes
+  (30.3).
+- Can renderer input substitute an action/value/address/process identity?
+  **No** — unchanged from Phase 2's original review; re-verified via 30.5.
+- Can a token be replayed, or duplicate approval execute twice? **No** —
+  unchanged, re-verified by the pre-existing scenarios.
+- Can rejection/cancellation/expiration/invalidation leave reusable low-level
+  authority? **No** — unchanged from the initial Phase 2 fix (Gap C).
+- Can the test seam exist in production? **No** — re-verified (30.5).
+- Can dialog unmount hide a successful/failed outcome, or fail to close on a
+  real external invalidation? **No**, on both counts — 30.3 fixed the second
+  half of this without regressing the first.
+- Are all terminal events audited? **Yes** — unchanged.
+- Are test counts and Atomfall claims accurate? **Yes** — 30.2, 30.7.
+
+No open Critical, High, or Medium finding remains (30.3's High finding was
+fixed and re-verified green, not merely documented).
+
+### 30.10 Final verdict
+
+`INITIAL INDEPENDENT PHASE 2 VERDICT (this closeout) — CONDITIONAL PASS`,
+conditioned on: (1) this document's own stale Section 29.16 claims, (2) the
+missing rendered-Electron lifecycle coverage, (3) an independently
+re-verified Atomfall record. All three are closed as of this section.
+
+`ADAPTIVE WISP PHASE 1 CONSENT WORKFLOW — FULLY CLOSED`
+
+`INDEPENDENT PHASE 2 CONSENT SECURITY REVIEW — PASS`
+
+`ADAPTIVE WISP PHASES 1–2 — EVIDENCE-COMPLETE, INTEGRATED, AND UNCONDITIONALLY PASSED`
+
+`REAL ATOMFALL READ-ONLY CERTIFICATION — PREVIOUSLY COMPLETED`
+
+`REAL ATOMFALL MUTATION — NOT AUTHORIZED`

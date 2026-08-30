@@ -43,11 +43,12 @@ import {
   validateSaveDataFileAccess
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
-import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
+import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner, setLiveMemorySessionDisposedListener } from './live-memory-ipc.js';
 import { registerWispConsentIpc } from './wisp-consent-ipc.js';
 import { registerWispE2ETestIpc } from './wisp-e2e-test-ipc.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
+import { disposeAdaptiveWispQuickSlotController } from './adaptive-wisp-hotkey-composition.js';
 import { disposeCheatSystemInitialization, initializeCheatSystemOnce } from '../src/core/cheat-system/initialization.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
@@ -101,6 +102,11 @@ protocol.registerSchemesAsPrivileged([
 // Registered once at module level, same as the other IPC handlers below, so
 // it is never duplicated on window recreation.
 registerLiveMemoryIpc();
+// Phase 2 remediation, Section 5.1 ("Detach while pending") — a real
+// live-memory detach must proactively invalidate any open Wisp consent
+// dialog rather than leaving it stale until the next hotkey press. Safe
+// no-op if the Wisp quick-slot controller was never constructed.
+setLiveMemorySessionDisposedListener(disposeAdaptiveWispQuickSlotController);
 registerWispConsentIpc();
 // Phase 2 remediation, Gap A — test-only Wisp E2E activation seam. Registered
 // ONLY when SOLITH_TEST_BUILD=1 (see wisp-e2e-test-ipc.ts's own doc comment);

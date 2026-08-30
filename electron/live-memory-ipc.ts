@@ -1614,6 +1614,27 @@ function maybeThrowForTestInjectedCleanupFailure(step: string): void {
   }
 }
 
+/**
+ * Phase 2 remediation, SOLITH.MD Section 5.1 ("Detach while pending") — a
+ * real live-memory detach previously left any Wisp consent dialog visually
+ * open with no proactive signal (the high-level `WispConsentProposal` only
+ * went stale lazily, on the NEXT quick-slot activation's context-identity
+ * resync). The low-level canonical write/freeze proposal was already
+ * released synchronously on detach via `revokePendingAuthorizationsForCleanup`
+ * (Increment 4, unchanged) — this closed no security gap, only a UX one.
+ *
+ * Set once at startup (electron/main.ts) to
+ * `disposeAdaptiveWispQuickSlotController`, which is a safe no-op if the Wisp
+ * quick-slot controller was never constructed. A plain callback (rather than
+ * a direct import) avoids a circular import: adaptive-wisp-hotkey-
+ * composition.ts already imports `getActiveLiveMemorySessionBundle` from
+ * this file.
+ */
+let onSessionDisposed: (() => void) | null = null;
+export function setLiveMemorySessionDisposedListener(listener: (() => void) | null): void {
+  onSessionDisposed = listener;
+}
+
 function disposeSession(senderId: number, removeTrustedOwnership = false): CleanupResult | null {
   const existing = sessions.get(senderId);
   if (!existing) {
@@ -1647,6 +1668,7 @@ function disposeSession(senderId: number, removeTrustedOwnership = false): Clean
     resetAvowedWingdkBackupSession();
     setCrashReportContext(undefined);
   }
+  onSessionDisposed?.();
   return result;
 }
 

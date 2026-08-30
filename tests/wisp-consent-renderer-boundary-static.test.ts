@@ -50,11 +50,19 @@ describe('Wisp consent renderer stays behind window.electronAPI (no direct backe
     });
   }
 
-  test('WispConsentQueue.tsx calls only the five documented wispConsent* preload methods, never a raw/arbitrary channel', () => {
+  test('WispConsentQueue.tsx calls only the documented wispConsent* preload methods, never a raw/arbitrary channel', () => {
     const contents = readFileSync(path.join(ROOT, 'src/app/components/WispConsentQueue.tsx'), 'utf8');
     const calls = contents.match(/window\.electronAPI\.(\w+)/g) ?? [];
     const allowed = new Set([
       'window.electronAPI.wispConsentListPending',
+      // Phase 2 lifecycle-evidence closeout — read-only, same bare-proposalId
+      // schema as the other four calls (see the .strict()/no-extra-fields
+      // test below); used only to distinguish an externally invalidated
+      // proposal (real detach/reattach/process-replacement/generation-
+      // change/game-switch) from the dialog's own approve/reject/cancel
+      // outcome, so the dialog can close itself on the former without ever
+      // unmounting the latter's own success/failure state prematurely.
+      'window.electronAPI.wispConsentGet',
       'window.electronAPI.wispConsentApprove',
       'window.electronAPI.wispConsentReject',
       'window.electronAPI.wispConsentCancel',

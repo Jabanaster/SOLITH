@@ -96,15 +96,40 @@ export function registerWispConsentIpc(): void {
   });
 }
 
-/** Push channel — a new proposal appeared, or the whole queue was invalidated (Section 17 "renderer resynchronization"). Broadcasts to every window, matching notifications-ipc.ts's existing broadcast pattern; the renderer re-fetches list-pending on receipt rather than trusting any payload on this event. */
-export function broadcastWispConsentQueueChanged(_reason: unknown): void {
+/**
+ * Real defect found during Phase 2's lifecycle-evidence closeout (SOLITH.MD
+ * Section 5.6, "Shutdown with a pending proposal"): `BrowserWindow.isDestroyed()`
+ * can still report `false` for a brief window after its own `webContents`
+ * has already been destroyed during app shutdown (they are torn down by
+ * Electron slightly out of sync) — `win.webContents.send(...)` then throws
+ * "Object has been destroyed" as an UNCAUGHT main-process exception. That
+ * crash surfaces as a native error dialog that blocks the entire shutdown
+ * sequence (reproduced live: `will-quit` -> disposeAllLiveMemorySessions ->
+ * disposeAdaptiveWispQuickSlotController -> resetPresentationState ->
+ * broadcastWispConsentQueueChanged -> WebContents.send throws). The same
+ * broadcast is also reachable from a live, non-shutdown detach, where the
+ * crash dialog silently blocks the renderer's queue-changed push instead.
+ * Checking `webContents.isDestroyed()` directly, in addition to the
+ * `BrowserWindow`'s own flag, closes the race; the try/catch is defense in
+ * depth so a push notification can never crash the main process outright.
+ */
+function sendToLiveWindows(channel: string, ...args: unknown[]): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('wisp:consent:queue-changed');
+    if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+    try {
+      win.webContents.send(channel, ...args);
+    } catch {
+      // Best-effort push — a destroyed/closing webContents must never crash
+      // the main process or block app shutdown.
+    }
   }
 }
 
+/** Push channel — a new proposal appeared, or the whole queue was invalidated (Section 17 "renderer resynchronization"). Broadcasts to every window, matching notifications-ipc.ts's existing broadcast pattern; the renderer re-fetches list-pending on receipt rather than trusting any payload on this event. */
+export function broadcastWispConsentQueueChanged(_reason: unknown): void {
+  sendToLiveWindows('wisp:consent:queue-changed');
+}
+
 export function broadcastWispConsentProposalUpdated(proposal: WispConsentProposalView): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('wisp:consent:proposal-updated', proposal);
-  }
+  sendToLiveWindows('wisp:consent:proposal-updated', proposal);
 }
