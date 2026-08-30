@@ -38,7 +38,16 @@ export interface StorageRoots {
   durableRoot: string;
 }
 
+const MIGRATION_STATE_SCHEMA_VERSION = 1 as const;
+
 interface MigrationState {
+  /**
+   * MP-P0.2/P0.3 — durable storage versioning. Present since the version
+   * this field was introduced; older marker files written before it existed
+   * simply lack the key, which readMigrationState treats as version 1 (the
+   * only version that has ever existed) rather than as corruption.
+   */
+  schemaVersion: number;
   completed: string[];
 }
 
@@ -67,16 +76,23 @@ function readMigrationState(durableRoot: string): MigrationState {
   try {
     const raw = fs.readFileSync(statePath, 'utf8');
     const parsed = JSON.parse(raw) as Partial<MigrationState>;
-    if (Array.isArray(parsed.completed) && parsed.completed.every((entry) => typeof entry === 'string')) {
-      return { completed: parsed.completed };
+    const schemaVersion = typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : 1;
+    if (
+      schemaVersion > MIGRATION_STATE_SCHEMA_VERSION ||
+      !Array.isArray(parsed.completed) ||
+      !parsed.completed.every((entry) => typeof entry === 'string')
+    ) {
+      // Corrupt/malformed shape, OR a schema version newer than this build
+      // understands (a downgrade scenario) — treat as no migrations recorded
+      // rather than trusting data this build cannot safely interpret.
+      // Migrations are idempotent, so redoing one that already happened is
+      // safe (see moveDirectoryContentsRecursive's copy-then-remove).
+      return { schemaVersion: MIGRATION_STATE_SCHEMA_VERSION, completed: [] };
     }
-    // Corrupt/malformed shape — treat as no migrations recorded rather than
-    // trusting partial garbage. Migrations are idempotent, so redoing a
-    // migration that already happened is safe (see markMigrationStarting).
-    return { completed: [] };
+    return { schemaVersion, completed: parsed.completed };
   } catch {
     // File missing or unreadable/corrupt JSON — same fallback as above.
-    return { completed: [] };
+    return { schemaVersion: MIGRATION_STATE_SCHEMA_VERSION, completed: [] };
   }
 }
 
@@ -154,7 +170,7 @@ export function reconcileStorageClasses(userDataRoot: string): StorageRoots {
     }
   }
 
-  writeMigrationState(durableRoot, { completed: Array.from(completed) });
+  writeMigrationState(durableRoot, { schemaVersion: MIGRATION_STATE_SCHEMA_VERSION, completed: Array.from(completed) });
 
   return { disposableRoot, durableRoot };
 }
