@@ -1223,7 +1223,18 @@ ipcMain.handle('trainer-host-start', async (event, payload: unknown) => {
       trainerHostSupervisor = getTrainerHostSupervisor();
     }
 
-    const result = await trainerHostSupervisor.start();
+    // MP-P0.4 — resolve the real durable storage root here (an already-async
+    // IPC handler) and pass it in, rather than inside start() itself, which
+    // must stay synchronous-until-spawn (see TrainerHostSupervisor.start()).
+    let durableRoot: string | undefined;
+    try {
+      const { getAppPaths } = await import('../src/shared/app-paths.js');
+      durableRoot = (await getAppPaths()).durableRoot;
+    } catch {
+      // Fall back to json-save-field.ts's own temp-directory default.
+    }
+
+    const result = await trainerHostSupervisor.start(durableRoot);
     if (result.success) {
       trainerHostOwner = event.sender.id;
     }

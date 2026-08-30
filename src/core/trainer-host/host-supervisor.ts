@@ -49,7 +49,15 @@ export interface HostStatus {
 }
 
 export interface TrainerHostSupervisor {
-  start(): Promise<{ success: boolean; error?: string }>;
+  /**
+   * @param durableRoot MP-P0.4 — real userData/durable directory (from
+   * getAppPaths()), passed by the caller so start() itself stays fully
+   * synchronous up to spawn (no internal await may precede the spawn call —
+   * tests and any other synchronous-until-first-real-await assumptions
+   * depend on stdout listeners being registered before control returns to
+   * the caller). Omit to fall back to json-save-field.ts's own temp default.
+   */
+  start(durableRoot?: string): Promise<{ success: boolean; error?: string }>;
   stop(): Promise<void>;
   readField(
     gameId: string,
@@ -174,7 +182,7 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
     pending.clear();
   }
 
-  async function start(): Promise<{ success: boolean; error?: string }> {
+  async function start(durableRoot?: string): Promise<{ success: boolean; error?: string }> {
     if (isRunning()) return { success: false, error: 'already_running' };
 
     // Resolve host-entry path. When bundled by tsup into main.js, import.meta.url
@@ -185,13 +193,23 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
     const rawPath = path.resolve(supervisorDir, 'host-entry.js');
     const entryPath = rawPath.replace(/app\.asar([\\/])/g, 'app.asar.unpacked$1');
 
+    // MP-P0.4 — give the child access to the real durable storage root (caller-
+    // supplied; see the TrainerHostSupervisor.start() doc comment for why this
+    // must not be resolved with an internal await here) so save-field providers
+    // running inside it (e.g. writeJsonSaveField) can persist
+    // MutationTransactionService backups/journal/receipts under the actual
+    // userData/durable directory rather than falling back to temp.
     const spawned = realSpawnFn(process.execPath, [entryPath], {
       shell: false,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
       // ELECTRON_RUN_AS_NODE makes the packaged Electron binary behave like Node.js
       // so it executes host-entry.js rather than reloading the ASAR app bundle.
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        ...(durableRoot ? { SOLITH_DURABLE_ROOT: durableRoot } : {}),
+      },
     });
 
     // Record identity synchronously before any await
