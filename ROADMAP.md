@@ -5,6 +5,16 @@
 > verdicts — see `SOLITH_SECURITY_ROADMAP.md` for the current canonical
 > security status.
 >
+> **Master Implementation Plan (2026-08-30):** The owner authorized a new
+> 22-phase "SOLITH MASTER IMPLEMENTATION PLAN" as the authoritative go-forward
+> sequencing — see the **`MASTER IMPLEMENTATION PLAN`** section appended at
+> the end of `SOLITH_SECURITY_ROADMAP.md` (numbered `MP-Phase-N` there to
+> avoid colliding with that file's own pre-existing Phase 0-15 gate ledger).
+> MP-Phase 1 (Security and Authority Closeout) and MP-Phase 2 (Windows
+> Lifecycle and Process Authority) gate everything else, including the
+> milestone/version work recorded below in this file. No milestone below is
+> exempt from that gate merely by predating this plan.
+>
 > **Branch caveat:** The most recent security verification (Gate 2.4/2.4A/2.5)
 > was performed on `review/gate2-5-doc-audit` @ `317baf0e`, not on `master`.
 > Do not treat `origin/master` below as having passed that verification until

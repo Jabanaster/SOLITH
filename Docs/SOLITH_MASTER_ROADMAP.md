@@ -1,5 +1,15 @@
 # SOLITH MASTER ROADMAP
 
+> **Superseded sequencing note (2026-08-30):** A new "SOLITH MASTER
+> IMPLEMENTATION PLAN" (MP-Phase 1 Security/Authority Closeout, MP-Phase 2
+> Windows Lifecycle/Process Authority, MP-Phase 3+ NativeHost v2 and beyond)
+> is now the authoritative go-forward sequencing — see the
+> `MASTER IMPLEMENTATION PLAN` section at the end of
+> `SOLITH_SECURITY_ROADMAP.md`. This file's own feature/milestone content
+> below is explicitly deferred behind MP-Phase 1 and MP-Phase 2 certifying,
+> per this new plan's own "nothing major should be built on top of SOLITH
+> until this phase passes" gate.
+
 ## Excluding Security Work and Current Wisp Development
 
 **Project:** `G:\ACTIVE_PROJECTS\SOLITH`

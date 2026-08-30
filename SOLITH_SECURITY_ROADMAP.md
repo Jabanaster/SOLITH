@@ -16,6 +16,20 @@
 > location going forward. All future sessions must update this in-repository
 > file.
 >
+> **Master Implementation Plan addendum (2026-08-30):** The owner authorized
+> a new, broader "SOLITH MASTER IMPLEMENTATION PLAN" (MIP) as the
+> authoritative go-forward sequencing for everything beyond the existing
+> Batch B1.1 gate cycle — see the **`MASTER IMPLEMENTATION PLAN`** section
+> appended at the end of this file. Its phases are numbered **MP-Phase-N**
+> specifically to avoid colliding with this document's own pre-existing
+> `Phase 0`–`Phase 15` gate ledger below, which remains the immutable,
+> unmodified evidence trail for the B1.1 cycle — nothing in the MIP addendum
+> changes any verdict, status, or evidence claim in the sections above it.
+> Where an MIP item extends or builds on an existing gate here (e.g. MP-P0.9
+> Wisp IPC authorization extends this document's own Phase 6.2 file/path
+> authorization work), the MIP section says so explicitly rather than
+> silently re-doing or re-numbering that work.
+>
 > **Documentation authority (2026-07-29):** This file is the **sole
 > canonical source** for security-gate status, Batch B1.1 status, security
 > verdicts, security residuals, and security promotion conditions. Where
@@ -1984,3 +1998,129 @@ authorization when reached):
     unconditional pass.
 
 No step above has been started by this session.
+
+---
+
+# MASTER IMPLEMENTATION PLAN
+
+**Authorized:** 2026-08-30, by the owner in chat, superseding prior ad-hoc
+sequencing for all go-forward work. Everything above this section is the
+pre-existing Batch B1.1 gate ledger and is untouched by this addendum.
+
+**Numbering:** Sections below use `MP-Phase-N` / `MP-P0.N` to avoid
+colliding with this document's own `Phase 0`–`Phase 15` above. "MP-Phase 1"
+and "MP-Phase 2" are the Master Implementation Plan's Phase 1 and Phase 2 —
+NOT this document's own existing Phase 1/Phase 2, which mean something
+different and remain unchanged above.
+
+**Advanced Tool Tier carve-out:** MP-§0.1's ban on DLL injection, manual
+mapping, and renderer hooks as part of SOLITH's *normal* architecture does
+NOT retroactively revoke `PROJECT_SPEC.md §3.1`'s pre-existing, explicitly
+authorized Internal Engine (in-process DLL injection / VEH hooks / HWBP).
+That capability is reclassified as SOLITH's one **Advanced Tool Tier**
+exception — narrowly scoped, never default, never "normal" architecture,
+gated behind explicit per-target user opt-in. See `PROJECT_SPEC.md §3.1` for
+the authoritative wording. Any future in-process hooking proposal must clear
+the same bar before being added, and never as default/normal architecture.
+
+## MP-§0. PROGRAM RULES
+
+These rules govern MP-Phase 1 onward.
+
+### MP-§0.1 Safety architecture
+
+SOLITH must remain: external to the target game process; normal-user by
+default; read-only until explicit mutation authorization; fail-closed on
+protected/unsupported targets; deterministic for security-sensitive
+decisions; recoverable after crashes, shutdowns, updates, and interrupted
+writes; usable without AI; usable without cloud services; local-first;
+auditable.
+
+SOLITH must not make the following part of its **normal** architecture
+(see the Advanced Tool Tier carve-out above for the one pre-existing,
+explicitly authorized exception): DLL injection, manual mapping, kernel
+drivers, anti-cheat bypass, stealth/evasion, memory hiding, renderer hooks,
+input interception, arbitrary Cheat Engine Lua execution, arbitrary Auto
+Assembler execution, arbitrary Python pickle execution, AI-controlled
+memory writes, AI-controlled filesystem writes, protected-trainer
+decryption, save encryption/key-extraction bypass.
+
+### MP-§0.2 Licensing gate
+
+Allowed for source incorporation: MIT, BSD-2-Clause, BSD-3-Clause,
+Apache-2.0, ISC, similarly permissive licenses after review.
+
+Normally reject: GPL, AGPL, LGPL, MPL under the project's strict current
+policy, no license, unclear license, contradictory license, unverified
+generated datasets, community data with incompatible redistribution terms.
+
+Every dependency must receive: (1) root license verification, (2)
+dependency-license closure, (3) capability audit, (4) activity/maintenance
+check, (5) Windows compatibility check, (6) supply-chain review.
+
+### MP-§0.3 Definition rule
+
+A trainer definition describes intent and resolution. It never grants
+execution authority by itself. Runtime mutation always passes through:
+**definition → resolution → evidence → policy → user authorization →
+MutationLease → NativeHost**.
+
+## MP-Phase 1 — Security and Authority Closeout
+
+**Priority:** P0. **Gate:** nothing major should be built on top of SOLITH
+until this phase passes.
+
+| # | Item | Status |
+|---|---|---|
+| MP-P0.1 | Packaged-runtime boundary (no `--dev`/`SOLITH_DEV`/dev-server routing/test overrides in production; unsafe `ELECTRON_USER_DATA_PATH` behavior removed) | **PENDING** |
+| MP-P0.2 | Uninstall data protection (`deleteAppDataOnUninstall: false`, disposable/durable split, uninstall + reinstall recovery tests) | **PARTIAL — REVERSAL NEEDED**: `package.json`'s `build.nsis` currently sets `"deleteAppDataOnUninstall": true`, the opposite of this requirement |
+| MP-P0.3 | Recovery storage split (disposable cache/thumbnails/scans/logs vs. durable Recovery Ledger/receipts/backup ownership/trusted catalog/definitions/research metadata) | **PENDING** |
+| MP-P0.4 | `MutationTransactionService` — one authoritative 15-step save/file mutation pipeline; no save provider writes directly to a path | **PENDING** — no such service exists; current save writes go through `src/core/safety/atomic-write.ts` (single-file, no canonical-handle/reparse/lock pipeline) |
+| MP-P0.5 | Handle-based path authorization (canonical handles, volume/file identity, reparse checks, symlink/junction/mount-point/hardlink/rename-race defenses) | **PARTIAL** — `src/core/safety/path-safety.ts` canonicalizes + symlink-resolves + containment-checks paths, but is string-path-based, not OS-handle-based; TOCTOU between check and use is not closed |
+| MP-P0.6 | Optimistic concurrency (file ID/volume ID/hash/size/generation revalidated immediately before commit; abort on drift) | **PARTIAL** — `src/core/safety/atomic-write.ts` has an `expectedOldValue` compare-before-write, scoped to single save-field writes, not a general session-level OCC model |
+| MP-P0.7 | `CloudSaveMutationGuard` (NONE/POSSIBLE/ACTIVE/UNKNOWN states for Steam/GOG/Xbox/Epic/unknown managed storage) | **PENDING** |
+| MP-P0.8 | Multi-file save transactions (`SaveSlotGroup` — primary/metadata/checksum/profile/inventory files commit or roll back together) | **PENDING** |
+| MP-P0.9 | Wisp IPC authorization (every handler validates sender identity, window role, channel, runtime payload schema) | **PARTIAL** — `electron/sender-validation.ts` + `src/core/security/trusted-sender-registry.ts` provide a general trusted-sender/window-role check already used by `wisp-consent-ipc.ts` and others; needs an explicit audit that every Wisp channel actually calls it (not assumed) |
+| MP-P0.10 | Electron window capability matrix (READ/FILE_READ/MUTATION/PROCESS_READ/PROCESS_WRITE/NETWORK/UI_CONTROL per window/preload surface) | **PARTIAL** — `trusted-sender-registry.ts`'s per-`SolithWindowType` registry is a real precursor; not yet framed as an explicit capability matrix, and coverage across every IPC channel is unverified |
+| MP-P0.11 | Electron hardening (context isolation, sandbox, nodeIntegration off, strict navigation, deny-by-default permission handlers, external URL allowlist, narrow custom protocol, CSP, split preloads, Electron fuses, packaged route validation) | **PENDING VERIFICATION** — `tests/electron.smoke.test.ts` already asserts `nodeIntegration: false`/`contextIsolation: true`/single-instance-lock per the build-verification script; Electron fuses (`@electron/fuses`) not yet confirmed present |
+| MP-P0.12 | Full Phase-1 adversarial certification (path-race, junction, symlink, file-replacement race, cloud-replacement race, interrupted-transaction recovery, uninstall/reinstall recovery, unauthorized-Wisp-sender, packaged-dev-override, malicious-navigation tests) | **PENDING** — depends on MP-P0.1–MP-P0.11 landing first |
+
+## MP-Phase 2 — Windows Lifecycle and Process Authority
+
+| # | Item | Status |
+|---|---|---|
+| MP-2.1 | `SystemLifecycleController` (suspend/resume/lock/unlock/logout/shutdown/restart/Fast User Switching/remote-session-disconnect/game-exit/game-restart/NativeHost-crash/app-update) | **PENDING** — closest existing analog is `src/core/v2/lifecycle/{evaluator,timeline,types}.ts` + `src/core/v2/session-monitor.ts`, scoped to the attached-game lifecycle, not Electron/OS session lifecycle |
+| MP-2.2 | Mutation authority lifecycle (revoke active MutationLeases + stop freeze loops + stale live addresses on suspend/lock/session-disconnect/game-exit/NativeHost-fault) | **PENDING** |
+| MP-2.3 | Session generation (`sessionGeneration` incremented on any runtime-identity change; stale-generation responses discarded) | **PENDING** for the general Electron/OS lifecycle — Adaptive Wisp already has its own analogous `sessionGeneration` tracker (`src/core/adaptive-wisp/session-context.ts`) scoped to the attached live-memory session; this item generalizes the pattern beyond Wisp |
+| MP-2.4 | `ProcessIdentity v2` (PID + creation time + full image path + architecture + fingerprint; never trust PID alone) | **PARTIAL (v1, narrower scope)** — `src/core/live-memory/windows-process-identity.ts` already does PID-reuse mitigation (exe hash, volume serial, file index, start time) for the attached game process; needs porting/extending to Electron helper/NativeHost processes |
+| MP-2.5 | NativeHost Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, no silent breakaway) | **PENDING** — no Job Object usage found anywhere in the repo |
+| MP-2.6 | `LifecycleRecoveryJournal` (session/lifecycle-state/active-target/active-transaction/trainer-generation/clean-shutdown-state; startup reconciliation before trainer activation) | **PENDING** |
+
+## MP-Phase 2 certification
+
+Suspend/resume, lock/unlock, logout, shutdown, restart, Fast User
+Switching, PID reuse, game crash/restart, NativeHost crash, SOLITH crash,
+power-loss simulation, updater-triggered quit — all **PENDING**, blocked on
+MP-2.1–MP-2.6 landing first.
+
+## Execution order
+
+Per the plan's own "First Execution Block": **MP-P0.1 → MP-P0.12 in order**,
+full adversarial certification before MP-Phase 2 work begins, full MP-Phase
+2 certification before MP-Phase 3 (NativeHost v2) begins. No step is
+claimed complete or certified until it has real source implementation,
+positive tests, negative tests, and lifecycle/cleanup tests — matching this
+document's own "how to read this roadmap" completion bar above.
+
+**Full MP-Phase 3 through MP-Phase 22** (NativeHost v2 RPC/framing,
+Definition Schema v2/EvidenceGraph, Hub Trust Platform, Scanner v2, Pointer
+Map v2, Research Snapshots, Semantic Signature Engine, Cheat Engine
+interoperability, Trainer Platform v2, Wisp/Input, Save Platform v2, Engine
+Provider SPI, RPG Maker/scripted engines, AI Research Assistant, Store/Save
+Location Intelligence, Supply Chain/Release Hardening, Fuzzing, Performance
+Certification, Real-Game Certification, Final Product Experience) are
+recorded as **PLANNED, NOT STARTED**, sequenced strictly after MP-Phase 1
+and MP-Phase 2 certify — not expanded here item-by-item to avoid this
+document ballooning past its role as the security/lifecycle gate ledger;
+each MP-Phase 3+ item gets its own certification entry here only once work
+on it actually begins.
