@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import db from '../database';
-import { getCanonicalPath, validatePathSafety } from './path-safety';
+import { getCanonicalPath } from './path-safety';
+import { authorizePath, reauthorizeBeforeCommit } from './handle-path-authorization';
 import { acquireFileLock, releaseFileLock } from './file-lock';
 import { getGameById } from '../games';
 import { getAdapterForFile } from '../adapters/index';
@@ -51,18 +52,19 @@ export async function atomicWrite(
       return { success: false, error: 'Target file is locked due to ambiguous crash state requiring review.' };
     }
     
-    // 2. Revalidate target containment (allowing target file inside game root or backup root)
-    const safety = validatePathSafety(canonicalTarget, [game.path]);
-    if (!safety.safe) {
-      return { success: false, error: safety.reason || 'Containment check failed.' };
+    // 2. MP-P0.5 — handle-based authorization: opens an OS handle to the target,
+    // rejects any symlink/junction/mount point anywhere along the path (not just the
+    // final component), and binds identity (volume id + file index) to that handle
+    // rather than to a fresh, TOCTOU-prone path lookup.
+    const authorization = authorizePath(canonicalTarget, [game.path]);
+    if (!authorization.authorized || !authorization.identity || authorization.fd === undefined) {
+      return { success: false, error: authorization.reason || 'Path authorization failed.' };
     }
+    const fileIdentity = authorization.identity;
+    const authorizedCanonicalPath = authorization.canonicalPath!;
+    fs.closeSync(authorization.fd);
 
-    // 3. Verify target exists
-    if (!fs.existsSync(canonicalTarget)) {
-      return { success: false, error: 'Target file does not exist.' };
-    }
-
-    // 4. Verify target is not blocked (e.g. executables/system files)
+    // 3. Verify target is not blocked (e.g. executables/system files)
     const stat = fs.statSync(canonicalTarget);
     if (!stat.isFile()) {
       return { success: false, error: 'Target is not a file.' };
@@ -121,6 +123,14 @@ export async function atomicWrite(
 
     // 10. Preserve target permissions
     fs.chmodSync(tmpPath, stat.mode);
+
+    // 10b. MP-P0.5 — revalidate identity immediately before the mutating rename to
+    // close the authorize-to-commit gap: if the target was renamed, deleted and
+    // recreated, or replaced (e.g. by a cloud-sync client) since step 2, abort closed.
+    const revalidation = reauthorizeBeforeCommit(authorizedCanonicalPath, fileIdentity);
+    if (!revalidation.valid) {
+      throw new Error(`Pre-commit revalidation failed: ${revalidation.reason || 'identity mismatch'}`);
+    }
 
     // 11. Atomically replace original
     fs.renameSync(tmpPath, canonicalTarget);
