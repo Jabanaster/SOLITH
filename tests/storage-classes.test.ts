@@ -45,6 +45,33 @@ describe('MP-P0.3 disposable/durable recovery storage split', () => {
     assert.equal(fs.readFileSync(migratedNested, 'utf8'), '{}');
   });
 
+  test('migrates an existing legacy solith.db file into durable/solith.db', () => {
+    const userDataRoot = freshUserDataRoot();
+    const legacyDb = path.join(userDataRoot, 'solith.db');
+    fs.writeFileSync(legacyDb, 'sqlite-content-placeholder', 'utf8');
+
+    const roots = reconcileStorageClasses(userDataRoot);
+
+    assert.equal(fs.existsSync(legacyDb), false, 'legacy solith.db should be removed after migration');
+    const migrated = path.join(roots.durableRoot, 'solith.db');
+    assert.equal(fs.readFileSync(migrated, 'utf8'), 'sqlite-content-placeholder');
+  });
+
+  test('re-running reconciliation after solith.db migration is idempotent and does not re-touch the migrated file', () => {
+    const userDataRoot = freshUserDataRoot();
+    fs.writeFileSync(path.join(userDataRoot, 'solith.db'), 'v1', 'utf8');
+
+    const first = reconcileStorageClasses(userDataRoot);
+    fs.writeFileSync(path.join(first.durableRoot, 'solith.db'), 'v2-written-by-app', 'utf8');
+
+    const second = reconcileStorageClasses(userDataRoot);
+    assert.equal(
+      fs.readFileSync(path.join(second.durableRoot, 'solith.db'), 'utf8'),
+      'v2-written-by-app',
+      'a completed file migration must never be re-applied and overwrite live data with the stale legacy copy',
+    );
+  });
+
   test('missing legacy directory is a no-op, not an error', () => {
     const userDataRoot = freshUserDataRoot();
     assert.doesNotThrow(() => reconcileStorageClasses(userDataRoot));

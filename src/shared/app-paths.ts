@@ -31,8 +31,15 @@ export interface SolithAppPaths {
   durableRoot: string;
 }
 
-function resolveDatabasePath(userDataRoot: string): string {
-  return path.join(userDataRoot, 'solith.db');
+function resolveDatabasePath(durableRoot: string): string {
+  // MP-P0.3 — solith.db is the Recovery Ledger / trusted catalog / backup
+  // ownership metadata store itself, unambiguously durable. Migration of any
+  // pre-existing solith.db at the legacy userDataRoot location into
+  // durableRoot happens inside reconcileStorageClasses() (the
+  // 'solith-db-to-durable-v1' entry), which getAppPaths() always calls
+  // before this function, so the file is already in place by the time this
+  // path is handed to database/index.ts's initDatabase().
+  return path.join(durableRoot, 'solith.db');
 }
 
 function isTestRuntime(): boolean {
@@ -73,7 +80,7 @@ export async function getAppPaths(): Promise<SolithAppPaths> {
     appRoot,
     resourcesRoot,
     userDataRoot,
-    databasePath: resolveDatabasePath(userDataRoot),
+    databasePath: resolveDatabasePath(durableRoot),
     demoFixtureRoot: path.resolve(appRoot, 'demo-game'),
     disposableRoot,
     durableRoot
@@ -86,10 +93,11 @@ export async function getAppPaths(): Promise<SolithAppPaths> {
  */
 export function getDevPaths() {
   const userDataRoot = resolveFallbackUserDataRoot();
+  const { durableRoot } = reconcileStorageClasses(userDataRoot);
   return {
     appRoot: projectRoot,
     userDataRoot,
-    databasePath: resolveDatabasePath(userDataRoot),
+    databasePath: resolveDatabasePath(durableRoot),
     demoFixtureRoot: path.resolve(projectRoot, 'demo-game')
   };
 }

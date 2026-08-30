@@ -56,6 +56,8 @@ interface LegacyMigration {
   legacyRelativePath: string;
   destinationClass: 'disposable' | 'durable';
   destinationRelativePath: string;
+  /** 'directory' (default) moves a whole tree; 'file' moves a single file. */
+  kind?: 'directory' | 'file';
 }
 
 const LEGACY_MIGRATIONS: LegacyMigration[] = [
@@ -64,6 +66,23 @@ const LEGACY_MIGRATIONS: LegacyMigration[] = [
     legacyRelativePath: 'logs',
     destinationClass: 'disposable',
     destinationRelativePath: 'logs',
+  },
+  {
+    // MP-P0.3 — solith.db is the Recovery Ledger / trusted catalog / backup
+    // ownership metadata store itself, unambiguously durable. sql.js (not
+    // better-sqlite3) is the engine here — it loads the whole file into
+    // memory once at initDatabase() and persists via a single atomic
+    // tmp-then-rename write (see database/index.ts's atomicWriteFileSync),
+    // no WAL/SHM sidecar files and no native OS-level file lock held between
+    // app launches — so a copy-then-unlink move of the flat file, performed
+    // before initDatabase() ever opens it, is safe with no partial-write or
+    // stale-lock risk. No content inside the database references its own
+    // file path, so relocating it does not invalidate anything stored in it.
+    id: 'solith-db-to-durable-v1',
+    legacyRelativePath: 'solith.db',
+    destinationClass: 'durable',
+    destinationRelativePath: 'solith.db',
+    kind: 'file',
   },
 ];
 
@@ -157,7 +176,16 @@ export function reconcileStorageClasses(userDataRoot: string): StorageRoots {
 
     try {
       const stat = fs.lstatSync(legacyPath);
-      if (stat.isDirectory()) {
+      if (migration.kind === 'file') {
+        if (stat.isFile()) {
+          // Copy-then-unlink, same resumability guarantee as the directory
+          // case below: re-copying an already-copied file (crash between
+          // copy and unlink) is a safe no-op in effect.
+          fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+          fs.copyFileSync(legacyPath, destinationPath);
+          fs.unlinkSync(legacyPath);
+        }
+      } else if (stat.isDirectory()) {
         moveDirectoryContentsRecursive(legacyPath, destinationPath);
         // Directory is empty now; remove it so the legacy path stops existing.
         fs.rmdirSync(legacyPath);
