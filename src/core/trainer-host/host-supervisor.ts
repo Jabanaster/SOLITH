@@ -253,6 +253,11 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
     } catch {
       child?.kill('SIGTERM');
     }
+    // SOL-1 G11: verify the child actually exited (or is force-killed) before
+    // clearing PID/lifecycle state, instead of assuming shutdown/SIGTERM
+    // succeeded. Reuses the same process.kill(pid, 0) liveness probe already
+    // used by dispose() — no new kill mechanism introduced.
+    verifyExitOrKill();
     child = null;
     childPid = null;
     childStartTime = null;

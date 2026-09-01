@@ -896,6 +896,11 @@ export class LiveMemorySession {
       return { success: false, guard, error: 'rollback_ledger_full' };
     }
 
+    // SOL-1 G9: re-check revocation after the `await` above — a revoke()
+    // triggered during that async gap must still block the write, not just
+    // one issued before confirmWrite() was entered.
+    if (this.revoking) return { success: false, guard, error: 'cleanup_in_progress' };
+
     try {
       this.driver.writeMemory(this.handle, proposal.target.address, proposal.target.dataType, proposal.requestedValue);
     } catch (err) {
@@ -1041,6 +1046,9 @@ export class LiveMemorySession {
       }
     }
 
+    // SOL-1 G9: re-check revocation after the `await` above.
+    if (this.revoking) return { success: false, guard, error: 'cleanup_in_progress' };
+
     try {
       if (entry.rawBefore) {
         // Gate 2: single authoritative byte-exact restore — guarantees
@@ -1172,6 +1180,8 @@ export class LiveMemorySession {
 
       // Stale: stopped/replaced while awaiting the guard check.
       if (generation !== this.freezeGeneration || !this.freeze?.active) return;
+      // SOL-1 G9: re-check revocation after the `await` above.
+      if (this.revoking) return;
 
       this.freeze.lastGuard = guard;
 
