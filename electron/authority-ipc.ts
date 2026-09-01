@@ -6,10 +6,15 @@ import {
   listRecentAuthorityDecisions,
 } from './authority-bridge.js';
 
-function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+interface SenderCheckResult {
+  ok: boolean;
+  reason: string;
+}
+
+function requireTrustedSender(event: IpcMainInvokeEvent): SenderCheckResult {
   const result = validateIpcSender(event, ['main']);
   if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
-  return { ok: true };
+  return { ok: true, reason: '' };
 }
 
 /**
