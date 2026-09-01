@@ -26,6 +26,8 @@ const GLOBAL_RULES: Array<{ id: string; fn: PolicyRule }> = [
   consentRequiredGate,
 ];
 
+const KNOWN_NETWORK_SUBSYSTEMS: ReadonlySet<string> = new Set(['trainer-catalog-sync', 'artwork-cache', 'local-ai-probe']);
+
 export interface CapabilityPolicy {
   /** Outcome applied when no rule (global or capability-specific) short-circuits. */
   defaultOutcome: AuthorityOutcome;
@@ -62,8 +64,7 @@ export const POLICY_REGISTRY: Record<Capability, CapabilityPolicy> = {
     defaultReason: 'Network destination not recognized as a bounded internal subsystem target.',
     rules: [
       (request: AuthorityRequest) => {
-        const knownSubsystems = new Set(['trainer-catalog-sync', 'artwork-cache', 'local-ai-probe']);
-        if (request.identity.kind === 'internal_subsystem' && request.identity.subsystem && knownSubsystems.has(request.identity.subsystem)) {
+        if (request.identity.kind === 'internal_subsystem' && request.identity.subsystem && KNOWN_NETWORK_SUBSYSTEMS.has(request.identity.subsystem)) {
           return { outcome: 'ALLOW', reason: `Bounded network access for known internal subsystem "${request.identity.subsystem}".` };
         }
         return null;
@@ -151,9 +152,10 @@ export function evaluateWithPolicy(request: AuthorityRequest): { outcome: Author
     return { outcome: 'DENY', reason: `No policy registered for capability "${request.capability}"; failing closed.`, policyId: 'missing-policy' };
   }
 
-  for (const capabilityRule of policy.rules ?? []) {
-    const result = capabilityRule(request);
-    if (result) return { ...result, policyId: `${request.capability}:custom` };
+  const capabilityRules = policy.rules ?? [];
+  for (let index = 0; index < capabilityRules.length; index += 1) {
+    const result = capabilityRules[index](request);
+    if (result) return { ...result, policyId: `${request.capability}:custom:${index}` };
   }
 
   return { outcome: policy.defaultOutcome, reason: policy.defaultReason, policyId: `${request.capability}:default` };

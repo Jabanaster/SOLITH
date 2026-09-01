@@ -60,10 +60,11 @@ export const packagedTestOverrideGate = rule('packaged-test-override', (request)
   return null;
 });
 
+const CONSENT_GATED_CAPABILITIES: ReadonlySet<string> = new Set(['memory.write', 'savefile.modify', 'filesystem.write']);
+
 /** Consent requirement for memory/save mutations — wraps write-policy.ts / write-consent.ts disposition. */
 export const consentRequiredGate = rule('consent-required', (request) => {
-  const consentGatedCapabilities = new Set(['memory.write', 'savefile.modify', 'filesystem.write']);
-  if (!consentGatedCapabilities.has(request.capability)) return null;
+  if (!CONSENT_GATED_CAPABILITIES.has(request.capability)) return null;
   if (request.context.operationOrigin !== 'ipc') return null;
   if (!request.context.consentTokenId) {
     return { outcome: 'REQUIRE_APPROVAL', reason: `${request.capability} from an IPC caller requires a scoped consent token.` };
@@ -87,14 +88,15 @@ export const notImplementedGate = rule('not-implemented', (request) => {
   return null;
 });
 
+const READ_ONLY_CAPABILITIES: ReadonlySet<string> = new Set([
+  'filesystem.read',
+  'process.observe',
+  'memory.read',
+  'window.observe',
+  'registry.read',
+  'audit.read',
+]);
+
 function isMutatingCapability(request: AuthorityRequest): boolean {
-  const readOnly = new Set([
-    'filesystem.read',
-    'process.observe',
-    'memory.read',
-    'window.observe',
-    'registry.read',
-    'audit.read',
-  ]);
-  return !readOnly.has(request.capability);
+  return !READ_ONLY_CAPABILITIES.has(request.capability);
 }

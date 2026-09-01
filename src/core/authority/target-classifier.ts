@@ -49,9 +49,9 @@ export function classifyProcessTarget(input: {
   };
 
   if (!identityCheck.allowed) {
-    const isSelf = identityCheck.reason.includes("Solith's own");
+    const targetClass: ProcessTargetClass = identityCheck.blockedKind === 'self' ? 'self' : 'system';
     return {
-      targetClass: isSelf ? 'self' : 'system',
+      targetClass,
       protectedTargetState: 'blocked',
       target,
       reason: identityCheck.reason,
