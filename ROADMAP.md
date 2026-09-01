@@ -4,6 +4,9 @@
 >
 > **Authority model**
 >
+> - `MASTER_ROADMAP.md` owns portfolio-level sequencing and reconciliation
+>   across product, security, Adaptive Wisp, and governed machine-authority
+>   work.
 > - `PROJECT_SPEC.md` owns the product specification and safety firewall.
 > - `SOLITH_SECURITY_ROADMAP.md` owns security-gate status and release-security verdicts.
 > - Current repository code, current git state, and reproducible runtime/test evidence outrank stale roadmap claims.

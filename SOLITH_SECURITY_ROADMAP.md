@@ -8,6 +8,15 @@
 > **Current program state:** Feature freeze active; release/security completion not yet granted
 > **Purpose of this document:** Provide a single root-level roadmap showing what has been reported complete, what must still be independently verified in the repository, what remains pending, and the exact work required before SOLITH may be considered security-complete.
 >
+> **Portfolio relationship (2026-08-31):** `MASTER_ROADMAP.md` owns
+> cross-workstream sequencing and the SOL-0 through SOL-8 governed
+> machine-authority program. This file remains the sole authority for detailed
+> security-gate verdicts and release-security status. The master roadmap may
+> summarize these results but may not upgrade them. New SOL phases must
+> preserve or extend proven security controls and must not weaken consent,
+> protected-target, emergency-stop, owner-authority, audit, lifecycle, or
+> deletion approval/explanation boundaries.
+>
 > **Canonical location note (2026-07-29):** This file at the repository root
 > (`G:\ACTIVE_PROJECTS\SOLITH\SOLITH_SECURITY_ROADMAP.md`) is now the
 > canonical roadmap. A prior cycle (Gate 2.2A) updated a copy at

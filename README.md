@@ -4,6 +4,17 @@ Solith is a local-first, single-player trainer-style desktop application. It hel
 
 Current development baseline: `solith@2.4.0-alpha.2`. Authoritative version is `package.json` (enforced by `tests/version-consistency.test.ts`). Do not treat historical `v2.4.0-rc.*` tags as the live product version.
 
+## Project direction and status
+
+- [`MASTER_ROADMAP.md`](MASTER_ROADMAP.md) is the authoritative portfolio roadmap. It reconciles product history, security, Adaptive Wisp, and the SOL-0 through SOL-8 governed machine-authority program.
+- [`ROADMAP.md`](ROADMAP.md) retains detailed product-phase requirements and evidence links.
+- [`SOLITH_SECURITY_ROADMAP.md`](SOLITH_SECURITY_ROADMAP.md) remains the sole authority for security-gate verdicts and release-security status.
+- [`PROJECT_SPEC.md`](PROJECT_SPEC.md) controls product requirements and the Safety Firewall.
+
+The governing workflow is **AUDIT → RECONCILE → IMPLEMENT → VERIFY → CERTIFY → DOCUMENT → INTEGRATE**. `CERTIFIED` requires reproducible build, test, and/or runtime evidence for the exact claimed scope. External repositories are references, not wholesale imports. Proven capability is preserved or extended instead of rebuilt. Existing owner-autonomous behavior remains available where already authorized; deletion remains approval- and explanation-protected.
+
+Current portfolio summary: historical product Phases 2–6 remain verified for their documented scopes; Phase 1 still has required manual acceptance gaps; release/security completion is not granted; Adaptive Wisp Phases 1–2 have evidence-backed branch-scope passes but the full Wisp workstream and later W3–W12 capabilities are not certified; SOL-0 through SOL-8 are forward work and are not certified unless the master roadmap explicitly says otherwise.
+
 "**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
 
 Solith is strictly designed for single-player, offline games or applications that you own or have permission to modify.
