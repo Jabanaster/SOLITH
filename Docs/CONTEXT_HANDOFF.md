@@ -1,5 +1,10 @@
 # Context Handoff
 
+> **ARCHIVED supplement** — See `MASTER_ROADMAP.md` for authoritative portfolio
+> status. This document is a point-in-time handoff snapshot from 2026-06-28
+> and is not maintained as a current-status doc; preserved as historical
+> evidence only.
+
 **Last Updated:** 2026-06-28 — Electron Runtime, Build Pipeline & Complete Workflow Verification
 
 ## Current Branch

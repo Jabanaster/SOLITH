@@ -3,7 +3,7 @@
 > **Project:** SOLITH
 > **Repository root:** `G:\ACTIVE_PROJECTS\SOLITH`
 > **Intended release branch:** `master`
-> **Verified branch (current security work):** `review/gate2-5-doc-audit` @ `317baf0ea573992dfa1a0cec2a30d6529b6ecee0` — **NOT `master` until merged.** Every Gate 2.4/2.4A/2.5 claim in this document applies only to that verified branch tip unless a later evidence record explicitly verifies another commit. `master` has not been rechecked against this work.
+> **Verified branch (current security work):** `review/gate2-5-doc-audit` @ `317baf0ea573992dfa1a0cec2a30d6529b6ecee0` — **merged into `master`** via PR #7 (confirmed 2026-09-01: `317baf0e` is an ancestor of current `master` @ `57cb7fb`). Every Gate 2.4/2.4A/2.5 claim in this document applies to that verified tip, which is now part of `master`'s history.
 > **Current security verdict:** **BATCH B1.1 CONDITIONAL PASS**
 > **Current program state:** Feature freeze active; release/security completion not yet granted
 > **Purpose of this document:** Provide a single root-level roadmap showing what has been reported complete, what must still be independently verified in the repository, what remains pending, and the exact work required before SOLITH may be considered security-complete.
