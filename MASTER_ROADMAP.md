@@ -134,7 +134,22 @@ All SOL phases begin **TODO / NOT CERTIFIED** unless a narrower preserved capabi
 
 ### SOL-0 — Baseline and Authority Audit
 
-**Status:** TODO / NOT CERTIFIED
+**Status:** CERTIFIED (audited 2026-09-01 at `0398c8a9`; SOL0-P0-1 remediated 2026-09-01)
+
+**Audit evidence:** `Docs/authority/SOL0_ACTION_AUTHORITY_MATRIX.md` — complete action-class inventory, authority model, consent model, destructive-policy audit, machine-scope classification, control-provider inventory, emergency-stop audit, process-lifecycle audit, browser-control absence proof, audit-logging/postcondition audit, action authority matrix, and SOL-1 gap list (G1–G11, G2 now closed).
+
+**Major findings:**
+- **P0 (SOL0-P0-1, RESOLVED 2026-09-01):** `electron/privileged-consent-dialog.ts`'s `SOLITH_PRIVILEGED_CONSENT`/`SOLITH_CONSENT_TTL_MS` env-var overrides had no `app.isPackaged` gate — silently bypassed the human consent dialog for live-memory write/freeze/injector-launch approval in a packaged build. Fixed by gating both reads on `isPrivilegedConsentEnvOverrideAllowed()` (`!app.isPackaged || SOLITH_TEST_BUILD==='1'`), mirroring the repo's actual established pattern (`trainer-catalog-ipc.ts:545`'s `if (app.isPackaged)` — the audit's original citation of a `runtime-trust.ts` file was itself an error; no such file exists in this repo). Behaviorally verified against a freshly built packaged exe in all 4 required cases (`tests/sol0-p0-1-consent-packaging-gate.e2e.test.ts`); full regression (1699/1699 + SQL 10/10), orphan-check, npm audit, and tsc all re-verified green with no regressions.
+- Live-memory attach scope classifies as **"arbitrary process"** (deny-list of system/anti-cheat/self processes, not an allow-list of known games) — wider than product framing might suggest; needs an explicit SOL-1 decision (G3).
+- All 180 current IPC handlers confirmed sender-identity-validated (up from July's 149-handler snapshot; `SOLITH_ATTACK_SURFACE.md` is stale and should be regenerated).
+- Stale-process-identity mutation of a replacement process: **confirmed NOT possible** — live identity re-verified before every mutating write, test-covered.
+- Memory writes/rollbacks are postcondition-PARTIAL (no read-back), vs. file writes which are fully hash-verified — direct SOL-2 input (G6).
+- Emergency-stop is fail-closed against further writes but does not restore mutated memory, and the `readOnlyMode` kill switch is fully built but unreachable in production (G7, G8, G9).
+- No unified capability/policy evaluator exists — authority logic is spread across `protected-target-guard.ts`, `write-consent.ts`, `write-policy.ts`, and per-IPC sender checks (G1) — this is what SOL-1 must introduce.
+
+**SOL-1 prerequisites:** SOL0-P0-1 resolved. Remaining prerequisite: explicit product decision on G3 (deny-list vs. allow-list scope).
+
+**Known blockers to full CERTIFIED status:** none. SOL-0 exit gate fully met.
 
 **Objective:** Produce the authoritative, evidence-linked map of SOLITH machine authority before expanding it.
 
@@ -459,7 +474,8 @@ Parallel work is allowed only when interfaces and ownership are stable and integ
 - [ ] Identify and document the intended integration branch/commit; remove or classify unrelated dirty-tree state.
 - [x] Classify the all-red PR #22 observation: GitHub billing/spending enforcement prevented runner assignment; public-repository reruns cleared six completed workflows.
 - [ ] Record the final CI Fast rerun result for PR #22; it was executing the standard test suite at the evidence cutoff.
-- [ ] Run SOL-0 and create the complete action-policy/evidence matrix.
+- [x] Run SOL-0 and create the complete action-policy/evidence matrix — done 2026-09-01, see `Docs/authority/SOL0_ACTION_AUTHORITY_MATRIX.md`. CERTIFIED.
+- [x] Fix SOL0-P0-1 (`SOLITH_PRIVILEGED_CONSENT`/`SOLITH_CONSENT_TTL_MS` missing `app.isPackaged` gate) as its own scoped change — done 2026-09-01.
 - [ ] Reconcile `ROADMAP.md`, `SOLITH_SECURITY_ROADMAP.md`, and Wisp status text to this portfolio roadmap after integration.
 - [ ] Complete the seven Phase 1 process-picker manual cases.
 - [ ] Finish pending/partial security roadmap phases and obtain a final security verdict.

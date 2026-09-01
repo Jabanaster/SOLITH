@@ -100,6 +100,10 @@ async function launchApp(tag: string, extraEnv: Record<string, string> = {}): Pr
       USERPROFILE: appData,
       NODE_ENV: 'test',
       SOLITH_PRIVILEGED_CONSENT: 'auto-approve',
+      // SOL0-P0-1 remediation: packaged builds now ignore the consent env
+      // override unless SOLITH_TEST_BUILD=1 (electron/privileged-consent-dialog.ts).
+      // extraEnv still wins if a scenario needs to override this explicitly.
+      SOLITH_TEST_BUILD: '1',
       ...extraEnv,
     },
   });

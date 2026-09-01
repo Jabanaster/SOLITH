@@ -81,7 +81,10 @@ async function launchApp(tag: string, needsFreezeHook = false): Promise<{ app: E
       USERPROFILE: appData,
       NODE_ENV: 'test',
       SOLITH_PRIVILEGED_CONSENT: 'auto-approve',
-      ...(needsFreezeHook ? { SOLITH_TEST_BUILD: '1' } : {}),
+      // SOL0-P0-1 remediation: packaged builds now ignore the consent env
+      // override unless SOLITH_TEST_BUILD=1 (electron/privileged-consent-dialog.ts),
+      // so this is needed unconditionally now, not just for needsFreezeHook.
+      SOLITH_TEST_BUILD: '1',
     },
   });
   const win = await app.firstWindow();

@@ -44,6 +44,7 @@ import {
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
+import { isPrivilegedConsentEnvOverrideAllowed } from './privileged-consent-dialog.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
@@ -142,6 +143,19 @@ const READY_TO_SHOW_TIMEOUT_MS = (() => {
   const raw = Number(process.env.SOLITH_READY_TO_SHOW_TIMEOUT_MS);
   return Number.isFinite(raw) && raw > 0 ? raw : 10_000;
 })();
+
+// SOL0-P0-1 remediation proof hook: exposes a read-only boolean (never a
+// bypass — it grants no capability itself, it only reports whether
+// privileged-consent-dialog.ts's env override is currently permitted) on
+// globalThis so tests/sol0-p0-1-consent-packaging-gate.e2e.test.ts can prove
+// the packaged-build gate behaviorally via ElectronApplication.evaluate(),
+// including the SOLITH_TEST_BUILD-absent case that the gate itself exists to
+// cover. Intentionally NOT gated behind SOLITH_TEST_BUILD, unlike the other
+// __solith* test-only globals in live-memory-ipc.ts — those expose actual
+// state-mutation capability and must fail closed by default; this exposes
+// only a derived boolean already computable from public isPackaged/env state.
+(globalThis as Record<string, unknown>).__solithIsPrivilegedConsentEnvOverrideAllowed =
+  isPrivilegedConsentEnvOverrideAllowed;
 
 // ── Isolated userData for test runs ─────────────────────────────────────────
 // Must run before app.requestSingleInstanceLock() and app.whenReady().

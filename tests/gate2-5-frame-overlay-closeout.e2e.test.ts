@@ -38,6 +38,14 @@ async function launchApp(tag: string, testBuildValue?: string): Promise<AppConte
     NODE_ENV: 'test',
     SOLITH_PRIVILEGED_CONSENT: 'auto-approve',
   };
+  // No call in this file reaches a real privileged-consent dialog: every
+  // liveMemory* invocation here either comes from a child frame/overlay
+  // window (rejected by requireTrustedSender before resolveDialogImpl runs)
+  // or uses a deliberately-invalid proposalId/consentToken (rejected before
+  // the dialog path). So SOL0-P0-1's packaged app.isPackaged gate on
+  // SOLITH_PRIVILEGED_CONSENT (electron/privileged-consent-dialog.ts) never
+  // engages here, and this file's own SOLITH_TEST_BUILD-value matrix (below)
+  // must keep observing 'undefined' as genuinely absent — do not default it.
   if (testBuildValue === undefined) delete env.SOLITH_TEST_BUILD;
   else env.SOLITH_TEST_BUILD = testBuildValue;
   const app = await electron.launch({ executablePath: EXE_PATH, env });

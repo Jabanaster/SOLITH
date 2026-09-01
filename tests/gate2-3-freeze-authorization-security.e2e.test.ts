@@ -78,6 +78,9 @@ async function launchApp(tag: string): Promise<{ app: ElectronApplication; win: 
       USERPROFILE: appData,
       NODE_ENV: 'test',
       SOLITH_PRIVILEGED_CONSENT: 'auto-approve',
+      // SOL0-P0-1 remediation: packaged builds now ignore the consent env
+      // override unless SOLITH_TEST_BUILD=1 (electron/privileged-consent-dialog.ts).
+      SOLITH_TEST_BUILD: '1',
     },
   });
   const win = await app.firstWindow();
