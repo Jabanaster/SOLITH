@@ -6,14 +6,14 @@ Current development baseline: `solith@2.4.0-alpha.2`. Authoritative version is `
 
 ## Project direction and status
 
-- [`MASTER_ROADMAP.md`](MASTER_ROADMAP.md) is the authoritative portfolio roadmap. It reconciles product history, security, Adaptive Wisp, and the SOL-0 through SOL-8 governed machine-authority program.
+- [`MASTER_ROADMAP.md`](MASTER_ROADMAP.md) is the authoritative portfolio roadmap. Revised 2026-09-01 to a gaming-first SOL-0 through SOL-22 phase plan (game identity, session runtime, observation, Wisp, knowledge, trainer, saves, mods, automation, and 1.0 certification). The prior security/authority-track roadmap is preserved as historical evidence at [`Docs/ROADMAP_ARCHIVE_SECURITY_TRACK_2026-09-01.md`](Docs/ROADMAP_ARCHIVE_SECURITY_TRACK_2026-09-01.md).
 - [`ROADMAP.md`](ROADMAP.md) retains detailed product-phase requirements and evidence links.
 - [`SOLITH_SECURITY_ROADMAP.md`](SOLITH_SECURITY_ROADMAP.md) remains the sole authority for security-gate verdicts and release-security status.
 - [`PROJECT_SPEC.md`](PROJECT_SPEC.md) controls product requirements and the Safety Firewall.
 
 The governing workflow is **AUDIT → RECONCILE → IMPLEMENT → VERIFY → CERTIFY → DOCUMENT → INTEGRATE**. `CERTIFIED` requires reproducible build, test, and/or runtime evidence for the exact claimed scope. External repositories are references, not wholesale imports. Proven capability is preserved or extended instead of rebuilt. Existing owner-autonomous behavior remains available where already authorized; deletion remains approval- and explanation-protected.
 
-Current portfolio summary: historical product Phases 2–6 remain verified for their documented scopes; Phase 1 still has required manual acceptance gaps; release/security completion is not granted; Adaptive Wisp Phases 1–2 have evidence-backed branch-scope passes but the full Wisp workstream and later W3–W12 capabilities are not certified; SOL-0 through SOL-8 are forward work and are not certified unless the master roadmap explicitly says otherwise.
+Current portfolio summary: historical product Phases 2–6 remain verified for their documented scopes; Phase 1 still has required manual acceptance gaps; release/security completion is not granted; Adaptive Wisp Phases 1–2 have evidence-backed branch-scope passes but the full Wisp workstream and later W3–W12 capabilities are not certified; SOL-0 through SOL-22 (gaming-first roadmap, revised 2026-09-01) are forward work and are not certified unless the master roadmap explicitly says otherwise.
 
 "**Offline-only**" here means **offline gameplay enforcement** for live-memory targeting (fail-closed online-session guard) — not that the application never uses the network. Opt-in hub sync / community listing metadata may exist; they must not enable online/multiplayer game targeting.
 
