@@ -91,7 +91,7 @@ Other preserved evidence includes closed offline metadata persistence and CT ZIP
 
 - `SOLITH_SECURITY_ROADMAP.md` contains a mixture of **VERIFIED COMPLETE**, **REPORTED COMPLETE — VERIFY**, **PARTIAL**, and **PENDING** items. Its detailed verdicts must not be flattened into a global security pass.
 - Security Phase 6 privileged IPC work is partial; several later secrets, dependency, native-helper, data-integrity, abuse-test, packaged-certification, and final-verdict gates remain pending.
-- The referenced CI watch observed all triggered checks failing on PR #22 at commit `17c6be3949a653824008d9ced132c9336f8e4239`; without usable job logs, the runner/repository cause remained unresolved. **TODO / NOT CERTIFIED:** reproduce and classify current CI state before release claims.
+- The referenced CI watch observed all triggered checks failing on PR #22 at commit `17c6be3949a653824008d9ced132c9336f8e4239`. After the repository became public, GitHub exposed the job annotation: “The job was not started because recent account payments have failed or your spending limit needs to be increased.” Every affected job had zero steps and `runner_id: 0`, proving the red wall was account billing/spending enforcement before runner assignment—not an OSV 2.5.1 or simultaneous repository-code regression. The failed workflows were rerun after the visibility change: Gitleaks, OSV, Semgrep, vendored-memory integrity, and PR Static passed; CI Fast and PR Windows remained queued at the 2026-08-31 evidence cutoff. **TODO / NOT CERTIFIED:** retain final results for the two queued workflows before treating PR #22 as fully green.
 - The present checkout is not clean and is not the upstream integration point. **TODO / NOT CERTIFIED:** establish a clean, intended integration commit and rerun applicable gates.
 
 ## 4. Current Adaptive Wisp workstream
@@ -457,7 +457,8 @@ Parallel work is allowed only when interfaces and ownership are stable and integ
 ## 8. Immediate TODO / NOT CERTIFIED register
 
 - [ ] Identify and document the intended integration branch/commit; remove or classify unrelated dirty-tree state.
-- [ ] Reproduce current CI and obtain/classify runner logs for the all-red PR #22 observation.
+- [x] Classify the all-red PR #22 observation: GitHub billing/spending enforcement prevented runner assignment; public-repository reruns cleared five completed workflows.
+- [ ] Record final CI Fast and PR Windows rerun results for PR #22; both remained queued at the evidence cutoff.
 - [ ] Run SOL-0 and create the complete action-policy/evidence matrix.
 - [ ] Reconcile `ROADMAP.md`, `SOLITH_SECURITY_ROADMAP.md`, and Wisp status text to this portfolio roadmap after integration.
 - [ ] Complete the seven Phase 1 process-picker manual cases.
