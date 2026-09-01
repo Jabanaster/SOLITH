@@ -86,9 +86,22 @@ interface PendingRequest {
 }
 
 const RPC_TIMEOUT_MS = 5000;
+/** Bound on how long stop() waits for the child's 'close' event per attempt (SOL-1 G11). */
+const STOP_EXIT_TIMEOUT_MS = 2000;
 let _reqCounter = 0;
 function nextId(): string {
   return `rpc-${++_reqCounter}`;
+}
+
+/** Resolves true if `promise` settles first, false if `timeoutMs` elapses first. */
+function raceWithTimeout(promise: Promise<void>, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    promise.then(() => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -248,11 +261,33 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
 
   async function stop(): Promise<void> {
     if (!child) return;
+    const childRef = child;
+    const exited = new Promise<void>((resolve) => {
+      childRef.on('close', () => resolve());
+    });
+
     try {
       await sendRpc('shutdown');
     } catch {
-      child?.kill('SIGTERM');
+      childRef.kill('SIGTERM');
     }
+
+    // SOL-1 G11: wait for the child to actually exit (the 'close' listener
+    // above, and the on('close') handler set at spawn time, both fire and
+    // clear PID/lifecycle state) instead of assuming shutdown/SIGTERM
+    // succeeded. Bounded by STOP_EXIT_TIMEOUT_MS — if the child hasn't
+    // closed by then, force-kill and give it one more short window before
+    // giving up on confirmation.
+    const closedInTime = await raceWithTimeout(exited, STOP_EXIT_TIMEOUT_MS);
+    if (!closedInTime) {
+      childRef.kill('SIGKILL');
+      await raceWithTimeout(exited, STOP_EXIT_TIMEOUT_MS);
+    }
+
+    // Defensive: the on('close') handler set at spawn time already clears
+    // child/childPid/childStartTime when the process actually exits. Clear
+    // them here too in case 'close' never fires (e.g. an already-dead
+    // handle), so stop() never leaves stale lifecycle state regardless.
     child = null;
     childPid = null;
     childStartTime = null;

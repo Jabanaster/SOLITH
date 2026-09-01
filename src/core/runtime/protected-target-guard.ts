@@ -124,9 +124,19 @@ export interface TargetProcessAuthorizationInput {
   executablePath?: string | null;
 }
 
+/**
+ * Structured discriminator for why a target was blocked, so callers (e.g.
+ * src/core/authority/target-classifier.ts) don't need to parse `reason`
+ * text to distinguish self-vs-system-vs-invalid. Optional and additive —
+ * `reason` remains the human-readable explanation and is unchanged.
+ */
+export type TargetProcessBlockedKind = 'invalid_pid' | 'no_executable_name' | 'self' | 'system';
+
 export interface TargetProcessAuthorizationResult {
   allowed: boolean;
   reason: string;
+  /** Present only when allowed is false. */
+  blockedKind?: TargetProcessBlockedKind;
 }
 
 /**
@@ -141,21 +151,22 @@ export function assessTargetProcessAuthorization(
   target: TargetProcessAuthorizationInput,
 ): TargetProcessAuthorizationResult {
   if (!Number.isInteger(target.pid) || target.pid <= 0) {
-    return { allowed: false, reason: 'Refusing to attach: target PID is invalid.' };
+    return { allowed: false, blockedKind: 'invalid_pid', reason: 'Refusing to attach: target PID is invalid.' };
   }
 
   if (target.pid === process.pid) {
-    return { allowed: false, reason: "Refusing to attach: target PID is Solith's own process." };
+    return { allowed: false, blockedKind: 'self', reason: "Refusing to attach: target PID is Solith's own process." };
   }
 
   const name = normalizeTargetProcessName(target.executableName);
   if (!name) {
-    return { allowed: false, reason: 'Refusing to attach: target process has no resolvable executable name.' };
+    return { allowed: false, blockedKind: 'no_executable_name', reason: 'Refusing to attach: target process has no resolvable executable name.' };
   }
 
   if (BLOCKED_TARGET_PROCESS_PATTERNS.some((pattern) => pattern.test(name))) {
     return {
       allowed: false,
+      blockedKind: 'system',
       reason: `Refusing to attach: "${target.executableName}" is a protected system/Solith process.`,
     };
   }
@@ -165,6 +176,7 @@ export function assessTargetProcessAuthorization(
   if (targetPath && ownExecutablePath && targetPath === ownExecutablePath) {
     return {
       allowed: false,
+      blockedKind: 'self',
       reason: "Refusing to attach: target executable path matches Solith's own executable.",
     };
   }
