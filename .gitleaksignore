@@ -1,0 +1,5 @@
+# Exact historical false positives from c5d4800. These tests generate ephemeral
+# Ed25519 keys at runtime; the repository contains no private-key material.
+c5d4800434693d4fe029c9fe60c8c00cd9348c58:tests/catalog-updates-apply.test.ts:private-key:12
+c5d4800434693d4fe029c9fe60c8c00cd9348c58:tests/catalog-updates-rollback.test.ts:private-key:12
+c5d4800434693d4fe029c9fe60c8c00cd9348c58:tests/catalog-updates-signing.test.ts:private-key:12

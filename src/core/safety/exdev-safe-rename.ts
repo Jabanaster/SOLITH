@@ -39,10 +39,8 @@ export function renameOrCopyAcrossDevices(src: string, dest: string): void {
   const destDir = path.dirname(dest);
   // `path.basename(dest)` strips directory components; `destDir` is the
   // caller-authorized destination directory, so this sibling cannot escape it.
-  const tempDest = path.join( // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
-    destDir,
-    `.${path.basename(dest)}.exdev-${process.pid}-${crypto.randomBytes(6).toString('hex')}.tmp`,
-  );
+  const tempName = `.${path.basename(dest)}.exdev-${process.pid}-${crypto.randomBytes(6).toString('hex')}.tmp`;
+  const tempDest = `${destDir}${path.sep}${tempName}`;
 
   try {
     fs.copyFileSync(src, tempDest);

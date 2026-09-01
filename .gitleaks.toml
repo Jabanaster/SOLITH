@@ -1,9 +1,2 @@
 [extend]
 useDefault = true
-
-[[allowlists]]
-description = "Runtime-generated Ed25519 test key; no key material is stored in source"
-regexTarget = "line"
-regexes = [
-  '''const TEST_PRIVATE_KEY_PEM = testKeyPair\.privateKey\.export\(\{ type: 'pkcs8', format: 'pem' \}\)\.toString\(\);''',
-]
