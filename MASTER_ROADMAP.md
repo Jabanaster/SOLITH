@@ -1,496 +1,983 @@
-# SOLITH MASTER ROADMAP
+# SOLITH — MASTER ROADMAP
 
-> **Authority:** This is the authoritative portfolio-level roadmap for SOLITH. It reconciles the product roadmap, security roadmap, Adaptive Wisp workstream, and the governed machine-authority program without erasing their evidence-backed history.
->
-> **Evidence review date:** 2026-08-31
->
-> **Repository:** `G:\ACTIVE_PROJECTS\SOLITH`
->
-> **Product version at review:** `2.4.0-alpha.2` (`package.json`)
->
-> **Repository state at review:** `review/gate2-5-doc-audit`, eight commits ahead of its upstream, with pre-existing untracked files. This roadmap does not treat that dirty branch as a release-certified state.
+> **Revised 2026-09-01.** This roadmap replaces the prior security/authority-track
+> roadmap, preserved verbatim at
+> `Docs/ROADMAP_ARCHIVE_SECURITY_TRACK_2026-09-01.md`. SOL-N now refers to the
+> phases defined below — they do **not** map onto the old SOL-0/SOL-1 numbering.
+> `CERTIFIED` still means reproducible build/test/runtime evidence exists for
+> the stated scope; it is never inferred from a phase document existing.
 
-## 1. Status legend
+## 1. Product definition
 
-| Status | Meaning |
-|---|---|
-| **CERTIFIED** | Reproducible build, test, and/or runtime evidence exists for the stated scope and environment. Certification is never inferred from implementation or a tool returning success. |
-| **VERIFIED COMPLETE** | Existing repository terminology for a completed, evidence-linked historical scope. Preserved as historical evidence; it is not automatically a current release certification. |
-| **IMPLEMENTED — NOT CERTIFIED** | Code exists, but required reproducible or manual evidence is incomplete. |
-| **REPORTED COMPLETE — VERIFY** | A report claims completion, but independent/current reproduction is still required. |
-| **IN PROGRESS** | Active implementation or evidence work is underway. |
-| **BLOCKED** | A named dependency or required acceptance condition prevents closure. |
-| **TODO / NOT CERTIFIED** | Planned work with insufficient evidence for certification. |
-| **DEFERRED / CONDITIONAL** | Intentionally sequenced later or activated only if a stated condition becomes true. |
-| **REGRESSED** | Previously passing scope no longer satisfies its gate. |
+**SOLITH is a local-first AI gaming intelligence, assistance, enhancement, modification, automation, and game-control platform.**
 
-Status applies only to the exact scope named. A passing unit test does not certify packaged runtime behavior; a packaged smoke test does not certify every supported machine; source inspection does not substitute for runtime evidence.
+SOLITH exists to understand and interact with **games**. Its responsibilities include:
 
-## 2. Authority and governance
+- Game discovery and identification
+- Live game/process observation
+- Game-state understanding
+- Wisp adaptive assistance
+- AI gaming companions/assistants
+- Game-specific automation
+- Single-player/offline trainer and cheat functionality
+- Game modification and experimentation
+- Save-game tooling
+- Gaming telemetry and analytics
+- Game troubleshooting
+- Performance optimization
+- Accessibility assistance
+- Game knowledge/research
+- Overlay and gaming UI
+- Controller/input assistance
+- Mod management/integration
+- Eventually deeper game-specific intelligence and autonomous gameplay
 
-### 2.1 Document authority
+### Explicitly outside SOLITH
 
-1. `PROJECT_SPEC.md` controls product scope and the Safety Firewall, especially §3.2.
-2. This file controls portfolio sequencing and cross-workstream reconciliation.
-3. `SOLITH_SECURITY_ROADMAP.md` controls detailed security-gate findings and security release verdicts.
-4. `ROADMAP.md` retains detailed product-phase requirements and historical closeout links.
-5. `Docs/Architecture/ADAPTIVE_WISP_PLATFORM.md` and `Docs/Architecture/SOLITH_WISP_COMPANION.md` control detailed Wisp design and evidence history.
-6. Current source, git state, reproducible tests, packaged runtime evidence, and signed evidence records outrank stale prose.
+General-purpose:
 
-When documents disagree, do not silently choose the more optimistic status. Reconcile the claim against current source and reproducible evidence, then update the owning documents.
+- desktop automation
+- PC administration
+- autonomous software engineering
+- repository management
+- arbitrary browser automation
+- general file management
+- OS maintenance
+- software installation
+- general computer-use agents
 
-### 2.2 Mandatory execution rule
+Those belong primarily to **CodeWorkshop**. SOLITH may use underlying
+capabilities when required to accomplish a gaming task, but they are
+implementation mechanisms — not SOLITH's product mission.
 
-Every phase and consequential change follows:
+## 2. Correct architectural flow
+
+The previous direction put too much emphasis on machine authority. The new
+hierarchy:
 
 ```text
-AUDIT → RECONCILE → IMPLEMENT → VERIFY → CERTIFY → DOCUMENT → INTEGRATE
+                        PLAYER
+                           |
+                           v
+                   +---------------+
+                   |    SOLITH     |
+                   | Gaming Intent |
+                   +-------+-------+
+                           |
+                           v
+                +---------------------+
+                | GAME ORCHESTRATOR   |
+                | What game?          |
+                | What does user want?|
+                | What is happening?  |
+                +----------+----------+
+                           |
+            +--------------+--------------+
+            v              v              v
+       GAME IDENTITY   GAME STATE     GAME KNOWLEDGE
+            |              |              |
+            +--------------+--------------+
+                           v
+                   GAMING INTELLIGENCE
+                           |
+      +--------------------+---------------------+
+      v                    v                     v
+    WISP               ASSISTANCE            TRAINER /
+                                              MODIFICATION
+      |                    |                     |
+      +--------------+-----+------+--------------+
+      v              v            v              v
+   INPUT          OVERLAY      AUTOMATION      GAME STATE
+   CONTROL                                      CONTROL
+      |              |            |              |
+      +--------------+-----+------+--------------+
+                           v
+                    GAME INTERACTION
+                           |
+                           v
+                          GAME
+                           |
+                           v
+                    OBSERVE RESULT
+                           |
+                           v
+                     ADAPT / VERIFY
 ```
 
-- **AUDIT:** establish current code, policy, runtime, evidence, and git state.
-- **RECONCILE:** map proposed work to proven capability using **PRESERVE / EXTEND / REPLACE / RETIRE**. Default to **PRESERVE / EXTEND** when evidence supports an existing capability.
-- **IMPLEMENT:** make the smallest coherent change inside the approved authority boundary.
-- **VERIFY:** prove preconditions, behavior, postconditions, negative paths, and cleanup.
-- **CERTIFY:** attach reproducible build/test/runtime evidence for the exact claimed scope.
-- **DOCUMENT:** record evidence, limitations, environment, commit, and remaining risk.
-- **INTEGRATE:** merge only after gates pass and re-run the required checks on the integrated commit.
+**Gaming intent sits at the top.** Machine-control systems become
+subordinate infrastructure.
 
-### 2.3 Non-negotiable governance
+## 3. Common SOLITH execution rule
 
-- `CERTIFIED` requires reproducible build/test/runtime evidence. Documentation, source presence, a passing typecheck alone, or a successful tool return is insufficient.
-- External repositories—including CUA, osquery, Stagehand, Browser Use, Betterleaks, CUA-Bench, and Syncthing—are design references, not wholesale imports. Any adopted pattern must pass SOLITH policy, license, dependency, threat-model, and maintenance review.
-- Preserve owner-autonomous behavior where the owner has already granted durable, scoped authority.
-- Deletion remains approval- and explanation-protected. No new capability model may weaken destructive-operation safeguards.
-- Online/multiplayer, anti-cheat, DRM, credential, protected-target, and other prohibited boundaries remain governed by `PROJECT_SPEC.md`; this roadmap does not override them.
-- No major forward phase may erase or bypass existing consent, sender validation, protected-target, emergency-stop, rollback, lifecycle, or audit controls.
-- Integration is not certification: the integrated commit must reproduce the applicable evidence.
+Keep the governance discipline:
 
-## 3. Evidence-backed baseline
+> **AUDIT -> RECONCILE -> IMPLEMENT -> VERIFY -> CERTIFY -> DOCUMENT -> INTEGRATE**
 
-### 3.1 Preserved historical product phases
+And retain:
 
-The following statuses are preserved from `ROADMAP.md` and its linked closeout reports. They are historical scope statements, not blanket certification of the current dirty branch or future architecture.
+> **CERTIFIED means reproducible build/test/runtime evidence exists.**
 
-| Existing phase | Preserved status | Reconciliation |
-|---|---|---|
-| Phase 0 — build/gate stabilization | **ACTIVE / NOT CERTIFIED** | Preserve Node 22 requirement, packaged Gate 2.5 evidence, shutdown and overlay lifecycle work. Reconcile current CI failures and branch state before closure. |
-| Phase 1 — shell/settings/notifications/banner/grid/title hygiene | **BLOCKED / IMPLEMENTED — NOT CERTIFIED** | Preserve implementation and automated coverage. Seven required process-picker manual cases remain `NOT TESTED`; do not certify. |
-| Phase 2 — canonical game model and Game Library | **VERIFIED COMPLETE** | Preserve canonical identity, launcher/install records, and linked Phase 2C evidence. Extend rather than rebuild. |
-| Phase 3 — Trainer Library catalog/support states | **VERIFIED COMPLETE** | Preserve support-state, ranking, sorting, filtering, and final-seven closeout evidence. |
-| Phase 4 — artwork identity/cache/legal sourcing | **VERIFIED COMPLETE** | Preserve identity-safe artwork, cache, fetch policy, and linked clean-clone/closeout evidence. |
-| Phase 5 — popularity/curated/signed catalog | **VERIFIED COMPLETE** | Preserve signed update, rollback, ranking, and closeout work. |
-| Phase 6 — trainer/save/discovery gap closeout | **VERIFIED COMPLETE** | Preserve Trainer/Workshop, CT, save/resource, local-AI, and onboarding closeout scope. Do not infer real-game certification beyond evidence. |
-| Phase 7 — security/packaging/supply chain/release QA | **REQUIRED / NOT CERTIFIED** | Detailed status remains in `SOLITH_SECURITY_ROADMAP.md`; several later security phases remain pending or partial. |
-| Phase 8 — customization | **TODO / NOT CERTIFIED** | Retain as product work and reconcile with Wisp customization where shared schemas are appropriate. |
-| Phase 9 — final hands-on acceptance | **DEFERRED / NOT CERTIFIED** | Required manual evidence remains outstanding. |
-| Phase 10 — V1 release | **TODO / NOT CERTIFIED** | No public V1 certification is claimed. |
+No feature gets called certified because the code exists.
 
-Other preserved evidence includes closed offline metadata persistence and CT ZIP bridge work, the responsive shared tool-page layout, packaged/native write-path and lifecycle evidence, and existing safety/failure-injection tests. These are inputs to SOL-0; they are not permission to mark SOL-0–SOL-8 certified.
+## Pending reconciliation (2026-09-01)
 
-### 3.2 Current security and release reality
+The prior security/authority track (archived at
+`Docs/ROADMAP_ARCHIVE_SECURITY_TRACK_2026-09-01.md`) had reached: baseline
+authority audit certified, SOL0-P0-1 packaged-consent gate fixed and merged
+to `master`, and a partial `AuthorityService` capability evaluator
+implemented (`src/core/authority/`, evidence at
+`Docs/authority/SOL1_GOVERNED_COMPUTER_CONTROL.md` and
+`Docs/authority/SOL0_ACTION_AUTHORITY_MATRIX.md`). None of that code has
+been deleted. Under this roadmap it is **unclassified** pending the SOL-0
+audit below (§"SOL-0 — Gaming Scope & Architecture Reconciliation",
+"Specifically inspect: ComputerControlService, authority system, consent
+system"). Do not assume it is PRESERVE, ADAPT, MOVE/EXTRACT, or REMOVE
+until that audit runs — this line exists so the work isn't silently lost
+or silently kept.
 
-- `SOLITH_SECURITY_ROADMAP.md` contains a mixture of **VERIFIED COMPLETE**, **REPORTED COMPLETE — VERIFY**, **PARTIAL**, and **PENDING** items. Its detailed verdicts must not be flattened into a global security pass.
-- Security Phase 6 privileged IPC work is partial; several later secrets, dependency, native-helper, data-integrity, abuse-test, packaged-certification, and final-verdict gates remain pending.
-- The referenced CI watch observed all triggered checks failing on PR #22 at commit `17c6be3949a653824008d9ced132c9336f8e4239`. After the repository became public, GitHub exposed the job annotation: “The job was not started because recent account payments have failed or your spending limit needs to be increased.” Every affected job had zero steps and `runner_id: 0`, proving the red wall was account billing/spending enforcement before runner assignment—not an OSV 2.5.1 or simultaneous repository-code regression. The failed workflows were rerun after the visibility change: Gitleaks, OSV, Semgrep, vendored-memory integrity, PR Static, and PR Windows passed. CI Fast completed install, typecheck, schema, orphan, and build steps and was running the test step at the 2026-08-31 evidence cutoff. **TODO / NOT CERTIFIED:** retain the final CI Fast result before treating PR #22 as fully green.
-- The present checkout is not clean and is not the upstream integration point. **TODO / NOT CERTIFIED:** establish a clean, intended integration commit and rerun applicable gates.
+---
 
-## 4. Current Adaptive Wisp workstream
-
-### 4.1 Reconciled status
-
-**Overall: IN PROGRESS — NOT FULLY CERTIFIED.**
-
-The old `ROADMAP.md` label “POST-V1 — WISP / DEFERRED” understates completed branch work. The dedicated `feature/adaptive-wisp-consent-completion` worktree and `Docs/Architecture/ADAPTIVE_WISP_PLATFORM.md` provide evidence-backed progress that must be preserved:
-
-- Adaptive Wisp Increments 4 and 5 are documented complete with regression/security evidence.
-- Increment 6 identity/registry work failed an initial independent review, was remediated, and later received a PASS.
-- Catalog and production composition Tasks 1–4 reached an unconditional integration PASS.
-- Adaptive Wisp Phases 1–2 are documented evidence-complete and unconditionally passed, including consent/security review.
-- The pre-Phase-3 regression and integration gate is documented PASS.
-- The current branch contains typed profiles, registry/binding/resolution, persistence, live adapter, execution, quick slots/hotkeys, consent proposal/service/audit paths, controlled execution, and extensive tests.
-
-These claims are preserved for their documented scope. They do not certify later visual/host milestones or certify the current main checkout.
-
-### 4.2 Wisp milestone ledger
-
-| Wisp scope | Status | Required next evidence |
-|---|---|---|
-| Foundation companion, safe allowlist, overlay route/window | **IMPLEMENTED — NOT FULLY CERTIFIED** | Repeat installed-app and real-game overlay checklist on integrated commit. |
-| Adaptive platform Phases 1–2 and pre-Phase-3 gate | **CERTIFIED for documented branch scope** | Integrate deliberately, rerun tests and runtime evidence on the merge commit. |
-| Consent queue/dialog and controlled execution | **CERTIFIED for documented branch scope** | Reproduce packaged consent path and negative cases after integration. |
-| Adaptive placement engine | **TODO / NOT CERTIFIED** | Unit geometry matrix plus DPI/multi-monitor packaged runtime evidence. |
-| Basic/Advanced game-aware UI | **TODO / NOT CERTIFIED** | Two-profile behavior and safety acceptance. |
-| Per-game control and appearance customization | **TODO / NOT CERTIFIED** | Persistence, migration, reset, invalid-data, and restart evidence. |
-| Multi-form/state renderer and neutral pose | **TODO / NOT CERTIFIED** | State transitions, reduced-motion, fallback, overlap, and performance evidence. |
-| Optional 3D renderer with 2D fallback | **DEFERRED / NOT CERTIFIED** | Hardware-tier and graceful-degradation evidence if authorized. |
-| Xbox Game Bar host transport/runtime prototype | **PARTIAL / NOT FULLY CERTIFIED** | Existing Palworld/runtime and transport artifacts are preserved, but W9–W12 require current integrated, real-supported-game, multi-monitor, scaling, persistence, safety, and performance certification. |
-| Full Wisp workstream | **NOT CERTIFIED** | W9–W12 and all mandatory acceptance gates must pass. |
-
-Wisp presentation/customization work must not change authority. A prettier or more proactive Wisp receives no new capability by implication.
-
-## 5. Forward roadmap: governed machine authority
-
-All SOL phases begin **TODO / NOT CERTIFIED** unless a narrower preserved capability is explicitly named. Each phase starts by reconciling existing code and evidence; proven controls are **PRESERVE / EXTEND**, not rebuilt.
-
-### SOL-0 — Baseline and Authority Audit
-
-**Status:** CERTIFIED (audited 2026-09-01 at `0398c8a9`; SOL0-P0-1 remediated 2026-09-01)
-
-**Audit evidence:** `Docs/authority/SOL0_ACTION_AUTHORITY_MATRIX.md` — complete action-class inventory, authority model, consent model, destructive-policy audit, machine-scope classification, control-provider inventory, emergency-stop audit, process-lifecycle audit, browser-control absence proof, audit-logging/postcondition audit, action authority matrix, and SOL-1 gap list (G1–G11, G2 now closed).
-
-**Major findings:**
-- **P0 (SOL0-P0-1, RESOLVED 2026-09-01):** `electron/privileged-consent-dialog.ts`'s `SOLITH_PRIVILEGED_CONSENT`/`SOLITH_CONSENT_TTL_MS` env-var overrides had no `app.isPackaged` gate — silently bypassed the human consent dialog for live-memory write/freeze/injector-launch approval in a packaged build. Fixed by gating both reads on `isPrivilegedConsentEnvOverrideAllowed()` (`!app.isPackaged || SOLITH_TEST_BUILD==='1'`), mirroring the repo's actual established pattern (`trainer-catalog-ipc.ts:545`'s `if (app.isPackaged)` — the audit's original citation of a `runtime-trust.ts` file was itself an error; no such file exists in this repo). Behaviorally verified against a freshly built packaged exe in all 4 required cases (`tests/sol0-p0-1-consent-packaging-gate.e2e.test.ts`); full regression (1699/1699 + SQL 10/10), orphan-check, npm audit, and tsc all re-verified green with no regressions.
-- Live-memory attach scope classifies as **"arbitrary process"** (deny-list of system/anti-cheat/self processes, not an allow-list of known games) — wider than product framing might suggest; needs an explicit SOL-1 decision (G3).
-- All 180 current IPC handlers confirmed sender-identity-validated (up from July's 149-handler snapshot; `SOLITH_ATTACK_SURFACE.md` is stale and should be regenerated).
-- Stale-process-identity mutation of a replacement process: **confirmed NOT possible** — live identity re-verified before every mutating write, test-covered.
-- Memory writes/rollbacks are postcondition-PARTIAL (no read-back), vs. file writes which are fully hash-verified — direct SOL-2 input (G6).
-- Emergency-stop is fail-closed against further writes but does not restore mutated memory, and the `readOnlyMode` kill switch is fully built but unreachable in production (G7, G8, G9).
-- No unified capability/policy evaluator exists — authority logic is spread across `protected-target-guard.ts`, `write-consent.ts`, `write-policy.ts`, and per-IPC sender checks (G1) — this is what SOL-1 must introduce.
-
-**SOL-1 prerequisites:** SOL0-P0-1 resolved. Remaining prerequisite: explicit product decision on G3 (deny-list vs. allow-list scope).
-
-**Known blockers to full CERTIFIED status:** none. SOL-0 exit gate fully met.
-
-**Objective:** Produce the authoritative, evidence-linked map of SOLITH machine authority before expanding it.
-
-**Requirements**
-
-- Reconfirm authority modes, identities, consent states, owner-autonomous grants, target scope, and risk levels.
-- Inventory destructive-operation policy; deletion must remain approval- and explanation-protected.
-- Inventory machine scope, computer-control providers, browser implementation, process lifecycle, emergency stop, audit logging, credentials, networking, installation, and settings mutation.
-- Map every consequential action class to current policy and implementation.
-- Reconcile claims across `PROJECT_SPEC.md`, both roadmaps, Wisp documents, IPC inventories, source, tests, evidence, and the current integrated git state.
-- Produce a **PRESERVE / EXTEND / REPLACE / RETIRE** matrix and evidence index.
-
-**Exit gate**
-
-- Every action class has an owner, capability, target, context, risk, decision, implementation path, evidence link, and known gap.
-- Deletion, emergency stop, consent, protected-target, cleanup, and audit behavior are reproduced on the intended integration commit.
-- Conflicting status claims are corrected in their owning documents.
-- **CERTIFIED** only after the audit commands/tests/runtime checks are reproducible from a clean checkout.
-
-**Dependencies:** clean intended baseline; Node 22; access to relevant packaged Windows environment and existing evidence.
-
-### SOL-1 — Governed Computer Control 2.0
+# SOL-0 — Gaming Scope & Architecture Reconciliation
 
 **Status:** TODO / NOT CERTIFIED
 
-**Objective:** Introduce capability-scoped authority while preserving already-proven autonomy and safeguards.
+### Objective
 
-**Requirements**
+Correct the repository to the gaming-only mission before adding more capabilities.
+
+### Audit
+
+Inventory every existing SOLITH subsystem and classify it:
+
+**PRESERVE** — already directly supports gaming.
+
+**ADAPT** — useful infrastructure but currently too general-purpose.
+
+**MOVE/EXTRACT** — belongs in CodeWorkshop rather than SOLITH.
+
+**REMOVE** — obsolete/redundant.
+
+**DEFER** — potentially useful but premature.
+
+### Specifically inspect
+
+- ComputerControlService
+- authority system
+- consent system
+- Wisp
+- process observation
+- input systems
+- browser/research
+- memory
+- skills
+- agents
+- automation
+- telemetry
+- security
+- overlays
+- Electron UI
+- game registry
+- game identification
+- process identity
+
+### Deliverable
+
+A clean architectural boundary:
 
 ```text
-filesystem.read       filesystem.write
-process.launch        process.kill
-browser.navigate      browser.submit
-input.mouse           input.keyboard
-network.request       credential.use
-software.install      system.settings
-destructive.delete
+SOLITH = GAMING
+CODEWORKSHOP = GENERAL COMPUTER/ENGINEERING
 ```
 
-Canonical decision:
+This should happen **first**.
 
-```text
-identity + capability + target + context + risk
-    → ALLOW / DENY / REQUIRE APPROVAL
-```
+---
 
-- Use typed, centrally evaluated grants with bounded target and lifetime.
-- Preserve owner-autonomous behavior where current durable authorization is valid.
-- Preserve trusted-sender, process identity, online/protected-target, write-consent, lifecycle-cleanup, and emergency-stop controls.
-- `destructive.delete` must never become implicitly autonomous; require clear explanation and approval under the existing deletion policy.
-- Deny unknown identities, capabilities, targets, contexts, or stale grants.
-
-**Exit gate**
-
-- Complete policy matrix and negative/abuse test suite.
-- No renderer, Wisp, browser page, or external input can mint authority.
-- Packaged runtime proves representative ALLOW, DENY, REQUIRE APPROVAL, revocation, expiry, restart, and emergency-stop paths.
-
-**Dependencies:** SOL-0 certified; security authority findings reconciled.
-
-### SOL-2 — Verified Action Runtime
+# SOL-1 — Game Identity & Game Registry
 
 **Status:** TODO / NOT CERTIFIED
 
-**Objective:** Make consequential success mean a proven state change, not a successful tool return.
+SOLITH needs to know exactly what game it's dealing with before doing anything intelligent.
 
-**Requirements**
+Build a canonical:
+
+## GameIdentity
+
+Potential identity signals:
+
+- executable
+- installation directory
+- launcher
+- Steam App ID
+- Epic identifier
+- GOG identifier
+- Microsoft/Xbox identity
+- executable hash
+- version
+- build
+- DLC
+- platform
+- process metadata
+
+Create:
+
+## GameRegistry
+
+Each supported game receives a structured profile.
 
 ```text
-Intent
-→ Preconditions
-→ Authority check
-→ Execute
-→ Postconditions
-→ Evidence
-→ Compensation/rollback if supported
+GameProfile
+ |-- identity
+ |-- executable
+ |-- versions
+ |-- process rules
+ |-- capabilities
+ |-- adapters
+ |-- telemetry
+ |-- Wisp support
+ |-- trainer support
+ |-- save locations
+ |-- mods
+ `-- known compatibility
 ```
 
-- Apply to process launch/termination, config changes, browser submission, file writes, installs, settings changes, and other consequential actions.
-- Define typed receipts, idempotency, correlation IDs, timeout/cancellation, partial-failure semantics, and rollback limitations.
-- Reuse existing operation state machine, atomic write, backup/rollback, consent, and cleanup mechanisms where proven.
-- Never claim success solely because a provider returned without error.
+This becomes one of SOLITH's foundational databases.
 
-**Exit gate**
+---
 
-- Each action family has deterministic pre/postconditions and tamper-resistant evidence.
-- Failure injection proves no false success, double application, stale confirmation, or silent partial completion.
-- Packaged runtime demonstrates state change and compensation for representative supported actions.
-
-**Dependencies:** SOL-1 certified; existing lifecycle and rollback evidence reconciled.
-
-### SOL-3 — Machine Intelligence Layer
+# SOL-2 — Game Session Runtime
 
 **Status:** TODO / NOT CERTIFIED
 
-**Objective:** Provide normalized machine state without fragile shell-text parsing as the primary interface.
+Turn the existing process/session work into a proper **GameSession** abstraction.
 
-**Reference:** osquery patterns, subject to SOLITH adoption review.
+SOLITH should understand:
 
 ```text
-MachineStateService
-├── OsqueryProvider
-├── WindowsNativeProvider
-├── ProcessProvider
-├── NetworkProvider
-├── HardwareProvider
-└── SecurityProvider
+NOT_RUNNING
+  |
+DISCOVERED
+  |
+LAUNCHING
+  |
+ATTACHED
+  |
+ACTIVE
+  |
+PAUSED
+  |
+DETACHED
+  |
+TERMINATED
 ```
 
-**Requirements**
+Track:
 
-- Normalize processes, services, ports, connections, startup items, hardware, users/sessions, installed software, hashes, and security state.
-- Define freshness, provenance, confidence, access-denied, unavailable, and partial-result semantics.
-- Prefer native/structured providers; constrain and evidence any shell fallback.
-- Keep observation separate from mutation authority.
+- PID
+- executable identity
+- game version
+- session generation
+- process restarts
+- game switches
+- foreground state
+- child processes
+- launcher handoff
 
-**Exit gate**
+This is where the existing Atomfall certification work becomes highly valuable.
 
-- Stable typed schema and provider contract with cross-provider reconciliation tests.
-- Representative Windows runtime fixtures prove normalization, refresh, degraded mode, and least privilege.
-- No unsupported provider silently fabricates or upgrades state.
+---
 
-**Dependencies:** SOL-0 certified; SOL-1 authority contract stable. SOL-2 receipts recommended for provider lifecycle actions.
-
-### SOL-4 — Browser Control 2.0
+# SOL-3 — Gaming Observation Engine
 
 **Status:** TODO / NOT CERTIFIED
 
-**Objective:** Deliver governed, observable, deterministic-first browser control.
+Now SOLITH learns to **observe games**. Use multiple observation providers
+rather than relying on one technique.
 
-**References:** Stagehand and Browser Use patterns, after license/security review.
+Potential providers:
+
+### Process observation
+
+Basic process state and lifecycle.
+
+### Screen observation
+
+Frames/screenshots and visual understanding.
+
+### UI observation
+
+Menus, HUDs, inventories, maps, dialogue, etc.
+
+### Game telemetry
+
+Official APIs where available.
+
+### Log observation
+
+Game-generated logs.
+
+### Local state
+
+Configuration and game-generated files.
+
+### Supported game integration
+
+Plugins/mod APIs where available.
+
+Eventually SOLITH creates a normalized:
+
+## GameState
 
 ```text
-Observe
-→ reduce context
-→ choose deterministic action
-→ semantic fallback
-→ execute
-→ verify
-→ recover
+GameState
+ |-- session
+ |-- player
+ |-- world
+ |-- UI
+ |-- inventory
+ |-- objectives
+ |-- combat
+ |-- environment
+ |-- performance
+ `-- confidence
 ```
 
-**Requirements**
+Not every game will expose every field. That's fine.
 
-- Accessibility/DOM state first, deterministic selectors where available, screenshot/vision only when needed.
-- Separate `browser.navigate` from consequential `browser.submit` and credential use.
-- Apply SOLITH authority, domain/target constraints, secret redaction, prompt-injection defenses, and verified postconditions.
-- Capture bounded trajectories without leaking credentials or sensitive content.
+---
 
-**Exit gate**
-
-- Reproducible fixtures cover navigation, forms, stale controls, redirects, downloads, dialogs, denial, recovery, and verification failure.
-- Submission cannot occur under navigation-only authority.
-- Packaged/browser runtime evidence proves safe abort and recovery.
-
-**Dependencies:** SOL-1 and SOL-2 certified; SOL-3 optional for richer host observation.
-
-### SOL-5 — Telemetry and Attribution
+# SOL-4 — Wisp 2.0
 
 **Status:** TODO / NOT CERTIFIED
 
-**Objective:** Correlate system effects to the SOLITH workflow that caused them.
+Wisp should become a flagship SOLITH capability. Rather than being a generic assistant:
 
-```text
-SystemEvent
-├── id
-├── timestamp
-├── source
-├── process_identity
-├── event_type
-├── severity
-├── attributes
-├── evidence
-└── correlation_id
-```
+> **Wisp is an adaptive AI gaming companion connected to the active game session.**
 
-**Requirements**
+Wisp should understand:
 
-- Normalize process, network, browser, agent-action, resource, and security events.
-- Add process → socket → destination attribution and carry action correlation IDs end to end.
-- Define retention, redaction, local-first storage, clock/skew, deduplication, and export rules.
-- Ensure telemetry is evidence, not an authority source.
+- current game
+- current situation
+- player behavior
+- objectives
+- recent events
+- failures
+- preferences
+- difficulty
+- available assistance
 
-**Exit gate**
+Then provide context-aware assistance. Examples:
 
-- “Which SOLITH workflow caused this process to contact this host?” is answerable for supported fixtures.
-- Restart, concurrency, missing-event, privacy, and tamper scenarios are tested.
-- Local storage and export contain no unapproved secrets.
+> "You're underleveled for this area."
 
-**Dependencies:** SOL-2 certified; SOL-3 and SOL-4 integrated for complete attribution.
+> "You've died to this attack four times. Want me to explain the timing?"
 
-### SOL-6 — Security Validation Pipeline
+> "You already have the item needed for this quest."
 
-**Status:** TODO / NOT CERTIFIED
+> "There's a better weapon in your inventory."
 
-**Objective:** Generalize evidence-aware candidate validation without unsafe probing.
+And eventually:
 
-**Reference:** Betterleaks-style detection patterns, after adoption review.
+> "Want me to handle this section?"
 
-```text
-candidate → context → confidence → safe validation → impact → policy response
-```
+That transitions into automation.
 
-**Requirements**
+---
 
-- Apply to credentials, suspicious executables, network destinations, unsafe child processes, unexpected persistence, and capability misuse.
-- Default to non-destructive, local, redacted validation; never transmit a suspected credential merely to test it without explicit governed authority.
-- Record confidence and evidence separately from enforcement decisions.
-- Connect policy response to revoke/deny/approval/emergency-stop paths without bypassing SOL-1.
-
-**Exit gate**
-
-- Seeded true/false-positive corpus and abuse tests are reproducible.
-- Redaction, quarantine/containment, notification, and audit behavior are verified.
-- No validator escalates authority or causes unsafe side effects.
-
-**Dependencies:** SOL-1, SOL-2, and SOL-5 certified; SOL-3 feeds structured machine candidates.
-
-### SOL-7 — Computer-Use Evaluation
+# SOL-5 — Game Knowledge Engine
 
 **Status:** TODO / NOT CERTIFIED
 
-**Objective:** Make computer-use behavior repeatable, measurable, and regression-safe.
+SOLITH needs gaming-specific research and knowledge.
 
-**Reference:** CUA-Bench concepts, adapted to SOLITH safety and local fixtures.
+Sources can include appropriately licensed/accessible:
 
-**Requirements**
+- game manuals
+- official documentation
+- wikis
+- patch notes
+- guides
+- local game data
+- player-provided information
+- SOLITH observations
 
-- Build fixtures for app opening, window movement, stale controls, permission denial, recovery, confirmation dialogs, browser forms, emergency stop, and verification failures.
-- Store complete trajectories:
+Knowledge should be version-aware. That's critical. A guide for game
+version 1.2 may be wrong under 1.8.
 
-```text
-initial state
-observations
-actions
-policy decisions
-verification
-final state
-timing
-errors
-```
-
-- Score task completion, policy correctness, false success, recovery, latency, reproducibility, and evidence completeness.
-- Include deterministic mocks and packaged Windows/runtime suites; distinguish simulation from real runtime.
-
-**Exit gate**
-
-- Versioned fixtures run repeatably with documented tolerance and seeded failures.
-- Policy violations and false-success claims are hard failures.
-- CI and packaged certification retain inspectable, privacy-safe trajectories.
-
-**Dependencies:** SOL-1 through SOL-6 stable enough to evaluate. Initial harness design may begin after SOL-2.
-
-### SOL-8 — Optional Peer/Fleet Architecture
-
-**Status:** DEFERRED / CONDITIONAL / NOT CERTIFIED
-
-**Activation condition:** SOLITH has an approved, concrete multi-machine use case that cannot be served by the single-machine architecture.
-
-**Objective:** Add trusted peer operation without prematurely building distributed infrastructure.
-
-**Requirements**
-
-- Study Syncthing-style trusted replication, device identity, incremental synchronization, revocation, conflict handling, and recovery.
-- Preserve per-device authority, local deletion protection, audit provenance, and least privilege.
-- Define offline behavior, clock/skew, key rotation, partial fleet failure, and secure bootstrap.
-- Do not build etcd/Kubernetes-style infrastructure unless scale and operational evidence justify it.
-
-**Exit gate**
-
-- Approved use case, threat model, data classification, protocol decision, conflict tests, revocation tests, and multi-device runtime evidence.
-- Single-machine mode remains fully supported and does not require fleet services.
-
-**Dependencies:** SOL-1, SOL-2, SOL-5, and SOL-6 certified; explicit owner authorization to activate.
-
-## 6. Final target architecture
+Model:
 
 ```text
-Owner / agent intent
-        ↓
-Identity + capability + target + context + risk
-        ↓
-Capability authority ───────────────→ DENY / REQUIRE APPROVAL
-        ↓ ALLOW
-Machine observation
-        ↓
-Verified action runtime
-        ↓
-Native / browser / Wisp / optional peer driver
-        ↓
-Postcondition evidence + compensation
-        ↓
-Telemetry, attribution, security validation, and audit
-        ↓
-Reproducible computer-use evaluation and certification
+GAME
+ |
+VERSION
+ |
+CONTENT
+ |
+MECHANICS
+ |
+PLAYER STATE
+ |
+CURRENT SITUATION
 ```
 
-Cross-cutting controls: Safety Firewall, owner-autonomous scoped grants, deletion approval/explanation, consent, protected-target guards, credential handling, emergency stop, privacy/redaction, lifecycle cleanup, evidence integrity, and versioned schemas.
+Wisp queries this system.
 
-## 7. Recommended execution order
+---
 
-1. Establish the intended clean integration baseline and reconcile current CI failures.
-2. Complete **SOL-0** and publish the authority/evidence/PRESERVE–EXTEND matrix.
-3. Close the existing product Phase 1 manual gap and continue required security/release gates without overwriting preserved Phase 2–6 history.
-4. Integrate Adaptive Wisp Phases 1–2 deliberately; rerun branch evidence on the integrated commit. Keep later Wisp workstream items explicitly not certified.
-5. Execute **SOL-1** capability authority.
-6. Execute **SOL-2** verified action runtime.
-7. Begin **SOL-7** harness foundations once SOL-2 contracts stabilize so later phases accumulate reproducible trajectories.
-8. Execute **SOL-3** machine intelligence.
-9. Execute **SOL-4** browser control.
-10. Execute **SOL-5** telemetry and attribution.
-11. Execute **SOL-6** security validation.
-12. Complete **SOL-7** full computer-use evaluation and packaged certification.
-13. Resume Wisp W3–W12 against the governed runtime as portfolio priority permits; Wisp authority remains bounded by SOL-1/SOL-2.
-14. Activate **SOL-8** only when its multi-machine condition is met.
-15. Run final hands-on, clean-machine, installer, security, and release certification on the exact release commit.
+# SOL-6 — Gaming Input & Action Engine
 
-Parallel work is allowed only when interfaces and ownership are stable and integration evidence is planned. No parallel feature stream may bypass an unmet authority or release gate.
+**Status:** TODO / NOT CERTIFIED
 
-## 8. Immediate TODO / NOT CERTIFIED register
+SOLITH needs reliable game interaction.
 
-- [ ] Identify and document the intended integration branch/commit; remove or classify unrelated dirty-tree state.
-- [x] Classify the all-red PR #22 observation: GitHub billing/spending enforcement prevented runner assignment; public-repository reruns cleared six completed workflows.
-- [ ] Record the final CI Fast rerun result for PR #22; it was executing the standard test suite at the evidence cutoff.
-- [x] Run SOL-0 and create the complete action-policy/evidence matrix — done 2026-09-01, see `Docs/authority/SOL0_ACTION_AUTHORITY_MATRIX.md`. CERTIFIED.
-- [x] Fix SOL0-P0-1 (`SOLITH_PRIVILEGED_CONSENT`/`SOLITH_CONSENT_TTL_MS` missing `app.isPackaged` gate) as its own scoped change — done 2026-09-01.
-- [ ] Reconcile `ROADMAP.md`, `SOLITH_SECURITY_ROADMAP.md`, and Wisp status text to this portfolio roadmap after integration.
-- [ ] Complete the seven Phase 1 process-picker manual cases.
-- [ ] Finish pending/partial security roadmap phases and obtain a final security verdict.
-- [ ] Integrate Adaptive Wisp evidence-complete work and rerun tests/runtime checks on the integration commit.
-- [ ] Certify Wisp placement, Basic/Advanced UI, per-game customization, multi-form behavior, reduced-motion, multi-monitor, and Game Bar W9–W12; until then the full Wisp workstream is **NOT CERTIFIED**.
-- [ ] Implement and certify SOL-1 through SOL-7 in dependency order.
-- [ ] Keep SOL-8 deferred until explicitly activated by a real fleet requirement.
-- [ ] Complete hands-on, clean-machine, installer, and exact-release-commit certification before any V1 claim.
+Providers may include:
 
-## 9. Roadmap maintenance rule
+- keyboard
+- mouse
+- controller
+- virtual controller
+- game APIs
+- mod APIs
 
-At the end of every material SOLITH session:
+Create semantic actions rather than exposing only raw keys.
 
-1. Record the branch, commit, environment, commands, test/runtime results, artifacts, limitations, and dirty-tree classification.
-2. Update the owning detailed roadmap first, then reconcile this master roadmap.
-3. Never replace `TODO`, `NOT CERTIFIED`, `PARTIAL`, or `REPORTED COMPLETE — VERIFY` with `CERTIFIED` without reproducible evidence.
-4. If evidence regresses, mark the scope **REGRESSED** immediately; historical evidence remains historical, not current proof.
-5. Preserve completed history. Extend proven controls rather than restarting them under a new phase name.
+Instead of:
+
+```text
+press W 812ms
+```
+
+higher layers request:
+
+```text
+MOVE_FORWARD
+OPEN_INVENTORY
+USE_ITEM
+INTERACT
+PAUSE
+OPEN_MAP
+```
+
+Game adapters translate semantic actions into actual controls. That
+dramatically improves portability.
+
+---
+
+# SOL-7 — Adaptive Assistance
+
+**Status:** TODO / NOT CERTIFIED
+
+Now combine: **GameState + Knowledge + Wisp + Input**
+
+SOLITH can provide different assistance levels.
+
+### Level 0 — Observe
+
+No intervention.
+
+### Level 1 — Inform
+
+Tips and contextual information.
+
+### Level 2 — Recommend
+
+Recommend actions.
+
+### Level 3 — Assist
+
+Perform limited actions after authorization.
+
+### Level 4 — Automate
+
+Execute defined gameplay tasks.
+
+### Level 5 — Agent
+
+Operate substantial gameplay sequences autonomously where appropriate.
+
+The player controls the level.
+
+---
+
+# SOL-8 — Trainer & Game Modification Framework
+
+**Status:** TODO / NOT CERTIFIED
+
+This should be a **first-class SOLITH subsystem**, not an awkward hidden
+feature. For supported single-player/offline contexts, build a structured
+trainer system.
+
+Potential capabilities include:
+
+- runtime state inspection
+- controlled value modification
+- health/resource modification
+- inventory experimentation
+- movement/gameplay modifiers
+- time/speed controls
+- debug-style functionality
+- configurable trainer profiles
+- reversible modifications where technically possible
+
+Game-specific implementations should be versioned and validated.
+
+```text
+TrainerProfile
+ |-- game
+ |-- version
+ |-- capabilities
+ |-- compatibility
+ |-- modification method
+ |-- restore behavior
+ |-- verification
+ `-- risk metadata
+```
+
+This should integrate directly with Wisp. For example:
+
+> "Give me unlimited crafting materials."
+
+SOLITH determines whether the current game/profile supports that
+capability and applies the supported local modification.
+
+Online competitive anti-cheat bypass/evasion remains outside the
+implementation scope.
+
+---
+
+# SOL-9 — Save Lab
+
+**Status:** TODO / NOT CERTIFIED
+
+This could become one of SOLITH's best utilities. Create a proper
+save-game management and experimentation environment.
+
+Capabilities:
+
+- discover saves
+- backup
+- restore
+- version
+- compare
+- inspect
+- validate
+- migrate where feasible
+- edit supported save structures
+- maintain snapshots
+
+Before modifications:
+
+```text
+ORIGINAL SAVE
+     |
+SNAPSHOT
+     |
+MODIFICATION
+     |
+VALIDATION
+     |
+NEW SAVE
+```
+
+Never blindly modify the only copy.
+
+---
+
+# SOL-10 — Mod Intelligence & Management
+
+**Status:** TODO / NOT CERTIFIED
+
+SOLITH should understand installed mods. Eventually:
+
+- discover mods
+- identify versions
+- detect conflicts
+- analyze load order
+- track dependencies
+- detect outdated mods
+- identify likely crash sources
+- maintain profiles
+- enable/disable profiles
+- explain conflicts
+
+Wisp can then answer:
+
+> "Why did my game start crashing?"
+
+using actual installed-game/mod state.
+
+---
+
+# SOL-11 — Gaming Performance & Troubleshooting
+
+**Status:** TODO / NOT CERTIFIED
+
+This is where PC telemetry belongs in SOLITH. Not:
+
+> Monitor my computer generally.
+
+Instead:
+
+> **Understand machine behavior as it affects gaming.**
+
+Monitor relevant:
+
+- FPS
+- frametime
+- CPU
+- GPU
+- VRAM
+- RAM
+- temperatures
+- storage
+- shader compilation
+- game crashes
+- driver-related symptoms
+
+SOLITH should eventually answer:
+
+> "Why is this game stuttering?"
+
+using evidence from the actual gaming session. That's legitimate SOLITH territory.
+
+---
+
+# SOL-12 — Gaming Automation
+
+**Status:** TODO / NOT CERTIFIED
+
+Build gaming-specific workflows. Examples:
+
+```text
+Launch game
+-> apply preferred settings
+-> activate mod profile
+-> start telemetry
+-> attach Wisp
+-> load trainer profile
+-> enter gaming mode
+```
+
+Or:
+
+```text
+Game exits
+-> capture session telemetry
+-> preserve relevant logs
+-> save Wisp session
+-> detect crash
+-> diagnose if necessary
+```
+
+This is **gaming automation**, not arbitrary desktop automation.
+
+---
+
+# SOL-13 — Accessibility Engine
+
+**Status:** TODO / NOT CERTIFIED
+
+Potentially a major feature. Examples:
+
+- input remapping
+- input simplification
+- repeated-input automation
+- timing assistance
+- visual assistance
+- contextual descriptions
+- menu navigation assistance
+- difficulty adaptation
+- configurable gameplay assistance
+
+Wisp could dynamically adjust assistance according to player preference.
+
+---
+
+# SOL-14 — Autonomous Gameplay Agents
+
+**Status:** TODO / NOT CERTIFIED
+
+Only after the observation/action infrastructure is mature.
+
+Create agents capable of:
+
+```text
+OBSERVE
+  |
+UNDERSTAND
+  |
+PLAN
+  |
+ACT
+  |
+OBSERVE RESULT
+  |
+ADAPT
+```
+
+Potential applications:
+
+- grinding
+- farming
+- navigation
+- repetitive tasks
+- testing
+- practice
+- experimentation
+- game QA
+- AI companion behavior
+
+This could become one of SOLITH's technically hardest systems.
+
+---
+
+# SOL-15 — Gaming Overlay / Command Center
+
+**Status:** TODO / NOT CERTIFIED
+
+The player needs one coherent interface.
+
+Potential UI:
+
+```text
++----------------------------------------------+
+| SOLITH                         ATOMFALL       |
++----------------------------------------------+
+| WISP                                          |
+|                                                |
+| "You're entering a high-radiation area."      |
++-------------+-------------+--------------------+
+| GAME STATE  | TRAINER     | PERFORMANCE        |
+| HP 82%      | God Mode o  | FPS 117             |
+| Ammo 24     | Ammo     o  | GPU 91%             |
+| Quest ...   | Speed    o  | VRAM 8.4 GB         |
++-------------+-------------+--------------------+
+| Mods | Saves | Guides | Automation | Wisp       |
++----------------------------------------------+
+```
+
+Desktop application plus optional in-game overlay where technically appropriate.
+
+---
+
+# SOL-16 — Game Adapter SDK
+
+**Status:** TODO / NOT CERTIFIED
+
+SOLITH cannot hard-code everything. Create a formal adapter system.
+
+```text
+SOLITH CORE
+    |
+    |-- Game Adapter
+    |      |-- identity
+    |      |-- observation
+    |      |-- actions
+    |      |-- trainer
+    |      |-- saves
+    |      |-- mods
+    |      `-- telemetry
+    |
+    |-- Game Adapter
+    |
+    `-- Game Adapter
+```
+
+Adding another supported game should eventually mean implementing an
+adapter rather than modifying SOLITH Core. This is essential for scaling.
+
+---
+
+# SOL-17 — Gaming Capability Registry
+
+**Status:** TODO / NOT CERTIFIED
+
+Every capability should be machine-readable. Example:
+
+```text
+GAME: Atomfall
+
+Observation
+  process                 CERTIFIED
+  screen                  CERTIFIED
+  inventory               VERIFIED
+
+Wisp
+  contextual assistance   CERTIFIED
+  adaptive hints          VERIFIED
+
+Trainer
+  health modification     SUPPORTED
+  inventory modification  UNSUPPORTED
+
+Automation
+  navigation              EXPERIMENTAL
+
+Saves
+  backup                   CERTIFIED
+  structured editing      UNSUPPORTED
+```
+
+This prevents SOLITH from pretending every game supports everything.
+
+---
+
+# SOL-18 — Safety, Integrity & Recovery
+
+**Status:** TODO / NOT CERTIFIED
+
+Keep security — but make it gaming-specific.
+
+Protect against:
+
+- wrong-process attachment
+- stale PID reuse
+- wrong game version
+- corrupted saves
+- incompatible mods
+- invalid trainer profiles
+- uncontrolled input
+- runaway automation
+- unexpected game state
+- conflicting modifications
+
+Maintain the existing emergency-stop concept. One command/button should
+immediately stop SOLITH gameplay control.
+
+---
+
+# SOL-19 — Test & Certification Platform
+
+**Status:** TODO / NOT CERTIFIED
+
+This needs to become unusually strong because live-game interaction is
+difficult to reproduce.
+
+Build:
+
+- simulated games
+- fixture processes
+- fake telemetry
+- recorded sessions
+- deterministic game-state streams
+- input/action verification
+- save fixtures
+- trainer fixtures
+- adapter conformance tests
+
+Then use actual games for final runtime certification.
+
+The maturity ladder remains:
+
+```text
+PROPOSED
+  |
+IMPLEMENTED
+  |
+TESTED
+  |
+INTEGRATED
+  |
+VERIFIED
+  |
+CERTIFIED
+```
+
+---
+
+# SOL-20 — SOLITH 1.0 Certification
+
+**Status:** TODO / NOT CERTIFIED
+
+Do **not** define 1.0 as "supports every game." That would never finish.
+
+Define SOLITH 1.0 by proving the architecture across a small set of
+representative games. Target roughly **3-5 games** with substantially
+different architectures. Each should demonstrate different SOLITH
+capabilities.
+
+Atomfall can remain one of the certification titles because real-process
+evidence is already established there.
+
+SOLITH 1.0 needs to prove:
+
+**discover -> identify -> attach -> observe -> understand -> assist -> interact -> modify where supported -> automate -> detach -> recover**
+
+with reproducible evidence.
+
+---
+
+# SOL-21 — Game Coverage Expansion
+
+**Status:** TODO / NOT CERTIFIED
+
+Only after 1.0. Then start expanding the adapter library.
+
+Prioritize games based on:
+
+**popularity x technical feasibility x capability coverage x Wisp usefulness x trainer/mod ecosystem**
+
+rather than simply adding games randomly.
+
+---
+
+# SOL-22 — Advanced Gaming Intelligence
+
+**Status:** TODO / NOT CERTIFIED
+
+Longer-term research:
+
+- learned player models
+- personalized coaching
+- adaptive difficulty assistance
+- gameplay strategy modeling
+- multimodal game understanding
+- long-horizon gameplay planning
+- persistent AI companions
+- cross-session learning
+- procedural strategy generation
+- automatic game-mechanic discovery
+- game-state prediction
+
+This is where SOLITH moves from a sophisticated trainer/assistant into
+genuine **gaming intelligence**.
+
+---
+
+# The resulting SOLITH stack
+
+```text
+                   +--------------------+
+                   |       PLAYER       |
+                   +---------+----------+
+                             |
+                   +---------v----------+
+                   |       WISP         |
+                   | Gaming Companion   |
+                   +---------+----------+
+                             |
+             +---------------v----------------+
+             |      GAMING INTELLIGENCE       |
+             | Reasoning / Planning / Memory  |
+             +---------------+----------------+
+                             |
+      +----------------------+----------------------+
+      v                      v                      v
+ KNOWLEDGE              GAME STATE             AUTOMATION
+      |                      |                      |
+      +--------------+-------+--------+-------------+
+      v              v                v             v
+   TRAINER          SAVES            MODS        ASSISTANCE
+      |              |                |             |
+      +--------------+--------+-------+-------------+
+                              v
+                    GAME ADAPTER LAYER
+                              |
+             +----------------+----------------+
+             v                v                v
+        OBSERVATION          INPUT         TELEMETRY
+             |                |                |
+             +----------------+----------------+
+                              v
+                           GAME
+```
