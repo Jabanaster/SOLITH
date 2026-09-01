@@ -61,19 +61,31 @@ function captureOutput(app: ElectronApplication): Capture {
 
 // electronApp.evaluate() occasionally races a transient internal navigation
 // right around the moment a window becomes visible ("Execution context was
-// destroyed, most likely because of a navigation"). It self-heals — the
-// same call reliably succeeds moments later — so a single short retry is
-// enough rather than an app-level fix.
+// destroyed, most likely because of a navigation"). It self-heals — the same
+// call reliably succeeds moments later — but a single fixed 250ms retry
+// proved insufficient under load (Gate 2.5/startup-visibility hardening
+// pass: observed two consecutive destructions in one run). There is no
+// observable Electron/CDP event for "the new execution context is stable"
+// to wait on instead, so this retries the evaluate call itself — the only
+// available signal — with a small bounded number of attempts and mild
+// backoff rather than one fixed sleep or an unbounded loop.
 async function evaluateWithRetry<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    if (error instanceof Error && /Execution context was destroyed/.test(error.message)) {
-      await new Promise((r) => setTimeout(r, 250));
-      return fn();
+  const maxAttempts = 5;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof Error) || !/Execution context was destroyed/.test(error.message)) {
+        throw error;
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 150 * attempt));
+      }
     }
-    throw error;
   }
+  throw lastError;
 }
 
 async function isMainWindowVisible(app: ElectronApplication): Promise<boolean> {
@@ -165,8 +177,18 @@ test.describe('ready path (real renderer load, normal fallback bound)', () => {
     expect(showMarks.length).toBe(1);
   });
 
-  test('no unhandled rejection reached the process (real run includes a caught Game Bar failure)', () => {
-    expect(capture.marks).toContain('gamebar-transport-failed');
+  test('Game Bar transport settles to exactly one supported outcome without an unhandled rejection', () => {
+    // startGameBarTransport() is expected to succeed on machines where the
+    // Xbox Game Bar overlay transport is available and to fail gracefully
+    // (caught, logged, gameBarTransport left unset) where it is not — both
+    // are valid product outcomes and which one occurs depends on the host
+    // machine, not on product correctness. This asserts the *contract*
+    // (exactly one outcome mark, no unhandled rejection) rather than
+    // asserting failure specifically, which previously made this suite
+    // fail on any machine where the transport actually succeeds.
+    const doneCount = capture.marks.filter((m) => m === 'gamebar-transport-done').length;
+    const failedCount = capture.marks.filter((m) => m === 'gamebar-transport-failed').length;
+    expect(doneCount + failedCount).toBe(1);
     const unhandled = capture.stderr.join('').match(/unhandledrejection|UnhandledPromiseRejection/i);
     expect(unhandled).toBeNull();
   });

@@ -17,9 +17,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRecipes: (gameId: string) => ipcRenderer.invoke('get-recipes', gameId),
   createRecipe: (recipeData: any) => ipcRenderer.invoke('create-recipe', recipeData),
   getJournal: (gameId?: string) => ipcRenderer.invoke('get-journal', gameId),
+  getProposals: (gameId: string) => ipcRenderer.invoke('get-proposals', gameId),
   logEvent: (eventData: any) => ipcRenderer.invoke('log-event', eventData),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSetting: (key: string, value: any) => ipcRenderer.invoke('set-setting', key, value),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  listNotifications: () => ipcRenderer.invoke('list-notifications'),
+  getUnreadNotificationCount: () => ipcRenderer.invoke('get-unread-notification-count'),
+  createNotification: (payload: {
+    category: string;
+    title: string;
+    message: string;
+    severity?: string;
+    action?: { type: 'open-view'; view: string };
+  }) => ipcRenderer.invoke('create-notification', payload),
+  markNotificationRead: (id: string) => ipcRenderer.invoke('mark-notification-read', { id }),
+  markAllNotificationsRead: () => ipcRenderer.invoke('mark-all-notifications-read'),
+  clearNotificationHistory: () => ipcRenderer.invoke('clear-notification-history'),
+  onNotificationCreated: (callback: (record: {
+    id: string;
+    category: string;
+    title: string;
+    message: string;
+    severity: string;
+    createdAt: string;
+    read: boolean;
+    action?: { type: 'open-view'; view: string };
+  }) => void) => {
+    const listener = (_event: unknown, record: any) => callback(record);
+    ipcRenderer.on('notification-created', listener);
+    return () => ipcRenderer.removeListener('notification-created', listener);
+  },
   deleteRecipe: (recipeId: string) => ipcRenderer.invoke('delete-recipe', recipeId),
   getBackups: (gameId: string) => ipcRenderer.invoke('get-backups', gameId),
   restoreBackup: (backupId: string) => ipcRenderer.invoke('restore-backup', backupId),
@@ -257,6 +285,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-catalog-approve-save-path', payload),
   trainerCatalogImportYaml: (payload: { yamlText: string }) =>
     ipcRenderer.invoke('trainer-catalog-import-yaml', payload),
+  trainerCatalogIdentityReviewList: () => ipcRenderer.invoke('trainer-catalog-identity-review-list'),
+  trainerCatalogIdentityReviewCount: () => ipcRenderer.invoke('trainer-catalog-identity-review-count'),
+  trainerCatalogIdentityReviewResolve: (payload: {
+    id: string;
+    resolution: 'keep-existing' | 'accept-incoming' | 'treat-separate' | 'ignore';
+  }) => ipcRenderer.invoke('trainer-catalog-identity-review-resolve', payload),
   trainerCatalogPickCt: () => ipcRenderer.invoke('trainer-catalog-pick-ct'),
   trainerCatalogPreviewCt: (payload: { filePath: string; xmlText: string; title: string; sha256: string }) =>
     ipcRenderer.invoke('trainer-catalog-preview-ct', payload),
@@ -271,6 +305,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('trainer-catalog-feedback-record', payload),
   trainerCatalogFeedbackSummary: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-feedback-summary', payload),
+  trainerCatalogSetOwned: (payload: { catalogGameId: string; owned: boolean }) =>
+    ipcRenderer.invoke('trainer-catalog-set-owned', payload),
+  artworkCacheRefresh: (payload?: { catalogGameIds?: string[] }) => ipcRenderer.invoke('artwork-cache-refresh', payload ?? {}),
+  artworkCacheRetryMissing: () => ipcRenderer.invoke('artwork-cache-retry-missing'),
+  artworkCacheStatus: () => ipcRenderer.invoke('artwork-cache-status'),
+  artworkCachePause: () => ipcRenderer.invoke('artwork-cache-pause'),
+  artworkCacheResume: () => ipcRenderer.invoke('artwork-cache-resume'),
+  artworkCacheCancel: () => ipcRenderer.invoke('artwork-cache-cancel'),
+  catalogUpdatesStatus: () => ipcRenderer.invoke('catalog-updates-status'),
+  catalogUpdatesSetPreference: (payload: { autoUpdateEnabled?: boolean; bundledSnapshotOnly?: boolean; artworkNetworkOptOut?: boolean }) =>
+    ipcRenderer.invoke('catalog-updates-set-preference', payload),
+  catalogUpdatesImport: () => ipcRenderer.invoke('catalog-updates-import'),
+  catalogUpdatesRollbackLast: () => ipcRenderer.invoke('catalog-updates-rollback-last'),
+  aiConfigTestConnection: (payload: { provider: 'None' | 'Ollama' | 'LM Studio'; endpoint?: string; model?: string; timeout?: number }) =>
+    ipcRenderer.invoke('ai-config-test-connection', payload),
   trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) =>
     ipcRenderer.invoke('trainer-catalog-evaluate-promotion', payload),
   trainerCatalogPromoteVerified: (payload: { catalogGameId: string }) =>
@@ -451,6 +500,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('install-discovery-commit', payload),
   installDiscoveryList: () => ipcRenderer.invoke('install-discovery-list'),
 
+  listGameLibrary: (payload?: { view?: 'installed' | 'all' | 'owned' }) =>
+    ipcRenderer.invoke('list-game-library', payload ?? {}),
+  listCanonicalGames: () => ipcRenderer.invoke('list-canonical-games'),
+  getCanonicalGame: (payload: { canonicalGameId: string }) => ipcRenderer.invoke('get-canonical-game', payload),
+  launchInstallation: (payload: { canonicalGameId: string; installationId: string }) =>
+    ipcRenderer.invoke('launch-installation', payload),
+
   trainerDeckGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-deck-get', payload),
   trainerHealthCheck: (payload?: { catalogGameId?: string }) =>
     ipcRenderer.invoke('trainer-health-check', payload ?? {}),
@@ -460,6 +516,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   catalogDemandNotify: (payload: { catalogGameId: string; kind?: 'notify' | 'verification_request' }) =>
     ipcRenderer.invoke('catalog-demand-notify', payload),
   catalogDemandList: () => ipcRenderer.invoke('catalog-demand-list'),
+  trainerCatalogAllTimePopularityList: () => ipcRenderer.invoke('trainer-catalog-all-time-popularity-list'),
   installDiscoveryOpenPath: (payload: { catalogGameId: string; targetPath?: string }) =>
     ipcRenderer.invoke('install-discovery-open-path', payload),
   catalogProcessWatchActive: (payload: { active: boolean }) =>

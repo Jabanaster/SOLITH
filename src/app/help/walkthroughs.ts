@@ -15,6 +15,7 @@ export type WalkthroughId =
   | 'data-editor'
   | 'compatibility'
   | 'recipes'
+  | 'proposal-inspector'
   | 'session-monitor'
   | 'live-memory-trainer';
 
@@ -190,6 +191,17 @@ export const walkthroughs: Record<WalkthroughId, PageWalkthroughDefinition> = {
       { id: 'safe', title: 'Unsupported versions', body: 'Unsupported or changed executable builds remain blocked until re-verified.', warning: true },
     ],
   },
+  'proposal-inspector': {
+    pageId: 'proposal-inspector',
+    title: 'How the Proposal Inspector works',
+    summary: 'Review every proposed save/data edit for a game — risk, validation, backup requirement, and dry-run result.',
+    relatedPages: ['Save Editor', 'Discovery Lab', 'Recipe Editor'],
+    sections: [
+      { id: 'inspect', title: 'Inspection only', body: 'This page never creates, approves, or rejects a proposal — it only shows what Save Editor and Discovery Lab have already proposed.' },
+      { id: 'fields', title: 'What each proposal shows', body: 'Operation, target path, old and new value, risk level, whether a backup is required, and whether its dry run passed.' },
+      { id: 'safe', title: 'Safety: nothing applies from here', body: 'Approving or applying a change always happens in Save Editor or Discovery Lab, never from this inspector.', warning: true },
+    ],
+  },
   recipes: {
     pageId: 'recipes',
     title: 'How Recipes work',
@@ -240,7 +252,8 @@ export const walkthroughAudit = [
   { viewId: 'registry-explorer', label: 'Registry Explorer', pageId: 'registry-explorer', status: 'PASS' },
   { viewId: 'data', label: 'Data Editor', pageId: 'data-editor', status: 'PASS' },
   { viewId: 'compatibility', label: 'Compatibility', pageId: 'compatibility', status: 'PASS' },
-  { viewId: 'recipes', label: 'Recipes', pageId: 'recipes', status: 'PASS' },
+  { viewId: 'recipes', label: 'Recipe Editor', pageId: 'recipes', status: 'PASS' },
+  { viewId: 'proposal-inspector', label: 'Proposal Inspector', pageId: 'proposal-inspector', status: 'PASS' },
   { viewId: 'session-monitor', label: 'Session Monitor', pageId: 'session-monitor', status: 'PASS' },
   { viewId: 'live-memory', label: 'Live Memory Trainer', pageId: 'live-memory-trainer', status: 'PASS' },
 ] as const satisfies ReadonlyArray<{

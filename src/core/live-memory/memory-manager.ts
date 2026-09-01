@@ -248,8 +248,9 @@ export class MemoryManager {
       reason: options.reason ?? 'confirm',
       userApproved,
     });
-    if (snap.ok === false) {
-      return { ...confirm, snapshotError: snap.error };
+    if (snap.ok !== true) {
+      const snapshotError = (snap as { error?: string }).error ?? 'snapshot_failed';
+      return { ...confirm, snapshotError };
     }
     return confirm;
   }

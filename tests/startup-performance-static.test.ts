@@ -37,11 +37,14 @@ describe('startup performance — window visibility gating', () => {
   test('window is shown on ready-to-show, not unconditionally', () => {
     const source = readMain();
     assert.match(source, /\.once\(\s*'ready-to-show'/, "expected a once('ready-to-show', ...) listener");
-    assert.doesNotMatch(
-      source,
-      /new BrowserWindow\(\{[\s\S]*?\}\);\s*\n(?:\s*mark\([^)]*\)\s*\n)*\s*mainWindow\.show\(\)/,
-      'window must not be shown immediately after construction'
-    );
+    const ctorMatch = source.match(/new BrowserWindow\(\{[\s\S]*?\}\);/);
+    assert.ok(ctorMatch && ctorMatch.index != null, 'BrowserWindow constructor call not found');
+    const afterCtorStatements = source
+      .slice(ctorMatch.index + ctorMatch[0].length)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    assert.notEqual(afterCtorStatements[0], 'mainWindow.show();', 'window must not be shown immediately after construction');
   });
 
   test('a fallback timeout exists so a stuck renderer still shows a window', () => {

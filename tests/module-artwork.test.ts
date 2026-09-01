@@ -27,6 +27,7 @@ describe('sidebar module artwork mapping', () => {
       data: 'hoodedProfile',
       compatibility: 'hoodedProfile',
       recipes: 'hoodedProfile',
+      'proposal-inspector': 'recoveryPhoenix',
       'session-monitor': 'advancedDragon',
       'live-memory': 'advancedDragon',
       'registry-explorer': 'hoodedProfile',

@@ -5,6 +5,7 @@ import { parseCheatTableXml, type CtImportResult } from './ct-import.js';
 import { parseCheatTableMetadata } from './ct-metadata.js';
 import { analyzeCheatTableScripts, buildScriptResearchNotes } from '../script-research/ct-script-research.js';
 import { solithDefinitionToModPack } from './mod-pack-adapter.js';
+import { validateXmlSafety } from '../adapters/xml.js';
 
 export interface ImportCtOutcome {
   success: true;
@@ -54,6 +55,17 @@ function catalogEntryFromImport(result: CtImportResult): TrainerCatalogEntry {
 }
 
 export async function importDefinitionCt(xmlText: string, options: { title?: string } = {}): Promise<ImportCtOutcome | ImportCtFailure> {
+  // Finding 1 (independent security review, ef254d1): this is the true
+  // top-level entry point for the fallback/metadata import path. Validate
+  // once, before ANY parser (main table, metadata fallback, script-research)
+  // touches the raw XML. accepted.length === 0 must never be treated as
+  // proof the document was safe — it only means "no supported pointer
+  // entries", which is also true for a rejected/unsafe document.
+  const safety = validateXmlSafety(xmlText);
+  if (!safety.safe) {
+    return { success: false, errors: [`xml_safety_violation:${safety.error ?? 'unknown'}`] };
+  }
+
   const parsed = await parseCheatTableXml(xmlText, options);
 
   if (parsed.accepted.length === 0) {
@@ -164,6 +176,12 @@ export async function previewDefinitionCt(
   xmlText: string,
   options: { title?: string } = {},
 ): Promise<PreviewCtOutcome | ImportCtFailure> {
+  // See importDefinitionCt above — same authoritative boundary applies to preview.
+  const safety = validateXmlSafety(xmlText);
+  if (!safety.safe) {
+    return { success: false, errors: [`xml_safety_violation:${safety.error ?? 'unknown'}`] };
+  }
+
   const parsed = await parseCheatTableXml(xmlText, options);
 
   if (parsed.accepted.length === 0) {

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { BrandingArtwork } from '../components/BrandingArtwork.js';
+
+type GameLauncherIdentity = 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
 
 interface Game {
   id: string;
@@ -17,6 +19,7 @@ interface Game {
   metadataId?: string;
   fingerprint?: any;
   needsRescan?: boolean;
+  launcher?: GameLauncherIdentity;
 }
 
 interface GameFormPayload {
@@ -29,6 +32,7 @@ interface GameFormPayload {
   saveLocations?: string[];
   notes?: string;
   metadataId?: string;
+  launcher?: GameLauncherIdentity;
 }
 
 interface GameLibraryProps {
@@ -37,13 +41,86 @@ interface GameLibraryProps {
   onAddGame?: (gameData: GameFormPayload) => Promise<{ success?: boolean; error?: string } | void> | { success?: boolean; error?: string } | void;
 }
 
+type GameLibraryView = 'installed' | 'all' | 'owned';
+
+type GameLibraryInstallation = {
+  installationId: string;
+  launcher: GameLauncherIdentity;
+  edition?: string;
+  installPath?: string;
+  executablePath?: string;
+  buildVersion?: string;
+  launchUri?: string;
+  lastSeenAt: string;
+  detectionSource: 'auto-detected' | 'manual';
+  active: boolean;
+  sourceGameId?: string;
+};
+
+type GameLibraryRecord = {
+  canonicalGameId: string;
+  title: string;
+  aliases: string[];
+  artworkUrl?: string;
+  supportState: 'supported' | 'partial' | 'unsupported' | 'unknown';
+  trainerAvailability: 'available' | 'unavailable' | 'unknown';
+  verificationStatus: 'verified' | 'community' | 'metadata-only' | 'unverified' | 'unknown';
+  ownershipStatus?: 'owned';
+  manuallyAdded: boolean;
+  installations: GameLibraryInstallation[];
+  saveLocations: string[];
+};
+
+const LAUNCHER_LABELS: Record<GameLibraryInstallation['launcher'], string> = {
+  steam: 'Steam',
+  epic: 'Epic',
+  gog: 'GOG',
+  xbox: 'Xbox',
+  ubisoft: 'Ubisoft Connect',
+  ea: 'EA app',
+  battlenet: 'Battle.net',
+  manual: 'Standalone',
+};
+
+const LAUNCHER_SELECT_OPTIONS: Array<{ value: GameLauncherIdentity; label: string }> = [
+  { value: 'manual', label: 'Standalone' },
+  { value: 'steam', label: 'Steam' },
+  { value: 'gog', label: 'GOG' },
+  { value: 'epic', label: 'Epic Games Store' },
+  { value: 'xbox', label: 'Xbox / Microsoft Store' },
+  { value: 'ubisoft', label: 'Ubisoft Connect' },
+  { value: 'ea', label: 'EA app' },
+  { value: 'battlenet', label: 'Battle.net' },
+];
+
+const GAME_LIBRARY_VIEW_KEY = 'solith-game-library-view';
+
+function readInitialView(): GameLibraryView {
+  try {
+    const saved = localStorage.getItem(GAME_LIBRARY_VIEW_KEY);
+    if (saved === 'installed' || saved === 'all' || saved === 'owned') return saved;
+  } catch {
+    // ignore — no localStorage access
+  }
+  return 'installed';
+}
+
 const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame }) => {
+  const [view, setView] = useState<GameLibraryView>(readInitialView);
+  const [records, setRecords] = useState<GameLibraryRecord[] | null>(null);
+  const [recordsError, setRecordsError] = useState('');
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [launchStatus, setLaunchStatus] = useState<Record<string, string>>({});
+  const [rescanning, setRescanning] = useState(false);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [newGameName, setNewGameName] = useState('');
   const [newGamePath, setNewGamePath] = useState('');
   const [newGameExecutable, setNewGameExecutable] = useState('');
-  const [newGameLauncher, setNewGameLauncher] = useState('');
+  const [newGameLauncher, setNewGameLauncher] = useState<GameLauncherIdentity>('manual');
   const [newGameSaveLocations, setNewGameSaveLocations] = useState('');
   const [newGameCover, setNewGameCover] = useState('');
   const [newGameIcon, setNewGameIcon] = useState('');
@@ -56,6 +133,33 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
   useEffect(() => {
     loadSettings();
   }, []);
+
+  const loadRecords = useCallback(async () => {
+    if (!window.electronAPI?.listGameLibrary) return;
+    setRecordsLoading(true);
+    setRecordsError('');
+    try {
+      const result = await window.electronAPI.listGameLibrary({ view });
+      if (result.success) {
+        setRecords(result.records ?? []);
+      } else {
+        setRecordsError(result.error ?? 'Could not load Game Library.');
+        setRecords([]);
+      }
+    } catch (err) {
+      setRecordsError(err instanceof Error ? err.message : 'Could not load Game Library.');
+      setRecords([]);
+    } finally {
+      setRecordsLoading(false);
+    }
+  }, [view]);
+
+  useEffect(() => {
+    void loadRecords();
+    // Re-fetch whenever the legacy games table changes (add/edit/remove/scan), since
+    // manual entries feed the canonical model through the migration bridge.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, games]);
 
   const loadSettings = async () => {
     try {
@@ -77,12 +181,21 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     }
   };
 
+  const selectView = (next: GameLibraryView) => {
+    setView(next);
+    try {
+      localStorage.setItem(GAME_LIBRARY_VIEW_KEY, next);
+    } catch {
+      // ignore — no localStorage access
+    }
+  };
+
   const resetManualForm = () => {
     setEditingGame(null);
     setNewGameName('');
     setNewGamePath('');
     setNewGameExecutable('');
-    setNewGameLauncher('');
+    setNewGameLauncher('manual');
     setNewGameSaveLocations('');
     setNewGameCover('');
     setNewGameIcon('');
@@ -96,14 +209,12 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     setShowAddModal(true);
   };
 
-  const openEditModal = (game: Game, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const openEditModalForGame = (game: Game) => {
     setEditingGame(game);
     setNewGameName(game.name);
     setNewGamePath(game.path);
     setNewGameExecutable(game.executablePath ?? '');
-    setNewGameLauncher(game.engine === 'Generic' ? '' : game.engine ?? '');
+    setNewGameLauncher(game.launcher ?? 'manual');
     setNewGameSaveLocations((game.saveLocations ?? []).join('\n'));
     setNewGameCover(game.coverPath ?? '');
     setNewGameIcon(game.iconPath ?? '');
@@ -158,11 +269,9 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
       setModalError(`This path is already recorded for ${duplicate.name}.`);
       return;
     }
-    const engine = newGameLauncher.trim() || 'Manual';
     const payload: GameFormPayload = {
       name: nameToSave,
       path: pathToSave,
-      engine,
       executablePath: newGameExecutable.trim() || undefined,
       coverPath: newGameCover.trim() || undefined,
       iconPath: newGameIcon.trim() || undefined,
@@ -172,6 +281,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
         .filter(Boolean),
       notes: newGameNotes.trim() || undefined,
       metadataId: newGameMetadataId.trim() || undefined,
+      launcher: newGameLauncher,
     };
     if (editingGame) {
       const result = await window.electronAPI?.updateGame?.({
@@ -204,9 +314,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     closeModal();
   };
 
-  const handleRemoveGame = async (game: Game, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleRemoveGame = async (game: Game) => {
     const confirmed = window.confirm(
       `Remove "${game.name}" from the local Solith library? This does not delete game files.`,
     );
@@ -221,9 +329,7 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     }
   };
 
-  const handleScan = async (e: React.MouseEvent, gameId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleScan = async (gameId: string) => {
     setLoading(true);
     try {
       await window.electronAPI.scanGame(gameId);
@@ -237,21 +343,62 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
     }
   };
 
+  const handleRescanLaunchers = async () => {
+    setRescanning(true);
+    try {
+      await window.electronAPI.installDiscoveryScan();
+      await loadRecords();
+    } catch (err) {
+      console.error('Failed to rescan launchers:', err);
+    } finally {
+      setRescanning(false);
+    }
+  };
+
+  const handleLaunch = async (record: GameLibraryRecord, installation: GameLibraryInstallation) => {
+    const key = installation.installationId;
+    setLaunchStatus((prev) => ({ ...prev, [key]: 'Launching…' }));
+    try {
+      const result = await window.electronAPI.launchInstallation({
+        canonicalGameId: record.canonicalGameId,
+        installationId: installation.installationId,
+      });
+      setLaunchStatus((prev) => ({ ...prev, [key]: result.success ? '' : (result.error ?? 'Launch failed.') }));
+    } catch (err) {
+      setLaunchStatus((prev) => ({ ...prev, [key]: err instanceof Error ? err.message : 'Launch failed.' }));
+    }
+  };
+
+  const matchesSearch = (record: GameLibraryRecord): boolean => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    if (record.title.toLowerCase().includes(q)) return true;
+    return record.aliases.some((alias) => alias.toLowerCase().includes(q));
+  };
+
+  const visibleRecords = (records ?? []).filter(matchesSearch);
+
+  const trainerBadgeLabel = (availability: GameLibraryRecord['trainerAvailability']): string => {
+    if (availability === 'available') return 'Trainer available';
+    if (availability === 'unavailable') return 'Trainer unavailable';
+    return 'Trainer: unknown';
+  };
+
   return (
     <div className="game-library">
       <PageModuleHeader
         artwork="gameLibraryControllerMonitors"
         title="Game Library"
-        description="Manage local game folders, scan files, and edit saves"
+        description="Your installed-game hub: detected launchers, manually-added games, and local file records"
         walkthroughId="game-library"
         actions={<button id="game-library-add-manual" onClick={openAddModal} className="btn-add">+ Add Game Manually</button>}
       />
 
       <div className="settings-panel glass">
         <label className="checkbox-container">
-          <input 
-            type="checkbox" 
-            checked={externalScanEnabled} 
+          <input
+            type="checkbox"
+            checked={externalScanEnabled}
             onChange={handleToggleExternalScan}
           />
           <span className="checkmark"></span>
@@ -261,83 +408,173 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
           </div>
         </label>
       </div>
-      
-      {games.length === 0 ? (
+
+      <nav className="game-library-tabs" aria-label="Game Library views">
+        {(['installed', 'all', 'owned'] as GameLibraryView[]).map((tabView) => (
+          <button
+            key={tabView}
+            type="button"
+            className={tabView === view ? 'active' : ''}
+            aria-current={tabView === view ? 'page' : undefined}
+            onClick={() => selectView(tabView)}
+          >
+            {tabView === 'installed' ? 'Installed' : tabView === 'all' ? 'All' : 'Owned'}
+          </button>
+        ))}
+        <input
+          type="search"
+          className="game-library-search"
+          placeholder="Search by title or alias…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Search Game Library"
+        />
+        <button type="button" className="btn-secondary" onClick={() => void handleRescanLaunchers()} disabled={rescanning}>
+          {rescanning ? 'Rescanning…' : '🔄 Rescan launchers'}
+        </button>
+      </nav>
+
+      {recordsError && <p className="no-scan-text">{recordsError}</p>}
+
+      {!recordsLoading && visibleRecords.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon-slot">
             <BrandingArtwork artwork="gameLibraryControllerMonitors" size="empty" />
           </div>
-          <h3>No games added yet</h3>
-          <p>Add a local game directory to build custom file-backed trainers.</p>
+          <h3>
+            {view === 'installed' ? 'No installed games detected yet' : view === 'owned' ? 'No proven ownership yet' : 'No games recorded yet'}
+          </h3>
+          <p>
+            {view === 'owned'
+              ? 'Ownership is only shown when Solith has trustworthy evidence — connected launcher accounts are not supported yet.'
+              : 'Add a game manually, or rescan detected launchers, to populate the library.'}
+          </p>
           <button id="game-library-empty-add-manual" onClick={openAddModal} className="btn-primary empty-state-cta">Add Game Manually</button>
         </div>
       ) : (
         <div className="game-grid">
-          {games.map(game => {
-            const hasScan = !!game.fingerprint;
-            const fileCount = game.fingerprint?.fileCount || 0;
-            const totalSizeMB = game.fingerprint?.totalSize ? (game.fingerprint.totalSize / (1024 * 1024)).toFixed(1) : '0';
-
+          {visibleRecords.map((record) => {
+            const launchers = [...new Set(record.installations.map((i) => LAUNCHER_LABELS[i.launcher]))];
+            const isExpanded = expandedCard === record.canonicalGameId;
             return (
-              <div 
-                key={game.id} 
-                className={`game-card glass ${game.needsRescan ? 'border-warning' : ''}`}
-              >
-                <div 
-                  className="game-card-clickable"
-                  onClick={() => onSelect(game.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(game.id); }}
-                >
-                  <div className="game-card-art" aria-hidden="true">
+              <div key={record.canonicalGameId} className="game-card glass">
+                <div className="game-card-art" aria-hidden="true">
+                  {record.artworkUrl ? (
+                    <img src={record.artworkUrl} alt="" loading="lazy" />
+                  ) : (
                     <BrandingArtwork artwork="gameLibraryControllerMonitors" size="section" />
-                  </div>
-                  <div className="game-card-content">
-                    <div className="game-card-header">
-                      <h3 className="game-name">{game.name}</h3>
-                      <span className={`badge engine-badge ${game.engine?.toLowerCase() || 'generic'}`}>
-                        {game.engine || 'Manual'}
-                      </span>
-                    </div>
-                    
-                    <div className="game-path" title={game.path}>
-                      📁 {game.path}
-                    </div>
-
-                    {hasScan ? (
-                      <div className="game-stats">
-                        <div>📄 <strong>{fileCount}</strong> scanned files</div>
-                        <div>💾 <strong>{totalSizeMB} MB</strong> total size</div>
-                      </div>
-                    ) : (
-                      <p className="no-scan-text">⚠️ Game not scanned. Scan now to discover saves & configurations.</p>
-                    )}
-                  </div>
+                  )}
                 </div>
+                <div className="game-card-content">
+                  <div className="game-card-header">
+                    <h3 className="game-name">{record.title}</h3>
+                    {record.ownershipStatus === 'owned' && <span className="badge">Owned</span>}
+                  </div>
 
-                <div className="game-card-actions">
-                  <button 
-                    onClick={(e) => handleScan(e, game.id)} 
-                    className="btn-scan"
-                    disabled={loading}
-                  >
-                    {loading ? 'Scanning...' : '🔍 Scan Folder'}
-                  </button>
+                  <div className="game-card-badges">
+                    {launchers.map((label) => (
+                      <span key={label} className="badge engine-badge">{label}</span>
+                    ))}
+                    <span className="badge">{trainerBadgeLabel(record.trainerAvailability)}</span>
+                    <span className="badge">{record.verificationStatus === 'unknown' ? 'Verification: unknown' : record.verificationStatus}</span>
+                  </div>
+
                   <button
-                    onClick={(e) => openEditModal(game, e)}
-                    className="btn-scan"
-                    disabled={loading}
+                    type="button"
+                    className="btn-secondary"
+                    aria-expanded={isExpanded}
+                    onClick={() => setExpandedCard(isExpanded ? null : record.canonicalGameId)}
                   >
-                    Edit local record
+                    {isExpanded ? 'Hide installations' : `Show installations (${record.installations.length})`}
                   </button>
-                  <button
-                    onClick={(e) => void handleRemoveGame(game, e)}
-                    className="btn-scan"
-                    disabled={loading}
-                  >
-                    Remove entry only
-                  </button>
+
+                  {isExpanded && (
+                    <div className="game-card-installations">
+                      {record.installations.map((installation) => {
+                        const legacyGame = installation.sourceGameId
+                          ? games.find((g) => g.id === installation.sourceGameId)
+                          : undefined;
+                        return (
+                          <div key={installation.installationId} className={`installation-row ${installation.active ? '' : 'installation-inactive'}`}>
+                            <div className="installation-row-header">
+                              <strong>{LAUNCHER_LABELS[installation.launcher]}</strong>
+                              {installation.edition && <span> — {installation.edition}</span>}
+                              {!installation.active && <span className="badge">No longer detected</span>}
+                            </div>
+                            {installation.installPath && (
+                              <div className="game-path" title={installation.installPath}>📁 {installation.installPath}</div>
+                            )}
+                            <div className="installation-row-meta">
+                              Last seen: {new Date(installation.lastSeenAt).toLocaleString()}
+                            </div>
+                            <div className="installation-row-actions">
+                              {installation.executablePath && (
+                                <button
+                                  type="button"
+                                  className="btn-scan"
+                                  onClick={() => void handleLaunch(record, installation)}
+                                >
+                                  ▶ Launch
+                                </button>
+                              )}
+                              {legacyGame && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-scan"
+                                    disabled={loading}
+                                    onClick={() => void handleScan(legacyGame.id)}
+                                  >
+                                    {loading ? 'Scanning...' : '🔍 Scan Folder'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-scan"
+                                    onClick={() => openEditModalForGame(legacyGame)}
+                                  >
+                                    Edit local record
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-scan"
+                                    onClick={() => void handleRemoveGame(legacyGame)}
+                                  >
+                                    Remove entry only
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            {launchStatus[installation.installationId] && (
+                              <p className="no-scan-text">{launchStatus[installation.installationId]}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {record.saveLocations.length > 0 && (
+                        <div className="installation-row">
+                          <strong>Save locations</strong>
+                          <ul>
+                            {record.saveLocations.map((location) => (
+                              <li key={location} title={location}>{location}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {record.installations.some((i) => i.sourceGameId) && (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            const withGame = record.installations.find((i) => i.sourceGameId);
+                            const legacyGame = withGame ? games.find((g) => g.id === withGame.sourceGameId) : undefined;
+                            if (legacyGame) onSelect(legacyGame.id);
+                          }}
+                        >
+                          Open save editor / trainer detail
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -387,13 +624,17 @@ const GameLibrary: React.FC<GameLibraryProps> = ({ games, onSelect, onAddGame })
               </button>
             </div>
             <div className="input-group">
-              <label>Launcher / Source</label>
-              <input
-                type="text"
-                placeholder="Manual, Steam, GOG, Epic, Xbox"
+              <label>Launcher</label>
+              <select
                 value={newGameLauncher}
-                onChange={(e) => setNewGameLauncher(e.target.value)}
-              />
+                onChange={(e) => setNewGameLauncher(e.target.value as GameLauncherIdentity)}
+              >
+                {LAUNCHER_SELECT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="input-group">
               <label>Save Locations (optional, persisted)</label>

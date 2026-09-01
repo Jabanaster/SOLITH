@@ -223,8 +223,10 @@ export function registerRegistryVerificationIpc(): void {
     }
   });
 
-  ipcMain.handle('registry-compare-restart-artifacts', async (_event, payload: unknown) => {
+  ipcMain.handle('registry-compare-restart-artifacts', async (event, payload: unknown) => {
     try {
+      const senderCheck = validateIpcSender(event, ['main']);
+      if (!senderCheck.ok) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const parsed = CompareRestartSchema.parse(payload);
       if (!isHeadlessArtifact(parsed.previous) || !isHeadlessArtifact(parsed.current)) {
         return { success: false, error: 'Restart comparison requires two headless read-only verification artifacts.' };

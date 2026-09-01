@@ -3,6 +3,7 @@ import React from 'react';
 import activitySvg from './activity.svg?raw';
 import applySvg from './apply.svg?raw';
 import backupsSvg from './backups.svg?raw';
+import bellSvg from './bell.svg?raw';
 import blockedSvg from './blocked.svg?raw';
 import cancelSvg from './cancel.svg?raw';
 import cautionSvg from './caution.svg?raw';
@@ -21,6 +22,7 @@ const ICONS = {
   activity: activitySvg,
   apply: applySvg,
   backups: backupsSvg,
+  bell: bellSvg,
   blocked: blockedSvg,
   cancel: cancelSvg,
   caution: cautionSvg,

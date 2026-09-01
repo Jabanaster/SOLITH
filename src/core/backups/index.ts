@@ -6,6 +6,7 @@ import db from '../database/index.js';
 import { getGameById } from '../games/index.js';
 import { acquireFileLock, releaseFileLock } from '../safety/file-lock.js';
 import { getCanonicalPath, validatePathSafety as validateCentralPathSafety } from '../safety/path-safety.js';
+import { renameOrCopyAcrossDevices } from '../safety/exdev-safe-rename.js';
 
 // Re-export Backup type for consumers
 export type { Backup } from '../../shared/types/index.js';
@@ -72,16 +73,20 @@ function saveManifest(backupDir: string, manifest: BackupManifest): void {
     `manifest.${process.pid}.${Date.now()}.${crypto.randomUUID()}.json.tmp`
   );
 
-  try {
-    fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2), 'utf-8');
-    fs.renameSync(tempPath, manifestPath);
-  } finally {
-    if (fs.existsSync(tempPath)) {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {
-        // Preserve the original write/rename failure for callers.
-      }
+  fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2), 'utf-8');
+
+  // Finding 3 (independent security review, ef254d1): tempPath is the only
+  // copy of the new manifest until this proves manifestPath holds it too.
+  // Do NOT wrap this in try/finally-delete — on failure (EXDEV copy failing
+  // partway, or any other rename error) tempPath must survive as the last
+  // known-good copy, so let the exception propagate without cleanup.
+  renameOrCopyAcrossDevices(tempPath, manifestPath);
+
+  if (fs.existsSync(tempPath)) {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // The write already succeeded — a leftover temp file is harmless.
     }
   }
 }
@@ -105,10 +110,27 @@ export function createBackup(
   proposalId?: string,
   operationId?: string
 ): Backup {
-  // Validate paths
+  // Validate paths — local check first (fast, always applies), then the
+  // stronger central check (symlink/junction canonicalization, approved-root
+  // containment) scoped to the owning game's install path, matching the
+  // pattern restoreBackup already uses for its destructive write direction
+  // (Phase 7 hardening — createBackup previously relied on the local check
+  // alone, which only rejects a literal ".." substring and requires an
+  // absolute path; it does not canonicalize symlinks or enforce containment).
   validatePathSafety(targetFile);
   validatePathSafety(backupDir);
-  
+  const owningGame = getGameById(gameId);
+  if (owningGame) {
+    const targetSafety = validateCentralPathSafety(targetFile, [owningGame.path]);
+    if (!targetSafety.safe) {
+      throw new Error(targetSafety.reason || 'Target path failed containment validation.');
+    }
+  }
+  const backupDirSafety = validateCentralPathSafety(backupDir);
+  if (!backupDirSafety.safe) {
+    throw new Error(backupDirSafety.reason || 'Backup directory failed safety validation.');
+  }
+
   // Verify source file exists
   if (!fs.existsSync(targetFile)) {
     throw new Error(`Source file not found: ${targetFile}`);
@@ -280,7 +302,11 @@ export function restoreBackup(backup: Backup): boolean {
     if (targetExists) {
       fs.chmodSync(tmpPath, fs.statSync(targetPath).mode);
     }
-    fs.renameSync(tmpPath, targetPath);
+    // backupPath (the true source of truth) is untouched by this rename
+    // regardless of outcome, so — unlike saveManifest above — a failure
+    // here does not risk losing the only good copy; EXDEV just needs a
+    // fallback so a redirected restore target doesn't spuriously fail.
+    renameOrCopyAcrossDevices(tmpPath, targetPath);
     tmpPath = '';
     
     // Verify restore

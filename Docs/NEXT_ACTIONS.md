@@ -1,6 +1,9 @@
 # Next Actions
 
-> **ARCHIVED working notes** — See `ROADMAP.md` and `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` for current priorities.
+> **ARCHIVED working notes** — See `MASTER_ROADMAP.md` for current portfolio
+> priorities, `ROADMAP.md` for detailed product sequencing, and
+> `SOLITH_SECURITY_ROADMAP.md` for security gates. The archived Pinnacle plan is
+> historical only.
 
 **Updated:** 2026-07-07 — Trainer accessibility polish: `aria-disabled`/`aria-describedby` completed on all `TrainerCard.tsx` controls; confirmed `prefers-reduced-motion` already covers all animation code paths (CSS-only, no JS rAF loops exist)
 

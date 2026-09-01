@@ -1,7 +1,7 @@
 # Solith Multi-Game Live Trainer - Complete Summary
 
 > **ARCHIVED (2026-07-12)** — Historical milestone summary. Superseded by
-> `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` and `Docs/SOLITH_LIVE_TRAINER_PARITY.md`.
+> `Docs/Archive/PriorPlans/OLD_SOLITH_PINNACLE_MASTER_PLAN.md` (historical, archived) and `Docs/SOLITH_LIVE_TRAINER_PARITY.md`.
 > Competitor product names below appear only in historical research context.
 
 > **Partially superseded (checkpoint `806ba56`, 2026-07-09).** `useLiveTrainerWorkflow.ts`,

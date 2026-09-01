@@ -14,6 +14,26 @@ export type ModPackSourceProvider =
 
 export type VerificationStatus = 'verified' | 'community' | 'metadata-only' | 'unverified';
 
+/**
+ * Phase 3A (§3.1/§3.2) safety-classification evidence. 'unknown' (or the field
+ * being absent) means no trusted evidence exists yet — it must never be treated
+ * as a safe default. Never derived from title/genre/launcher/popularity.
+ */
+export type AntiCheatStatus = 'none' | 'protected-multiplayer' | 'protected-online-only' | 'unknown';
+
+/** Phase 3A (§3.2) catalog exclusion categories — explicit evidence only, never inferred. */
+export type CatalogExclusionFlag =
+  | 'mmo'
+  | 'competitive-online-only'
+  | 'no-meaningful-offline-play'
+  | 'cloud-only'
+  | 'dedicated-server'
+  | 'demo'
+  | 'soundtrack'
+  | 'editor-tool'
+  | 'dlc-only'
+  | 'unsupported-delisted';
+
 export interface ModPackSource {
   provider: ModPackSourceProvider;
   url?: string;
@@ -80,6 +100,35 @@ export interface TrainerCatalogEntry {
    * Filled by search/load IPC when a definition payload exists — not a second SoT.
    */
   capabilities?: import('../definitions/load-catalog-definition.js').CatalogDefinitionCapabilities | null;
+  /** Phase 3A safety/exclusion evidence — absent means no known evidence (see AntiCheatStatus). */
+  antiCheat?: AntiCheatStatus;
+  offlinePlayAvailable?: boolean;
+  catalogExclusionFlags?: CatalogExclusionFlag[];
+  explicitlyUnsupported?: boolean;
+  /** ROADMAP §3.5 "Newest release" — real release date from seed/import sources only; undefined = unknown. */
+  releaseDate?: string;
+  /** ROADMAP §3.5 "Recently added to SOLITH" — set once on first insert; undefined on legacy pre-migration rows. */
+  createdAt?: string;
+  /** ROADMAP §3.5 "Recently updated" — set only on a meaningful content change, not every sync/upsert; undefined = never meaningfully updated. */
+  contentUpdatedAt?: string;
+  /** ROADMAP §3.6 Mode — curated capability evidence only; undefined field = unknown, never inferred from categories/antiCheat/offlinePlayAvailable. */
+  modeCapabilities?: GameModeCapabilities;
+  /** ROADMAP §3.6 Catalog "All-time classic" — curated flag only; no age/popularity threshold is fabricated. */
+  isAllTimeClassic?: boolean;
+  /** ROADMAP §3.6 Availability "Owned" — explicit local user confirmation only (never inferred from installation/launcher/catalog presence). Set via a deliberate "Mark as owned" action, distinct from `installations` evidence in the canonical Game Library model. */
+  ownedConfirmed?: boolean;
+}
+
+/**
+ * ROADMAP §3.6 Mode capability lanes. `undefined` on any field means unknown —
+ * it must never be silently treated as `false`. Populated only by explicit
+ * curated evidence (seed/import/manual curation), never inferred.
+ */
+export interface GameModeCapabilities {
+  singlePlayer?: boolean;
+  offlineCoop?: boolean;
+  localMultiplayer?: boolean;
+  onlineFeaturesPresent?: boolean;
 }
 
 export interface TrainerCatalogSearchResult {

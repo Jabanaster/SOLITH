@@ -8,6 +8,7 @@ export type ModuleViewId =
   | 'discovery'
   | 'trainer-research'
   | 'recipes'
+  | 'proposal-inspector'
   | 'backups'
   | 'journal'
   | 'locations'
@@ -19,7 +20,8 @@ export type ModuleViewId =
   | 'ct-library'
   | 'trainer-deck'
   | 'catalog-save-controls'
-  | 'registry-explorer';
+  | 'registry-explorer'
+  | 'settings';
 
 /**
  * Icon assignment:
@@ -47,6 +49,7 @@ export const NAV_MODULE_ARTWORK: Partial<Record<ModuleViewId, SolithBrandingArtw
   data: 'hoodedProfile',
   compatibility: 'hoodedProfile',
   recipes: 'hoodedProfile',
+  'proposal-inspector': 'recoveryPhoenix',
   'session-monitor': 'advancedDragon',
   'live-memory': 'advancedDragon',
   'registry-explorer': 'hoodedProfile',

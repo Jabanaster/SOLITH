@@ -5,7 +5,10 @@
  * Enabled = immediate delta sync + non-overlapping 15-minute interval.
  */
 
-import { getSetting } from '../src/core/settings/index.js';
+import { getSetting, setSetting } from '../src/core/settings/index.js';
+import { getNotificationsCategoryEnabled } from '../src/core/settings/index.js';
+import { createNotification } from '../src/core/notifications/index.js';
+import { shouldNotifyCatalogUpdate } from '../src/core/notifications/catalogUpdateRule.js';
 import {
   syncCommunityDefinitions,
   type CommunitySyncOptions,
@@ -21,6 +24,9 @@ export interface CommunitySyncOrchestratorDeps {
   clearIntervalFn?: typeof clearInterval;
   now?: () => number;
   log?: (message: string, detail?: unknown) => void;
+  hasSyncedBefore?: () => boolean;
+  markSyncedBefore?: () => void;
+  notifyCatalogUpdate?: (importedCount: number) => void;
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -39,6 +45,40 @@ function defaultDeps(): Required<CommunitySyncOrchestratorDeps> {
         console.info(`[community-sync] ${message}`, detail);
       } else {
         console.info(`[community-sync] ${message}`);
+      }
+    },
+    // Best-effort: DB/notification wiring must never break the sync tick itself.
+    hasSyncedBefore: () => {
+      try {
+        return getSetting('communitySyncEverSucceeded') === true;
+      } catch {
+        return false;
+      }
+    },
+    markSyncedBefore: () => {
+      try {
+        setSetting('communitySyncEverSucceeded', true);
+      } catch {
+        // non-fatal
+      }
+    },
+    // Persists the notification; the real Electron bootstrap overrides this
+    // via configureCommunitySyncOrchestrator to also broadcast it to open
+    // windows (broadcasting needs the real 'electron' module, which is not
+    // safe to statically import from this file — it breaks outside Electron,
+    // including under the Node test runner).
+    notifyCatalogUpdate: (importedCount) => {
+      try {
+        if (!getNotificationsCategoryEnabled('catalog-update')) return;
+        createNotification({
+          category: 'catalog-update',
+          title: 'Catalog updated',
+          message: `${importedCount} trainer definition${importedCount === 1 ? '' : 's'} added or refreshed from the community catalog.`,
+          severity: 'info',
+          action: { type: 'open-view', view: 'trainer-library' },
+        });
+      } catch {
+        // non-fatal
       }
     },
   };
@@ -90,6 +130,15 @@ async function runSyncTick(reason: string): Promise<CommunitySyncResult | null> 
       rejected: result.rejected,
       pages: result.pages,
     });
+    if (result.status === 'synced') {
+      const hadSyncedBefore = deps.hasSyncedBefore();
+      if (shouldNotifyCatalogUpdate({ hasSyncedBefore: hadSyncedBefore, importedCount: result.imported })) {
+        deps.notifyCatalogUpdate(result.imported);
+      }
+      if (!hadSyncedBefore) {
+        deps.markSyncedBefore();
+      }
+    }
     return result;
   } catch (error) {
     deps.log(`tick ${reason} failed`, error instanceof Error ? error.message : String(error));

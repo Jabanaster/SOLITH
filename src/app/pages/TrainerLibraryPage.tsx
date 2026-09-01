@@ -1,17 +1,38 @@
-import React, { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
-import { CATALOG_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
+import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
+import { ROADMAP_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
 import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
+import {
+  projectPopularTrainerEntries,
+  POPULAR_TRAINER_LIMIT,
+  type TrainerCatalogPopularityEvidence,
+} from '../../core/trainer-catalog/popular-ranking.js';
+import {
+  sortAllGamesEntries,
+  ALL_GAMES_SORT_MODE_LABELS,
+  type AllGamesSortMode,
+} from '../../core/trainer-catalog/all-games-sorting.js';
+import {
+  filterTrainerLibraryEntries,
+  TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS,
+  TRAINER_LIBRARY_CATALOG_FILTER_LABELS,
+  TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS,
+  TRAINER_LIBRARY_MODE_FILTER_LABELS,
+  type TrainerLibraryAvailabilityFilter,
+  type TrainerLibraryCatalogFilter,
+  type TrainerLibraryLauncherFilter,
+  type TrainerLibraryModeFilter,
+} from '../../core/trainer-catalog/all-games-filters.js';
 import { describeCapabilityLanes } from '../../core/definitions/catalog-definition-capabilities.js';
 import { COMMUNITY_WARNING_LABEL } from '../../core/trainer-catalog/community-trust.js';
 import { isCommunityScanEntry, tierHint } from './trainer-library-verification-state.js';
 import { fallbackArtworkTreatment } from './trainer-card-fallback-artwork.js';
 import { isGenericTemplateEntry } from './trainer-catalog-generic-detection.js';
-import { orderCatalogDefault } from './trainer-catalog-default-order.js';
 import { PublishDefinitionModal } from '../components/PublishDefinitionModal.js';
 import type { SolithDefinitionV1 } from '../../core/definitions/schema.v1.js';
 import {
@@ -21,7 +42,106 @@ import {
 } from '../../core/ct-library/import-state.js';
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
-type SortMode = 'installed-first' | 'a-z';
+type SortMode = AllGamesSortMode;
+/** ROADMAP §3.3 — Popular is the default Trainer Library view; All Games preserves prior unranked behavior. */
+type ViewMode = 'popular' | 'all';
+/** ROADMAP §3.4 — All Games first-use notice dismissal, persisted the same way as other local-only UI preferences. */
+const ALL_GAMES_NOTICE_DISMISSED_KEY = 'trainerLibrary.allGamesNoticeDismissed';
+const ALL_GAMES_NOTICE_TEXT =
+  'All Games includes SOLITH’s full eligible catalog, including niche and less widely played titles. Use filters or search to narrow the list.';
+
+const TRAINER_LIBRARY_FILTERS_KEY = 'trainerLibrary.filters';
+
+interface RememberedTrainerLibraryFilters {
+  availability: TrainerLibraryAvailabilityFilter[];
+  catalog: TrainerLibraryCatalogFilter[];
+  genres: string[];
+  launcher: TrainerLibraryLauncherFilter[];
+  mode: TrainerLibraryModeFilter[];
+}
+
+const EMPTY_REMEMBERED_FILTERS: RememberedTrainerLibraryFilters = {
+  availability: [],
+  catalog: [],
+  genres: [],
+  launcher: [],
+  mode: [],
+};
+
+function readRememberedTrainerLibraryFilters(): RememberedTrainerLibraryFilters {
+  try {
+    const raw = window.sessionStorage.getItem(TRAINER_LIBRARY_FILTERS_KEY);
+    if (!raw) return EMPTY_REMEMBERED_FILTERS;
+    const parsed = JSON.parse(raw) as Partial<RememberedTrainerLibraryFilters>;
+    const availability = Array.isArray(parsed.availability)
+      ? parsed.availability.filter((value): value is TrainerLibraryAvailabilityFilter =>
+          typeof value === 'string' && value in TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS,
+        )
+      : [];
+    const catalog = Array.isArray(parsed.catalog)
+      ? parsed.catalog.filter((value): value is TrainerLibraryCatalogFilter =>
+          typeof value === 'string' && value in TRAINER_LIBRARY_CATALOG_FILTER_LABELS,
+        )
+      : [];
+    const genres = Array.isArray(parsed.genres)
+      ? parsed.genres.filter((value): value is string =>
+          typeof value === 'string' && ROADMAP_GENRE_FILTERS.includes(value as (typeof ROADMAP_GENRE_FILTERS)[number]),
+        )
+      : [];
+    const launcher = Array.isArray(parsed.launcher)
+      ? parsed.launcher.filter((value): value is TrainerLibraryLauncherFilter =>
+          typeof value === 'string' && value in TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS,
+        )
+      : [];
+    const mode = Array.isArray(parsed.mode)
+      ? parsed.mode.filter((value): value is TrainerLibraryModeFilter =>
+          typeof value === 'string' && value in TRAINER_LIBRARY_MODE_FILTER_LABELS,
+        )
+      : [];
+    return { availability, catalog, genres, launcher, mode };
+  } catch {
+    return EMPTY_REMEMBERED_FILTERS;
+  }
+}
+
+function writeRememberedTrainerLibraryFilters(filters: RememberedTrainerLibraryFilters): void {
+  try {
+    window.sessionStorage.setItem(TRAINER_LIBRARY_FILTERS_KEY, JSON.stringify(filters));
+  } catch {
+    // Session-only UI preference is best-effort; filters still work for the current render.
+  }
+}
+
+function buildInstalledPlatformsMap(
+  games: Array<{ catalogGameId?: string; platform: string }>,
+): Map<string, Set<TrainerLibraryLauncherFilter>> {
+  const map = new Map<string, Set<TrainerLibraryLauncherFilter>>();
+  for (const game of games) {
+    if (!game.catalogGameId || !(game.platform in TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS)) continue;
+    const platform = game.platform as TrainerLibraryLauncherFilter;
+    const existing = map.get(game.catalogGameId);
+    if (existing) existing.add(platform);
+    else map.set(game.catalogGameId, new Set([platform]));
+  }
+  return map;
+}
+
+function readAllGamesNoticeDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(ALL_GAMES_NOTICE_DISMISSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeAllGamesNoticeDismissed(): void {
+  try {
+    window.localStorage.setItem(ALL_GAMES_NOTICE_DISMISSED_KEY, '1');
+  } catch {
+    // Local-only preference is best-effort; notice simply reappears next session.
+  }
+}
+
 const DISCOVERY_PREVIEW_HEIGHT_KEY = 'solith:trainer-library:discovery-preview-height';
 const DEFAULT_DISCOVERY_PREVIEW_HEIGHT = 288;
 const MIN_DISCOVERY_PREVIEW_HEIGHT = 192;
@@ -135,6 +255,7 @@ export function CatalogCard({
   onRequestVerification,
   onNotify,
   onPublish,
+  onToggleOwned,
 }: {
   entry: TrainerCatalogEntry;
   trust?: TrustMeta;
@@ -147,6 +268,7 @@ export function CatalogCard({
   onRequestVerification: (entry: TrainerCatalogEntry) => void;
   onNotify: (entry: TrainerCatalogEntry) => void;
   onPublish: (entry: TrainerCatalogEntry) => void;
+  onToggleOwned?: (entry: TrainerCatalogEntry) => void;
 }) {
   const coverUrl = resolveCatalogCoverUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
@@ -266,6 +388,17 @@ export function CatalogCard({
           >
             {communityScan || isGeneric ? 'View Details' : entry.hasModPack ? 'Open Trainer Deck' : 'View'}
           </button>
+          {onToggleOwned && (
+            <button
+              type="button"
+              className={entry.ownedConfirmed === true ? styles.filterActive : styles.secondaryBtn}
+              onClick={() => onToggleOwned(entry)}
+              aria-pressed={entry.ownedConfirmed === true}
+              title="Deliberate local confirmation only — never inferred from installation or launcher detection."
+            >
+              {entry.ownedConfirmed === true ? 'Owned ✓' : 'Mark as owned'}
+            </button>
+          )}
           {entry.hasModPack && (
             <details className={styles.moreActions}>
               <summary>More actions</summary>
@@ -321,19 +454,29 @@ export default function TrainerLibraryPage({
   const [overwriteLocalDefs, setOverwriteLocalDefs] = useState(false);
   const [publishDefinition, setPublishDefinition] = useState<SolithDefinitionV1 | null>(null);
   const [message, setMessage] = useState('');
-  const [tierFilter, setTierFilter] = useState<TierFilter>('all');
-  const [genreFilters, setGenreFilters] = useState<string[]>([]);
+  const [rememberedFilters] = useState(readRememberedTrainerLibraryFilters);
+  const [tierFilter] = useState<TierFilter>('all');
+  const [availabilityFilters, setAvailabilityFilters] = useState<TrainerLibraryAvailabilityFilter[]>(rememberedFilters.availability);
+  const [catalogFilters, setCatalogFilters] = useState<TrainerLibraryCatalogFilter[]>(rememberedFilters.catalog);
+  const [genreFilters, setGenreFilters] = useState<string[]>(rememberedFilters.genres);
+  const [launcherFilters, setLauncherFilters] = useState<TrainerLibraryLauncherFilter[]>(rememberedFilters.launcher);
+  const [modeFilters, setModeFilters] = useState<TrainerLibraryModeFilter[]>(rememberedFilters.mode);
   const [importing, setImporting] = useState(false);
   const [ctImportState, dispatchCtImport] = useReducer(ctImportUiReducer, idleCtImportUiState);
   const [trustMeta, setTrustMeta] = useState<Record<string, TrustMeta>>({});
   const [quarantineCount, setQuarantineCount] = useState(0);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
+  const [installedPlatformsByCatalogGameId, setInstalledPlatformsByCatalogGameId] = useState<Map<string, Set<TrainerLibraryLauncherFilter>>>(new Map());
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [healthMap, setHealthMap] = useState<Record<string, { status: string }>>({});
-  const [installedOnly, setInstalledOnly] = useState(false);
   const [runningOnly, setRunningOnly] = useState(false);
   const [needsReverifyOnly, setNeedsReverifyOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('installed-first');
+  const [viewMode, setViewMode] = useState<ViewMode>('popular');
+  const [popularityMap, setPopularityMap] = useState<Map<string, TrainerCatalogPopularityEvidence>>(new Map());
+  const [allTimePopularityMap, setAllTimePopularityMap] = useState<Map<string, number>>(new Map());
+  const [catalogFilterUniverse, setCatalogFilterUniverse] = useState<TrainerCatalogEntry[] | null>(null);
+  const [allGamesNoticeDismissed, setAllGamesNoticeDismissed] = useState(readAllGamesNoticeDismissed);
   const [dragOver, setDragOver] = useState(false);
   const [scanningInstalls, setScanningInstalls] = useState(false);
   const [addingSelectedInstalls, setAddingSelectedInstalls] = useState(false);
@@ -358,6 +501,7 @@ export default function TrainerLibraryPage({
     append: boolean,
     tier: TierFilter,
     genres: string[],
+    limit: number = PAGE_SIZE,
   ) => {
     if (!window.electronAPI?.trainerCatalogSearch) return;
     if (append) setLoadingMore(true);
@@ -366,7 +510,7 @@ export default function TrainerLibraryPage({
       if (pageOffset === 0) await window.electronAPI.trainerCatalogSeed?.();
       const result = (await window.electronAPI.trainerCatalogSearch({
         query: searchQuery,
-        limit: PAGE_SIZE,
+        limit,
         offset: pageOffset,
         verificationStatus: tier,
         categories: genres.length > 0 ? genres : undefined,
@@ -384,18 +528,142 @@ export default function TrainerLibraryPage({
     }
   }, []);
 
+
+  const fetchAllCandidatePages = useCallback(async (
+    searchQuery: string,
+    tier: TierFilter,
+    genres: string[],
+  ) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogSearch) return;
+    setLoading(true);
+    try {
+      await api.trainerCatalogSeed?.();
+      const all: TrainerCatalogEntry[] = [];
+      let pageOffset = 0;
+      let expectedTotal = Number.POSITIVE_INFINITY;
+      while (pageOffset < expectedTotal) {
+        const result = (await api.trainerCatalogSearch({
+          query: searchQuery,
+          limit: POPULAR_TRAINER_LIMIT,
+          offset: pageOffset,
+          verificationStatus: tier,
+          categories: genres.length > 0 ? genres : undefined,
+        })) as SearchResponse;
+        if (!result.success || !result.entries) {
+          setMessage(result.error ?? 'Search failed');
+          return;
+        }
+        all.push(...result.entries);
+        expectedTotal = result.total ?? all.length;
+        pageOffset += POPULAR_TRAINER_LIMIT;
+      }
+      setEntries(all);
+      // Every raw DB page has now been visited; report the actual eligible/search-matched
+      // candidate count rather than the store's pre-eligibility SQL count.
+      setTotal(all.length);
+      setOffset(all.length);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
   const load = useCallback(async (
     searchQuery = query,
     tier: TierFilter = tierFilter,
     genres: string[] = genreFilters,
+    view: ViewMode = viewMode,
+    hasDerivedFilters = availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0 || modeFilters.length > 0,
   ) => {
     setOffset(0);
-    await fetchPage(searchQuery, 0, false, tier, genres);
-  }, [fetchPage, query, tierFilter, genreFilters]);
+    // §3.6 derived filters must see the complete search/genre candidate set;
+    // otherwise a match beyond the first 120-row All Games page can be hidden.
+    if (hasDerivedFilters) {
+      await fetchAllCandidatePages(searchQuery, tier, genres);
+      return;
+    }
+    // Popular is a bounded, non-paginated projection (ROADMAP §3.3 Step 9) — fetch
+    // up to POPULAR_TRAINER_LIMIT in one page instead of the paginated PAGE_SIZE
+    // used by All Games, so ranking always sees the full Popular candidate set.
+    await fetchPage(searchQuery, 0, false, tier, genres, view === 'popular' ? POPULAR_TRAINER_LIMIT : PAGE_SIZE);
+  }, [fetchAllCandidatePages, fetchPage, query, tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters, modeFilters]);
 
   useEffect(() => {
-    void load(query, tierFilter, genreFilters);
-  }, [tierFilter, genreFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
+    void load(
+      query,
+      tierFilter,
+      genreFilters,
+      viewMode,
+      availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0 || modeFilters.length > 0,
+    );
+  }, [tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters, modeFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.catalogDemandList) return;
+    void api.catalogDemandList().then((result) => {
+      if (result.success && result.demand) {
+        setPopularityMap(
+          new Map(
+            result.demand.map((d) => [
+              d.catalogGameId,
+              { notifyCount: d.notifyCount, verificationRequests: d.verificationRequests },
+            ]),
+          ),
+        );
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogAllTimePopularityList) return;
+    void api.trainerCatalogAllTimePopularityList().then((result) => {
+      if (result.success && result.popularity) {
+        setAllTimePopularityMap(new Map(result.popularity.map((p) => [p.catalogGameId, p.positiveCount])));
+      }
+    });
+  }, []);
+
+
+  useEffect(() => {
+    writeRememberedTrainerLibraryFilters({
+      availability: availabilityFilters,
+      catalog: catalogFilters,
+      genres: genreFilters,
+      launcher: launcherFilters,
+      mode: modeFilters,
+    });
+  }, [availabilityFilters, catalogFilters, genreFilters, launcherFilters, modeFilters]);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogSearch) return;
+    let cancelled = false;
+    void (async () => {
+      await api.trainerCatalogSeed?.();
+      const all: TrainerCatalogEntry[] = [];
+      let pageOffset = 0;
+      let expectedTotal = Number.POSITIVE_INFINITY;
+      while (!cancelled && pageOffset < expectedTotal) {
+        const result = (await api.trainerCatalogSearch({
+          query: '',
+          limit: POPULAR_TRAINER_LIMIT,
+          offset: pageOffset,
+          verificationStatus: 'all',
+        })) as SearchResponse;
+        if (!result.success || !result.entries) return;
+        all.push(...result.entries);
+        expectedTotal = result.total ?? all.length;
+        pageOffset += POPULAR_TRAINER_LIMIT;
+      }
+      if (!cancelled) setCatalogFilterUniverse(all);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -411,6 +679,9 @@ export default function TrainerLibraryPage({
     void api.installDiscoveryList().then((result) => {
       if (result.success && result.catalogGameIds) {
         setInstalledIds(new Set(result.catalogGameIds));
+      }
+      if (result.success && result.games) {
+        setInstalledPlatformsByCatalogGameId(buildInstalledPlatformsMap(result.games));
       }
     });
     void api.trainerHealthList?.().then((result) => {
@@ -435,6 +706,9 @@ export default function TrainerLibraryPage({
     const list = await api.installDiscoveryList();
     if (list.success && list.catalogGameIds) {
       setInstalledIds(new Set(list.catalogGameIds));
+    }
+    if (list.success && list.games) {
+      setInstalledPlatformsByCatalogGameId(buildInstalledPlatformsMap(list.games));
     }
   }, []);
 
@@ -482,6 +756,9 @@ export default function TrainerLibraryPage({
   };
 
   const handleLoadMore = useCallback(() => {
+    // Popular is a bounded, non-paginated projection (Step 9) — appending further
+    // pages here would mix an unranked tail into the ranked/limited Popular set.
+    if (viewMode === 'popular') return;
     if (loadingMore || loading || entries.length >= total) return;
     void fetchPage(
       queryRef.current,
@@ -490,7 +767,7 @@ export default function TrainerLibraryPage({
       tierFilterRef.current,
       genreFiltersRef.current,
     );
-  }, [loadingMore, loading, entries.length, total, offset, fetchPage]);
+  }, [viewMode, loadingMore, loading, entries.length, total, offset, fetchPage]);
 
   const toggleGenre = (genre: string) => {
     setGenreFilters((prev) =>
@@ -499,6 +776,44 @@ export default function TrainerLibraryPage({
   };
 
   const clearGenres = () => setGenreFilters([]);
+
+  const toggleAvailabilityFilter = (filter: TrainerLibraryAvailabilityFilter) => {
+    setAvailabilityFilters((prev) =>
+      prev.includes(filter) ? prev.filter((value) => value !== filter) : [...prev, filter],
+    );
+  };
+
+  const toggleCatalogFilter = (filter: TrainerLibraryCatalogFilter) => {
+    setCatalogFilters((prev) =>
+      prev.includes(filter) ? prev.filter((value) => value !== filter) : [...prev, filter],
+    );
+  };
+
+  const toggleLauncherFilter = (filter: TrainerLibraryLauncherFilter) => {
+    setLauncherFilters((prev) =>
+      prev.includes(filter) ? prev.filter((value) => value !== filter) : [...prev, filter],
+    );
+  };
+
+  const toggleModeFilter = (filter: TrainerLibraryModeFilter) => {
+    setModeFilters((prev) =>
+      prev.includes(filter) ? prev.filter((value) => value !== filter) : [...prev, filter],
+    );
+  };
+
+  const handleToggleOwned = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogSetOwned) return;
+    const nextOwned = entry.ownedConfirmed !== true;
+    const result = await api.trainerCatalogSetOwned({ catalogGameId: entry.catalogGameId, owned: nextOwned });
+    if (result.success) {
+      setEntries((prev) =>
+        prev.map((e) => (e.catalogGameId === entry.catalogGameId ? { ...e, ownedConfirmed: result.ownedConfirmed ?? nextOwned } : e)),
+      );
+    } else {
+      setMessage(result.error ?? 'Failed to update ownership.');
+    }
+  };
 
   const handleScanInstalled = async () => {
     const api = window.electronAPI;
@@ -981,35 +1296,84 @@ export default function TrainerLibraryPage({
     );
   };
 
-  const filteredEntries = entries.filter((e) => {
-    if (installedOnly && !installedIds.has(e.catalogGameId)) return false;
+  const popularCatalogGameIds = useMemo(
+    () => catalogFilterUniverse === null
+      ? undefined
+      : new Set(
+          projectPopularTrainerEntries(catalogFilterUniverse, {
+            installedCatalogGameIds: installedIds,
+            popularityByCatalogGameId: popularityMap,
+          }).map((ranked) => ranked.entry.catalogGameId),
+        ),
+    [catalogFilterUniverse, installedIds, popularityMap],
+  );
+
+  const legacyStatusFilteredEntries = entries.filter((e) => {
     if (runningOnly && !runningIds.has(e.catalogGameId)) return false;
     if (needsReverifyOnly && !entryNeedsReverify(e.catalogGameId)) return false;
     return true;
   });
-  // Explicit A-Z stays pure alphabetical, untouched by tiering/interleaving.
-  // The default ("installed first") mode uses orderCatalogDefault, which
-  // breaks up same-provider/same-initial runs among generic entries instead
-  // of letting them cluster — see trainer-catalog-default-order.ts.
-  const visible =
-    sortMode === 'a-z'
-      ? filteredEntries.slice().sort((a, b) => a.displayName.localeCompare(b.displayName))
-      : orderCatalogDefault(filteredEntries, installedIds);
+
+  const filteredEntries = filterTrainerLibraryEntries(
+    legacyStatusFilteredEntries,
+    { availability: availabilityFilters, catalog: catalogFilters, launcher: launcherFilters, mode: modeFilters },
+    { installedCatalogGameIds: installedIds, popularCatalogGameIds, installedPlatformsByCatalogGameId },
+  );
+
+  const visible = viewMode === 'popular'
+    ? projectPopularTrainerEntries(filteredEntries, {
+        installedCatalogGameIds: installedIds,
+        popularityByCatalogGameId: popularityMap,
+      }).map((ranked) => ranked.entry)
+    : sortAllGamesEntries(filteredEntries, sortMode, {
+        installedCatalogGameIds: installedIds,
+        popularityByCatalogGameId: popularityMap,
+        allTimePopularityByCatalogGameId: allTimePopularityMap,
+      });
 
   const activeFilterSummary =
     [
+      viewMode === 'popular' ? 'Popular' : 'All Games',
+      availabilityFilters.length > 0
+        ? availabilityFilters.map((filter) => TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS[filter]).join(', ')
+        : null,
+      catalogFilters.length > 0
+        ? catalogFilters.map((filter) => TRAINER_LIBRARY_CATALOG_FILTER_LABELS[filter]).join(', ')
+        : null,
+      launcherFilters.length > 0
+        ? launcherFilters.map((filter) => TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS[filter]).join(', ')
+        : null,
+      modeFilters.length > 0
+        ? modeFilters.map((filter) => TRAINER_LIBRARY_MODE_FILTER_LABELS[filter]).join(', ')
+        : null,
       genreFilters.length > 0 ? genreFilters.join(', ') : null,
-      tierFilter !== 'all' ? tierFilter : null,
-      installedOnly ? 'installed' : null,
       runningOnly ? 'running' : null,
       needsReverifyOnly ? 'needs re-verify' : null,
-      sortMode === 'a-z' ? 'A–Z' : null,
+      viewMode === 'all' && sortMode !== 'installed-first' ? ALL_GAMES_SORT_MODE_LABELS[sortMode] : null,
     ]
       .filter(Boolean)
       .join(' · ') || null;
 
+  const hasActiveLibraryFilters =
+    availabilityFilters.length > 0 ||
+    catalogFilters.length > 0 ||
+    launcherFilters.length > 0 ||
+    modeFilters.length > 0 ||
+    genreFilters.length > 0 ||
+    runningOnly ||
+    needsReverifyOnly;
+
+  const handleDismissAllGamesNotice = () => {
+    setAllGamesNoticeDismissed(true);
+    writeAllGamesNoticeDismissed();
+  };
+
   const resetLibraryFilters = () => {
-    setInstalledOnly(false);
+    setAvailabilityFilters([]);
+    setCatalogFilters([]);
+    setLauncherFilters([]);
+    setModeFilters([]);
+    setGenreFilters([]);
     setRunningOnly(false);
     setNeedsReverifyOnly(false);
   };
@@ -1314,29 +1678,25 @@ export default function TrainerLibraryPage({
       </form>
 
       <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Verification</span>
+        <span className={styles.filterLabel}>Availability</span>
         <div className={styles.filters}>
-          {(['all', 'verified', 'community', 'metadata-only'] as const).map((f) => (
+          {(Object.entries(TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS) as Array<[TrainerLibraryAvailabilityFilter, string]>).map(([filter, label]) => (
             <button
-              key={f}
+              key={filter}
               type="button"
-              className={tierFilter === f ? styles.filterActive : styles.filterBtn}
-              onClick={() => {
-                setTierFilter(f);
-                resetLibraryFilters();
-              }}
+              className={availabilityFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
+              onClick={() => toggleAvailabilityFilter(filter)}
+              aria-pressed={availabilityFilters.includes(filter)}
             >
-              {f === 'metadata-only' ? 'Metadata' : f.charAt(0).toUpperCase() + f.slice(1)}
+              {label}
             </button>
           ))}
-          <button
-            type="button"
-            className={installedOnly ? styles.filterActive : styles.filterBtn}
-            onClick={() => setInstalledOnly((v) => !v)}
-            aria-pressed={installedOnly}
-          >
-            Installed
-          </button>
+        </div>
+      </div>
+
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Status (existing)</span>
+        <div className={styles.filters}>
           <button
             type="button"
             className={runningOnly ? styles.filterActive : styles.filterBtn}
@@ -1356,32 +1716,191 @@ export default function TrainerLibraryPage({
         </div>
       </div>
 
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Sort</span>
+      <div className={styles.filterSection} role="group" aria-labelledby="trainer-library-view-label">
+        <span id="trainer-library-view-label" className={styles.filterLabel}>View</span>
         <div className={styles.filters}>
           <button
+            id="trainer-library-view-popular"
             type="button"
-            className={sortMode === 'installed-first' ? styles.filterActive : styles.filterBtn}
-            onClick={() => setSortMode('installed-first')}
-            aria-pressed={sortMode === 'installed-first'}
+            className={viewMode === 'popular' ? styles.filterActive : styles.filterBtn}
+            onClick={() => setViewMode('popular')}
+            aria-pressed={viewMode === 'popular'}
           >
-            Installed first
+            Popular
           </button>
           <button
+            id="trainer-library-view-all"
             type="button"
-            className={sortMode === 'a-z' ? styles.filterActive : styles.filterBtn}
-            onClick={() => setSortMode('a-z')}
-            aria-pressed={sortMode === 'a-z'}
+            className={viewMode === 'all' ? styles.filterActive : styles.filterBtn}
+            onClick={() => setViewMode('all')}
+            aria-pressed={viewMode === 'all'}
           >
-            A–Z
+            All Games
           </button>
         </div>
       </div>
 
+      {viewMode === 'all' && !allGamesNoticeDismissed && (
+        <p
+          id="trainer-library-all-games-notice"
+          className={styles.allGamesNotice}
+          role="status"
+        >
+          {ALL_GAMES_NOTICE_TEXT}
+          <button
+            type="button"
+            className={styles.allGamesNoticeDismiss}
+            onClick={handleDismissAllGamesNotice}
+            aria-label="Dismiss All Games notice"
+          >
+            Dismiss
+          </button>
+        </p>
+      )}
+
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Mode</span>
+        <div className={styles.filters}>
+          {(Object.entries(TRAINER_LIBRARY_MODE_FILTER_LABELS) as Array<[TrainerLibraryModeFilter, string]>).map(([filter, label]) => (
+            <button
+              key={filter}
+              type="button"
+              className={modeFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
+              onClick={() => toggleModeFilter(filter)}
+              aria-pressed={modeFilters.includes(filter)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Catalog</span>
+        <div className={styles.filters}>
+          {(Object.entries(TRAINER_LIBRARY_CATALOG_FILTER_LABELS) as Array<[TrainerLibraryCatalogFilter, string]>).map(([filter, label]) => (
+            <button
+              key={filter}
+              type="button"
+              className={catalogFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
+              onClick={() => toggleCatalogFilter(filter)}
+              aria-pressed={catalogFilters.includes(filter)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.filterSection}>
+        <span className={styles.filterLabel}>Launcher</span>
+        <div className={styles.filters}>
+          {(Object.entries(TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS) as Array<[TrainerLibraryLauncherFilter, string]>).map(([filter, label]) => (
+            <button
+              key={filter}
+              type="button"
+              className={launcherFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
+              onClick={() => toggleLauncherFilter(filter)}
+              aria-pressed={launcherFilters.includes(filter)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {viewMode === 'all' && (
+        <div className={styles.filterSection}>
+          <span className={styles.filterLabel}>Sort</span>
+          <div className={styles.filters}>
+            <button
+              type="button"
+              className={sortMode === 'recommended' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('recommended')}
+              aria-pressed={sortMode === 'recommended'}
+            >
+              Recommended
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'installed-first' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('installed-first')}
+              aria-pressed={sortMode === 'installed-first'}
+            >
+              Installed first
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'a-z' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('a-z')}
+              aria-pressed={sortMode === 'a-z'}
+            >
+              A–Z
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'verified-first' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('verified-first')}
+              aria-pressed={sortMode === 'verified-first'}
+            >
+              Verified first
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'popular-now' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('popular-now')}
+              aria-pressed={sortMode === 'popular-now'}
+            >
+              Popular now
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'most-trainer-options' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('most-trainer-options')}
+              aria-pressed={sortMode === 'most-trainer-options'}
+            >
+              Most trainer options
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'all-time-popular' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('all-time-popular')}
+              aria-pressed={sortMode === 'all-time-popular'}
+            >
+              All-time popular
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'newest-release' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('newest-release')}
+              aria-pressed={sortMode === 'newest-release'}
+            >
+              Newest release
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'recently-added' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('recently-added')}
+              aria-pressed={sortMode === 'recently-added'}
+            >
+              Recently added to SOLITH
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'recently-updated' ? styles.filterActive : styles.filterBtn}
+              onClick={() => setSortMode('recently-updated')}
+              aria-pressed={sortMode === 'recently-updated'}
+            >
+              Recently updated
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={styles.filterSection}>
         <span className={styles.filterLabel}>Genre (optional)</span>
         <div className={styles.genreFilters}>
-          {CATALOG_GENRE_FILTERS.map((genre) => (
+          {ROADMAP_GENRE_FILTERS.map((genre) => (
             <button
               key={genre}
               type="button"
@@ -1398,6 +1917,18 @@ export default function TrainerLibraryPage({
             </button>
           )}
         </div>
+      </div>
+
+      <div className={styles.filterSection} role="status" aria-live="polite">
+        <span className={styles.filterLabel}>
+          {visible.length.toLocaleString()} result{visible.length === 1 ? '' : 's'} shown
+          {entries.length < total ? ` from ${entries.length.toLocaleString()} loaded` : ''}
+        </span>
+        {hasActiveLibraryFilters && (
+          <button type="button" className={styles.clearGenresBtn} onClick={resetLibraryFilters}>
+            Reset
+          </button>
+        )}
       </div>
 
       {message && <p className={styles.message}>{message}</p>}
@@ -1434,6 +1965,7 @@ export default function TrainerLibraryPage({
               onRequestVerification={handleRequestVerification}
               onNotify={handleNotifyWhenVerified}
               onPublish={handlePublish}
+              onToggleOwned={handleToggleOwned}
             />
           )}
         />

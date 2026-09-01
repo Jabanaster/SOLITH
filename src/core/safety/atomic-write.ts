@@ -6,6 +6,7 @@ import { getCanonicalPath, validatePathSafety } from './path-safety';
 import { acquireFileLock, releaseFileLock } from './file-lock';
 import { getGameById } from '../games';
 import { getAdapterForFile } from '../adapters/index';
+import { renameOrCopyAcrossDevices } from './exdev-safe-rename';
 
 /**
  * Centralized Atomic File Replacement Service.
@@ -34,7 +35,16 @@ export async function atomicWrite(
   }
 
   let tmpPath = '';
-  
+  // Finding 3 (independent security review, ef254d1): only becomes true once
+  // tmpPath holds content-validated data (step 9). Before that, tmpPath (if
+  // it exists at all) is not a "known good copy" — it may be malformed or
+  // never written — so cleaning it up on an early failure is safe. After
+  // that point tmpPath is the only known-good copy until canonicalTarget is
+  // proven correct (step 12), so the finally block must never delete it on
+  // a later failure — see rationale at the atomicWriteFileSync fix this
+  // mirrors, src/core/database/index.ts.
+  let tmpPathIsRecoverableCopy = false;
+
   try {
     // Get game root directory for containment check
     const game = getGameById(gameId);
@@ -119,29 +129,52 @@ export async function atomicWrite(
       throw new Error(`Temporary file validation failed: ${valResult.error || 'file is malformed'}`);
     }
 
+    // From here on, tmpPath holds validated, correct data — it is a
+    // recoverable copy and must survive any failure in the steps below.
+    tmpPathIsRecoverableCopy = true;
+
     // 10. Preserve target permissions
     fs.chmodSync(tmpPath, stat.mode);
 
-    // 11. Atomically replace original
-    fs.renameSync(tmpPath, canonicalTarget);
-    
-    // Clear tmpPath so finally block doesn't try to delete it
-    tmpPath = '';
+    // 11. Atomically replace original. renameOrCopyAcrossDevices falls back
+    // to copy when the filesystem reports EXDEV — observed even for a
+    // same-directory rename on a OneDrive-redirected/Files-On-Demand game
+    // save or Documents folder (same class of failure seen against a
+    // OneDrive-redirected AppData\Roaming, see atomicWriteFileSync in
+    // src/core/database/index.ts).
+    renameOrCopyAcrossDevices(tmpPath, canonicalTarget);
 
     // 12. Verify the final target hash matches the written content hash
+    // BEFORE deleting tmpPath — tmpPath remains the only known-good copy
+    // until this verification proves canonicalTarget itself is correct.
     const expectedHash = crypto.createHash('sha256').update(newContent).digest('hex');
     const actualHash = crypto.createHash('sha256').update(fs.readFileSync(canonicalTarget)).digest('hex');
     if (expectedHash !== actualHash) {
       throw new Error('Atomic replacement verification failed: final file hash mismatch.');
     }
 
+    // Only now is it safe to discard tmpPath — canonicalTarget is proven correct.
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+        // canonicalTarget write is already verified correct — a leftover
+        // temp file is a harmless recovery artifact, not a reason to fail.
+      }
+    }
+    tmpPath = '';
+
     return { success: true };
   } catch (error) {
     console.error('Atomic write failed:', error);
     return { success: false, error: String(error) };
   } finally {
-    // 13. Remove Solith-owned temporary file if it remains (on failure)
-    if (tmpPath && fs.existsSync(tmpPath)) {
+    // 13. Remove Solith-owned temporary file if it remains (on failure) —
+    // but only when it was never proven to hold validated, correct data.
+    // Once tmpPathIsRecoverableCopy is true, tmpPath is the last known-good
+    // copy of the edit (see Finding 3, independent security review,
+    // ef254d1) and must be left on disk for recovery rather than deleted.
+    if (tmpPath && fs.existsSync(tmpPath) && !tmpPathIsRecoverableCopy) {
       try {
         fs.unlinkSync(tmpPath);
       } catch (e) {

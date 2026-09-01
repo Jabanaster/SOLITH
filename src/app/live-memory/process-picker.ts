@@ -1,4 +1,5 @@
 import type { GameConfig } from '../../core/cheat-system/types.js';
+import { BLOCKED_TARGET_PROCESS_PATTERNS } from '../../core/runtime/protected-target-guard.js';
 
 export type ProcessPickerSort = 'az' | 'za' | 'confidence' | 'recent' | 'pid';
 export type ProcessPickerGroup = 'current' | 'installed' | 'likely' | 'unknown';
@@ -58,24 +59,13 @@ const GROUP_ORDER: Record<ProcessPickerGroup, number> = {
   unknown: 3,
 };
 
-const BLOCKED_PROCESS_PATTERNS = [
-  /^solith/i,
-  /^electron/i,
-  /^explorer(?:\.exe)?$/i,
-  /^runtimebroker(?:\.exe)?$/i,
-  /^applicationframehost(?:\.exe)?$/i,
-  /^textinputhost(?:\.exe)?$/i,
-  /^startmenuexperiencehost(?:\.exe)?$/i,
-  /^shellexperiencehost(?:\.exe)?$/i,
-  /^systemsettings(?:\.exe)?$/i,
-  /^taskmgr(?:\.exe)?$/i,
-  /^dwm(?:\.exe)?$/i,
-  /^winlogon(?:\.exe)?$/i,
-  /^csrss(?:\.exe)?$/i,
-  /^lsass(?:\.exe)?$/i,
-  /^services(?:\.exe)?$/i,
-  /^svchost(?:\.exe)?$/i,
-];
+// Finding 2 (independent security review, ef254d1): this list is UX filtering
+// only — it is NOT the security boundary. The authoritative, main-process
+// enforcement lives in src/core/runtime/protected-target-guard.ts's
+// assessTargetProcessAuthorization(), which LiveMemorySession.attach() invokes
+// directly regardless of what this picker displayed. Sourced from the same
+// module so the two can never silently drift apart.
+export const BLOCKED_PROCESS_PATTERNS = BLOCKED_TARGET_PROCESS_PATTERNS;
 
 const NON_GAME_PROCESS_PATTERNS = [
   /^node(?:\.exe)?$/i,

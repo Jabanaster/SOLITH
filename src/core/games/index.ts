@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import db from '../database';
-import { Game, GameFingerprint } from '../../shared/types';
+import { Game, GameFingerprint, GameLauncherIdentity } from '../../shared/types';
 import { scanDirectory, detectEngine, getGameFingerprint as computeFingerprint } from '../scanner';
 import { classifyFile } from '../safety';
 import { logEvent } from '../journal';
@@ -11,6 +11,13 @@ import { getScanSizeLimitMB } from '../settings';
 
 const DEMO_GAME_ID = 'demo-game-quest-id-000000000000';
 const cancelledScans = new Set<string>();
+
+const KNOWN_LAUNCHERS: GameLauncherIdentity[] = ['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea', 'battlenet', 'manual'];
+
+function normalizeLauncher(value: unknown): GameLauncherIdentity | undefined {
+  if (typeof value !== 'string') return undefined;
+  return (KNOWN_LAUNCHERS as string[]).includes(value) ? (value as GameLauncherIdentity) : undefined;
+}
 
 function normalizeOptionalText(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -56,7 +63,8 @@ function rowToGame(row: any): Game {
     notes: normalizeOptionalText(row.notes),
     metadataId: normalizeOptionalText(row.metadataId),
     fingerprint: row.fingerprint ? JSON.parse(row.fingerprint) : undefined,
-    needsRescan: row.needsRescan === 1
+    needsRescan: row.needsRescan === 1,
+    launcher: normalizeLauncher(row.launcher) ?? 'manual'
   };
 }
 
@@ -146,11 +154,11 @@ export function addGame(game: Omit<Game, 'id' | 'dateAdded'>): Game {
   const stmt = db.prepare(`
     INSERT INTO games (
       id, name, path, engine, executablePath, coverPath, iconPath,
-      saveLocations, notes, metadataId, fingerprint
+      saveLocations, notes, metadataId, fingerprint, launcher
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  
+
   stmt.run(
     gameId,
     game.name,
@@ -168,13 +176,15 @@ export function addGame(game: Omit<Game, 'id' | 'dateAdded'>): Game {
       keyHashes: [],
       mainExecutable: undefined,
       lastScan: new Date().toISOString()
-    })
+    }),
+    normalizeLauncher(game.launcher) ?? 'manual'
   );
-  
+
   return {
     ...game,
     id: gameId,
-    dateAdded: new Date().toISOString()
+    dateAdded: new Date().toISOString(),
+    launcher: normalizeLauncher(game.launcher) ?? 'manual'
   };
 }
 
@@ -194,6 +204,7 @@ export function updateGame(gameId: string, updates: Partial<Omit<Game, 'id' | 'd
   const fingerprint = updates.fingerprint !== undefined ? updates.fingerprint : current.fingerprint;
   const lastScan = updates.lastScan !== undefined ? updates.lastScan : current.lastScan;
   const needsRescan = updates.needsRescan !== undefined ? updates.needsRescan : current.needsRescan;
+  const launcher = updates.launcher !== undefined ? normalizeLauncher(updates.launcher) ?? 'manual' : current.launcher ?? 'manual';
 
   const stmt = db.prepare(`
     UPDATE games SET
@@ -201,11 +212,11 @@ export function updateGame(gameId: string, updates: Partial<Omit<Game, 'id' | 'd
       executablePath = ?, coverPath = ?, iconPath = ?,
       saveLocations = ?, notes = ?, metadataId = ?,
       fingerprint = ?,
-      lastScan = ?, needsRescan = ?,
+      lastScan = ?, needsRescan = ?, launcher = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
-  
+
   const result = stmt.run(
     name,
     pathVal,
@@ -219,6 +230,7 @@ export function updateGame(gameId: string, updates: Partial<Omit<Game, 'id' | 'd
     fingerprint ? JSON.stringify(fingerprint) : null,
     lastScan,
     needsRescan ? 1 : 0,
+    launcher,
     gameId
   );
   

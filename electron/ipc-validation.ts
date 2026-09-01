@@ -4,11 +4,14 @@ import path from 'path';
 import { isContainedWithin, validatePathSafety } from '../src/core/safety/path-safety.js';
 import { getGameById } from '../src/core/games/index.js';
 import { isPathApproved } from '../src/core/saves/locations.js';
+import { POPULAR_TRAINER_LIMIT } from '../src/core/trainer-catalog/popular-ranking.js';
 
 /**
  * Zod validation schemas for all Electron IPC payloads.
  * Validates shapes, types, IDs, and path safety constraints at runtime.
  */
+
+const GameLauncherSchema = z.enum(['steam', 'epic', 'gog', 'xbox', 'ubisoft', 'ea', 'battlenet', 'manual']);
 
 export const AddGameSchema = z.object({
   name: z.string().min(1).max(100),
@@ -19,7 +22,8 @@ export const AddGameSchema = z.object({
   iconPath: z.string().max(1024).optional(),
   saveLocations: z.array(z.string().max(1024)).max(20).optional(),
   notes: z.string().max(2000).optional(),
-  metadataId: z.string().max(200).optional()
+  metadataId: z.string().max(200).optional(),
+  launcher: GameLauncherSchema.optional()
 });
 
 export const UpdateGameSchema = z.object({
@@ -32,7 +36,8 @@ export const UpdateGameSchema = z.object({
   iconPath: z.string().max(1024).optional(),
   saveLocations: z.array(z.string().max(1024)).max(20).optional(),
   notes: z.string().max(2000).optional(),
-  metadataId: z.string().max(200).optional()
+  metadataId: z.string().max(200).optional(),
+  launcher: GameLauncherSchema.optional()
 });
 
 export const ScanGameSchema = z.object({
@@ -114,6 +119,11 @@ export const GetJournalSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')).nullable().optional()
 });
 
+/** ROADMAP §6.2 Proposal Inspector — same gameId shape as GetJournalSchema, since proposals are scoped per-game the same way journal events are. */
+export const GetProposalsSchema = z.object({
+  gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')),
+});
+
 export const LogEventSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000')).nullable().optional(),
   recipeId: z.string().uuid().nullable().optional(),
@@ -125,6 +135,21 @@ export const LogEventSchema = z.object({
 export const SetSettingSchema = z.object({
   key: z.string().min(1),
   value: z.union([z.string(), z.number(), z.boolean()])
+});
+
+export const CreateNotificationSchema = z.object({
+  category: z.enum(['catalog-update', 'artwork', 'trainer-profile', 'maintenance', 'recovery', 'general']),
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(1000),
+  severity: z.enum(['info', 'success', 'warning', 'error']).optional(),
+  action: z.object({
+    type: z.literal('open-view'),
+    view: z.string().min(1).max(100),
+  }).optional(),
+});
+
+export const MarkNotificationReadSchema = z.object({
+  id: z.string().uuid(),
 });
 
 export const GetBackupsSchema = z.object({
@@ -765,3 +790,8 @@ export function validateSaveDataFileAccess(gameId: string, filePath: string): Ip
     return { safe: false, error: UNAPPROVED_FILE_ERROR };
   }
 }
+
+/** ROADMAP §4.5 artwork refresh IPC payload — optional explicit scope, bounded to the same limit as a full Popular projection. */
+export const ArtworkCacheRefreshSchema = z.object({
+  catalogGameIds: z.array(z.string().min(1).max(120)).max(POPULAR_TRAINER_LIMIT).optional(),
+});

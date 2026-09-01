@@ -1,6 +1,7 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { platform } from 'node:os';
 import type { CompatibilityProfile } from '../profiles/schema.js';
+import { systemBinaryPath } from '../safety/system-binary.js';
 
 /**
  * Game-Running Detection
@@ -75,7 +76,8 @@ function checkWindowsProcessList(executableNames: string[]): GameRunningCheck {
   try {
     // Use tasklist to get current processes
     // Output format: "Image Name","PID","Session Name","Session Number","Memory Usage"
-    const output = execSync('tasklist /V /FO CSV', {
+    // execFileSync (array args, no shell) — no command/shell interpolation, only fixed literal args.
+    const output = execFileSync(systemBinaryPath('tasklist.exe'), ['/V', '/FO', 'CSV'], {
       encoding: 'utf-8',
       timeout: 5000,
     });
@@ -115,36 +117,7 @@ function checkWindowsProcessList(executableNames: string[]): GameRunningCheck {
  * Match process by executable name
  */
 function checkMacProcessList(executableNames: string[]): GameRunningCheck {
-  try {
-    const normalizedNames = executableNames.map(n => n.toLowerCase());
-
-    for (const name of normalizedNames) {
-      // Avoid matching the grep process itself with explicit filter
-      const baseName = name.replace(/\.exe$/i, '');
-      const output = execSync(`ps aux | grep -i "${baseName}" | grep -v grep`, {
-        encoding: 'utf-8',
-        timeout: 5000,
-      });
-
-      if (output.trim().length > 0) {
-        return {
-          running: true,
-          evidence: `Found running process: ${baseName}`,
-        };
-      }
-    }
-
-    return {
-      running: false,
-      evidence: `Process not found (checked: ${executableNames.join(', ')})`,
-    };
-  } catch (err) {
-    // grep returns exit code 1 if no match found (not an error)
-    return {
-      running: false,
-      evidence: `Process check completed; not found`,
-    };
-  }
+  return checkUnixProcessListViaPs(executableNames);
 }
 
 /**
@@ -152,17 +125,25 @@ function checkMacProcessList(executableNames: string[]): GameRunningCheck {
  * Match process by executable name
  */
 function checkLinuxProcessList(executableNames: string[]): GameRunningCheck {
+  return checkUnixProcessListViaPs(executableNames);
+}
+
+/**
+ * Shared macOS/Linux path. Fixed literal `ps aux` invocation only (execFileSync,
+ * array args, no shell) — matching is done in JS against the captured output,
+ * never by interpolating the renderer-settable executable name into a shell
+ * command (the prior `ps aux | grep -i "${baseName}"` form allowed shell/command
+ * injection via a crafted profile.executableNames entry containing `"`/`;`/`$()`).
+ */
+function checkUnixProcessListViaPs(executableNames: string[]): GameRunningCheck {
   try {
-    const normalizedNames = executableNames.map(n => n.toLowerCase());
+    const normalizedNames = executableNames.map((n) => n.toLowerCase().replace(/\.exe$/i, ''));
+    const output = execFileSync('ps', ['aux'], { encoding: 'utf-8', timeout: 5000 });
+    const lines = output.split('\n').filter((line) => line.trim().length > 0);
 
-    for (const name of normalizedNames) {
-      const baseName = name.replace(/\.exe$/i, '');
-      const output = execSync(`ps aux | grep -i "${baseName}" | grep -v grep`, {
-        encoding: 'utf-8',
-        timeout: 5000,
-      });
-
-      if (output.trim().length > 0) {
+    for (const baseName of normalizedNames) {
+      const match = lines.find((line) => line.toLowerCase().includes(baseName));
+      if (match) {
         return {
           running: true,
           evidence: `Found running process: ${baseName}`,
@@ -175,7 +156,6 @@ function checkLinuxProcessList(executableNames: string[]): GameRunningCheck {
       evidence: `Process not found (checked: ${executableNames.join(', ')})`,
     };
   } catch (err) {
-    // grep returns exit code 1 if no match found (not an error)
     return {
       running: false,
       evidence: `Process check completed; not found`,

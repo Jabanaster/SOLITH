@@ -135,11 +135,14 @@ describe('Solith Parser Adapters Expansion & Safety Tests', () => {
     const bombSafety = validateXmlSafety(bombContent);
     assert.strictEqual(bombSafety.safe, false);
 
-    // Nesting depth limit validation
+    // Nesting depth limit validation. Limit recalibrated to 256 (from 32)
+    // after Finding 1's fix exposed that 32 rejected legitimate real-world
+    // CT tables (CrimsonDesert.CT nests to depth 75) — see
+    // src/core/adapters/xml.ts. 300 stays a clear, deliberate exceedance.
     let nesting = '';
-    for (let i = 0; i < 40; i++) nesting += `<tag_${i}>`;
-    for (let i = 39; i >= 0; i--) nesting += `</tag_${i}>`;
-    
+    for (let i = 0; i < 300; i++) nesting += `<tag_${i}>`;
+    for (let i = 299; i >= 0; i--) nesting += `</tag_${i}>`;
+
     const depthSafety = validateXmlSafety(nesting);
     assert.strictEqual(depthSafety.safe, false);
     assert.ok(depthSafety.error?.includes('nesting depth'));

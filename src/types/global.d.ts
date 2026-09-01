@@ -19,6 +19,7 @@ interface Window {
       saveLocations?: string[];
       notes?: string;
       metadataId?: string;
+      launcher?: 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
     }) => Promise<any>;
     deleteGame: (gameId: string) => Promise<any>;
     pickGameFolder: () => Promise<{ success: boolean; folderPath?: string; canceled?: boolean; error?: string }>;
@@ -30,10 +31,55 @@ interface Window {
     deleteRecipe: (recipeId: string) => Promise<any>;
     // Journal
     getJournal: (gameId?: string) => Promise<any[]>;
+    getProposals: (gameId: string) => Promise<{
+      success: boolean;
+      proposals?: Array<{
+        id: string;
+        gameId: string;
+        recipeId?: string;
+        targetFile: string;
+        operation: 'set' | 'increment' | 'decrement' | 'toggle';
+        path: string;
+        oldValue: unknown;
+        newValue: unknown;
+        risk: string;
+        preview: string;
+        validationRule: string;
+        requiresBackup: boolean;
+        dryRunPassed: boolean;
+        status: 'pending' | 'approved' | 'rejected';
+        createdAt: string;
+      }>;
+      error?: string;
+    }>;
     logEvent: (eventData: any) => Promise<any>;
     // Settings
     getSettings: () => Promise<any>;
     setSetting: (key: string, value: any) => Promise<any>;
+    getAppVersion: () => Promise<string>;
+    // Notifications
+    listNotifications: () => Promise<any[]>;
+    getUnreadNotificationCount: () => Promise<number>;
+    createNotification: (payload: {
+      category: string;
+      title: string;
+      message: string;
+      severity?: string;
+      action?: { type: 'open-view'; view: string };
+    }) => Promise<any>;
+    markNotificationRead: (id: string) => Promise<any>;
+    markAllNotificationsRead: () => Promise<any>;
+    clearNotificationHistory: () => Promise<any>;
+    onNotificationCreated?: (callback: (record: {
+      id: string;
+      category: string;
+      title: string;
+      message: string;
+      severity: string;
+      createdAt: string;
+      read: boolean;
+      action?: { type: 'open-view'; view: string };
+    }) => void) => () => void;
     // Backups
     getBackups: (gameId: string) => Promise<any[]>;
     restoreBackup: (backupId: string) => Promise<any>;
@@ -408,6 +454,24 @@ interface Window {
       errors?: string[];
       error?: string;
     }>;
+    trainerCatalogIdentityReviewList: () => Promise<{
+      success: boolean;
+      items?: import('../core/trainer-catalog/identity-review.js').IdentityReviewItem[];
+      error?: string;
+    }>;
+    trainerCatalogIdentityReviewCount: () => Promise<{
+      success: boolean;
+      count?: number;
+      error?: string;
+    }>;
+    trainerCatalogIdentityReviewResolve: (payload: {
+      id: string;
+      resolution: 'keep-existing' | 'accept-incoming' | 'treat-separate' | 'ignore';
+    }) => Promise<{
+      success: boolean;
+      item?: import('../core/trainer-catalog/identity-review.js').IdentityReviewItem;
+      error?: string;
+    }>;
     trainerCatalogPickCt: () => Promise<{
       success: boolean;
       canceled?: boolean;
@@ -511,6 +575,70 @@ interface Window {
       pendingUpdates?: number;
       error?: string;
     }>;
+    trainerCatalogSetOwned: (payload: { catalogGameId: string; owned: boolean }) => Promise<{
+      success: boolean;
+      ownedConfirmed?: boolean;
+      error?: string;
+    }>;
+    artworkCacheRefresh: (payload?: { catalogGameIds?: string[] }) => Promise<{
+      success: boolean;
+      queued?: number;
+      error?: string;
+    }>;
+    artworkCacheRetryMissing: () => Promise<{ success: boolean; queued?: number; error?: string }>;
+    artworkCacheStatus: () => Promise<{
+      success: boolean;
+      running?: boolean;
+      active?: number;
+      completed?: number;
+      total?: number;
+      paused?: boolean;
+      cancelled?: boolean;
+      error?: string;
+    }>;
+    artworkCachePause: () => Promise<{ success: boolean; error?: string }>;
+    artworkCacheResume: () => Promise<{ success: boolean; error?: string }>;
+    artworkCacheCancel: () => Promise<{ success: boolean; error?: string }>;
+    catalogUpdatesStatus: () => Promise<{
+      success: boolean;
+      state?: {
+        currentVersion: number;
+        lastSuccessAt: string | null;
+        lastCheckAt: string | null;
+        autoUpdateEnabled: boolean;
+        bundledSnapshotOnly: boolean;
+        artworkNetworkOptOut: boolean;
+      };
+      history?: Array<{
+        id: number;
+        version: number;
+        appliedAt: string;
+        recordCount: number;
+        notice: string;
+        status: 'applied' | 'rejected' | 'rolled-back';
+        rejectReason?: string;
+      }>;
+      dueForAutomaticCheck?: boolean;
+      error?: string;
+    }>;
+    catalogUpdatesSetPreference: (payload: {
+      autoUpdateEnabled?: boolean;
+      bundledSnapshotOnly?: boolean;
+      artworkNetworkOptOut?: boolean;
+    }) => Promise<{ success: boolean; error?: string }>;
+    catalogUpdatesImport: () => Promise<{
+      success: boolean;
+      canceled?: boolean;
+      result?: { status: 'applied' | 'rejected'; version: number; recordCount: number; rejectReason?: string };
+      error?: string;
+    }>;
+    catalogUpdatesRollbackLast: () => Promise<{ success: boolean; restoredCount?: number; error?: string }>;
+    aiConfigTestConnection: (payload: {
+      provider: 'None' | 'Ollama' | 'LM Studio';
+      endpoint?: string;
+      model?: string;
+      timeout?: number;
+    }) => Promise<{ success: boolean; result?: { success: boolean; message: string }; error?: string }>;
     trainerCatalogEvaluatePromotion: (payload: { catalogGameId: string }) => Promise<{
       success: boolean;
       eligibility?: { eligible: boolean; reasons: string[] };
@@ -861,7 +989,10 @@ interface Window {
         needsReverification: boolean;
         catalogGameId?: string;
         catalogDisplayName?: string;
-        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+        // Matches InstalledGameRecord['platform'] (InstallPlatform, 8 values) — the
+        // narrower 5-value union above belongs only to preview/commit, whose scanners
+        // and Zod schema do not yet produce ubisoft/ea/battlenet records.
+        platform: 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
         installPath: string;
         executablePath?: string;
         displayName?: string;
@@ -871,6 +1002,47 @@ interface Window {
       }>;
       catalogGameIds?: string[];
       total?: number;
+      error?: string;
+    }>;
+
+    listGameLibrary: (payload?: { view?: 'installed' | 'all' | 'owned' }) => Promise<{
+      success: boolean;
+      records?: Array<{
+        canonicalGameId: string;
+        title: string;
+        aliases: string[];
+        artworkUrl?: string;
+        supportState: 'supported' | 'partial' | 'unsupported' | 'unknown';
+        trainerAvailability: 'available' | 'unavailable' | 'unknown';
+        verificationStatus: 'verified' | 'community' | 'metadata-only' | 'unverified' | 'unknown';
+        ownershipStatus?: 'owned';
+        manuallyAdded: boolean;
+        installations: Array<{
+          installationId: string;
+          launcher: 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
+          edition?: string;
+          installPath?: string;
+          executablePath?: string;
+          buildVersion?: string;
+          launchUri?: string;
+          lastSeenAt: string;
+          detectionSource: 'auto-detected' | 'manual';
+          active: boolean;
+          sourceGameId?: string;
+        }>;
+        saveLocations: string[];
+      }>;
+      error?: string;
+    }>;
+    listCanonicalGames: () => Promise<{ success: boolean; games?: unknown[]; error?: string }>;
+    getCanonicalGame: (payload: { canonicalGameId: string }) => Promise<{
+      success: boolean;
+      game?: unknown;
+      installations?: unknown[];
+      error?: string;
+    }>;
+    launchInstallation: (payload: { canonicalGameId: string; installationId: string }) => Promise<{
+      success: boolean;
       error?: string;
     }>;
 
@@ -910,7 +1082,16 @@ interface Window {
       demand?: { catalogGameId: string; notifyCount: number; verificationRequests: number };
       error?: string;
     }>;
-    catalogDemandList: () => Promise<{ success: boolean; error?: string }>;
+    catalogDemandList: () => Promise<{
+      success: boolean;
+      demand?: Array<{ catalogGameId: string; notifyCount: number; verificationRequests: number; lastRequestedAt: string }>;
+      error?: string;
+    }>;
+    trainerCatalogAllTimePopularityList: () => Promise<{
+      success: boolean;
+      popularity?: Array<{ catalogGameId: string; positiveCount: number }>;
+      error?: string;
+    }>;
     installDiscoveryOpenPath: (payload: {
       catalogGameId: string;
       targetPath?: string;

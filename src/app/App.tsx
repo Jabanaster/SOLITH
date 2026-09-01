@@ -7,6 +7,7 @@ import ExternalTrainerResearchLab from './pages/ExternalTrainerResearchLab';
 import Recipes from './pages/Recipes';
 import Backups from './pages/Backups';
 import Journal from './pages/Journal';
+import ProposalInspector from './pages/ProposalInspector';
 import SaveLocations from './pages/SaveLocations';
 import CompatibilityDashboard from './pages/CompatibilityDashboard';
 import SessionMonitorPage from './pages/SessionMonitorPage';
@@ -29,6 +30,14 @@ import { SolithWispCompanion } from './components/SolithWispCompanion.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
 import { WalkthroughOwner } from './components/PageWalkthrough.js';
+import { SettingsPage } from './pages/settings/SettingsPage.js';
+import { useNavSectionState } from './hooks/useNavSectionState.js';
+import { useNotifications } from './hooks/useNotifications.js';
+import { NotificationBell } from './components/NotificationBell.js';
+import { NotificationCenter } from './components/NotificationCenter.js';
+import { ToastHost } from './components/ToastHost.js';
+import type { Settings, NotificationAction } from '../shared/types/index.js';
+import { type View, isValidView } from './nav-views.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -56,12 +65,6 @@ class ContentErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-
-type View =
-  | 'library' | 'trainer' | 'saves' | 'data' | 'discovery' | 'trainer-research'
-  | 'recipes' | 'backups' | 'journal' | 'locations' | 'compatibility'
-  | 'session-monitor' | 'controls' | 'live-memory' | 'trainer-library'
-  | 'catalog-save-controls' | 'trainer-deck' | 'registry-explorer' | 'ct-library';
 
 type NavItem = {
   id: View;
@@ -134,7 +137,8 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'registry-explorer', label: 'Registry Explorer', icon: 'database' },
       { id: 'data', label: 'Data Editor', icon: 'database' },
       { id: 'compatibility', label: 'Compatibility', icon: 'safe' },
-      { id: 'recipes', label: 'Recipes', icon: 'apply' },
+      { id: 'recipes', label: 'Recipe Editor', icon: 'apply' },
+      { id: 'proposal-inspector', label: 'Proposal Inspector', icon: 'log' },
     ],
   },
   {
@@ -181,6 +185,7 @@ const App: React.FC = () => {
   } | null>(null);
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const finishOpeningCinematic = useCallback(() => {
     setShowOpeningCinematic(false);
   }, []);
@@ -188,14 +193,22 @@ const App: React.FC = () => {
   useEffect(() => {
     void (async () => {
       try {
-        const settings = await (window as any).electronAPI?.getSettings?.();
-        if (settings && settings.onboardingCompleted !== true) {
-          setShowOnboarding(true);
+        const result = await (window as any).electronAPI?.getSettings?.();
+        if (result && !result.error) {
+          setSettings(result);
+          if (result.onboardingCompleted !== true) {
+            setShowOnboarding(true);
+          }
         }
       } catch {
         // ignore — browser mode
       }
     })();
+  }, []);
+
+  const updateSetting = useCallback((key: keyof Settings, value: Settings[keyof Settings]) => {
+    setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
+    void (window as any).electronAPI?.setSetting?.(key, value);
   }, []);
 
   const handleLibraryLaunch = (
@@ -311,6 +324,39 @@ const App: React.FC = () => {
   };
 
   const isNavActive = (view: View) => currentView === view;
+  const activeSectionTitle = NAV_SECTIONS.find((section) =>
+    section.items.some((item) => item.id === currentView),
+  )?.title ?? null;
+  const { isCollapsed: isSectionCollapsed, toggleSection, canManuallyToggle: canManuallyToggleSection } =
+    useNavSectionState({
+      activeSectionTitle,
+      behaviorMode: settings?.navSectionBehaviorMode ?? 'remember',
+      rememberedStateRaw: settings?.navRememberedSectionState ?? '{}',
+      onPersistRememberedState: (raw) => updateSetting('navRememberedSectionState', raw),
+    });
+  const navCompactMode = settings?.navCompactMode ?? false;
+  const navShowSectionLabels = settings?.navShowSectionLabels ?? true;
+  const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
+  const { notifications, unreadCount, toasts, markRead, markAllRead, clearHistory, dismissToast } =
+    useNotifications({ toastsEnabled: settings?.notificationsToastEnabled ?? true });
+  const handleNotificationAction = (action: NotificationAction) => {
+    setNotificationCenterOpen(false);
+    // action.view is untrusted (persisted/IPC-derived) — never cast it, always
+    // validate against the canonical View allowlist. Unknown/malformed values
+    // are ignored and never touch currentView.
+    if (action.type === 'open-view' && isValidView(action.view)) {
+      setCurrentView(action.view);
+    }
+  };
+
+  useEffect(() => {
+    if (!notificationCenterOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNotificationCenterOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [notificationCenterOpen]);
   const walkthroughOwnerKey = [
     currentView,
     selectedGame?.id ?? '',
@@ -342,6 +388,8 @@ const App: React.FC = () => {
         return <CtLibraryExplorerPage />;
       case 'recipes':
         return <Recipes gameId={selectedGame?.id ?? null} />;
+      case 'proposal-inspector':
+        return <ProposalInspector gameId={selectedGame?.id ?? null} />;
       case 'backups':
         return <Backups gameId={selectedGame?.id ?? null} />;
       case 'journal':
@@ -379,15 +427,24 @@ const App: React.FC = () => {
         );
       case 'controls':
         return <TrainerControlPanel />;
+      case 'settings':
+        return (
+          <SettingsPage
+            settings={settings}
+            onUpdateSetting={updateSetting}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={toggleSidebar}
+          />
+        );
       default:
         return null;
     }
   };
 
   return (
-    <div className={`app-container${sidebarCollapsed ? ' app-container--sidebar-collapsed' : ''}`}>
+    <div className={`app-container${sidebarCollapsed ? ' app-container--sidebar-collapsed' : ''}${navCompactMode ? ' app-container--nav-compact' : ''}`}>
       <aside
-        className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}`}
+        className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}${navCompactMode ? ' sidebar--compact' : ''}`}
         aria-label="Main navigation"
       >
         <div className="sidebar-header">
@@ -399,6 +456,34 @@ const App: React.FC = () => {
               <span className="sidebar-header__label">Solith</span>
             )}
           </div>
+          <div className="sidebar-notification-anchor">
+            <NotificationBell
+              unreadCount={unreadCount}
+              showBadge={settings?.notificationsShowUnreadBadge ?? true}
+              isOpen={notificationCenterOpen}
+              onToggle={() => setNotificationCenterOpen((prev) => !prev)}
+            />
+            {notificationCenterOpen && (
+              <NotificationCenter
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onClose={() => setNotificationCenterOpen(false)}
+                onMarkRead={markRead}
+                onMarkAllRead={markAllRead}
+                onClearHistory={clearHistory}
+                onAction={handleNotificationAction}
+              />
+            )}
+          </div>
+          <button
+            type="button"
+            className="sidebar-settings-btn"
+            onClick={() => navigateTo('settings')}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <Icon name="settings" size={20} />
+          </button>
           <button
             type="button"
             className="sidebar-collapse-btn"
@@ -415,19 +500,33 @@ const App: React.FC = () => {
         </div>
 
         <div id="app-nav" className="sidebar-nav">
-          {NAV_SECTIONS.map((section) => (
+          {NAV_SECTIONS.map((section) => {
+            const collapsed = isSectionCollapsed(section.title);
+            return (
             <nav
               key={section.title}
-              className={`nav-section${section.secondary ? ' nav-section--secondary' : ''}`}
+              className={`nav-section${section.secondary ? ' nav-section--secondary' : ''}${collapsed ? ' nav-section--collapsed' : ''}`}
               aria-label={section.title}
             >
               <h3>
                 {SECTION_ARTWORK[section.title] && !sidebarCollapsed ? (
                   <BrandingArtwork artwork={SECTION_ARTWORK[section.title]!} size="section" />
                 ) : null}
-                <span>{section.title}</span>
+                {!sidebarCollapsed && navShowSectionLabels && <span>{section.title}</span>}
+                {!sidebarCollapsed && canManuallyToggleSection && (
+                  <button
+                    type="button"
+                    className="nav-section-toggle"
+                    onClick={() => toggleSection(section.title)}
+                    aria-expanded={!collapsed}
+                    aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${section.title} section`}
+                    title={`${collapsed ? 'Expand' : 'Collapse'} ${section.title}`}
+                  >
+                    <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                  </button>
+                )}
               </h3>
-              {section.items.map((item) => {
+              {(!collapsed || sidebarCollapsed) && section.items.map((item) => {
                 const artwork = NAV_MODULE_ARTWORK[item.id];
                 return (
                 <button
@@ -450,7 +549,8 @@ const App: React.FC = () => {
               );
               })}
             </nav>
-          ))}
+            );
+          })}
 
           {selectedGame && (
             <nav className="nav-section nav-section--context" aria-label="Game trainer categories">
@@ -543,6 +643,8 @@ const App: React.FC = () => {
           onDismiss={() => setProcessToast(null)}
         />
       )}
+
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
 
       {showOpeningCinematic && (
         <OpeningCinematic

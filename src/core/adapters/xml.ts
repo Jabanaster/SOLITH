@@ -5,40 +5,134 @@ import { getDeepValue, setDeepValue } from './json';
 import { ParsedDocument, ParserDiagnostic } from '../../shared/types';
 import { buildParsedDocument } from '../saves/normalization';
 
+// Bounded single-pass structural depth scan. Not a full XML parser — it only
+// tracks enough state (comment/CDATA/PI/markup-declaration skipping, quoted
+// attribute values) to count element nesting correctly without being fooled
+// by '<'/'>' characters that appear inside those constructs. A prior regex
+// implementation (`/<(\/?[a-zA-Z_][a-zA-Z0-9_\-\.:]*)(?:\s+[^>]*)*>/g`)
+// counted fake tags found inside comments/CDATA and mis-terminated tags on a
+// quoted '>' inside an attribute value, both of which under- or over-count
+// real structural depth. This walks the string once (O(n), no backtracking)
+// so it stays cheap enough to run before considering the document safe to
+// hand to a full parser.
+function scanXmlStructuralDepth(content: string, maxDepth: number): { exceeded: boolean; maxDepthSeen: number } {
+  const len = content.length;
+  let i = 0;
+  let depth = 0;
+  let maxDepthSeen = 0;
+
+  while (i < len) {
+    if (content[i] !== '<') {
+      i++;
+      continue;
+    }
+
+    if (content.startsWith('<!--', i)) {
+      const end = content.indexOf('-->', i + 4);
+      i = end === -1 ? len : end + 3;
+      continue;
+    }
+
+    if (content.startsWith('<![CDATA[', i)) {
+      const end = content.indexOf(']]>', i + 9);
+      i = end === -1 ? len : end + 3;
+      continue;
+    }
+
+    if (content.startsWith('<?', i)) {
+      const end = content.indexOf('?>', i + 2);
+      i = end === -1 ? len : end + 2;
+      continue;
+    }
+
+    // Any other markup declaration (DOCTYPE internal subsets, etc.). DOCTYPE
+    // itself is already rejected before this function runs, but this branch
+    // stays as defense-in-depth against other '<!...>' constructs and skips
+    // to the matching top-level '>', respecting a bracketed internal subset
+    // which may itself contain unquoted '>' characters.
+    if (content.startsWith('<!', i)) {
+      let j = i + 2;
+      let bracketDepth = 0;
+      while (j < len) {
+        const c = content[j];
+        if (c === '[') bracketDepth++;
+        else if (c === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (c === '>' && bracketDepth === 0) break;
+        j++;
+      }
+      i = j < len ? j + 1 : len;
+      continue;
+    }
+
+    // Element start/end tag: scan to the matching unquoted '>', tracking
+    // quoted attribute values so a '>' inside "..." or '...' doesn't
+    // terminate the tag early.
+    let j = i + 1;
+    let quote: string | null = null;
+    while (j < len) {
+      const c = content[j];
+      if (quote) {
+        if (c === quote) quote = null;
+      } else if (c === '"' || c === "'") {
+        quote = c;
+      } else if (c === '>') {
+        break;
+      }
+      j++;
+    }
+
+    if (j >= len) {
+      // Unterminated tag — nothing further to structurally count. The
+      // downstream XML parser will reject this document as malformed.
+      break;
+    }
+
+    const tagBody = content.slice(i + 1, j);
+    const isClosing = tagBody.startsWith('/');
+    const isSelfClosing = tagBody.endsWith('/');
+
+    if (isClosing) {
+      if (depth > 0) depth--;
+    } else if (!isSelfClosing) {
+      depth++;
+      if (depth > maxDepthSeen) maxDepthSeen = depth;
+      if (maxDepthSeen > maxDepth) {
+        return { exceeded: true, maxDepthSeen };
+      }
+    }
+
+    i = j + 1;
+  }
+
+  return { exceeded: false, maxDepthSeen };
+}
+
 export function validateXmlSafety(content: string): { safe: boolean; error?: string } {
   // 1. Check file size
   if (content.length > 5 * 1024 * 1024) {
     return { safe: false, error: 'XML file size exceeds safe limit of 5MB' };
   }
 
-  // 2. Reject DOCTYPE or entity definitions
+  // 2. Reject DOCTYPE and entity definitions outright. A bare DOCTYPE with no
+  // visible ENTITY/SYSTEM/PUBLIC is still rejected — parsers can resolve
+  // internal subsets or externally-referenced DTDs the regex above can't see,
+  // so "no entity keyword present" is not proof of safety.
   if (/<!DOCTYPE/i.test(content)) {
-    if (/<!ENTITY/i.test(content)) {
-      return { safe: false, error: 'XML entity declarations (<!ENTITY) are blocked to prevent expansion attacks.' };
-    }
-    if (/SYSTEM|PUBLIC/i.test(content)) {
-      return { safe: false, error: 'External entity resolution is blocked.' };
-    }
+    return { safe: false, error: 'XML DOCTYPE declarations are blocked to prevent entity expansion and external entity resolution attacks.' };
   }
 
-  // 3. Limit depth
-  let depth = 0;
-  let maxDepth = 0;
-  const tagRegex = /<(\/?[a-zA-Z_][a-zA-Z0-9_\-\.:]*)(?:\s+[^>]*)*>/g;
-  let match;
-  while ((match = tagRegex.exec(content)) !== null) {
-    const tag = match[1];
-    if (tag.startsWith('/') || tag.endsWith('/')) {
-      if (depth > 0) depth--;
-    } else {
-      depth++;
-      if (depth > maxDepth) {
-        maxDepth = depth;
-      }
-      if (maxDepth > 32) {
-        return { safe: false, error: 'XML nesting depth exceeds safe limit of 32.' };
-      }
-    }
+  // 3. Limit depth. Real community Cheat Engine tables nest CheatEntry
+  // category folders far deeper than a typical save-editor XML document —
+  // a genuine CrimsonDesert.CT fixture reaches depth 75 with no malicious
+  // intent. 32 rejected real, legitimate tables outright (discovered when
+  // Finding 1's fix wired this same validator into the metadata/script
+  // fallback path, which had never enforced it before). 256 stays orders of
+  // magnitude below any realistic engineered stack-exhaustion depth while
+  // comfortably covering real-world nesting.
+  const MAX_XML_DEPTH = 256;
+  const { exceeded } = scanXmlStructuralDepth(content, MAX_XML_DEPTH);
+  if (exceeded) {
+    return { safe: false, error: `XML nesting depth exceeds safe limit of ${MAX_XML_DEPTH}.` };
   }
 
   return { safe: true };

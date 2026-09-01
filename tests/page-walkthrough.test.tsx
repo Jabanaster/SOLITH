@@ -28,6 +28,7 @@ describe('page walkthrough registry', () => {
     'data-editor': readFileSync('src/app/pages/SaveEditor.tsx', 'utf8'),
     'compatibility': readFileSync('src/app/pages/CompatibilityDashboard.tsx', 'utf8'),
     'recipes': readFileSync('src/app/pages/Recipes.tsx', 'utf8'),
+    'proposal-inspector': readFileSync('src/app/pages/ProposalInspector.tsx', 'utf8'),
     'session-monitor': readFileSync('src/app/pages/SessionMonitorPage.tsx', 'utf8'),
     'live-memory-trainer': readFileSync('src/app/pages/LiveMemoryTrainerPage.tsx', 'utf8'),
   };
@@ -50,7 +51,7 @@ describe('page walkthrough registry', () => {
 
   test('keeps navigation, audit classifications, registry, and page bindings aligned', () => {
     const appSource = readFileSync('src/app/App.tsx', 'utf8');
-    assert.equal(walkthroughAudit.length, 16);
+    assert.equal(walkthroughAudit.length, 17);
     assert.equal(walkthroughAudit.every(({ status }) => status === 'PASS'), true);
 
     for (const entry of walkthroughAudit) {

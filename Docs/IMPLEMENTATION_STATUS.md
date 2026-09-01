@@ -1,6 +1,9 @@
 # Implementation Status
 
-> **ARCHIVED supplement** — See `ROADMAP.md` and `Docs/Plans/SOLITH_PINNACLE_MASTER_PLAN.md` for current status.
+> **ARCHIVED supplement** — See `MASTER_ROADMAP.md` for authoritative portfolio
+> status, `ROADMAP.md` for detailed product phases, and
+> `SOLITH_SECURITY_ROADMAP.md` for security verdicts. The archived Pinnacle plan
+> is historical only.
 
 This document tracks the implementation and verification status of Solith core modules and security hardening requirements.
 

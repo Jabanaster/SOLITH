@@ -11,6 +11,8 @@ import { getFlingReference } from '../../cheat-system/trainer-reference.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'Solith-TrainerCatalog/1.0 (+local definitions sync; no binary download)';
+const MAX_HTML_REDIRECTS = 5;
+const MAX_HTML_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 export interface SyncImportResult {
   provider: string;
@@ -20,21 +22,75 @@ export interface SyncImportResult {
   trainers: ParsedRemoteTrainer[];
 }
 
+// Finding R1 (independent security review, d3397bb): every redirect hop is a
+// new outbound network target and must be revalidated, not just counted and
+// size-capped. Strict same-host, HTTPS-only policy: a redirect is only
+// followed if it stays on the exact hostname of the original request. Since
+// the 3 configured sources are fixed, non-renderer-controlled hostnames, this
+// makes a separate private-network/loopback denylist redundant here — a
+// compromised source host cannot redirect off its own hostname to pivot
+// anywhere else (localhost, RFC1918, link-local, or an unrelated public
+// host), so there is no host it could redirect to that isn't itself.
+export function validateRedirectTarget(location: string, currentUrl: string, allowedHost: string): URL {
+  let target: URL;
+  try {
+    target = new URL(location, currentUrl);
+  } catch {
+    throw new Error(`Redirect from ${currentUrl} had a malformed Location header`);
+  }
+  if (target.protocol !== 'https:') {
+    throw new Error(`Redirect from ${currentUrl} to disallowed scheme "${target.protocol}" rejected`);
+  }
+  if (target.username || target.password) {
+    throw new Error(`Redirect from ${currentUrl} carrying embedded credentials rejected`);
+  }
+  if (target.hostname.toLowerCase() !== allowedHost.toLowerCase()) {
+    throw new Error(`Redirect from ${currentUrl} to disallowed host "${target.hostname}" rejected`);
+  }
+  return target;
+}
+
 async function fetchHtml(url: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': USER_AGENT,
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} for ${url}`);
+    const initialUrl = new URL(url);
+    if (initialUrl.protocol !== 'https:') {
+      throw new Error(`Refusing non-HTTPS sync source: ${url}`);
     }
-    return await response.text();
+    const allowedHost = initialUrl.hostname;
+    let currentUrl = url;
+    let response: Response | undefined;
+    for (let redirects = 0; ; redirects += 1) {
+      response = await fetch(currentUrl, {
+        signal: controller.signal,
+        redirect: 'manual',
+        headers: {
+          'User-Agent': USER_AGENT,
+          Accept: 'text/html,application/xhtml+xml',
+        },
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) throw new Error(`Redirect from ${currentUrl} had no Location header`);
+        if (redirects >= MAX_HTML_REDIRECTS) throw new Error('Exceeded maximum redirect count');
+        currentUrl = validateRedirectTarget(location, currentUrl, allowedHost).toString();
+        continue;
+      }
+      break;
+    }
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} for ${currentUrl}`);
+    }
+    const contentLength = Number(response.headers.get('content-length') ?? 0);
+    if (contentLength > MAX_HTML_RESPONSE_BYTES) {
+      throw new Error(`Response for ${currentUrl} exceeds ${MAX_HTML_RESPONSE_BYTES} byte cap`);
+    }
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_HTML_RESPONSE_BYTES) {
+      throw new Error(`Response for ${currentUrl} exceeds ${MAX_HTML_RESPONSE_BYTES} byte cap`);
+    }
+    return text;
   } finally {
     clearTimeout(timer);
   }

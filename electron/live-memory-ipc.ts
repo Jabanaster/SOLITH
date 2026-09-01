@@ -94,7 +94,8 @@ async function getLiveMemoryModule() {
 export function registerLiveMemoryIpc(): void {
   ipcMain.handle('live-memory-list-processes', async (event) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       LiveMemoryListProcessesSchema.parse({});
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
@@ -107,7 +108,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-attach', async (event, payload: unknown) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
       const parsed = LiveMemoryAttachSchema.parse(payload);
@@ -203,7 +205,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-zero-input-prepare', async (event, payload: unknown) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
       const parsed = LiveMemoryZeroInputPrepareSchema.parse(payload);
@@ -311,6 +314,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-detach', async (event) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       LiveMemoryDetachSchema.parse({});
       disposeSession(event.sender.id);
       return { success: true };
@@ -321,6 +326,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-read', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = LiveMemoryReadSchema.parse(payload);
       const value = bundle.manager.read({ address: BigInt(parsed.address), dataType: parsed.dataType });
@@ -333,6 +340,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-propose-write', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = LiveMemoryProposeWriteSchema.parse(payload);
       // Staging only — destructive confirm requires a consumed consent artifact.
@@ -470,9 +479,13 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
-  // Read-only: no guard check needed here, nothing is written to the process.
+  // Guarded (Phase 7 finding): session binding is per-webContents, not per-frame,
+  // so an unguarded read-only channel is still reachable by any trusted-window type
+  // sharing that sender id — see requireTrustedSender's frame/window-type check.
   ipcMain.handle('live-memory-scan-first', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanFirstSchema.parse(payload);
       const result = session.scanFirst(parsed.dataType, parsed.targetValue, {
@@ -490,6 +503,8 @@ export function registerLiveMemoryIpc(): void {
   // scan modes and value types, plus an optional unknown-value baseline.
   ipcMain.handle('live-memory-scan-first-auto-matrix', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanFirstAutoMatrixSchema.parse(payload);
       const result = session.scanFirstAutoMatrix({
@@ -518,6 +533,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-scan-next', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanNextSchema.parse(payload);
       const previous: ScanMatch[] = parsed.previous.map((m) => ({ address: BigInt(m.address), value: m.value }));
@@ -532,6 +549,8 @@ export function registerLiveMemoryIpc(): void {
   // percentage with no digits). Read-only, same as scan-first: nothing is written.
   ipcMain.handle('live-memory-scan-first-unknown', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanFirstUnknownSchema.parse(payload);
       const result = session.scanFirstUnknown(parsed.key, {
@@ -551,6 +570,8 @@ export function registerLiveMemoryIpc(): void {
   // turn "every writable byte" into a workable candidate list, one real filter.
   ipcMain.handle('live-memory-scan-next-from-unknown', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanNextFromUnknownSchema.parse(payload);
       const result = session.scanNextFromUnknown(parsed.key, parsed.dataTypes, parsed.comparison, {
@@ -575,6 +596,8 @@ export function registerLiveMemoryIpc(): void {
   // via repeated increased/decreased narrow rounds.
   ipcMain.handle('live-memory-read-many', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryReadManySchema.parse(payload);
       const results = session.readMany(parsed.addresses.map((a) => ({ address: BigInt(a.address), dataType: a.dataType })));
@@ -589,6 +612,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-correlation-start', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = LiveMemoryCorrelationStartSchema.parse(payload);
       const mod = await getLiveMemoryModule();
@@ -620,6 +645,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-correlation-poll', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       LiveMemoryCorrelationEmptySchema.parse(payload ?? {});
       const bundle = requireBundle(event);
       if (!bundle.correlationWatcher) return { success: false, error: 'correlation_watcher_not_started' };
@@ -631,6 +658,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-correlation-event', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const parsed = LiveMemoryCorrelationEventSchema.parse(payload);
       const bundle = requireBundle(event);
       if (!bundle.correlationWatcher) return { success: false, error: 'correlation_watcher_not_started' };
@@ -642,6 +671,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-correlation-stop', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       LiveMemoryCorrelationEmptySchema.parse(payload ?? {});
       const bundle = requireBundle(event);
       bundle.correlationWatcher?.stop();
@@ -826,6 +857,8 @@ export function registerLiveMemoryIpc(): void {
   // Read-only: Phase 4 schema.v1-only live controls (legacy catalog removed).
   ipcMain.handle('live-memory-list-controls', async (event) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       LiveMemoryListControlsSchema.parse({});
       const executableName = session.getAttachedExecutableName();
@@ -851,6 +884,8 @@ export function registerLiveMemoryIpc(): void {
   // therefore the online-session guard) to actually change it.
   ipcMain.handle('live-memory-resolve-control', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryResolveControlSchema.parse(payload);
       const mod = await getLiveMemoryModule();
@@ -880,6 +915,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-resolve-definition-feature', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryResolveDefinitionFeatureSchema.parse(payload);
       const { getModPackForGame, getDefinitionPayload } = await import('../src/core/trainer-catalog/store.js');
@@ -910,6 +947,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-pointer-scan', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryPointerScanSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
@@ -940,6 +979,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('live-memory-scan-aob', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanAobSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
@@ -956,6 +997,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('research:view', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = ResearchViewSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
@@ -979,6 +1022,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('research:hex', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = ResearchHexSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
@@ -1002,6 +1047,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('research:pointer-analyze', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = ResearchPointerAnalyzeSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
@@ -1036,6 +1083,8 @@ export function registerLiveMemoryIpc(): void {
   /** Phase 2 — resolve module+offset[+chain] on the attached session only. */
   ipcMain.handle('research:resolve-path', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const bundle = requireBundle(event);
       const parsed = ResearchResolvePathSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
@@ -1068,7 +1117,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('research:snapshot-diff', async (event, payload: unknown) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const parsed = ResearchSnapshotDiffSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
@@ -1083,7 +1133,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('research:snapshot-save', async (event, payload: unknown) => {
     try {
-      if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const parsed = ResearchSnapshotSaveSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
@@ -1118,6 +1169,8 @@ export function registerLiveMemoryIpc(): void {
 
   ipcMain.handle('in-process-propose-hook', async (event, payload: unknown) => {
     try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = InProcessProposeHookSchema.parse(payload);
       if (!(await isInProcessEnabled())) return { success: false, error: 'in_process_disabled' };

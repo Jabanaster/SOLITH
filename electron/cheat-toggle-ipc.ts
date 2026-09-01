@@ -1,4 +1,5 @@
-import { ipcMain } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import { CheatToggleGetAllSchema, CheatToggleSetSchema, CheatToggleClearSchema } from './ipc-validation.js';
 
 /**
@@ -8,8 +9,28 @@ import { CheatToggleGetAllSchema, CheatToggleSetSchema, CheatToggleClearSchema }
  * Not feature-flag-gated the way live-memory IPC is — this only reads/writes
  * a small local table, no process memory access happens here.
  */
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerCheatToggleIpc(): void {
-  ipcMain.handle('cheat-toggle-get-all', async (event, payload: unknown) => {
+  guardedHandle('cheat-toggle-get-all', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const parsed = CheatToggleGetAllSchema.parse(payload);
@@ -20,7 +41,7 @@ export function registerCheatToggleIpc(): void {
     }
   });
 
-  ipcMain.handle('cheat-toggle-set', async (event, payload: unknown) => {
+  guardedHandle('cheat-toggle-set', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const parsed = CheatToggleSetSchema.parse(payload);
@@ -36,7 +57,7 @@ export function registerCheatToggleIpc(): void {
     }
   });
 
-  ipcMain.handle('cheat-toggle-clear', async (event, payload: unknown) => {
+  guardedHandle('cheat-toggle-clear', async (event, payload: unknown) => {
     try {
       if (event.sender.isDestroyed()) return { success: false, error: 'sender_invalid' };
       const parsed = CheatToggleClearSchema.parse(payload);

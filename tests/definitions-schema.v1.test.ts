@@ -5,7 +5,9 @@ import {
   validateSolithDefinitionV1,
   memoryDataTypeToLiveValue,
   SOLITH_DEFINITION_SCHEMA_VERSION,
+  isValidMemoryFeatureResolution,
 } from '../src/core/definitions/schema.v1.js';
+import { importDefinitionYaml } from '../src/core/definitions/import-definition.js';
 import { verifyDefinitionFingerprint, fingerprintBlocksAttach } from '../src/core/definitions/fingerprint-verify.js';
 import { modPackToSolithDefinition } from '../src/core/definitions/mod-pack-adapter.js';
 import type { ModPack } from '../src/core/trainer-catalog/types.js';
@@ -143,5 +145,51 @@ describe('modPackToSolithDefinition', () => {
     assert.equal(definition.connectionBaseline, 2);
     assert.equal(definition.memoryFeatures?.[0]?.resolution.baseOffset, '0x100');
     assert.equal(definition.memoryFeatures?.[0]?.type, 'toggle');
+  });
+});
+
+describe('Candidate 1A Regression Coverage: Resolution shape safety & import outcomes', () => {
+  test('isValidMemoryFeatureResolution identifies valid, malformed, and missing resolution objects', () => {
+    const valid = { moduleName: 'Game.exe', baseOffset: '0x10', pointerChain: [0x20] };
+    const missingModuleName = { baseOffset: '0x10' };
+    const badChainType = { moduleName: 'Game.exe', pointerChain: ['not-a-number'] };
+    const nullVal = null;
+    const undefinedVal = undefined;
+
+    assert.equal(isValidMemoryFeatureResolution(valid), true);
+    assert.equal(isValidMemoryFeatureResolution(missingModuleName), false);
+    assert.equal(isValidMemoryFeatureResolution(badChainType), false);
+    assert.equal(isValidMemoryFeatureResolution(nullVal), false);
+    assert.equal(isValidMemoryFeatureResolution(undefinedVal), false);
+  });
+
+  test('valid feature resolution is accepted by parseSolithDefinitionV1', () => {
+    const parsed = parseSolithDefinitionV1(SAMPLE_DEFINITION);
+    assert.equal(isValidMemoryFeatureResolution(parsed.memoryFeatures?.[0]?.resolution), true);
+  });
+
+  test('malformed feature resolution is rejected by validateSolithDefinitionV1 without throwing runtime errors', () => {
+    const malformedDef = {
+      ...SAMPLE_DEFINITION,
+      memoryFeatures: [
+        {
+          ...SAMPLE_DEFINITION.memoryFeatures[0],
+          resolution: { baseOffset: '0x10' }, // missing required moduleName
+        },
+      ],
+    };
+    const errors = validateSolithDefinitionV1(malformedDef);
+    assert.ok(errors.length > 0, 'Validation must report error for missing moduleName');
+    assert.ok(errors.some((e) => e.includes('moduleName')), 'Error message must mention moduleName');
+  });
+
+  test('importDefinitionYaml exposes errors through discriminated failure outcome when YAML compilation fails', () => {
+    const badYaml = 'invalid: [yaml: content';
+    const outcome = importDefinitionYaml(badYaml);
+    assert.equal(outcome.success, false);
+    if (outcome.success === false) {
+      assert.ok(Array.isArray(outcome.errors), 'Outcome must expose errors array');
+      assert.ok(outcome.errors.length > 0, 'Outcome must contain at least one error');
+    }
   });
 });

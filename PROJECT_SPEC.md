@@ -4,6 +4,11 @@ You are the principal software architect, product designer, security engineer, a
 
 This document is the authoritative project specification.
 
+`MASTER_ROADMAP.md` is the authoritative portfolio sequencing and
+cross-workstream reconciliation document. It does not override this
+specification or the Safety Firewall. `SOLITH_SECURITY_ROADMAP.md` remains the
+authority for security-gate and release-security verdicts.
+
 Before making changes:
 
 1. Read this entire specification.

@@ -1,4 +1,5 @@
-import { desktopCapturer, ipcMain } from 'electron';
+import { desktopCapturer, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
 import { LocalOcrCaptureSchema, LocalOcrListSourcesSchema } from './ipc-validation.js';
 import {
   extractBestNumericValue,
@@ -8,8 +9,28 @@ import {
 
 const WINDOW_THUMBNAIL_SIZE = { width: 1920, height: 1080 };
 
+function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, ['main']);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/** Phase 7 B2 hardening — see electron/main.ts's handleGuarded for the pattern this mirrors. */
+function guardedHandle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerLocalOcrIpc(): void {
-  ipcMain.handle('local-ocr-list-window-sources', async (_event, payload: unknown) => {
+  guardedHandle('local-ocr-list-window-sources', async (_event, payload: unknown) => {
     try {
       const parsed = LocalOcrListSourcesSchema.parse(payload ?? {});
       const sources = await desktopCapturer.getSources({
@@ -36,7 +57,7 @@ export function registerLocalOcrIpc(): void {
     }
   });
 
-  ipcMain.handle('local-ocr-read-window-region', async (_event, payload: unknown) => {
+  guardedHandle('local-ocr-read-window-region', async (_event, payload: unknown) => {
     try {
       const parsed = LocalOcrCaptureSchema.parse(payload);
       const sources = await desktopCapturer.getSources({

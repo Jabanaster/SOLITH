@@ -9,6 +9,7 @@ import {
   INSTALL_IDENTITY_VERSION,
 } from '../install-discovery/identity.js';
 import type { InstallPlatform, RawInstalledGame } from '../install-discovery/types.js';
+import { renameOrCopyAcrossDevices } from '../safety/exdev-safe-rename.js';
 
 let dbPath = '';
 
@@ -498,16 +499,24 @@ export function atomicWriteFileSync(targetPath: string, data: Buffer | string): 
     dir,
     `${path.basename(targetPath)}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`,
   );
-  try {
-    fs.writeFileSync(tempPath, data);
-    fs.renameSync(tempPath, targetPath);
-  } finally {
-    if (fs.existsSync(tempPath)) {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {
-        // Preserve the original write/rename failure for callers.
-      }
+
+  fs.writeFileSync(tempPath, data);
+
+  // Finding 3 (independent security review, ef254d1): tempPath is the ONLY
+  // known-good copy of the new data until this call proves targetPath now
+  // holds it too (targetPath itself may be absent, stale, or about to be
+  // partially overwritten by a failing copy fallback). If this throws —
+  // EXDEV copy failing partway, or any other rename failure — tempPath must
+  // NOT be deleted, so the propagating exception below skips the cleanup
+  // entirely rather than deleting it in a finally.
+  renameOrCopyAcrossDevices(tempPath, targetPath);
+
+  if (fs.existsSync(tempPath)) {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // The write itself already succeeded — a leftover temp file is a
+      // harmless recovery artifact, not a reason to fail the write.
     }
   }
 }
@@ -574,7 +583,17 @@ export function persistDatabase(sqlDb: any, forceSync = false): Promise<void> {
 
   persistTimeout = setTimeout(() => {
     persistTimeout = null;
-    performWrite();
+    try {
+      performWrite();
+    } catch {
+      // performWrite() already logged the error and rejected pendingPersistPromise
+      // for any caller awaiting it. This debounced timer callback has no caller of
+      // its own to propagate to — a synchronous throw here becomes an uncaught
+      // exception that kills the whole process over one transient write failure
+      // (observed: a same-directory renameSync EXDEV during Phase 7 installer
+      // upgrade testing crashed a running app on its own autosave tick). Swallow
+      // it here so a failed background persist degrades instead of crashing.
+    }
   }, 10);
 
   return pendingPersistPromise;
@@ -845,6 +864,7 @@ function applySchema(): void {
     'saveLocations TEXT',
     'notes TEXT',
     'metadataId TEXT',
+    'launcher TEXT',
   ];
   for (const column of optionalGameColumns) {
     const columnName = column.split(' ')[0];
@@ -1180,6 +1200,46 @@ function applySchema(): void {
     )
   `);
 
+  const trainerCatalogColumns = rawDb!.exec('PRAGMA table_info(trainer_catalog_games)')[0];
+  const trainerCatalogColumnNames = new Set(
+    (trainerCatalogColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  const optionalTrainerCatalogColumns = [
+    'antiCheat TEXT',
+    'offlinePlayAvailable INTEGER',
+    'catalogExclusionFlagsJson TEXT',
+    'explicitlyUnsupported INTEGER',
+    // ROADMAP §3.5 — release date is real catalog metadata (from seed/import sources only);
+    // NULL means unknown, never derived from insertion/file time.
+    'releaseDate TEXT',
+    // ROADMAP §3.5 — set once on INSERT only (see upsertCatalogEntry); ON CONFLICT UPDATE
+    // never rewrites this column, so it stays an honest catalog-added timestamp.
+    'createdAt TEXT',
+    // ROADMAP §3.5 — set only when upsertCatalogEntry detects a meaningful content change
+    // (see MEANINGFUL_UPDATE_FIELDS in store.ts); unconditional syncs/no-op upserts do not
+    // touch it. Distinct from `updatedAt`, which remains an unconditional last-write stamp.
+    'contentUpdatedAt TEXT',
+    // ROADMAP §3.6 Mode — curated capability evidence; NULL = unknown, never inferred.
+    // A routine catalog sync that omits these fields must not null them out (see
+    // upsertCatalogEntry's curated-value preservation in store.ts).
+    'singlePlayer INTEGER',
+    'offlineCoop INTEGER',
+    'localMultiplayer INTEGER',
+    'onlineFeaturesPresent INTEGER',
+    // ROADMAP §3.6 Catalog "All-time classic" — curated flag, no fabricated threshold.
+    'isAllTimeClassic INTEGER',
+    // ROADMAP §3.6 Availability "Owned" — explicit local user confirmation only, set via
+    // setCatalogEntryOwnedConfirmed(); intentionally never written by upsertCatalogEntry
+    // so a routine catalog sync can never wipe a user's manual ownership mark.
+    'ownedConfirmed INTEGER',
+  ];
+  for (const column of optionalTrainerCatalogColumns) {
+    const columnName = column.split(' ')[0];
+    if (!trainerCatalogColumnNames.has(columnName)) {
+      rawDb!.run(`ALTER TABLE trainer_catalog_games ADD COLUMN ${column}`);
+    }
+  }
+
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS trainer_mod_packs (
       packId TEXT PRIMARY KEY,
@@ -1229,6 +1289,24 @@ function applySchema(): void {
 
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_catalog_search ON trainer_catalog_games(searchableText)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_mod_packs_game ON trainer_mod_packs(catalogGameId)');
+
+  // Manual review queue for catalog identity collisions/ambiguity (Phase 1.7).
+  // id is a deterministic collision fingerprint so re-syncing an unresolved
+  // pair reuses the same row instead of creating duplicate review items.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_identity_review (
+      id TEXT PRIMARY KEY,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      leftRecordJson TEXT NOT NULL,
+      rightRecordJson TEXT NOT NULL,
+      resolution TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      resolvedAt TEXT
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_catalog_identity_review_status ON catalog_identity_review(status, createdAt)');
 
   // Persisted cheat toggle state (Multi-Game Live Trainer) — remembers which cheats were
   // enabled and their confirmed address so a Solith restart (not a game restart) can
@@ -1326,6 +1404,81 @@ function applySchema(): void {
     )
   `);
 
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS canonical_games (
+      id TEXT PRIMARY KEY,
+      displayName TEXT NOT NULL,
+      normalizedTitle TEXT NOT NULL,
+      aliasesJson TEXT NOT NULL DEFAULT '[]',
+      developer TEXT,
+      publisher TEXT,
+      releaseDate TEXT,
+      genresJson TEXT NOT NULL DEFAULT '[]',
+      playModesJson TEXT NOT NULL DEFAULT '[]',
+      eligibility TEXT NOT NULL DEFAULT 'listed',
+      supportState TEXT NOT NULL DEFAULT 'unknown',
+      artworkIdentityJson TEXT,
+      popularityMetadataJson TEXT,
+      catalogGameId TEXT,
+      identityStatus TEXT NOT NULL DEFAULT 'backfilled',
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_catalog ON canonical_games(catalogGameId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_normalized ON canonical_games(normalizedTitle)');
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS game_installations (
+      id TEXT PRIMARY KEY,
+      canonicalGameId TEXT NOT NULL,
+      launcher TEXT NOT NULL,
+      launcherGameId TEXT,
+      installPath TEXT,
+      executablePath TEXT,
+      processNamesJson TEXT,
+      edition TEXT,
+      buildVersion TEXT,
+      launchUri TEXT,
+      trainerProfileCompatible INTEGER,
+      installIdentity TEXT NOT NULL,
+      sourceInstalledGameId TEXT,
+      detectedAt TEXT NOT NULL,
+      lastSeenAt TEXT NOT NULL,
+      FOREIGN KEY (canonicalGameId) REFERENCES canonical_games(id)
+    )
+  `);
+  rawDb!.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_game_installations_identity ON game_installations(installIdentity)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_game_installations_canonical ON game_installations(canonicalGameId)');
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS canonical_identity_review (
+      id TEXT PRIMARY KEY,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      evidenceJson TEXT NOT NULL,
+      resolution TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      resolvedAt TEXT
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_identity_review_status ON canonical_identity_review(status, createdAt)');
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      createdAt TEXT DEFAULT (datetime('now')),
+      read INTEGER DEFAULT 0,
+      actionType TEXT,
+      actionView TEXT
+    )
+  `);
+
   // Indexes
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_games_path ON games(path)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_scans_gameId ON scans(gameId)');
@@ -1397,6 +1550,57 @@ function applySchema(): void {
       removedCatalogRowJson TEXT NOT NULL,
       removedModPackRowJson TEXT,
       appliedAt TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ROADMAP §5.5/§5.6 signed catalog update state (single row) and history.
+  // rollbackDataJson on a history row holds the pre-update snapshot of every
+  // touched entry, enabling a targeted rollback without a whole-catalog backup.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_update_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      currentVersion INTEGER NOT NULL DEFAULT 0,
+      lastSuccessAt TEXT,
+      lastCheckAt TEXT,
+      autoUpdateEnabled INTEGER NOT NULL DEFAULT 1,
+      bundledSnapshotOnly INTEGER NOT NULL DEFAULT 0,
+      artworkNetworkOptOut INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS catalog_update_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version INTEGER NOT NULL,
+      appliedAt TEXT NOT NULL,
+      recordCount INTEGER NOT NULL,
+      notice TEXT NOT NULL,
+      status TEXT NOT NULL,
+      rejectReason TEXT,
+      rollbackDataJson TEXT
+    )
+  `);
+
+  // ROADMAP §4.2/§4.3 managed local artwork cache metadata. localPath is a
+  // solith-asset:// addressable file under Electron userData, never a
+  // renderer-controlled path. rightsClass records the ROADMAP §4.2
+  // persistent-cache rights decision every row was written under — see
+  // src/core/artwork-cache/fetch-policy.ts#isPersistableRightsClass, the
+  // gate actually enforced (in src/core/artwork-cache/cache-writer.ts)
+  // before any row here can exist with a non-persistable class and status='ok'.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS artwork_cache (
+      catalogGameId TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      sourceUrl TEXT NOT NULL,
+      rightsClass TEXT NOT NULL,
+      licenseNote TEXT,
+      localPath TEXT NOT NULL,
+      sizeBytes INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      fetchedAt TEXT NOT NULL,
+      lastError TEXT,
+      PRIMARY KEY (catalogGameId, kind)
     )
   `);
 

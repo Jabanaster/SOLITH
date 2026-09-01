@@ -1,4 +1,6 @@
-import { globalShortcut, BrowserWindow, ipcMain } from 'electron';
+import { globalShortcut, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { validateIpcSender } from './sender-validation.js';
+import type { SolithWindowType } from '../src/core/security/trusted-sender-registry.js';
 import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
 import {
   detectHotkeyConflicts,
@@ -41,13 +43,43 @@ export function unregisterTrainerHotkeys(): void {
   registered = false;
 }
 
+function requireTrustedSender(
+  event: IpcMainInvokeEvent,
+  allowedWindowTypes: readonly SolithWindowType[],
+): { ok: true } | { ok: false; reason: string } {
+  const result = validateIpcSender(event, allowedWindowTypes);
+  if (!result.ok) return { ok: false, reason: result.reason ?? 'unknown' };
+  return { ok: true };
+}
+
+/**
+ * Phase 7 B2 hardening — mirrors electron/main.ts's handleGuarded, but takes
+ * an explicit allowedWindowTypes list per channel: hotkey config is a
+ * main-window Settings concern, but trainer-overlay-toggle/hide are called
+ * both from the main window (MultiGameTrainerPage) and by the trainer
+ * overlay window itself (TrainerOverlayPage's own self-hide).
+ */
+function guardedHandle(
+  channel: string,
+  allowedWindowTypes: readonly SolithWindowType[],
+  listener: (event: IpcMainInvokeEvent, ...args: any[]) => any,
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    const senderCheck = requireTrustedSender(event, allowedWindowTypes);
+    if (senderCheck.ok === false) {
+      return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    }
+    return listener(event, ...args);
+  });
+}
+
 export function registerTrainerHotkeyIpc(): void {
-  ipcMain.handle('trainer-hotkeys-get-defaults', async () => ({
+  guardedHandle('trainer-hotkeys-get-defaults', ['main'], async () => ({
     success: true,
     hotkeys: getTrainerHotkeyBindings(),
   }));
 
-  ipcMain.handle('trainer-hotkeys-get-bindings', async () => {
+  guardedHandle('trainer-hotkeys-get-bindings', ['main'], async () => {
     const hotkeys = getTrainerHotkeyBindings();
     return {
       success: true,
@@ -57,7 +89,7 @@ export function registerTrainerHotkeyIpc(): void {
     };
   });
 
-  ipcMain.handle('trainer-hotkeys-set-bindings', async (_event, payload: unknown) => {
+  guardedHandle('trainer-hotkeys-set-bindings', ['main'], async (_event, payload: unknown) => {
     if (!payload || typeof payload !== 'object' || !('hotkeys' in payload)) {
       return { success: false, error: 'invalid_payload' };
     }
@@ -69,7 +101,7 @@ export function registerTrainerHotkeyIpc(): void {
     return { success: true, hotkeys: merged, conflicts, osWarnings };
   });
 
-  ipcMain.handle('trainer-overlay-toggle', async () => {
+  guardedHandle('trainer-overlay-toggle', ['main', 'trainer-overlay'], async () => {
     if (!isTrainerCapabilityEnabled('v2OverlayEnabled')) {
       return { success: false, error: 'overlay_disabled' };
     }
@@ -77,7 +109,7 @@ export function registerTrainerHotkeyIpc(): void {
     return { success: true, visible };
   });
 
-  ipcMain.handle('trainer-overlay-hide', async () => {
+  guardedHandle('trainer-overlay-hide', ['main', 'trainer-overlay'], async () => {
     hideTrainerOverlay();
     return { success: true };
   });

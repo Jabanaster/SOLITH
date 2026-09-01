@@ -1,4 +1,4 @@
-export type InstallPlatform = 'steam' | 'epic' | 'gog' | 'xbox' | 'manual';
+export type InstallPlatform = 'steam' | 'epic' | 'gog' | 'xbox' | 'ubisoft' | 'ea' | 'battlenet' | 'manual';
 export type InstallIdentityStatus = 'verified' | 'backfilled' | 'ambiguous' | 'legacy';
 
 export interface RawInstalledGame {

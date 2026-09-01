@@ -1,5 +1,13 @@
 import db from '../database';
-import { Settings } from '../../shared/types';
+import { Settings, NavSectionBehaviorMode } from '../../shared/types';
+
+const NAV_SECTION_BEHAVIOR_MODES: NavSectionBehaviorMode[] = [
+  'remember', 'always-expand', 'always-collapse-inactive',
+];
+
+function isValidNavSectionBehaviorMode(value: unknown): value is NavSectionBehaviorMode {
+  return typeof value === 'string' && (NAV_SECTION_BEHAVIOR_MODES as string[]).includes(value);
+}
 
 export function getSettings(): Settings {
   const settings: Partial<Settings> = {};
@@ -14,6 +22,12 @@ export function getSettings(): Settings {
     'communitySyncEnabled',
     'installDiscoveryEnabled', 'installDiscoveryLastScan',
     'inProcessScriptExecutionEnabled',
+    'navSectionBehaviorMode', 'navCompactMode', 'navShowSectionLabels',
+    'navRememberedSectionState',
+    'notificationsToastEnabled', 'notificationsCatalogUpdateEnabled',
+    'notificationsArtworkEnabled', 'notificationsTrainerProfileEnabled',
+    'notificationsMaintenanceEnabled', 'notificationsShowUnreadBadge',
+    'communitySyncEverSucceeded',
   ];
   
   keys.forEach(key => {
@@ -52,6 +66,23 @@ export function getSettings(): Settings {
     installDiscoveryEnabled: settings.installDiscoveryEnabled ?? true,
     installDiscoveryLastScan: settings.installDiscoveryLastScan ?? '',
     inProcessScriptExecutionEnabled: settings.inProcessScriptExecutionEnabled ?? false,
+    navSectionBehaviorMode: isValidNavSectionBehaviorMode(settings.navSectionBehaviorMode)
+      ? settings.navSectionBehaviorMode
+      : 'remember',
+    navCompactMode: settings.navCompactMode === true,
+    navShowSectionLabels: typeof settings.navShowSectionLabels === 'boolean'
+      ? settings.navShowSectionLabels
+      : true,
+    navRememberedSectionState: typeof settings.navRememberedSectionState === 'string'
+      ? settings.navRememberedSectionState
+      : '{}',
+    notificationsToastEnabled: settings.notificationsToastEnabled !== false,
+    notificationsCatalogUpdateEnabled: settings.notificationsCatalogUpdateEnabled !== false,
+    notificationsArtworkEnabled: settings.notificationsArtworkEnabled !== false,
+    notificationsTrainerProfileEnabled: settings.notificationsTrainerProfileEnabled !== false,
+    notificationsMaintenanceEnabled: settings.notificationsMaintenanceEnabled !== false,
+    notificationsShowUnreadBadge: settings.notificationsShowUnreadBadge !== false,
+    communitySyncEverSucceeded: settings.communitySyncEverSucceeded === true,
   };
 
   if (process.env.NODE_ENV === 'test' || process.env.SOLITH_SKIP_ONBOARDING === '1') {
@@ -138,4 +169,77 @@ export function getTheme(): 'dark' | 'light' {
 
 export function setTheme(theme: 'dark' | 'light'): void {
   setSetting('theme', theme);
+}
+
+export function getNavSectionBehaviorMode(): NavSectionBehaviorMode {
+  const value = getSetting('navSectionBehaviorMode');
+  return isValidNavSectionBehaviorMode(value) ? value : 'remember';
+}
+
+export function setNavSectionBehaviorMode(mode: NavSectionBehaviorMode): void {
+  setSetting('navSectionBehaviorMode', mode);
+}
+
+export function getNavCompactMode(): boolean {
+  return getSetting('navCompactMode') === true;
+}
+
+export function setNavCompactMode(enabled: boolean): void {
+  setSetting('navCompactMode', enabled);
+}
+
+export function getNavShowSectionLabels(): boolean {
+  const value = getSetting('navShowSectionLabels');
+  return typeof value === 'boolean' ? value : true;
+}
+
+export function setNavShowSectionLabels(enabled: boolean): void {
+  setSetting('navShowSectionLabels', enabled);
+}
+
+export function getNavRememberedSectionState(): string {
+  const value = getSetting('navRememberedSectionState');
+  return typeof value === 'string' ? value : '{}';
+}
+
+export function setNavRememberedSectionState(json: string): void {
+  setSetting('navRememberedSectionState', json);
+}
+
+export function getNotificationsToastEnabled(): boolean {
+  return getSetting('notificationsToastEnabled') !== false;
+}
+
+export function setNotificationsToastEnabled(enabled: boolean): void {
+  setSetting('notificationsToastEnabled', enabled);
+}
+
+const NOTIFICATION_CATEGORY_SETTING_KEYS: Record<
+  'catalog-update' | 'artwork' | 'trainer-profile' | 'maintenance',
+  keyof Settings
+> = {
+  'catalog-update': 'notificationsCatalogUpdateEnabled',
+  artwork: 'notificationsArtworkEnabled',
+  'trainer-profile': 'notificationsTrainerProfileEnabled',
+  maintenance: 'notificationsMaintenanceEnabled',
+};
+
+export function getNotificationsCategoryEnabled(category: 'catalog-update' | 'artwork' | 'trainer-profile' | 'maintenance'): boolean {
+  return getSetting(NOTIFICATION_CATEGORY_SETTING_KEYS[category]) !== false;
+}
+
+export function setNotificationsShowUnreadBadge(enabled: boolean): void {
+  setSetting('notificationsShowUnreadBadge', enabled);
+}
+
+export function getNotificationsShowUnreadBadge(): boolean {
+  return getSetting('notificationsShowUnreadBadge') !== false;
+}
+
+export function getCommunitySyncEverSucceeded(): boolean {
+  return getSetting('communitySyncEverSucceeded') === true;
+}
+
+export function setCommunitySyncEverSucceeded(value: boolean): void {
+  setSetting('communitySyncEverSucceeded', value);
 }

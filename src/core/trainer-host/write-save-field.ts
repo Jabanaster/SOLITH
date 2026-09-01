@@ -19,6 +19,7 @@ import { readJsonSaveField, validateJsonSaveFieldProposal, writeJsonSaveField } 
 import { readIniSaveField, validateIniSaveFieldProposal, writeIniSaveField } from '../saves/ini-save-field';
 import { readBinarySaveField, writeBinarySaveField } from '../saves/binary-save-field';
 import { assertPathSaveFormatSupportsOperation, detectSaveFormatFromPath } from '../saves/save-format';
+import { renameOrCopyAcrossDevices } from '../safety/exdev-safe-rename';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -188,10 +189,14 @@ export async function executeWriteField(params: unknown): Promise<ExecuteWriteRe
   const validation = await adapter.validateContent(buildResult.content, filePath);
   if (!validation.valid) throw new Error(`validation_failed: ${validation.error}`);
 
-  // Atomic write: write temp then rename (same-volume rename is atomic on Windows)
+  // Atomic write: write temp then rename (same-volume rename is atomic on
+  // Windows; falls back to copy on EXDEV — a redirected save directory can
+  // report it even for a same-directory rename). backupPath above already
+  // preserves the pre-edit state independently, so a failure here is
+  // recoverable via rollbackWriteField even without special tmp-cleanup handling.
   const tmpPath = filePath + '.trainer-tmp';
   fs.writeFileSync(tmpPath, buildResult.content, 'utf-8');
-  fs.renameSync(tmpPath, filePath);
+  renameOrCopyAcrossDevices(tmpPath, filePath);
 
   // Verify
   const verifyResult = await adapter.readCurrentValue(filePath, field);
@@ -231,7 +236,9 @@ export async function rollbackWriteField(params: unknown): Promise<RollbackResul
 
   const tmpPath = path.join(path.dirname(filePath), path.basename(filePath) + '.trainer-restore-tmp');
   fs.copyFileSync(backupPath, tmpPath);
-  fs.renameSync(tmpPath, filePath);
+  // backupPath is untouched by this rename regardless of outcome, so a
+  // failure here is not a data-loss risk — just needs an EXDEV fallback.
+  renameOrCopyAcrossDevices(tmpPath, filePath);
 
   const format = detectSaveFormatFromPath(filePath);
   if (format === 'json') {

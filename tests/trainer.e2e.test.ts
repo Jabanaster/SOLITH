@@ -120,7 +120,11 @@ test('trainer-e2e 01–25 — full Trainer UX workflow', async () => {
     win.on('pageerror', err => rendererErrors.push(err.message));
 
     // ── Test 01: Solith top banner present ──────────────────────────────────
-    await expect(win.locator('.solith-top-banner__title')).toBeVisible();
+    // SolithTopBanner.tsx was redesigned to a single full raster banner image
+    // (emblem + title + tagline baked into one asset) — '__title' is no
+    // longer rendered as a separate element; '__full' is the real current
+    // markup this test should assert against.
+    await expect(win.locator('.solith-top-banner__full')).toBeVisible();
 
     // ── Test 02: Unified sidebar navigation visible ─────────────────────────
     await expect(win.locator('button', { hasText: 'Game Library' })).toBeVisible();
@@ -445,7 +449,7 @@ test('trainer-e2e 28 — unified sidebar contains core workshop pages', async ()
     await win.waitForSelector('#root > *', { timeout: 15_000 });
 
     const expectedPages = [
-      'Save Editor', 'Discovery Lab', 'Recipes', 'Backups', 'Journal',
+      'Save Editor', 'Discovery Lab', 'Recipe Editor', 'Proposal Inspector', 'Backups', 'Journal',
       'Save Locations', 'Compatibility', 'Trainer Library', 'Live Memory Trainer',
     ];
     for (const page of expectedPages) {
