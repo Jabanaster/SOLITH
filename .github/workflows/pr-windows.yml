@@ -1,0 +1,61 @@
+name: PR Windows
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows native and Electron gate
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Verify Node policy
+        run: node scripts/check-node.mjs
+
+      # Native Electron dependencies and the Rust scanner are installed here;
+      # --ignore-scripts would skip the repository's required postinstall.
+      - name: Install dependencies and native Electron modules
+        run: npm ci
+
+      - name: Root strict TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Electron TypeScript check
+        run: npx tsc --project tsconfig.electron.json --noEmit
+
+      - name: Build Electron and native output
+        run: npm run build:electron
+
+      - name: Verify Electron output
+        run: npm run verify:electron-output
+
+      # orphan-check must follow build:electron: it checks the emitted
+      # dist-electron/host-entry.js and otherwise intentionally reports a
+      # boundaries-only result when no host has been built.
+      - name: Orphan and boundary check
+        run: npm run orphan-check
+
+      - name: Run standard test suite
+        run: npm test
+
+      # Live-memory and Playwright suites are deferred from this gate: they
+      # require live game/process state or a separately managed Electron
+      # browser session. The existing CI workflows own those checks.

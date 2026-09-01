@@ -9,14 +9,17 @@ jobs:
   nightly:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: '.nvmrc'
           cache: npm
       - run: npm ci
       - run: npm run build:electron
-      - run: npm run build
+      # Nightly validates packaging only; publishing requires an explicit
+      # release workflow and token, so prevent electron-builder's implicit
+      # CI publish attempt.
+      - run: npm run build -- --publish never
       - run: npx playwright install chromium
       - run: npm run test:accessibility
       - run: npx playwright test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts -g "sidebar collapse"

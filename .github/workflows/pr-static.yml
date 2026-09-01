@@ -1,0 +1,42 @@
+name: PR Static
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-static-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: TypeScript and architecture checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Verify Node policy
+        run: node scripts/check-node.mjs
+
+      - name: Install dependencies without native postinstall scripts
+        run: npm ci --ignore-scripts
+
+      - name: TypeScript strict check
+        run: npx tsc --noEmit
+
+      - name: Schema.v1 import bans and legacy drift
+        run: npm run verify:schema-v1-boundaries

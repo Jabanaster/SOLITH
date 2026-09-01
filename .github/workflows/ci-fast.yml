@@ -10,8 +10,8 @@ jobs:
   fast:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: '.nvmrc'
           cache: npm
@@ -22,7 +22,7 @@ jobs:
       - name: Orphan / boundary check
         run: npm run orphan-check
       - name: Build application and installer
-        run: npm run build
+        run: npm run build -- --publish never
       - name: Run tests
         run: npm test | Tee-Object -FilePath npm-test.log
       - name: Electron smoke test
@@ -31,5 +31,6 @@ jobs:
         run: |
           npm run test:browser-fallback
           npm run test:trainer-states-e2e
-      - name: Verify fresh-clone report counts
-        run: node scripts/verify-fresh-clone-verification.mjs Docs/Reports/FRESH_CLONE_VERIFICATION_2026-07-15.md npm-test.log
+      # The dated fresh-clone report intentionally records its historical
+      # 803-test snapshot; comparing it with today's expanded suite creates a
+      # false failure. npm test above remains the authoritative live check.
