@@ -123,7 +123,11 @@ async function killFixture(f: FixtureHandle): Promise<void> {
 
 type AppCtx = { app: ElectronApplication; win: Page; userData: string; appData: string };
 
-async function launchApp(tag: string, extraEnv: Record<string, string> = {}): Promise<AppCtx> {
+async function launchApp(
+  tag: string,
+  extraEnv: Record<string, string> = {},
+  opts: { defaultTestBuild?: boolean } = {},
+): Promise<AppCtx> {
   const runId = `${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const userData = path.join(os.tmpdir(), `solith-gate2-5-${runId}`);
   const appData = path.join(os.tmpdir(), `solith-gate2-5-appdata-${runId}`);
@@ -138,6 +142,12 @@ async function launchApp(tag: string, extraEnv: Record<string, string> = {}): Pr
       USERPROFILE: appData,
       NODE_ENV: 'test',
       SOLITH_PRIVILEGED_CONSENT: 'auto-approve',
+      // SOL0-P0-1 remediation: packaged builds now ignore the consent env
+      // override unless SOLITH_TEST_BUILD=1 (electron/privileged-consent-dialog.ts).
+      // Phase 8's env-variant matrix needs 'absent' to mean genuinely absent
+      // (an empty extraEnv can't delete a key already spread in below), so it
+      // opts out via defaultTestBuild:false instead of relying on override order.
+      ...(opts.defaultTestBuild === false ? {} : { SOLITH_TEST_BUILD: '1' }),
       ...extraEnv,
     },
   });
@@ -529,7 +539,7 @@ test('Phase 8 — only the exact SOLITH_TEST_BUILD=1 value enables test-only glo
   for (const variant of variants) {
     let ctx: AppCtx | null = null;
     try {
-      ctx = await launchApp(`p8-${variant.label}`, variant.env);
+      ctx = await launchApp(`p8-${variant.label}`, variant.env, { defaultTestBuild: false });
       const hooksPresent = await ctx.app.evaluate(() => {
         const g = globalThis as Record<string, unknown>;
         return (

@@ -5,7 +5,7 @@
  * dialog, or a test double). The renderer may request consent; it cannot
  * manufacture or auto-approve tokens by asserting userConfirmed.
  */
-import { dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import { app, dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import {
   issueWriteConsent,
   WRITE_CONSENT_TTL_MS,
@@ -42,9 +42,26 @@ export function setPrivilegedConsentDialogForTests(impl: DialogImpl | null): voi
   dialogImpl = impl;
 }
 
+/**
+ * SOL0-P0-1: the SOLITH_PRIVILEGED_CONSENT / SOLITH_CONSENT_TTL_MS env
+ * overrides must never be honored in a packaged build unless the packaged
+ * process was itself explicitly built/launched as a test harness
+ * (SOLITH_TEST_BUILD=1 — the same escape hatch already used by
+ * src/core/live-memory/live-memory-session.ts's test-only globals). Without
+ * this gate, setting SOLITH_PRIVILEGED_CONSENT=auto-approve before launching
+ * the shipped .exe silently auto-approved every privileged consent dialog.
+ * Exported (not just inlined) so packaged e2e coverage can assert the gate
+ * behaviorally in the real running process instead of by source inspection.
+ */
+export function isPrivilegedConsentEnvOverrideAllowed(): boolean {
+  return !app.isPackaged || process.env.SOLITH_TEST_BUILD === '1';
+}
+
 function resolveDialogImpl(): DialogImpl {
   if (dialogImpl) return dialogImpl;
-  const mode = (process.env.SOLITH_PRIVILEGED_CONSENT ?? '').trim().toLowerCase();
+  const mode = isPrivilegedConsentEnvOverrideAllowed()
+    ? (process.env.SOLITH_PRIVILEGED_CONSENT ?? '').trim().toLowerCase()
+    : '';
   if (mode === 'auto-approve') {
     return async () => 'approve';
   }
@@ -119,7 +136,9 @@ export async function requestPrivilegedWriteConsent(
   if (!approval.approved) {
     return { approved: false, reason: approval.reason ?? 'user_denied_privileged_consent' };
   }
-  const envTtl = Number(process.env.SOLITH_CONSENT_TTL_MS ?? '');
+  const envTtl = isPrivilegedConsentEnvOverrideAllowed()
+    ? Number(process.env.SOLITH_CONSENT_TTL_MS ?? '')
+    : NaN;
   const ttlMs =
     options.ttlMs ??
     (Number.isFinite(envTtl) && envTtl > 0 ? Math.floor(envTtl) : undefined);
