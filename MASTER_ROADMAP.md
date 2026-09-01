@@ -173,9 +173,11 @@ All SOL phases begin **TODO / NOT CERTIFIED** unless a narrower preserved capabi
 
 ### SOL-1 — Governed Computer Control 2.0
 
-**Status:** TODO / NOT CERTIFIED
+**Status:** PARTIAL / NOT CERTIFIED (core evaluator implemented 2026-09-01; domain integration incomplete)
 
 **Objective:** Introduce capability-scoped authority while preserving already-proven autonomy and safeguards.
+
+**Evidence:** `Docs/authority/SOL1_GOVERNED_COMPUTER_CONTROL.md` — architecture, capability registry, target model, consent integration, destructive policy, action-surface coverage (GOVERNED/EXCEPTION/GAP), and the exact remaining work before `CERTIFIED` is possible. Summary: the pure decision core (`src/core/authority/*` — types, evaluator, policy registry, target classifiers, grants) is implemented and unit-tested (77 new tests; full regression 1776/1776); SOL-0 G7 (readonly kill switch), G9 (revoke-during-await race), and G11 (unverified TrainerHost kill) are fixed. No IPC handler routes a blocking decision through the evaluator yet except `destructive.delete` on `delete-game`/`delete-recipe`/`restore-backup`, which is evidence-only pending a real approval-issuance UI (documented exception, not a silent gap). Memory/process/network/registry domain integration, emergency-stop wiring, and packaged-runtime certification remain.
 
 **Requirements**
 
