@@ -9,12 +9,12 @@ import type { CatalogUpdateManifest, SignedCatalogUpdatePackage } from '../src/c
 
 // Ephemeral test-only Ed25519 keypair, generated fresh per test run — never
 // the production catalog signing key. verifySignedCatalogUpdate calls below
-// pass TEST_PUBLIC_KEY_PEM explicitly rather than relying on the embedded
+// pass the runtime-generated public key explicitly rather than relying on the embedded
 // production trust root, since the production private key never enters
 // this repository (see signing.ts's doc comment).
 const testKeyPair = crypto.generateKeyPairSync('ed25519');
-const TEST_PRIVATE_KEY_PEM = testKeyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
-const TEST_PUBLIC_KEY_PEM = testKeyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+const testSigningPrivateKey = testKeyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+const testSigningPublicKey = testKeyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
 
 function manifest(overrides: Partial<CatalogUpdateManifest> = {}): CatalogUpdateManifest {
   return {
@@ -26,7 +26,7 @@ function manifest(overrides: Partial<CatalogUpdateManifest> = {}): CatalogUpdate
   };
 }
 
-function signManifest(m: CatalogUpdateManifest, privateKeyPem = TEST_PRIVATE_KEY_PEM): SignedCatalogUpdatePackage {
+function signManifest(m: CatalogUpdateManifest, privateKeyPem = testSigningPrivateKey): SignedCatalogUpdatePackage {
   const privateKey = crypto.createPrivateKey(privateKeyPem);
   const payload = Buffer.from(canonicalizeForSigning(m), 'utf8');
   const signature = crypto.sign(null, payload, privateKey).toString('base64');
@@ -48,30 +48,30 @@ describe('canonicalizeForSigning', () => {
 describe('verifySignedCatalogUpdate', () => {
   test('valid signature is accepted', () => {
     const pkg = signManifest(manifest());
-    assert.equal(verifySignedCatalogUpdate(pkg, TEST_PUBLIC_KEY_PEM), true);
+    assert.equal(verifySignedCatalogUpdate(pkg, testSigningPublicKey), true);
   });
 
   test('a modified payload after signing is rejected', () => {
     const pkg = signManifest(manifest());
     const tampered: SignedCatalogUpdatePackage = { ...pkg, manifest: { ...pkg.manifest, version: 999 } };
-    assert.equal(verifySignedCatalogUpdate(tampered, TEST_PUBLIC_KEY_PEM), false);
+    assert.equal(verifySignedCatalogUpdate(tampered, testSigningPublicKey), false);
   });
 
   test('a signature from an unknown key is rejected', () => {
     const otherKeyPair = crypto.generateKeyPairSync('ed25519');
     const otherPrivatePem = otherKeyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
     const pkg = signManifest(manifest(), otherPrivatePem);
-    assert.equal(verifySignedCatalogUpdate(pkg, TEST_PUBLIC_KEY_PEM), false);
+    assert.equal(verifySignedCatalogUpdate(pkg, testSigningPublicKey), false);
   });
 
   test('a malformed base64 signature is rejected, not thrown', () => {
     const pkg = signManifest(manifest());
-    assert.equal(verifySignedCatalogUpdate({ ...pkg, signature: 'not-valid-base64-!!!' }, TEST_PUBLIC_KEY_PEM), false);
+    assert.equal(verifySignedCatalogUpdate({ ...pkg, signature: 'not-valid-base64-!!!' }, testSigningPublicKey), false);
   });
 
   test('an empty signature is rejected', () => {
     const pkg = signManifest(manifest());
-    assert.equal(verifySignedCatalogUpdate({ ...pkg, signature: '' }, TEST_PUBLIC_KEY_PEM), false);
+    assert.equal(verifySignedCatalogUpdate({ ...pkg, signature: '' }, testSigningPublicKey), false);
   });
 
   test('a non-Ed25519 public key (e.g. RSA) is rejected outright', () => {

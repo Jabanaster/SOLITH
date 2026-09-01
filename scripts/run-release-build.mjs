@@ -9,6 +9,8 @@
 // silently skipped by an env var nobody remembered to set. Ordinary dev
 // builds (`npm run build` directly) are unaffected and continue to only warn.
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const npmScripts = process.argv.slice(2);
 if (npmScripts.length === 0) {
@@ -22,16 +24,22 @@ if (npmScripts.length === 0) {
 // and stopping at the first would hide the rest. The overall exit code is
 // non-zero if any script failed.
 let worstStatus = 0;
+const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+
+if (!fs.existsSync(npmCli)) {
+  console.error('Unable to locate the npm CLI beside the active Node.js runtime.');
+  process.exit(1);
+}
 
 for (const npmScript of npmScripts) {
-  const result = spawnSync('npm', ['run', npmScript], {
+  const result = spawnSync(process.execPath, [npmCli, 'run', npmScript], {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: false,
     env: { ...process.env, SOLITH_RELEASE_BUILD: '1' },
   });
 
   if (result.error) {
-    console.error(`Failed to launch npm run ${npmScript}:`, result.error);
+    console.error('Failed to launch npm script:', npmScript, result.error);
     process.exit(1);
   }
 

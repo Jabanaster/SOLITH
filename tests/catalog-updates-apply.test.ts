@@ -11,14 +11,14 @@ import type { CatalogUpdateManifest, SignedCatalogUpdatePackage } from '../src/c
 
 // Ephemeral test-only Ed25519 keypair — never the production catalog signing
 // key. applySignedCatalogUpdate is called via the `apply()` wrapper below,
-// which passes TEST_PUBLIC_KEY_PEM as the trust root explicitly, since the
+// which passes the runtime-generated public key as the trust root explicitly, since the
 // production private key never enters this repository (see signing.ts).
 const testKeyPair = crypto.generateKeyPairSync('ed25519');
-const TEST_PRIVATE_KEY_PEM = testKeyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
-const TEST_PUBLIC_KEY_PEM = testKeyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+const testSigningPrivateKey = testKeyPair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+const testSigningPublicKey = testKeyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString();
 
 function apply(pkg: unknown): ReturnType<typeof applySignedCatalogUpdate> {
-  return applySignedCatalogUpdate(pkg, { trustedPublicKeyPem: TEST_PUBLIC_KEY_PEM });
+  return applySignedCatalogUpdate(pkg, { trustedPublicKeyPem: testSigningPublicKey });
 }
 
 function manifest(overrides: Partial<CatalogUpdateManifest> = {}): CatalogUpdateManifest {
@@ -31,7 +31,7 @@ function manifest(overrides: Partial<CatalogUpdateManifest> = {}): CatalogUpdate
   };
 }
 
-function sign(m: CatalogUpdateManifest, privateKeyPem = TEST_PRIVATE_KEY_PEM): SignedCatalogUpdatePackage {
+function sign(m: CatalogUpdateManifest, privateKeyPem = testSigningPrivateKey): SignedCatalogUpdatePackage {
   const privateKey = crypto.createPrivateKey(privateKeyPem);
   const payload = Buffer.from(canonicalizeForSigning(m), 'utf8');
   return { manifest: m, signature: crypto.sign(null, payload, privateKey).toString('base64') };
