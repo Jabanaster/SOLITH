@@ -317,21 +317,57 @@ test('Phase 6 — the DevTools webContents has no privileged preload bridge', as
       wc.openDevTools({ mode: 'detach' });
       return { opened: true };
     });
-    await sleep(1500);
 
-    const devtoolsProbe = await ctx.app.evaluate(async ({ webContents }) => {
-      const mainWc = webContents.getAllWebContents().find((w) => !w.getURL().startsWith('devtools://'));
-      const devToolsWc = mainWc?.devToolsWebContents ?? null;
-      if (!devToolsWc) {
-        return { hasDevToolsWebContents: false, hadElectronAPI: null as boolean | null, note: 'devToolsWebContents not available on this webContents' };
-      }
-      try {
-        const hadElectronAPI = await devToolsWc.executeJavaScript('typeof window.electronAPI !== "undefined"');
-        return { hasDevToolsWebContents: true, hadElectronAPI };
-      } catch (e) {
-        return { hasDevToolsWebContents: true, hadElectronAPI: null as boolean | null, note: `executeJavaScript threw: ${String(e)}` };
-      }
-    });
+    // Chromium recreates the detached-DevTools webContents once during
+    // startup (an initial placeholder is destroyed and replaced by the real
+    // one, observed here to land anywhere from ~1.0s to ~1.5s after
+    // openDevTools()). A single fixed sleep can race that replacement, so
+    // poll until devToolsWebContents is actually linked instead of trusting
+    // one fixed-delay snapshot.
+    const probeDevTools = () =>
+      ctx!.app.evaluate(async ({ webContents }) => {
+        const mainWc = webContents.getAllWebContents().find((w) => !w.getURL().startsWith('devtools://'));
+        const devToolsWc = mainWc?.devToolsWebContents ?? null;
+        if (!devToolsWc) {
+          return { hasDevToolsWebContents: false, hadElectronAPI: null as boolean | null, note: 'devToolsWebContents not available on this webContents' };
+        }
+        try {
+          const hadElectronAPI = await devToolsWc.executeJavaScript('typeof window.electronAPI !== "undefined"');
+          return { hasDevToolsWebContents: true, hadElectronAPI };
+        } catch (e) {
+          return { hasDevToolsWebContents: true, hadElectronAPI: null as boolean | null, note: `executeJavaScript threw: ${String(e)}` };
+        }
+      });
+
+    const pollIntervalMs = 150;
+    const pollTimeoutMs = 10_000;
+    const pollStart = Date.now();
+    let devtoolsProbe = await probeDevTools();
+    while (!devtoolsProbe.hasDevToolsWebContents && Date.now() - pollStart < pollTimeoutMs) {
+      await sleep(pollIntervalMs);
+      devtoolsProbe = await probeDevTools();
+    }
+
+    if (!devtoolsProbe.hasDevToolsWebContents) {
+      const diagnostics = await ctx.app.evaluate(({ webContents }) =>
+        webContents.getAllWebContents().map((w) => ({
+          id: w.id,
+          url: w.getURL().slice(0, 80),
+          isDevToolsOpened: (() => {
+            try {
+              return w.isDevToolsOpened();
+            } catch {
+              return 'N/A';
+            }
+          })(),
+        })),
+      );
+      throw new Error(
+        `Phase 6: devToolsWebContents never became available within ${pollTimeoutMs}ms. ` +
+          `openDevTools() reported opened=${openResult.opened}. ` +
+          `webContents at timeout: ${JSON.stringify(diagnostics)}`,
+      );
+    }
 
     fs.writeFileSync(
       path.join(ROOT, 'Docs/Security/Evidence/BatchB1_1_Closeout/Gate2_5/devtools-frame-raw-results.json'),
