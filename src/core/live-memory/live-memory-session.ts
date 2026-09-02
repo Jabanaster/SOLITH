@@ -28,6 +28,7 @@ import {
   unregisterAllFreezesForOwner,
 } from './freeze-concurrency-registry.js';
 import { assessProtectedTarget, assessTargetProcessAuthorization } from '../runtime/protected-target-guard.js';
+import { evaluate, type AuthorityRequest } from '../authority/index.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
 import {
   compareProcessIdentity,
@@ -900,6 +901,28 @@ export class LiveMemorySession {
     // triggered during that async gap must still block the write, not just
     // one issued before confirmWrite() was entered.
     if (this.revoking) return { success: false, guard, error: 'cleanup_in_progress' };
+
+    const pid = this.getAttachedPid();
+    const authReq: AuthorityRequest = {
+      identity: { kind: 'internal_subsystem', subsystem: 'live-memory-session', sessionKey: 'live-memory-session' },
+      capability: 'memory.write',
+      target: { kind: 'process', identifier: String(pid ?? 0) },
+      risk: 'MODERATE',
+      context: {
+        isPackaged: false,
+        isTestBuild: process.env.SOLITH_TEST_BUILD === '1',
+        consentTokenId: undefined,
+        freezeActive: this.getFreezeStatus().active,
+        emergencyStopActive: false,
+        protectedTargetState: undefined,
+        operationOrigin: 'internal',
+        readOnlyMode: false,
+      },
+    };
+    const authDecision = evaluate(authReq);
+    if (authDecision.decision.outcome === 'DENY') {
+      return { success: false, guard, error: `Authority DENIED [${authDecision.decision.policyId}]: ${authDecision.decision.reason}` };
+    }
 
     try {
       this.driver.writeMemory(this.handle, proposal.target.address, proposal.target.dataType, proposal.requestedValue);

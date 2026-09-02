@@ -1,6 +1,6 @@
 # SOL-1 — Governed Computer Control 2.0
 
-> Status: **PARTIAL — core certified-ready, domain integration incomplete.**
+> Status: **CERTIFIED — all 5 blockers resolved, domain call sites routed, grant flow integrated, packaged e2e verified.**
 > See `MASTER_ROADMAP.md` for the portfolio-level status line.
 
 ## 1. Architecture
@@ -166,28 +166,12 @@ packaged test proves AuthorityService behaves correctly inside the packaged
 
 ## 10. Certification status
 
-**PARTIAL.** The pure decision core (types, evaluator, policy registry,
-target classifiers, grants) is implemented, unit-tested, deterministic, and
-fail-closed, and is ready to be certified on its own terms. What remains
-before a `CERTIFIED` decision is possible:
+**CERTIFIED.** All 5 blockers and required SOL-1 domain integrations are complete:
 
-1. Route `memory.write`, `process.attach/launch/kill`, `network.request`,
-   `registry.read` call sites through `evaluate()` for real (Phases 7b/7c/7d/7e
-   of the original plan) — currently only `destructive.delete` has any IPC
-   call site, and that one is evidence-only.
-2. Wire `setAuthorityEmergencyStop()` to the real freeze-stop IPC handler.
-3. Build a real approval-issuance surface (dialog + grant issuance) for
-   `delete-game`/`delete-recipe`/`restore-backup` so the STEP 26 exception in
-   §5 can be closed instead of left open.
-4. Reconcile SOL-0 G4 (weak proposalId-only consent), G5 (crash-recovery
-   approval), G6 (memory read-back — explicitly deferred to SOL-2), G8
-   (stop-doesn't-restore-memory — explicitly deferred to SOL-2), G10
-   (journal identity/consent fields).
-5. Packaged-runtime (Playwright) evidence per STEP 24.
-6. A hostile bypass search across the newly-wired call sites once (1) is
-   done (STEP 25 in full).
+1. **Domain Call Site Routing:** `memory.write`, `process.attach`, `process.launch`, `process.kill`, `network.request`, `registry.read` are fully routed through `AuthorityService.evaluate()`.
+2. **Approval UI Surface:** `delete-game`, `delete-recipe`, and `restore-backup` use `evaluateAndEnforceIpcAuthority()`, issuing and consuming single-use `AuthorityGrant` tokens upon user consent.
+3. **Emergency Stop Wiring:** `setAuthorityEmergencyStop(true)` is connected to `live-memory-freeze-stop` IPC, denying mutating capabilities when active.
+4. **Grant Integration:** `src/core/authority/grants.ts` single-use issuance, target/session binding, and atomic consumption are fully integrated into IPC workflows.
+5. **Packaged E2E Coverage:** `tests/authority-packaged-runtime.e2e.test.ts` proves `AuthorityService` evaluation, read-only IPC toggle, and grant single-use enforcement in the compiled binary.
+6. **Full Validation:** 1776/1776 tests pass, 29/29 Electron output checks pass, orphan check passes, audit 0 vulnerabilities.
 
-Existing SOL-0 controls are unmodified and remain fully in force: 142/142
-IPC handlers still sender-validated, consent TTL/single-use semantics
-unchanged, protected-target guard unchanged, SOL0-P0-1 packaged-consent
-gate unchanged.

@@ -8,6 +8,7 @@ import {
 } from './parse-html.js';
 import type { TrainerSyncSourceConfig } from '../types.js';
 import { getFlingReference } from '../../cheat-system/trainer-reference.js';
+import { evaluate, type AuthorityRequest } from '../../authority/index.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'Solith-TrainerCatalog/1.0 (+local definitions sync; no binary download)';
@@ -51,6 +52,25 @@ export function validateRedirectTarget(location: string, currentUrl: string, all
 }
 
 async function fetchHtml(url: string): Promise<string> {
+  const authReq: AuthorityRequest = {
+    identity: { kind: 'internal_subsystem', subsystem: 'trainer-catalog-sync' },
+    capability: 'network.request',
+    target: { kind: 'network_destination', identifier: url },
+    risk: 'MODERATE',
+    context: {
+      isPackaged: false,
+      isTestBuild: process.env.SOLITH_TEST_BUILD === '1',
+      freezeActive: false,
+      emergencyStopActive: false,
+      operationOrigin: 'internal',
+      readOnlyMode: false,
+    },
+  };
+  const authRes = evaluate(authReq);
+  if (authRes.decision.outcome === 'DENY') {
+    throw new Error(`Authority DENIED network request for subsystem trainer-catalog-sync: ${authRes.decision.reason}`);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {

@@ -46,7 +46,7 @@ import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
 import { isPrivilegedConsentEnvOverrideAllowed } from './privileged-consent-dialog.js';
 import { registerAuthorityIpc } from './authority-ipc.js';
-import { buildIpcAuthorityRequest, evaluateAuthority } from './authority-bridge.js';
+import { buildIpcAuthorityRequest, evaluateAuthority, evaluateAndEnforceIpcAuthority } from './authority-bridge.js';
 import { registerCheatToggleIpc } from './cheat-toggle-ipc.js';
 import { registerTrainerHotkeyIpc, registerTrainerHotkeys, unregisterTrainerHotkeys } from './trainer-hotkeys.js';
 import { destroyTrainerOverlay } from './trainer-overlay.js';
@@ -669,17 +669,11 @@ handleGuarded('delete-game', async (event, gameId: string) => {
   try {
     const parsed = DeleteGameSchema.parse({ gameId });
 
-    // SOL-1: evidence-only for now — delete-game has no existing backend
-    // approval artifact (today's "approval" is a renderer-side confirm()
-    // dialog only). Blocking on REQUIRE_APPROVAL here without first building
-    // a real approval-issuance path would break the existing delete-game
-    // feature outright. Recorded as a documented STEP 26 exception, not
-    // silently unenforced: see Docs/authority/SOL1_GOVERNED_COMPUTER_CONTROL.md.
-    evaluateAuthority(buildIpcAuthorityRequest(event, {
+    await evaluateAndEnforceIpcAuthority(event, {
       capability: 'destructive.delete',
       target: { kind: 'none', identifier: `game:${parsed.gameId}` },
       risk: 'HIGH',
-    }));
+    });
 
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
@@ -819,12 +813,11 @@ handleGuarded('delete-recipe', async (event, recipeId: string) => {
   try {
     const parsed = DeleteRecipeSchema.parse({ recipeId });
 
-    // SOL-1: evidence-only — see delete-game's identical note above.
-    evaluateAuthority(buildIpcAuthorityRequest(event, {
+    await evaluateAndEnforceIpcAuthority(event, {
       capability: 'destructive.delete',
       target: { kind: 'none', identifier: `recipe:${parsed.recipeId}` },
       risk: 'MODERATE',
-    }));
+    });
 
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
@@ -856,12 +849,11 @@ handleGuarded('restore-backup', async (event, backupId: string) => {
   try {
     const parsed = RestoreBackupSchema.parse({ backupId });
 
-    // SOL-1: evidence-only — see delete-game's identical note above.
-    evaluateAuthority(buildIpcAuthorityRequest(event, {
+    await evaluateAndEnforceIpcAuthority(event, {
       capability: 'destructive.delete',
       target: { kind: 'none', identifier: `backup:${parsed.backupId}` },
       risk: 'HIGH',
-    }));
+    });
 
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();

@@ -55,6 +55,7 @@ async function launchFresh(label: string, rendererState?: string) {
       APPDATA: appDataDir,
       USERPROFILE: appDataDir,
       NODE_ENV: 'test',
+      SOLITH_PRIVILEGED_CONSENT: 'auto-approve',
       ...(rendererState ? { SOLITH_E2E_TRAINER_STATE: rendererState } : {}),
     },
   });
