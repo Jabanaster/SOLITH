@@ -157,7 +157,7 @@
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "@vitejs/plugin-react": "^6.1.0",
-    "concurrently": "^9.2.4",
+    "concurrently": "^10.0.5",
     "electron": "^42.5.1",
     "electron-builder": "^26.15.3",
     "patch-package": "^8.0.1",
