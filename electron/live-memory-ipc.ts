@@ -57,6 +57,11 @@ import {
   type NavigableEmitter,
 } from '../src/core/live-memory/session-cleanup.js';
 import { validateIpcSender } from './sender-validation.js';
+import {
+  evaluateAuthority,
+  buildIpcAuthorityRequest,
+  setAuthorityEmergencyStop,
+} from './authority-bridge.js';
 import { isTrainerCapabilityEnabled } from '../src/core/settings/unlock-trainer-capabilities.js';
 import { revokeWriteConsentsForSession, clearWriteConsentStore } from '../src/core/consent/write-consent.js';
 import { clearSelectionsForWindow, clearAllProcessSelections } from '../src/core/security/process-selection-registry.js';
@@ -113,6 +118,15 @@ export function registerLiveMemoryIpc(): void {
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
       const parsed = LiveMemoryAttachSchema.parse(payload);
+
+      const authRes = evaluateAuthority(buildIpcAuthorityRequest(event, {
+        capability: 'process.attach',
+        target: { kind: 'process', identifier: String(parsed.pid) },
+        risk: 'HIGH',
+      }));
+      if (authRes.decision.outcome === 'DENY') {
+        return { success: false, error: `authority_denied:${authRes.decision.policyId}` };
+      }
 
       const mod = await getLiveMemoryModule();
       disposeSession(event.sender.id);
@@ -835,6 +849,7 @@ export function registerLiveMemoryIpc(): void {
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       LiveMemoryFreezeStopSchema.parse({});
+      setAuthorityEmergencyStop(true);
       const status = session.stopFreeze();
       return { success: true, status: serializeFreezeStatus(status) };
     } catch (error) {
