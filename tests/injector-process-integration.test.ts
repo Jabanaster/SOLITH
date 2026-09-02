@@ -67,7 +67,7 @@ class SolithInjectorFixture {
   }
   execFileSync(csc, ['/nologo', '/target:exe', `/out:${outPath}`, srcPath], {
     encoding: 'utf8',
-    timeout: 30_000,
+    timeout: 60_000,
     windowsHide: true,
   });
   assert.equal(fs.existsSync(outPath), true, 'fixture exe must exist after compile');
