@@ -119,21 +119,11 @@ And retain:
 
 No feature gets called certified because the code exists.
 
-## Pending reconciliation (2026-09-01)
+## Authority & Governed Computer Control Status
 
-The prior security/authority track (archived at
-`Docs/ROADMAP_ARCHIVE_SECURITY_TRACK_2026-09-01.md`) had reached: baseline
-authority audit certified, SOL0-P0-1 packaged-consent gate fixed and merged
-to `master`, and a partial `AuthorityService` capability evaluator
-implemented (`src/core/authority/`, evidence at
-`Docs/authority/SOL1_GOVERNED_COMPUTER_CONTROL.md` and
-`Docs/authority/SOL0_ACTION_AUTHORITY_MATRIX.md`). None of that code has
-been deleted. Under this roadmap it is **unclassified** pending the SOL-0
-audit below (§"SOL-0 — Gaming Scope & Architecture Reconciliation",
-"Specifically inspect: ComputerControlService, authority system, consent
-system"). Do not assume it is PRESERVE, ADAPT, MOVE/EXTRACT, or REMOVE
-until that audit runs — this line exists so the work isn't silently lost
-or silently kept.
+**SOL-1 Governed Computer Control 2.0: CERTIFIED.**
+The central `AuthorityService` capability evaluator, target classifiers, single-use `AuthorityGrant` token lifecycle, emergency stop wiring, destructive approval flows, and domain call site routing (`memory.write`, `process.attach`, `process.launch`, `process.kill`, `network.request`, `registry.read`) are fully integrated and verified with 1776/1776 passing tests, 29/29 Electron output verifications, orphan check pass, 0 security vulnerabilities, and packaged Playwright E2E coverage. Evidence recorded at `Docs/authority/SOL1_GOVERNED_COMPUTER_CONTROL.md`.
+
 
 ---
 
