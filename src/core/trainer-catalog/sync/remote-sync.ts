@@ -51,6 +51,25 @@ export function validateRedirectTarget(location: string, currentUrl: string, all
 }
 
 async function fetchHtml(url: string): Promise<string> {
+  const authReq: AuthorityRequest = {
+    identity: { kind: 'internal_subsystem', subsystem: 'trainer-catalog-sync' },
+    capability: 'network.request',
+    target: { kind: 'url', identifier: url },
+    risk: 'MODERATE',
+    context: {
+      isPackaged: false,
+      isTestBuild: process.env.SOLITH_TEST_BUILD === '1',
+      freezeActive: false,
+      emergencyStopActive: false,
+      operationOrigin: 'internal',
+      readOnlyMode: false,
+    },
+  };
+  const authRes = evaluate(authReq);
+  if (authRes.decision.outcome === 'DENY') {
+    throw new Error(`Authority DENIED network request for subsystem trainer-catalog-sync: ${authRes.decision.reason}`);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {

@@ -1,7 +1,9 @@
+import * as electronModule from 'electron';
+const app = ((electronModule as any).default ?? electronModule as any).app ?? { isPackaged: false };
 import type { IpcMainInvokeEvent } from 'electron';
-import { app } from 'electron';
 import {
   evaluate,
+  consumeGrant,
   type AuthorityRequest,
   type AuthorityIdentity,
   type AuthorityTarget,
@@ -10,6 +12,10 @@ import {
   type AuthorityEvaluationResult,
 } from '../src/core/authority/index.js';
 import { validateIpcSender } from './sender-validation.js';
+import {
+  parentWindowFromEvent,
+  requestPrivilegedAuthorityGrant,
+} from './privileged-consent-dialog.js';
 
 /**
  * Global mutable authority state, set by electron/authority-ipc.ts and read
@@ -125,3 +131,64 @@ export function evaluateAuthority(request: AuthorityRequest): AuthorityEvaluatio
   recordDecision(result.evidence);
   return result;
 }
+
+/**
+ * Evaluates authority for an IPC request and enforces the result.
+ * - ALLOW: proceeds.
+ * - DENY: throws Error with policyId and reason.
+ * - REQUIRE_APPROVAL: consumes authorityGrantId if provided; otherwise triggers
+ *   interactive privileged consent dialog to issue & consume a single-use AuthorityGrant.
+ */
+export async function evaluateAndEnforceIpcAuthority(
+  event: IpcMainInvokeEvent,
+  options: BuildAuthorityRequestOptions & { authorityGrantId?: string },
+): Promise<AuthorityEvaluationResult> {
+  const request = buildIpcAuthorityRequest(event, options);
+  const result = evaluateAuthority(request);
+
+  if (result.decision.outcome === 'DENY') {
+    throw new Error(`Authority DENY [${result.decision.policyId}]: ${result.decision.reason}`);
+  }
+
+  if (result.decision.outcome === 'REQUIRE_APPROVAL') {
+    const sessionKey = options.sessionKey ?? 'ipc-default';
+    const binding = {
+      capability: options.capability,
+      targetIdentifier: options.target.identifier,
+      sessionKey,
+    };
+
+    if (options.authorityGrantId) {
+      const consumed = consumeGrant(options.authorityGrantId, binding);
+      if (!consumed.ok) {
+        throw new Error(`Authority REQUIRE_APPROVAL failed: ${consumed.reason}`);
+      }
+      return result;
+    }
+
+    const parent = parentWindowFromEvent(event);
+    const summary = {
+      title: `Authority Approval Required: ${options.capability}`,
+      lines: [
+        `Capability: ${options.capability}`,
+        `Target: ${options.target.identifier}`,
+        `Risk level: ${options.risk ?? 'MODERATE'}`,
+        'Consequence: This operation requires explicit user authorization.',
+      ],
+      capability: options.capability,
+      targetIdentifier: options.target.identifier,
+      sessionKey,
+    };
+    const approval = await requestPrivilegedAuthorityGrant(parent, summary);
+    if (!approval.approved) {
+      throw new Error(`Authority REQUIRE_APPROVAL denied: ${approval.reason}`);
+    }
+    const consumeRes = consumeGrant(approval.grant.grantId, binding);
+    if (!consumeRes.ok) {
+      throw new Error(`Authority grant consumption failed: ${consumeRes.reason}`);
+    }
+  }
+
+  return result;
+}
+

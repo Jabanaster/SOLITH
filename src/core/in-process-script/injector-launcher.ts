@@ -15,6 +15,7 @@ import {
   queryAuthenticodePublisher,
 } from './helper-manifest.js';
 import type { InjectorLaunchProposal, InProcessGateInput } from './types.js';
+import { evaluate, type AuthorityRequest } from '../authority/index.js';
 
 const PROPOSAL_TTL_MS = 10 * 60 * 1000;
 
@@ -287,6 +288,28 @@ export async function confirmInjectorLaunch(
   if (consent.ok !== true) {
     const reason = (consent as { reason?: string }).reason ?? 'invalid_consent';
     denyConfirm(`consent_denied:${reason}`, {
+      proposalId: proposal.proposalId,
+      exePath: proposal.exePath,
+    });
+  }
+
+  const authReq: AuthorityRequest = {
+    identity: { kind: 'internal_subsystem', subsystem: 'injector-launcher' },
+    capability: 'process.launch',
+    target: { kind: 'process', identifier: proposal.exePath },
+    risk: 'HIGH',
+    context: {
+      isPackaged: false,
+      isTestBuild: process.env.SOLITH_TEST_BUILD === '1',
+      freezeActive: false,
+      emergencyStopActive: false,
+      operationOrigin: 'internal',
+      readOnlyMode: false,
+    },
+  };
+  const authRes = evaluate(authReq);
+  if (authRes.decision.outcome === 'DENY') {
+    denyConfirm(`authority_denied:${authRes.decision.policyId}`, {
       proposalId: proposal.proposalId,
       exePath: proposal.exePath,
     });

@@ -5,13 +5,20 @@
  * dialog, or a test double). The renderer may request consent; it cannot
  * manufacture or auto-approve tokens by asserting userConfirmed.
  */
-import { app, dialog, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import * as electronModule from 'electron';
+const { app, dialog, BrowserWindow } = (electronModule as any).default ?? electronModule as any;
+import type { IpcMainInvokeEvent } from 'electron';
 import {
   issueWriteConsent,
   WRITE_CONSENT_TTL_MS,
   type WriteConsentArtifact,
   type WriteConsentBinding,
 } from '../src/core/consent/write-consent.js';
+import {
+  issueGrant,
+  type AuthorityGrant,
+  type Capability,
+} from '../src/core/authority/index.js';
 
 export interface PrivilegedConsentSummary {
   title: string;
@@ -212,3 +219,20 @@ export function formatInjectorConsentLines(input: {
     'Consequence: Solith will spawn this helper detached. You are responsible for what it does.',
   ];
 }
+
+export async function requestPrivilegedAuthorityGrant(
+  parent: BrowserWindow | null,
+  summary: { title: string; lines: string[]; capability: Capability; targetIdentifier: string; sessionKey: string },
+  options: { ttlMs?: number; nowMs?: number } = {},
+): Promise<{ approved: true; grant: AuthorityGrant } | { approved: false; reason: string }> {
+  const approval = await requestPrivilegedApproval(parent, { title: summary.title, lines: summary.lines });
+  if (!approval.approved) {
+    return { approved: false, reason: approval.reason ?? 'user_denied_privileged_consent' };
+  }
+  const grant = issueGrant(
+    { capability: summary.capability, targetIdentifier: summary.targetIdentifier, sessionKey: summary.sessionKey },
+    options,
+  );
+  return { approved: true, grant };
+}
+

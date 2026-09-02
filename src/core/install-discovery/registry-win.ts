@@ -1,8 +1,28 @@
 import { execFileSync } from 'node:child_process';
 import { systemBinaryPath } from '../safety/system-binary.js';
+import { evaluate, type AuthorityRequest } from '../authority/index.js';
 
 function isWindows(): boolean {
   return process.platform === 'win32';
+}
+
+function checkRegistryReadAuthority(targetIdentifier: string): boolean {
+  const authReq: AuthorityRequest = {
+    identity: { kind: 'internal_subsystem', subsystem: 'install-discovery' },
+    capability: 'registry.read',
+    target: { kind: 'none', identifier: targetIdentifier },
+    risk: 'LOW',
+    context: {
+      isPackaged: false,
+      isTestBuild: process.env.SOLITH_TEST_BUILD === '1',
+      freezeActive: false,
+      emergencyStopActive: false,
+      operationOrigin: 'internal',
+      readOnlyMode: false,
+    },
+  };
+  const authRes = evaluate(authReq);
+  return authRes.decision.outcome !== 'DENY';
 }
 
 /**
@@ -20,6 +40,7 @@ function regQuery(args: string[]): string {
 
 export function readRegistryString(hiveKey: string, valueName: string): string | null {
   if (!isWindows()) return null;
+  if (!checkRegistryReadAuthority(`${hiveKey}\\${valueName}`)) return null;
   try {
     const out = regQuery(['query', hiveKey, '/v', valueName]);
     const line = out
@@ -36,6 +57,7 @@ export function readRegistryString(hiveKey: string, valueName: string): string |
 
 export function listRegistrySubkeys(hiveKey: string): string[] {
   if (!isWindows()) return [];
+  if (!checkRegistryReadAuthority(hiveKey)) return [];
   try {
     const out = regQuery(['query', hiveKey]);
     const prefix = hiveKey.replace(/\\/g, '\\\\');
