@@ -6,8 +6,9 @@
  * manufacture or auto-approve tokens by asserting userConfirmed.
  */
 import * as electronModule from 'electron';
+import type { BrowserWindow as ElectronBrowserWindow, IpcMainInvokeEvent } from 'electron';
 const { app, dialog, BrowserWindow } = (electronModule as any).default ?? electronModule as any;
-import type { IpcMainInvokeEvent } from 'electron';
+type BrowserWindow = ElectronBrowserWindow;
 import {
   issueWriteConsent,
   WRITE_CONSENT_TTL_MS,

@@ -161,7 +161,8 @@ export async function evaluateAndEnforceIpcAuthority(
     if (options.authorityGrantId) {
       const consumed = consumeGrant(options.authorityGrantId, binding);
       if (!consumed.ok) {
-        throw new Error(`Authority REQUIRE_APPROVAL failed: ${consumed.reason}`);
+        const reason = 'reason' in consumed ? consumed.reason : 'Invalid grant';
+        throw new Error(`Authority REQUIRE_APPROVAL failed: ${reason}`);
       }
       return result;
     }
@@ -181,11 +182,13 @@ export async function evaluateAndEnforceIpcAuthority(
     };
     const approval = await requestPrivilegedAuthorityGrant(parent, summary);
     if (!approval.approved) {
-      throw new Error(`Authority REQUIRE_APPROVAL denied: ${approval.reason}`);
+      const reason = 'reason' in approval ? approval.reason : 'User denied grant request';
+      throw new Error(`Authority REQUIRE_APPROVAL denied: ${reason}`);
     }
     const consumeRes = consumeGrant(approval.grant.grantId, binding);
     if (!consumeRes.ok) {
-      throw new Error(`Authority grant consumption failed: ${consumeRes.reason}`);
+      const reason = 'reason' in consumeRes ? consumeRes.reason : 'Grant consumption failed';
+      throw new Error(`Authority grant consumption failed: ${reason}`);
     }
   }
 
