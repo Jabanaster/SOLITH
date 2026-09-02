@@ -902,16 +902,17 @@ export class LiveMemorySession {
     // one issued before confirmWrite() was entered.
     if (this.revoking) return { success: false, guard, error: 'cleanup_in_progress' };
 
+    const pid = this.getAttachedPid();
     const authReq: AuthorityRequest = {
-      identity: { kind: 'internal_subsystem', subsystem: 'live-memory-session', sessionKey: this.sessionKey },
+      identity: { kind: 'internal_subsystem', subsystem: 'live-memory-session', sessionKey: 'live-memory-session' },
       capability: 'memory.write',
-      target: { kind: 'process', identifier: String(this.attachedPid ?? 0) },
+      target: { kind: 'process', identifier: String(pid ?? 0) },
       risk: 'MODERATE',
       context: {
         isPackaged: false,
         isTestBuild: process.env.SOLITH_TEST_BUILD === '1',
         consentTokenId: undefined,
-        freezeActive: (this.freezeStore?.size ?? 0) > 0,
+        freezeActive: this.getFreezeStatus().active,
         emergencyStopActive: false,
         protectedTargetState: undefined,
         operationOrigin: 'internal',

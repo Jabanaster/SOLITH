@@ -132,7 +132,7 @@ describe('SOL-1 Authority Domain Routing & Grant Integration', () => {
       const allowedReq: AuthorityRequest = {
         identity: { kind: 'internal_subsystem', subsystem: 'trainer-catalog-sync' },
         capability: 'network.request',
-        target: { kind: 'url', identifier: 'https://flingtrainer.com' },
+        target: { kind: 'network_destination', identifier: 'https://flingtrainer.com' },
         risk: 'MODERATE',
         context: {
           isPackaged: false,
@@ -148,7 +148,7 @@ describe('SOL-1 Authority Domain Routing & Grant Integration', () => {
       const deniedReq: AuthorityRequest = {
         identity: { kind: 'internal_subsystem', subsystem: 'arbitrary-module' },
         capability: 'network.request',
-        target: { kind: 'url', identifier: 'https://example.com' },
+        target: { kind: 'network_destination', identifier: 'https://example.com' },
         risk: 'HIGH',
         context: {
           isPackaged: false,
