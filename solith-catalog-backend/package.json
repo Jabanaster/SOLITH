@@ -1,0 +1,29 @@
+{
+  "name": "solith-catalog-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SOLITH Phase 2 read-only discovery-catalog / trainer-coverage / trainer-artifact sync backend on Cloudflare Workers and D1. LOCAL DEV / ARCHITECTURE PROOF ONLY — never deployed by this task. See README.md.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "echo 'OWNER-ONLY STEP: wrangler deploy requires real Cloudflare account credentials that do not exist in this environment. Not run by this task.' && exit 1",
+    "db:migrate:local": "wrangler d1 migrations apply solith-catalog-db --local",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.13.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20260723.1",
+    "miniflare": "^4.20260721.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.113.0"
+  }
+}

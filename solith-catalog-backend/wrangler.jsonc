@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "solith-catalog-backend",
+  "main": "src/index.ts",
+  // Deliberately NOT deployed anywhere by this task. This whole file exists
+  // to run under `wrangler dev --local` / miniflare on the developer's own
+  // machine only. `workers_dev` is left false and no real account/zone
+  // config is present. See README.md "Deployment status" section.
+  "workers_dev": false,
+  "compatibility_date": "2026-07-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "solith-catalog-db",
+      // Placeholder UUID — this project has never been `wrangler d1 create`d
+      // against a real Cloudflare account. Local dev/miniflare only needs
+      // *a* stable id to key its on-disk local SQLite file; it does not
+      // validate this against any real D1 instance unless `--remote` is
+      // passed (which this task never does).
+      "database_id": "84b13486-938a-4c01-aa4c-c662bc326e07",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
