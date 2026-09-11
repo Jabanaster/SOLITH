@@ -1167,6 +1167,176 @@ For file/resource editing additionally require:
 
 ---
 
+# ONLINE / DISCOVERY / COMMUNITY FOUNDATION — PHASE 1 / 1.5 / 2 / 2.1
+
+**Reconciled against actual implementation + reproducible test evidence — not optimistic claims.**
+Status vocabulary for this section only: `CERTIFIED` (reproducible evidence exists and was
+independently re-run), `IMPLEMENTED_NOT_CERTIFIED`, `PARTIAL`, `DEFERRED`, `BLOCKED`.
+
+| Capability | Status | Evidence |
+|---|---|---|
+| Canonical custom-game + identity-link offering | `CERTIFIED` | `tests/canonical-game-custom.test.ts`, part of 188/188 online-foundation run |
+| Per-provider capability model (honest, no fabricated SUPPORTED) | `CERTIFIED` | `tests/provider-capabilities-full.test.ts` |
+| Discovery catalog schema + query + trainer-status | `CERTIFIED` | `tests/discovery-catalog-*.test.ts`; real storage measured 10k/50k/100k rows |
+| Content-addressed trainer artifact store (SHA-256, dedup, immutable versions) | `CERTIFIED` | `tests/trainer-artifact-store.test.ts` |
+| Local artifact cache (hash-verified, SSRF-guarded, size-capped) | `CERTIFIED` | `tests/trainer-artifact-cache.test.ts` (14 tests incl. 5 security-fix regression tests) |
+| Sync-manifest delta model | `CERTIFIED` | `tests/sync-manifest-{client,apply}.test.ts` |
+| Sync-manifest revision monotonicity (Phase 1.5, A1) | `CERTIFIED` | `tests/sync-manifest-revision-monotonicity.test.ts`, 9 adversarial scenarios incl. rollback/replay/malformed/restart-persistence |
+| Community upload contract + 5-stage trust progression | `CERTIFIED` | `tests/community-upload-store.test.ts` |
+| Trainer classification trust boundary (Phase 1.5, A2) | `CERTIFIED` (boundary architecture) / `DEFERRED` (real content-type detection) | `tests/artifact-classification.test.ts`, `tests/community-upload-classification-trust-boundary.test.ts`. Classifier is honestly `v0-inconclusive-only` — the boundary is real and unbypassable by test-proof, but automatic upload eligibility cannot be reached by ANY artifact yet, by design, until real classification logic is built |
+| Community submission security invariant (Phase 2.1) — runtime/persistence-enforced, not caller-discipline | `CERTIFIED` | `tests/community-upload-store.test.ts`, `tests/community-upload-classification-trust-boundary.test.ts` (incl. RESTART persistence proof). `createLocalDraftSubmission` can only ever insert `submissionState: 'LOCAL_DRAFT'` with `trustState: null`; only `submitDraftToCommunity` can promote a row, and it independently re-derives qualification from `classification_receipts` by the draft's OWN artifactHash — no caller-supplied qualification result is ever trusted. Dedicated hostile-review agent pass (Mission 8 question) answered NO exploitable bypass found; 0 P0/P1, 2 P2/P3 disclosed and fixed (JSON.parse robustness) or accepted (pure `qualifyForUpload` remains directly importable — documented residual risk, mitigated by it being the only non-DB-backed entry point and having zero production call sites) |
+| Automatic Community upload eligibility (end-to-end) | `DEFERRED` | Zero artifacts can reach `COMMUNITY_SUBMITTED` automatically today — the real classifier only ever returns `inconclusive`. Intentional per owner: no fabricated eligible classifier. Same dependency as the row above. |
+| Master Online Services toggle + network-call gating | `CERTIFIED` | `tests/online-services-gate.test.ts` + `tests/community-sync-orchestrator-online-gate.test.ts`; every real network call site audited, 7 previously-ungated sites fixed |
+| Artwork resolution-state model + one-time notice | `CERTIFIED` | `tests/artwork-resolution-state.test.ts`, `tests/artwork-eligibility.test.ts`, `tests/artwork-notice.test.ts` |
+| Local 16-step E2E proof (mock server) | `CERTIFIED` | `tests/local-e2e-sync-proof.test.ts`, 16/16 |
+| Offline guarantee (mock/local) | `CERTIFIED` | `tests/offline-guarantee.test.ts`, 6/6 |
+| Real backend (Cloudflare Workers + D1, local `wrangler dev`) | `CERTIFIED` (local, non-deployed) | `solith-catalog-backend/` — 11/11 own tests (real workerd via `@cloudflare/vitest-pool-workers`, real local D1, no mocks) |
+| Real 12-step E2E vs. local real backend | `CERTIFIED` | `tests/real-backend-e2e.test.ts`, 12/12, independently re-run (17s real `wrangler dev` spawn) |
+| Vendor abstraction (fetchImpl swap, mock ↔ real, zero call-site changes) | `CERTIFIED` | `src/core/{sync-manifest,trainer-artifact-cache}/http-fetch-impl.ts` — one-line typed aliases to `globalThis.fetch`, no client contract change required |
+| Production deployment (`wrangler deploy` to a live Cloudflare account) | `BLOCKED` | No Cloudflare account credentials exist in this environment; deployment is an explicit owner-only step (owner must run `wrangler login` + `deploy` or provide CI secrets) |
+| Community read/download UI, Community upload UI, Discovery browsing UI | `DEFERRED` | Out of scope through Phase 2 by owner's own instruction; Phase 1-2 built the data/contract layer these consume, no UI work performed |
+| Real trainer-content-type detection (replacing `v0-inconclusive-only`) | `DEFERRED` | Explicitly out of scope this pass per owner ("do not build a fake malware scanner") — tracked as the actual prerequisite for Phase 6 (Community Uploads) |
+
+Full per-phase detail below is retained as narrative context; the table above is the
+authoritative status source per the owner's Phase 1.5/2 reconciliation instruction.
+
+## Phase 1 — Online/Discovery/Community Foundation (narrative)
+
+Built the local, offline-first foundation for a later online/Discovery/Community
+architecture: canonical-game custom-game support, a per-provider capability model, a
+lightweight shipped Discovery catalog schema, content-addressed trainer artifact storage
+(SHA-256, dedup, immutable versioning), a local artifact cache with hash verification, a
+delta sync-manifest model against a local mock server, a Community upload contract with a
+5-stage trust progression, and a master Online Services toggle gating every real network
+call site. Proven end-to-end via a 16-step local-only scenario and an offline-guarantee
+suite. No public backend, no commit/push.
+
+## Phase 1.5 — Security Closeout (narrative)
+
+Closed the two P2 gaps a hostile security review found in Phase 1: sync-manifest revision
+monotonicity (a malicious/compromised server could previously roll a client's cursor
+backward) and the undefined trainer-content-classification trust boundary (nothing
+independently derived real content-type from artifact bytes before `qualifyForUpload`
+decided eligibility). Both closed with adversarial test proof, not just documentation.
+Also fixed 2 P1 findings from Phase 1's own hostile review (unbounded artifact download,
+no URL/SSRF guard on artifact fetches) inline during Phase 1 itself.
+
+## Phase 2 — Real Backend Prototype (narrative)
+
+Stood up a real Cloudflare Workers + D1 backend (`solith-catalog-backend/`, a clean sibling
+of the existing `solith-hub-backend/` rather than overloading its incompatible `/catalog/sync`
+contract) serving `GET /health`, `GET /catalog/sync`, `GET /artifacts/:hash` — read-only,
+no upload endpoint, exactly as scoped. Run locally via `wrangler dev --local` against a real
+local D1 database with zero Cloudflare account credentials required. The Phase 1
+`fetchImpl`-injectable client contracts needed zero changes to point at this real backend
+instead of the mock — the vendor-abstraction goal is proven, not just claimed. Production
+deployment to a live Cloudflare account is the one remaining `BLOCKED` item, requiring an
+owner-supplied account/credentials.
+
+## Phase 2.1 — Community Submission Security Invariant Closure (narrative)
+
+Closed the one remaining disclosed architectural weakness from Phase 1.5: `createCommunitySubmission`
+was a low-level store function any caller could invoke directly to manufacture a row at
+`trustState: 'NEW_COMMUNITY'` with zero enforcement that classification/qualification had
+actually run. Per owner decision ("caller discipline is not sufficient for this security
+boundary"), replaced it with a two-function split enforced in types, persistence, and
+runtime logic (not comments):
+
+- `createLocalDraftSubmission` can ONLY ever insert `submissionState: 'LOCAL_DRAFT'` with
+  `trustState: null` — structurally incapable of being read as upload-eligible, remotely
+  approved, verified, trusted, or queued for transmission by any consumer.
+- `submitDraftToCommunity` is the ONLY function that can promote a row to
+  `submissionState: 'COMMUNITY_SUBMITTED'` + `trustState: 'NEW_COMMUNITY'`. It derives the
+  artifact hash to qualify SOLELY from the persisted draft row (no caller-supplied hash
+  parameter exists on its input at all — a "classify one hash, submit another" attack is
+  structurally impossible, not just logically rejected) and independently re-looks-up the
+  classification receipt from `classification_receipts` rather than trusting any
+  caller-supplied qualification result.
+- `advanceTrustState` now refuses to operate on anything that is not already
+  `submissionState: 'COMMUNITY_SUBMITTED'` with a non-null `trustState`.
+- Persistence defense: `community_submissions` gained `submissionState`,
+  `qualifiedVerdict`, `qualifiedClassifierVersion`, `qualifiedAt` columns; `trustState`
+  became nullable (null for drafts, only ever set by the one authorized transition
+  function) rather than defaulting to `'NEW_COMMUNITY'` on every insert.
+
+A dedicated hostile-review agent pass (independent of the implementation) was run against
+the owner's exact Mission 8 question — "can any caller, persisted state, restart path, or
+manually constructed object cause SOLITH to regard an artifact as Community-upload-eligible
+without valid classification and qualification evidence for the exact artifact bytes?" —
+and answered NO, with 0 P0/P1 findings. Two P2/P3 findings were disclosed: JSON.parse calls
+on stored blobs lacked try/catch (fixed, now fail closed to `null`/no-receipt rather than
+crashing or fabricating state), and the pure `qualifyForUpload` function remains directly
+importable with a hand-forged receipt object by any future code that bypasses the DB-backed
+wrapper (accepted as a documented residual risk — it has zero production call sites today;
+only the verified wrapper is wired to real persistence).
+
+The real classifier remains `v0-inconclusive-only` (unchanged, per owner instruction not to
+build a fake malware scanner to make tests pass) — automatic Community upload eligibility
+is therefore still unreachable for every artifact today, which is the correct, intentional
+state pending real content-type detection (tracked as `DEFERRED`, prerequisite for a future
+Community Uploads phase). `solith-catalog-backend` remains read-only; no upload endpoint,
+no public write API, no production classification, no Steam integration were added this pass.
+
+## Phase 3 — Steam Catalog Sync
+
+Ingest a real Steam app catalog into `provider_catalog_records`/`discovery_catalog_entries`
+using a modern, supported Steam catalog mechanism (not the deprecated full applist dump).
+Filter to real games (exclude DLC/demos/tools/soundtracks/servers per owner's explicit
+separation of provider-catalog-existence from trainer-availability/ownership/installation).
+
+## Phase 4 — Steam Library Ownership Sync
+
+Implement `ownedLibrarySync` for Steam (currently `REQUIRES_AUTH`/unimplemented in
+`provider-capabilities.ts`) via the legitimate Steam Web API + public-profile mechanism
+only. No token/credential extraction, no scraping. Report unavailable honestly when
+privacy/API limitations prevent a field, per owner's explicit instruction.
+
+## Phase 5 — Community Read/Download
+
+Wire the Phase 1 `community_submissions`/`trainer_artifacts` tables to a real backend for
+read-only Community browsing and download (search/popular/recently-updated/needs-update).
+No upload path yet — this phase only proves the download half of the sync-manifest model
+against real user-facing UI.
+
+## Phase 6 — Community Uploads
+
+Wire the Phase 1/2.1 `qualifyForUploadWithVerifiedClassification`/`submitDraftToCommunity`
+pipeline to a real upload endpoint, respecting the existing `OFF/ASK_ME/ON` sharing
+preference gate exactly as modeled. Requires real trainer-content-type detection first
+(the current `v0-inconclusive-only` classifier makes zero artifacts eligible by design —
+see Phase 2.1), plus Phase 2's real backend and Phase 5's read path.
+
+## Phase 7 — Moderation / Trust / Reputation
+
+Build the human/automated review surface that actually advances a submission through
+`NEW_COMMUNITY → AUTOMATED_CHECKS_PASSED → COMMUNITY_CONFIRMED → COMMUNITY_VERIFIED →
+LOCALLY_VERIFIED` (the state machine already exists in
+`src/core/community-upload/store.ts#advanceTrustState`; this phase builds who/what is
+allowed to call it and under what evidence).
+
+## Phase 8 — Additional Providers
+
+Extend the Phase 1 provider-capability model (`provider-capabilities.ts`) with real
+`catalogDiscovery`/`ownedLibrarySync`/`artwork` implementations for GOG, Epic, Ubisoft, EA,
+Xbox, and Battle.net, following whatever each provider's actual supported public API allows
+— do not claim `SUPPORTED` for anything not actually implemented (this discipline was
+enforced from the start in Phase 1 and must not regress).
+
+## Phase 9 — Community UI
+
+Build the actual COMMUNITY primary-navigation surface (SEARCH/POPULAR/RECENTLY
+UPDATED/NEEDS UPDATE) against the by-then-real Phase 5/6/7 backend. No new architecture —
+Phase 1-7 already define every contract this UI consumes.
+
+## Phase 10 — Discovery Full UI Integration
+
+Wire `src/core/discovery-catalog/query.ts` into an actual Discovery browsing page (filters:
+provider, trainer status, popularity, rating, recent release/update, genre/year — the query
+function already supports the local subset of these). Wire `createCustomGame`/
+`offerIdentityLink` into a real "Create Custom Game" UI flow.
+
+---
+
 # ROADMAP MAINTENANCE
 
 After every significant implementation or verification cycle:
