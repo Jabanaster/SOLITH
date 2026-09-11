@@ -1706,6 +1706,26 @@ function applySchema(): void {
     )
   `);
 
+  // Phase 1.5 security closeout, Mission A2 — verifiable trainer-content classification
+  // receipts (src/core/artifact-classification/). artifactHash is the real SHA-256 of the
+  // classified bytes (never caller-supplied) and is the sole identity key: a receipt is
+  // immutable once recorded for a given hash (see store.ts recordClassificationReceipt for
+  // the exact re-classification/idempotency policy). qualifyForUploadWithVerifiedClassification
+  // (community-upload/qualification.ts) looks receipts up from THIS table by hash rather than
+  // trusting any in-memory receipt object a caller hands it directly — that lookup is the
+  // actual trust boundary between "artifact bytes were classified" and "upload may proceed".
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS classification_receipts (
+      artifactHash TEXT PRIMARY KEY,
+      verdict TEXT NOT NULL,
+      contentTypesJson TEXT NOT NULL,
+      reasonsJson TEXT NOT NULL,
+      classifiedAt TEXT NOT NULL,
+      classifierVersion TEXT NOT NULL
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_classification_receipts_verdict ON classification_receipts(verdict)');
+
   reconcileCatalogOrphans();
 }
 
