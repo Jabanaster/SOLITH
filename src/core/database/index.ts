@@ -1706,6 +1706,76 @@ function applySchema(): void {
     )
   `);
 
+  // ROADMAP §online-foundation — Community trainer submission contract (Mission 11).
+  //
+  // Phase 2.1 security invariant closure (Mission 2/4): `trustState` is nullable and
+  // ONLY ever set once a row has genuinely passed qualifyForUploadWithVerifiedClassification
+  // (see submitDraftToCommunity in community-upload/store.ts). A freshly inserted row is a
+  // `submissionState = 'LOCAL_DRAFT'` with `trustState = NULL` — structurally NOT interpretable
+  // as upload-eligible, remotely approved, verified, or queued for transmission, because every
+  // consumer of this table (advanceTrustState, listCommunitySubmissionsByArtifact's community-
+  // facing callers, future sync/upload code) must treat a NULL trustState / non-'COMMUNITY_SUBMITTED'
+  // submissionState row as inert. Only submitDraftToCommunity may transition
+  // LOCAL_DRAFT -> COMMUNITY_SUBMITTED + trustState 'NEW_COMMUNITY', and only after independently
+  // re-deriving qualification from the classification_receipts table by this row's own
+  // artifactHash — it never trusts a caller-supplied qualification result. qualifiedVerdict /
+  // qualifiedClassifierVersion / qualifiedAt persist the evidence that justified the transition,
+  // for audit and to satisfy the "no fabricated CERTIFIED state" requirement.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS community_submissions (
+      submissionId TEXT PRIMARY KEY,
+      gameId TEXT,
+      customGameId TEXT,
+      trainerId TEXT NOT NULL,
+      artifactHash TEXT NOT NULL,
+      authorLabel TEXT,
+      submissionState TEXT NOT NULL DEFAULT 'LOCAL_DRAFT',
+      trustState TEXT,
+      safetyClassificationJson TEXT,
+      qualifiedVerdict TEXT,
+      qualifiedClassifierVersion TEXT,
+      qualifiedAt TEXT,
+      submittedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (artifactHash) REFERENCES trainer_artifacts(artifactHash)
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_community_submissions_artifact ON community_submissions(artifactHash)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_community_submissions_trust ON community_submissions(trustState)');
+
+  // BUG FOUND during Phase 2.1 recertification (root-caused via full-suite
+  // investigation, not a flaky test): the `idx_community_submissions_state`
+  // index on `submissionState` MUST be created AFTER the ALTER-TABLE
+  // migration below, not before. On any pre-existing `community_submissions`
+  // table predating this column (a real upgraded install, or a stale
+  // leftover db file), `CREATE TABLE IF NOT EXISTS` no-ops and the OLD
+  // schema stays in effect until the migration loop runs — creating an
+  // index on a column that doesn't exist yet crashes with
+  // "no such column: submissionState". This was caught here specifically
+  // because a stale pre-Phase-2.1-schema db file from this same dev
+  // session's temp test-runtime directory collided with a reused process
+  // ID under full-suite load, reproducing the exact upgrade-path crash a
+  // real user would hit.
+  const communitySubmissionsColumns = rawDb!.exec('PRAGMA table_info(community_submissions)')[0];
+  const communitySubmissionsColumnNames = new Set(
+    (communitySubmissionsColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  const optionalCommunitySubmissionsColumns = [
+    "submissionState TEXT NOT NULL DEFAULT 'LOCAL_DRAFT'",
+    'qualifiedVerdict TEXT',
+    'qualifiedClassifierVersion TEXT',
+    'qualifiedAt TEXT',
+  ];
+  for (const column of optionalCommunitySubmissionsColumns) {
+    const columnName = column.split(' ')[0];
+    if (!communitySubmissionsColumnNames.has(columnName)) {
+      rawDb!.run(`ALTER TABLE community_submissions ADD COLUMN ${column}`);
+    }
+  }
+  // Safe here: submissionState is now guaranteed to exist, whether it came
+  // from CREATE TABLE (fresh db) or the ALTER-TABLE migration above (upgraded db).
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_community_submissions_state ON community_submissions(submissionState)');
+
   // Phase 1.5 security closeout, Mission A2 — verifiable trainer-content classification
   // receipts (src/core/artifact-classification/). artifactHash is the real SHA-256 of the
   // classified bytes (never caller-supplied) and is the sole identity key: a receipt is
