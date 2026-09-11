@@ -41,6 +41,13 @@ export interface CanonicalGame {
   /** Bridge to trainer_catalog_games.catalogGameId — see canonical-games/identity.ts. Never a second source of truth. */
   catalogGameId?: string;
   identityStatus: CanonicalIdentityStatus;
+  /**
+   * ROADMAP §online-foundation (Mission 2/13) — records how this canonical game was
+   * CREATED (explicitly authored by the user via createCustomGame, never inferred),
+   * not whether it currently has any provider link. A custom game may still gain a
+   * GameInstallation later (see custom-game.ts) without this flag ever changing.
+   */
+  isCustomGame: boolean;
   createdAt: string;
   updatedAt: string;
 }

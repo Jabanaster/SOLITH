@@ -115,6 +115,7 @@ function buildCanonicalGameForGroup(canonicalId: string, evidence: CanonicalIden
       : undefined,
     catalogGameId: catalogEntry?.catalogGameId,
     identityStatus: identityKey.trusted ? 'verified' : 'backfilled',
+    isCustomGame: false,
     createdAt: nowIso,
     updatedAt: nowIso,
   };

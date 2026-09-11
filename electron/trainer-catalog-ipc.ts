@@ -27,6 +27,7 @@ import {
 import { loadGameConfigFromCatalog } from '../src/core/trainer-catalog/mod-pack-loader.js';
 import { registerGame } from '../src/core/cheat-system/game-registry.js';
 import { getSetting } from '../src/core/settings/index.js';
+import { isOnlineOperationAllowed } from '../src/core/settings/online-services-gate.js';
 import { importDefinitionYaml } from '../src/core/definitions/import-definition.js';
 import { importDefinitionCt, previewDefinitionCt } from '../src/core/definitions/import-definition-ct.js';
 import {
@@ -187,6 +188,10 @@ export function registerTrainerCatalogIpc(): void {
 
   handleGuarded('trainer-catalog-sync-remote', async () => {
     try {
+      const onlineServicesEnabled = getSetting('onlineServicesEnabled') !== false;
+      if (!isOnlineOperationAllowed({ onlineServicesEnabled }, 'catalog-refresh')) {
+        return { success: false, error: 'online_services_disabled' };
+      }
       if (getSetting('v2RemoteCatalogSyncEnabled') === false) {
         return { success: false, error: 'remote_sync_disabled' };
       }
@@ -199,6 +204,10 @@ export function registerTrainerCatalogIpc(): void {
 
   handleGuarded('trainer-catalog-sync-hub', async (_event, payload: unknown) => {
     try {
+      const onlineServicesEnabled = getSetting('onlineServicesEnabled') !== false;
+      if (!isOnlineOperationAllowed({ onlineServicesEnabled }, 'community-sync')) {
+        return { success: false, error: 'online_services_disabled' };
+      }
       const parsed = SyncHubSchema.parse(payload ?? {});
       const report = await syncCommunityDefinitions({
         overwriteUserDefinitions: parsed.overwriteUserDefinitions === true,
@@ -227,6 +236,10 @@ export function registerTrainerCatalogIpc(): void {
 
   handleGuarded('publishToCommunity', async (_event, payload: unknown) => {
     try {
+      const onlineServicesEnabled = getSetting('onlineServicesEnabled') !== false;
+      if (!isOnlineOperationAllowed({ onlineServicesEnabled }, 'trainer-upload')) {
+        return { success: false, error: 'online_services_disabled' };
+      }
       const parsed = PublishToCommunitySchema.parse(payload);
       const published = await publishCommunityDefinition(parsed);
       return { success: true, published };

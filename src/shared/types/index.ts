@@ -229,6 +229,17 @@ export interface Settings {
   v2FreeformMemoryEnabled: boolean;
   v2RemoteCatalogSyncEnabled: boolean;
   trainerRemoteSyncCompleted?: boolean;
+  /**
+   * Master switch for all online/network activity (Community sync, catalog
+   * refresh, trainer download/upload, provider-account sync, artwork
+   * download). When false, no network-calling feature may run regardless of
+   * its own per-feature flag. When true, per-feature flags (e.g.
+   * communitySyncEnabled) still individually gate their own feature.
+   * Local-only functionality (Discovery index, local trainers, trainer
+   * creation, My Games, install discovery, backups) is unaffected either way.
+   * Default: true (see src/core/settings/online-services-gate.ts).
+   */
+  onlineServicesEnabled: boolean;
   /** Opt-in Solith Definition Hub synchronization. Default: false. */
   communitySyncEnabled: boolean;
   /** V2 read-only session lifecycle monitor. Default: false. */
@@ -263,6 +274,10 @@ export interface Settings {
   notificationsShowUnreadBadge?: boolean;
   /** Tracks whether community catalog sync has ever completed successfully, used to suppress the first-sync notification. Default: false. */
   communitySyncEverSucceeded?: boolean;
+  /** Artwork Notice (Phase 1 online-foundation, Mission 15) -- see src/core/artwork-cache/artwork-notice.ts. Policy version the user last acknowledged. Absent = never acknowledged. One-time, application-level; never shown per-game. */
+  artworkNoticeAckPolicyVersion?: number;
+  /** Epoch-ms timestamp of the last successful Artwork Notice acknowledgment. Absent = never acknowledged. */
+  artworkNoticeAckAt?: number;
 }
 
 export type NavSectionBehaviorMode = 'remember' | 'always-expand' | 'always-collapse-inactive';

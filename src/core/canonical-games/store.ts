@@ -22,6 +22,7 @@ function parseCanonicalGameRow(row: Record<string, unknown>): CanonicalGame {
     popularityMetadata: row.popularityMetadataJson ? JSON.parse(String(row.popularityMetadataJson)) : undefined,
     catalogGameId: row.catalogGameId ? String(row.catalogGameId) : undefined,
     identityStatus: String(row.identityStatus) as CanonicalGame['identityStatus'],
+    isCustomGame: Boolean(row.isCustomGame),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   };
@@ -52,8 +53,8 @@ export function upsertCanonicalGame(game: CanonicalGame): void {
     `INSERT INTO canonical_games (
        id, displayName, normalizedTitle, aliasesJson, developer, publisher, releaseDate,
        genresJson, playModesJson, eligibility, supportState, artworkIdentityJson,
-       popularityMetadataJson, catalogGameId, identityStatus, createdAt, updatedAt
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       popularityMetadataJson, catalogGameId, identityStatus, isCustomGame, createdAt, updatedAt
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        displayName = excluded.displayName,
        normalizedTitle = excluded.normalizedTitle,
@@ -69,6 +70,7 @@ export function upsertCanonicalGame(game: CanonicalGame): void {
        popularityMetadataJson = excluded.popularityMetadataJson,
        catalogGameId = excluded.catalogGameId,
        identityStatus = excluded.identityStatus,
+       isCustomGame = excluded.isCustomGame,
        updatedAt = excluded.updatedAt`,
   ).run(
     game.id,
@@ -86,6 +88,7 @@ export function upsertCanonicalGame(game: CanonicalGame): void {
     game.popularityMetadata ? JSON.stringify(game.popularityMetadata) : null,
     game.catalogGameId ?? null,
     game.identityStatus,
+    game.isCustomGame ? 1 : 0,
     game.createdAt,
     game.updatedAt,
   );
@@ -271,6 +274,7 @@ function mintCanonicalGameForEvidence(canonicalId: string, evidence: CanonicalId
     supportState: 'unknown',
     catalogGameId: primary.catalogGameId,
     identityStatus: 'backfilled',
+    isCustomGame: false,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

@@ -299,6 +299,7 @@ describe('canonical games — lookup API', () => {
           eligibility: 'listed',
           supportState: 'unknown',
           identityStatus: 'verified',
+          isCustomGame: false,
           createdAt: new Date(0).toISOString(),
           updatedAt: new Date(0).toISOString(),
         },

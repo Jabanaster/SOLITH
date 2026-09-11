@@ -15,6 +15,19 @@ import {
   upsertArtworkCacheEntry,
   listOkArtworkCacheKeys,
   listFailedArtworkCacheEntries,
+import { getSetting } from '../src/core/settings/index.js';
+import { isOnlineOperationAllowed } from '../src/core/settings/online-services-gate.js';
+
+/**
+ * Master Online Services gate for artwork downloads. All three artwork-cache
+ * IPC handlers below call fetchArtworkJob (a real network fetch); none had
+ * any online-activity gate before this check, so this blocks every one of
+ * them unconditionally when Online Services is off.
+ */
+function isArtworkDownloadAllowed(): boolean {
+  const onlineServicesEnabled = getSetting('onlineServicesEnabled') !== false;
+  return isOnlineOperationAllowed({ onlineServicesEnabled }, 'artwork-download');
+}
 } from '../src/core/artwork-cache/store.js';
 
 // mirrors requireTrustedSender() in electron/main.ts / electron/live-memory-ipc.ts.
@@ -105,6 +118,7 @@ export function registerArtworkCacheIpc(): void {
     try {
       const senderCheck = requireTrustedSender(event);
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      if (!isArtworkDownloadAllowed()) return { success: false, error: 'online_services_disabled' };
       if (activeController && !activeController.isCancelled() && (activeController.activeCount() > 0 || activeController.completedCount() < activeController.totalCount())) {
         return { success: false, error: 'already_running' };
       }
@@ -121,6 +135,7 @@ export function registerArtworkCacheIpc(): void {
     try {
       const senderCheck = requireTrustedSender(event);
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      if (!isArtworkDownloadAllowed()) return { success: false, error: 'online_services_disabled' };
       if (activeController && !activeController.isCancelled() && (activeController.activeCount() > 0 || activeController.completedCount() < activeController.totalCount())) {
         return { success: false, error: 'already_running' };
       }

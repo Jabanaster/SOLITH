@@ -9,11 +9,25 @@ import { getSetting, setSetting } from '../src/core/settings/index.js';
 import { getNotificationsCategoryEnabled } from '../src/core/settings/index.js';
 import { createNotification } from '../src/core/notifications/index.js';
 import { shouldNotifyCatalogUpdate } from '../src/core/notifications/catalogUpdateRule.js';
+import { isOnlineOperationAllowed } from '../src/core/settings/online-services-gate.js';
 import {
   syncCommunityDefinitions,
   type CommunitySyncOptions,
   type CommunitySyncResult,
 } from '../src/core/trainer-catalog/sync/hub-client.js';
+
+/**
+ * Community sync is gated by BOTH the master Online Services switch and its
+ * own per-feature opt-in. The master switch (default true) blocks
+ * unconditionally when off, even if `communitySyncEnabled` is somehow true.
+ */
+function isCommunitySyncAllowed(): boolean {
+  const onlineServicesEnabled = getSetting('onlineServicesEnabled') !== false;
+  if (!isOnlineOperationAllowed({ onlineServicesEnabled }, 'community-sync')) {
+    return false;
+  }
+  return getSetting('communitySyncEnabled') === true;
+}
 
 export const COMMUNITY_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -35,7 +49,7 @@ let deps: Required<CommunitySyncOrchestratorDeps> = defaultDeps();
 
 function defaultDeps(): Required<CommunitySyncOrchestratorDeps> {
   return {
-    isEnabled: () => getSetting('communitySyncEnabled') === true,
+    isEnabled: isCommunitySyncAllowed,
     sync: (options) => syncCommunityDefinitions(options),
     setIntervalFn: setInterval,
     clearIntervalFn: clearInterval,

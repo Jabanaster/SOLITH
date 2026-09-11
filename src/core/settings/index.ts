@@ -19,6 +19,7 @@ export function getSettings(): Settings {
     'v2LiveModeEnabled', 'v2HotkeysEnabled', 'v2OverlayEnabled',
     'v2SessionMonitorEnabled', 'trainerCapabilitiesUnlocked',
     'v2FreeformMemoryEnabled', 'v2RemoteCatalogSyncEnabled', 'trainerRemoteSyncCompleted',
+    'onlineServicesEnabled',
     'communitySyncEnabled',
     'installDiscoveryEnabled', 'installDiscoveryLastScan',
     'inProcessScriptExecutionEnabled',
@@ -28,6 +29,7 @@ export function getSettings(): Settings {
     'notificationsArtworkEnabled', 'notificationsTrainerProfileEnabled',
     'notificationsMaintenanceEnabled', 'notificationsShowUnreadBadge',
     'communitySyncEverSucceeded',
+    'artworkNoticeAckPolicyVersion', 'artworkNoticeAckAt',
   ];
   
   keys.forEach(key => {
@@ -62,6 +64,7 @@ export function getSettings(): Settings {
     v2FreeformMemoryEnabled: settings.v2FreeformMemoryEnabled ?? true,
     v2RemoteCatalogSyncEnabled: settings.v2RemoteCatalogSyncEnabled ?? true,
     trainerRemoteSyncCompleted: settings.trainerRemoteSyncCompleted ?? false,
+    onlineServicesEnabled: settings.onlineServicesEnabled ?? true,
     communitySyncEnabled: settings.communitySyncEnabled ?? false,
     installDiscoveryEnabled: settings.installDiscoveryEnabled ?? true,
     installDiscoveryLastScan: settings.installDiscoveryLastScan ?? '',
@@ -83,6 +86,12 @@ export function getSettings(): Settings {
     notificationsMaintenanceEnabled: settings.notificationsMaintenanceEnabled !== false,
     notificationsShowUnreadBadge: settings.notificationsShowUnreadBadge !== false,
     communitySyncEverSucceeded: settings.communitySyncEverSucceeded === true,
+    // Game Artwork Notice (Policy v1) -- deliberately left absent (undefined)
+    // rather than defaulted to 0/false when no row exists, matching the
+    // Offline Safety Acknowledgment pattern: "never acknowledged" must stay
+    // distinguishable from "explicitly acknowledged policy version 0".
+    artworkNoticeAckPolicyVersion: typeof settings.artworkNoticeAckPolicyVersion === 'number' ? settings.artworkNoticeAckPolicyVersion : undefined,
+    artworkNoticeAckAt: typeof settings.artworkNoticeAckAt === 'number' ? settings.artworkNoticeAckAt : undefined,
   };
 
   if (process.env.NODE_ENV === 'test' || process.env.SOLITH_SKIP_ONBOARDING === '1') {

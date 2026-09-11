@@ -1427,6 +1427,22 @@ function applySchema(): void {
   `);
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_catalog ON canonical_games(catalogGameId)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_normalized ON canonical_games(normalizedTitle)');
+  const canonicalGamesColumns = rawDb!.exec('PRAGMA table_info(canonical_games)')[0];
+  const canonicalGamesColumnNames = new Set(
+    (canonicalGamesColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  const optionalCanonicalGamesColumns = [
+    // ROADMAP §online-foundation — user-authored game with no provider/store backing.
+    // Never inferred; set only at creation time by the custom-game creation flow.
+    'isCustomGame INTEGER DEFAULT 0',
+  ];
+  for (const column of optionalCanonicalGamesColumns) {
+    const columnName = column.split(' ')[0];
+    if (!canonicalGamesColumnNames.has(columnName)) {
+      rawDb!.run(`ALTER TABLE canonical_games ADD COLUMN ${column}`);
+    }
+  }
+
 
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS game_installations (
@@ -1601,6 +1617,92 @@ function applySchema(): void {
       fetchedAt TEXT NOT NULL,
       lastError TEXT,
       PRIMARY KEY (catalogGameId, kind)
+    )
+  `);
+
+  // ROADMAP §online-foundation — normalized external-provider game record (Mission 3).
+  // Distinct from canonical_games: this is raw per-provider catalog data (Steam/GOG/etc),
+  // never a second source of truth for identity. Many rows may point at one canonical game
+  // via game_installations; a row may also exist with no canonical link yet (catalog-only).
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS provider_catalog_records (
+      provider TEXT NOT NULL,
+      providerGameId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'game',
+      storeUrl TEXT,
+      releaseDate TEXT,
+      developer TEXT,
+      publisher TEXT,
+      genresJson TEXT,
+      tagsJson TEXT,
+      rating REAL,
+      ratingSource TEXT,
+      popularityRank INTEGER,
+      popularitySource TEXT,
+      lastUpdated TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (provider, providerGameId)
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_provider_catalog_records_title ON provider_catalog_records(title)');
+
+  // ROADMAP §online-foundation — Discovery's shipped local catalog (Mission 6). Deliberately
+  // lightweight (no bundled artwork — see ARTWORK POLICY) so it scales to 100k+ rows.
+  // trainerAvailable/ctAvailable are cached denormalized flags refreshed by trainer-coverage
+  // sync, not joined live on every query, so Discovery search stays fast at scale.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS discovery_catalog_entries (
+      solithGameId TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      normalizedTitle TEXT NOT NULL,
+      aliasesJson TEXT NOT NULL DEFAULT '[]',
+      providerIdsJson TEXT NOT NULL DEFAULT '{}',
+      type TEXT NOT NULL DEFAULT 'game',
+      releaseDate TEXT,
+      releaseYear INTEGER,
+      genresJson TEXT NOT NULL DEFAULT '[]',
+      tagsJson TEXT NOT NULL DEFAULT '[]',
+      trainerAvailable INTEGER NOT NULL DEFAULT 0,
+      ctAvailable INTEGER NOT NULL DEFAULT 0,
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_discovery_catalog_normalized ON discovery_catalog_entries(normalizedTitle)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_discovery_catalog_release_year ON discovery_catalog_entries(releaseYear)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_discovery_catalog_trainer ON discovery_catalog_entries(trainerAvailable)');
+
+  // ROADMAP §online-foundation — content-addressed trainer artifact model (Missions 8/12).
+  // artifactHash (SHA-256 of the artifact blob) is the real storage identity; the same blob
+  // uploaded under different filenames/by different users/for the same trainer version
+  // collapses to one row. A new gameBuild always gets a new artifactHash row — never
+  // overwritten in place (see IMMUTABLE VERSIONING).
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS trainer_artifacts (
+      artifactHash TEXT PRIMARY KEY,
+      trainerId TEXT NOT NULL,
+      gameId TEXT,
+      gameBuild TEXT,
+      kind TEXT NOT NULL DEFAULT 'native-package',
+      sizeBytes INTEGER NOT NULL DEFAULT 0,
+      localPath TEXT,
+      rightsClass TEXT NOT NULL DEFAULT 'user-provided',
+      firstSeenAt TEXT NOT NULL DEFAULT (datetime('now')),
+      lastReferencedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_artifacts_trainer ON trainer_artifacts(trainerId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_trainer_artifacts_game ON trainer_artifacts(gameId)');
+
+  // ROADMAP §online-foundation — local sync-manifest cursor state (Mission 10). One row per
+  // logical remote service (e.g. 'catalog', 'trainer-coverage'); tracks the last-applied
+  // revision so startup sync can request a delta instead of the full manifest every time.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS sync_manifest_state (
+      service TEXT PRIMARY KEY,
+      catalogRevision TEXT,
+      trainerRevision TEXT,
+      lastSyncedAt TEXT,
+      lastSyncStatus TEXT
     )
   `);
 
