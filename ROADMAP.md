@@ -476,49 +476,33 @@ Exclude:
 
 For mixed offline/anti-cheat multiplayer titles, use the owner-selected strict policy: exclude the entire title when protected multiplayer materially conflicts with SOLITH’s safety boundary.
 
-## 3.3 Default Trainer Library
+## 3.3 Default Trainer Library — FROZEN (supersedes the prior Popular/All-Games + 10-mode sort design)
 
-Default:
-
-```text
-Popular
-```
-
-Initial curated list:
+Organization is deterministic section hierarchy, not a recommendation/sort algorithm:
 
 ```text
-500 games
+1. INSTALLED
+2. OWNED — TRAINERS AVAILABLE
+3. OWNED — SUPPORT NEEDED
+4. ALL OTHER GAMES
+5. NOT YET SUPPORTED / MISSING TRAINER
 ```
 
-Ranking priority:
+A-Z within every section. "All Other Games" is collapsed by default (shown with a count, e.g. "All Other Games (642)"). Running games may be visually pinned/badged within Installed — this is a display treatment, not a separate sort mode. Favorites is a separate filter/view, layered on top of the hierarchy, never a ranking algorithm.
 
-1. Installed
-2. Verified SOLITH support
-3. Popular now
-4. Recently released
-5. Enduring favorites
-6. Other eligible catalog
+Implementation: `src/core/trainer-catalog/library-sections.ts` (`assignLibrarySection`, `organizeLibrary`). Do not add more sections or sort modes without strong evidence of a real usability problem — this is an intentional, frozen product decision.
 
-## 3.4 All Games
+## 3.4 All Games — RETIRED
 
-All Games exposes the full eligible catalog, including niche/deep-catalog titles.
+The "Popular" vs "All Games" view toggle and its first-use notice are retired. The old concern (accidentally scrolling the full unfiltered catalog) is now handled natively: personal-relevant sections always render first, and "All Other Games" is collapsed by default instead of needing an opt-in warning.
 
-First-use notice:
+## 3.5 Sorting — REINSTATED (2026-09-10, owner-directed reversal of the prior freeze)
 
-> All Games includes SOLITH’s full eligible catalog, including niche and less widely played titles. Use filters or search to narrow the list.
+The Mission 3/24 freeze that removed the sort-mode picker has been explicitly overridden by the owner: a real Sort control (`TrainerLibrarySortMenu.tsx`, options: Recommended, A→Z, Z→A, Recently added, Trainer quality) is back in the Trainer Library UI.
 
-## 3.5 Sorting
+Scope, so this cannot re-litigate §3.3: sort applies to the flat/All-Games browse view only (`trainer-library-sort-options.ts`). The §3.3 section hierarchy itself is untouched — every section still sorts A-Z internally, unconditionally, regardless of the selected sort option. "Recommended" reuses the exact ranking model the section hierarchy is already built from, so it cannot contradict it.
 
-- Recommended
-- Popular now
-- All-time popular
-- Newest release
-- Recently added to SOLITH
-- Recently updated
-- A–Z
-- Installed first
-- Verified first
-- Most trainer options
+The underlying `all-games-sorting.ts` module supplies the Recommended/Recently-added comparators directly (reused, not reimplemented) — see `src/app/pages/trainer-library-sort-options.ts`.
 
 ## 3.6 Filters
 
@@ -1277,19 +1261,81 @@ state pending real content-type detection (tracked as `DEFERRED`, prerequisite f
 Community Uploads phase). `solith-catalog-backend` remains read-only; no upload endpoint,
 no public write API, no production classification, no Steam integration were added this pass.
 
-## Phase 3 — Steam Catalog Sync
+## Phase 3 / 3.1 / 3.2 — Multi-Provider Discovery Catalog (Steam + Epic + GOG)
 
-Ingest a real Steam app catalog into `provider_catalog_records`/`discovery_catalog_entries`
-using a modern, supported Steam catalog mechanism (not the deprecated full applist dump).
-Filter to real games (exclude DLC/demos/tools/soundtracks/servers per owner's explicit
-separation of provider-catalog-existence from trainer-availability/ownership/installation).
+**Reconciled against actual implementation + reproducible test evidence.**
+**Phase 3 / 3.1 / 3.2 status: CLOSED — all three owner-mandated follow-up items (tombstone state engine, backend dependency audit investigation, zero-flake full-suite closeout) are done, reproducibly green, and re-certified. Phase 3 + 3.1 + 3.2 together are the full multi-provider catalog scope. Not committed/pushed/deployed — awaiting owner authorization per standing instruction. Scheduler EXECUTION remains deferred (contract-only, Mission 20). Phase 3.5 and Phase 4 remain NOT STARTED.**
 
-## Phase 4 — Steam Library Ownership Sync
+| Capability | Status | Evidence |
+|---|---|---|
+| Provider-neutral catalog adapter contract | `CERTIFIED` | `src/core/provider-catalog/adapter.ts` — shared `AdapterFetchImpl`/`ProviderSyncResult` contract, zero Steam-specific assumptions in the shared type |
+| Steam catalog adapter (official `IStoreService/GetAppList`) | `CERTIFIED` | `tests/steam-catalog-adapter.test.ts`, 12/12. Games-only default, real cursor pagination (`last_appid`), rawRevision-based no-change sync |
+| Epic catalog adapter (storefront GraphQL, unofficial-but-legitimate) | `CERTIFIED` (adapter) / `BLOCKED` (live smoke — Cloudflare bot-challenge, 403, not bypassed) | `tests/epic-catalog-adapter.test.ts`, 9/9. Real bounded probe from this environment returned HTTP 403 (Cloudflare challenge page) — confirms the research finding that this endpoint has anti-automation protection; not bypassed |
+| GOG catalog adapter (storefront filtered-catalog endpoint, unofficial-but-legitimate) | `CERTIFIED` (adapter) / `PARTIAL` (live smoke) | `tests/gog-catalog-adapter.test.ts`, 10/10 (incl. storeUrl phishing-domain fix). Real bounded probe: HTTP 200, schema shape confirmed correct (`products`/`totalPages`/`page` fields match exactly), but `products` returns empty under unauthenticated/bounded conditions despite accurate `totalResults` — endpoint likely now needs session state beyond what a stateless bounded GET provides. Honestly reported as PARTIAL, not fabricated as a full pass |
+| Steam live network smoke test | `BLOCKED` (no key) | `LIVE_SMOKE_BLOCKED_NO_KEY` — no `SOLITH_STEAM_API_KEY` in this environment; harness (`steam-smoke-harness.ts`) ready, fixture-only proof stands at 12/12 |
+| **sql.js statement-handle resource exhaustion — ROOT CAUSE + FIX** | `CERTIFIED` | Root cause found via deterministic reproducer (not assumed): every `db.prepare()` leaked a WASM statement handle (`.free()` existed, was never called anywhere in ~165 call sites) — real observed crash "Error: out of memory" at ~164k leaked complex statements. Fixed with (a) a `FinalizationRegistry` safety net for all existing call sites (proven: full 2026-test suite green, zero regressions) and (b) a genuinely batched import path (`provider-catalog/batch-import.ts`) for bulk work — one prepared statement per table per batch, freed once, wrapped in a real SQL transaction |
+| Catalog scale certification — 10k/50k/100k/250k | `CERTIFIED` (all 4 REAL, zero extrapolation) | `tests/provider-catalog-scale-performance.test.ts`: 10k=8.89MiB/151ms, 50k=43.49MiB/842ms, 100k=86.94MiB/1989ms, 250k=220.66MiB/6064ms (peak RSS 1215MB). All complete cleanly, no sql.js errors |
+| Search at scale (exact/prefix/substring/provider/trainer-status/year/genre/combined) | `CERTIFIED` | Same test, real p-measured at all 4 tiers: worst case at 250k is exact-title 88.5ms, all others under 27ms; `MAX_LIMIT=500` guard still enforced |
+| Cross-provider canonical identity matching (EXACT/HIGH/POSSIBLE/AMBIGUOUS/UNLINKED) | `CERTIFIED` | `tests/cross-provider-match.test.ts`, 14/14, PLUS a P1 security fix (metadata-only title+publisher match downgraded HIGH→POSSIBLE — see security row) |
+| Multi-provider Discovery E2E (merge, launcher-exclusives, outage + malformed-payload isolation, offline) | `CERTIFIED` | `tests/multi-provider-catalog-e2e.test.ts`, 12/12 |
+| Ambiguous/possible link candidate persistence (Mission 7, P3 closed) | `CERTIFIED` | New `canonical_provider_link_candidates` table (own PK includes candidate id — multiple rows per record, nothing collapses); `tests/canonical-provider-link-candidates.test.ts`, 6/6. Authoritative `canonical_provider_links` table now holds ONLY EXACT/HIGH applied links |
+| Metadata sanitization — developer/publisher/genres/tags (Mission 8, P3 closed) | `CERTIFIED` | `sanitizeDisplayMetadata(List)` added, wired into Epic/GOG adapters; `tests/metadata-sanitization.test.ts`, 15/15 hostile payloads (`<script>`, `<img onerror>`, SVG, entity tricks, 10k-char strings, control chars, legitimate Unicode preserved) |
+| Batch import crash safety (10%/50%/90% mid-batch failure) | `CERTIFIED` | `tests/provider-batch-import-crash-safety.test.ts`, 6/6 — real SQL transaction ROLLBACK proven at all three failure points, zero partial application, clean recovery on retry |
+| Rollback/replay guard re-certification | `CERTIFIED` | `tests/provider-catalog-store-rollback-guard.test.ts`, 6/6 — older/equal/newer/malformed rawRevision, clock-identical-timestamp edge case all covered |
+| Provider secret boundary (Steam API key) | `CERTIFIED` | `tests/provider-secret-boundary.test.ts`, 6/6 — static proof no `electron/`/`src/app/` file references the adapter or key env var; runtime proof the key never appears in any error/result string |
+| Provider failure isolation (outage + malformed payload) | `CERTIFIED` | Extended E2E: Steam outage AND Steam malformed-JSON payload both proven not to affect Epic/GOG or wipe pre-existing records |
+| Known-provider-alias seed model (Mission 16) | `CERTIFIED` (mechanism) | `KnownProviderAliasMember` now requires `evidenceSource`+`verifiedAt` per entry — structurally prevents a fuzzy/bulk-generated alias from ever being confused with a human-verified one. Seed list itself remains empty in production (no real IDs fabricated) |
+| Ubisoft/EA/Xbox/Battle.net catalog audit (Mission 20, Phase 3 original) | `CERTIFIED` (audit only, no implementation) | Unchanged from Phase 3 — no legitimate public catalog-browse API exists for any of the four |
+| Hostile security review + fixes | `CERTIFIED` | Phase 3's original pass: 1 P1 + 2 P2 fixed. Phase 3.1: both disclosed P3s also now closed (see rows above) |
+| Storage compression review (Mission 18, Phase 3.1) | `PARTIAL` (measured, not optimized) | Real bytes-per-row measured across all 4 scale tiers (§ above); no schema/index changes made — owner explicitly said "do not optimize prematurely" and current search latency (sub-100ms even at 250k) does not justify the risk of a compression pass yet |
 
-Implement `ownedLibrarySync` for Steam (currently `REQUIRES_AUTH`/unimplemented in
-`provider-capabilities.ts`) via the legitimate Steam Web API + public-profile mechanism
-only. No token/credential extraction, no scraping. Report unavailable honestly when
-privacy/API limitations prevent a field, per owner's explicit instruction.
+### Phase 3.2 — Backend provider-ingest write path (Phase 3.1's deferred item, now closed)
+
+| Capability | Status | Evidence |
+|---|---|---|
+| Write trust boundary | `CERTIFIED` | `authenticateIngestRequest` fails closed (401) on missing/misconfigured/mismatched `INGEST_TOKEN`, constant-time compare (`timingSafeStringEqual`). Desktop client has no code path referencing `INGEST_TOKEN` or `ingest.ts` |
+| Provider-neutral ingest contract + bounds | `CERTIFIED` | `ingest-schema.ts` — `.strict()` schemas reject unknown fields, `safeUrlSchema` blocks non-http(s) schemes, per-field length caps, 4MiB request cap |
+| Transactional ingest (Mission 5) | `CERTIFIED` | Every batch applies via one atomic `db.batch()` call — proven via `test/ingest.test.ts` and the real spawned-process E2E |
+| Revision-monotonicity rollback guard (Mission 6) | `CERTIFIED` | Only the server-generated `last_updated` timestamp orders writes, never a provider-supplied revision. Proven with a real stale-write attempt against a real local D1 file (`tests/backend-ingest-e2e.test.ts` steps 13-14) |
+| Idempotency + conflict detection (Mission 7) | `CERTIFIED` | Byte-identical `(provider, syncId)` replay is a no-op; same `syncId` with different content is a 409 conflict, never silently overwritten |
+| Provider failure isolation (Mission 8) | `CERTIFIED` | A malformed Epic batch cannot touch Steam's or GOG's rows or `provider_sync_status` |
+| Canonical linking after ingest (Mission 9) | `CERTIFIED` | Reuses the Phase 3.1 P1 fix (title+publisher match stays `POSSIBLE`, never auto-merged) — verified live against a spawned backend, not just in-process |
+| Tombstone/removal model (Mission 10) | `CERTIFIED` | Full deterministic ACTIVE/STALE/TOMBSTONED state engine now implemented (`tombstone-lifecycle.ts` + `evaluateSyncCycleCompletion`) and hostile-tested (20/20, `test/tombstone-lifecycle.test.ts`) — see Owner Follow-up Mission 1 below |
+| Sync status + delta read API (Missions 11-13) | `CERTIFIED` | `/provider-sync/status` (no secret material) and `/catalog/sync` delta cursor both real-HTTP-proven; a genuine bug was found and fixed here — see below |
+| Secret boundary (Mission 14) | `CERTIFIED` | `INGEST_TOKEN` never appears in any client-visible response body, confirmed against real HTTP responses (`tests/backend-ingest-e2e.test.ts` step 18) |
+| Real backend local E2E, 18 steps (Mission 17) | `CERTIFIED` — 18/18 | `tests/backend-ingest-e2e.test.ts`, spawned `wrangler dev --local` + real local D1, isolated `--persist-to` state per run |
+| Large backend ingest E2E (Mission 18) | `CERTIFIED` (real, measured, no extrapolation) | `tests/backend-ingest-scale-e2e.test.ts` — 10,050 records / 134 real bounded HTTP batches, ~221 rows/sec, ~9.6MiB D1 growth. Directly drove a real batch-size-limit finding — see below |
+| Provider ingest scheduler contract (Mission 20) | `CERTIFIED` (interfaces only, no deployment) | `src/core/provider-catalog/sync-scheduler-contract.ts` — no cron registered anywhere in this repo or `wrangler.jsonc` |
+| Live provider status (Mission 21) | `CARRIED FORWARD` | Unchanged from Phase 3.1: Steam `BLOCKED_NO_KEY`, Epic `403` (Cloudflare challenge, not bypassed), GOG `200`/schema-valid/empty-results. No further bypass attempts made |
+| **Real bug found + fixed: `/catalog/sync` delta cursor never advanced from the ingest path** | `FIXED` | `sync_state.catalog_revision` (the value `/catalog/sync` actually reports) was never updated by any ingest write — only discovered via the real Mission 17 E2E, since the in-process vitest suite happened not to exercise a second delta call against a non-truncated response. Fixed: `applyIngestBatch` now recomputes `sync_state.catalog_revision` from `MAX(discovery_catalog_entries.revision)` as part of the same atomic batch |
+| **Real bug found + fixed: ingest 500s on any real-sized batch** | `FIXED` | The declared `MAX_RECORDS_PER_BATCH=2000` silently 500'd (`D1_ERROR: too many SQL variables`) on every batch anywhere near that size — found via the Mission 18 scale test, root-caused by empirical bisection (100 records/~3,800 bound params succeeded, 150/~5,700 failed). Fixed two ways: (1) `loadCandidatesForTitles`'s title/publisher lookup queries now chunk their `IN (...)`/OR-clause parameter lists; (2) `MAX_RECORDS_PER_BATCH` lowered from the aspirational-but-broken 2000 to a real-measured-safe 75 |
+| Backend dependency audit | `PARTIAL` (investigated, documented, not upgraded) | Root repo: 0 vulnerabilities. `solith-catalog-backend`: 5 high findings, ALL transitive through `wrangler`/`miniflare`/`@cloudflare/vitest-pool-workers` DEV tooling — `npm audit --omit=dev` = 0. `wrangler` and `vitest-pool-workers` are already at their latest published versions; `miniflare`'s entire 5.x line (which contains the fix) has NEVER published a stable release — every 5.x version to date is `-alpha`, and the latest stable 4.x (`4.20260730.0`, already installed) still pins the vulnerable `sharp`/`undici`. No stable remediation exists at all right now — confirmed against the live npm registry, not assumed. Not upgraded to an alpha per owner instruction. See Owner Follow-up Mission 2 below |
+
+### Owner Follow-up — Phase 3.2 Three-Closure Pass (2026-09-11/12)
+
+| Item | Result |
+|---|---|
+| **Mission 1 — Tombstone state engine** | `CERTIFIED`. New `provider_sync_cycles` table + `provider_catalog_records.lifecycle_status`/`last_seen_in_sync_at`/`lifecycle_last_transitioned_by_cycle_id` columns (migration 0004, extended). Pure decision logic in `tombstone-lifecycle.ts` (`computeCanonicalLifecycleStatus`, `nextLifecycleStatusOnCycleClose`), orchestrated by `evaluateSyncCycleCompletion` in `ingest.ts`, invoked ONLY from a successfully-applied batch's `cycleComplete: true` path — structurally enforces "only a successfully completed authoritative sync may contribute absence evidence." 20/20 hostile tests pass, covering every rule the owner listed (successful/repeated omission, provider failure, malformed response, reappearance, multi-provider safety, launcher-exclusive, idempotent re-evaluation). **Two real bugs found and fixed while building this**: (a) a reappearing record with no publisher/releaseDate could only ever re-match its own prior discovery entry via weak title-only evidence (POSSIBLE), never reactivating its canonical-level status — fixed by reusing an already-authoritative `canonical_provider_links` row directly instead of re-running the fuzzy matcher on every re-observation; (b) re-evaluating the SAME completed cycle twice (a legitimate retry scenario) double-degraded STALE rows straight to TOMBSTONED — fixed by recording which cycle caused each STALE transition and only allowing TOMBSTONE when the existing STALE came from a genuinely different, earlier cycle |
+| **Mission 2 — Backend audit findings** | Investigated individually, not blindly upgraded. Full per-advisory breakdown in the final report. Verdict: 5 high findings, 100% dev-tooling-only, 0 in the deployed Worker artifact, no stable fix available at all today (not just "alpha vs stable" — miniflare 5.x has literally never shipped a stable tag). Documented and accepted, not upgraded |
+| **Mission 3 — Zero-flake closeout** | `CERTIFIED`. Root-caused `tests/process.test.ts`'s flake: `tasklist /V /FO CSV` measured ~8s on real hardware under ordinary load — already past the previous 5000ms timeout with NO test concurrency or contention involved. This was a genuine PRODUCTION correctness bug (category E, not a test-harness artifact) — any real caller of `isGameRunning` could get a false "not running" under ordinary system load. Fixed by raising the timeout to 15000ms in `src/core/process/index.ts`. Verified deterministic: 3/3 consecutive isolated runs green, then two full consecutive `npm test` runs at 2036/2036 pass, 0 failed/cancelled/skipped, both times |
+| **Mission 4 — Recertification** | All green: root `tsc --noEmit`, `test:online-foundation` (200/200), `test:visual-library-closure` (312/312), `test:phase3-catalog` (107/107), `npm test` x2 (2036/2036 both), `test:real-backend-e2e` (12/12), `test:backend-ingest-e2e`/Mission 17 (18/18), `test:backend-ingest-scale-e2e`/Mission 18 (10,050 records), catalog backend typecheck + tests (54/54) + `npm audit`/`npm audit --omit=dev`, hub backend typecheck + tests (6/6) |
+| **Mission 5 — Roadmap** | Phase 3 / 3.1 / 3.2 marked CLOSED below. Scheduler execution remains deferred (contract only). Phase 3.5: NOT STARTED. Phase 4: NOT STARTED |
+
+## Phase 3.5 — Ubisoft + EA + Xbox + Battle.net Catalog Integrations
+
+Deferred pending a genuine, legitimate public catalog source appearing for any of these four
+providers. Mission 20's fresh research found none today. Revisit if Microsoft, Ubisoft, EA,
+or Blizzard ever publish an official bulk catalog-browse API; do not attempt scraping or
+credential-based workarounds as a substitute.
+
+## Phase 4 — Account/Library Ownership Sync (Steam + Epic + GOG)
+
+Implement `ownedLibrarySync` (currently `REQUIRES_AUTH`/unimplemented for all three in
+`provider-capabilities.ts`) via each provider's legitimate account-authorized mechanism only
+— Steam Web API `GetOwnedGames` + user-supplied API key/SteamID64, Epic/GOG per their own
+authenticated flows once researched. No token/credential extraction, no scraping. Report
+unavailable honestly when privacy/API limitations prevent a field. Explicitly NOT started
+this phase per the owner's hard stop.
 
 ## Phase 5 — Community Read/Download
 
@@ -1316,11 +1362,12 @@ allowed to call it and under what evidence).
 
 ## Phase 8 — Additional Providers
 
-Extend the Phase 1 provider-capability model (`provider-capabilities.ts`) with real
-`catalogDiscovery`/`ownedLibrarySync`/`artwork` implementations for GOG, Epic, Ubisoft, EA,
-Xbox, and Battle.net, following whatever each provider's actual supported public API allows
-— do not claim `SUPPORTED` for anything not actually implemented (this discipline was
-enforced from the start in Phase 1 and must not regress).
+Superseded in part by Phase 3 (Steam/Epic/GOG `catalogDiscovery` now real) and Phase 3.5
+(Ubisoft/EA/Xbox/Battle.net `catalogDiscovery` researched and found unavailable). Remaining
+scope: `artwork`/`storeMetadata`/`ratings`/`popularity` implementations for Epic and GOG
+(Steam's already has `artwork: SUPPORTED` via its CDN), following whatever each provider's
+actual supported public surface allows — do not claim `SUPPORTED` for anything not actually
+implemented.
 
 ## Phase 9 — Community UI
 
