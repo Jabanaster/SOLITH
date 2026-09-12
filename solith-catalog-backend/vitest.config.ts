@@ -31,7 +31,10 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations },
+          // TEST-ONLY fixture secret (Mission 15) — never a real credential,
+          // never committed as a production value. Real deployments set
+          // INGEST_TOKEN via `wrangler secret put`, never wrangler.jsonc vars.
+          bindings: { TEST_MIGRATIONS: migrations, INGEST_TOKEN: 'test-fixture-ingest-token-do-not-use-in-prod' },
         },
       }),
     ],

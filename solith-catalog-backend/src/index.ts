@@ -39,9 +39,20 @@ import {
   type DiscoveryCatalogEntryRow,
   type TrainerCoverageRow,
 } from './schema.js';
+import { handleIngestRequest } from './ingest.js';
 
 type Bindings = {
   DB: D1Database;
+  /**
+   * Phase 3.2 — internal ingest authentication secret. NEVER a
+   * wrangler.jsonc `vars` plaintext value in any committed config; set via
+   * `wrangler secret put INGEST_TOKEN` for real deployments, or a local
+   * `.dev.vars` file (gitignored) for `wrangler dev`. Optional at the type
+   * level because most of this backend's routes (read-only) never touch it —
+   * see ingest.ts's authenticateIngestRequest for the fail-closed check when
+   * it's actually needed and absent.
+   */
+  INGEST_TOKEN?: string;
 };
 
 /**
@@ -274,6 +285,53 @@ app.get('/artifacts/:hash', async (c) => {
       'cache-control': 'public, max-age=31536000, immutable',
     },
   });
+});
+
+/**
+ * Phase 3.2 Mission 2 — the ONLY write endpoint in this service. Internal-
+ * only: requires `Authorization: Bearer <INGEST_TOKEN>` (see ingest.ts's
+ * authenticateIngestRequest). Never reachable by the desktop renderer with
+ * a valid token — the token is never shipped to the client (see
+ * tests/ingest-secret-boundary.test.ts).
+ */
+app.post('/internal/ingest/:provider', async (c) => {
+  return handleIngestRequest(c);
+});
+
+/** Mission 11 — per-provider sync status, read-only, no secret material. */
+app.get('/provider-sync/status', async (c) => {
+  const rows =
+    (
+      await c.env.DB.prepare(
+        'SELECT provider, last_attempt_at, last_success_at, last_revision, last_record_count, status, error_code, error_summary FROM provider_sync_status ORDER BY provider',
+      ).all<{
+        provider: string;
+        last_attempt_at: string | null;
+        last_success_at: string | null;
+        last_revision: string | null;
+        last_record_count: number;
+        status: string;
+        error_code: string | null;
+        error_summary: string | null;
+      }>()
+    ).results ?? [];
+
+  return c.json(
+    {
+      providers: rows.map((r) => ({
+        provider: r.provider,
+        lastAttemptAt: r.last_attempt_at,
+        lastSuccessAt: r.last_success_at,
+        lastRevision: r.last_revision,
+        lastRecordCount: r.last_record_count,
+        status: r.status,
+        errorCode: r.error_code,
+        errorSummary: r.error_summary,
+      })),
+    },
+    200,
+    { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  );
 });
 
 app.notFound((c) => {
