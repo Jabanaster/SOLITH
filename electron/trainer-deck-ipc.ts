@@ -20,7 +20,7 @@ import { catalogDefinitionCapabilities } from '../src/core/definitions/load-cata
 import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-read-save-controls.js';
 import {
   setCatalogProcessWatchInterval,
-  getLastProcessDetection,
+  getActiveProcessDetections,
 } from './catalog-process-watch.js';
 
 function sanitize(error: unknown): string {
@@ -83,7 +83,13 @@ export function registerTrainerDeckIpc(): void {
         health,
         installed,
         demand: demand ?? null,
-        lastProcessDetection: getLastProcessDetection(),
+        // The single global "last detection" can be a DIFFERENT game than the
+        // one this deck is for (any catalog game's process poll updates it).
+        // Look up this catalogGameId's own live detection instead, so the
+        // deck only ever shows a PID that actually belongs to it.
+        activeProcessDetection: getActiveProcessDetections().find(
+          (d) => d.catalogGameId === catalogGameId,
+        ) ?? null,
       };
     } catch (error) {
       return { success: false, error: sanitize(error) };
@@ -185,6 +191,17 @@ export function registerTrainerDeckIpc(): void {
           : false;
       setCatalogProcessWatchInterval(active ? 5_000 : 15_000);
       return { success: true, intervalMs: active ? 5_000 : 15_000 };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  // Pull-based current-state sync: lets a renderer that just mounted (or a
+  // fresh SOLITH launch racing an already-running game) recover the running
+  // set immediately instead of waiting for the next poll's push event.
+  guardedHandle('catalog-process-active-list', async () => {
+    try {
+      return { success: true, detections: getActiveProcessDetections() };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

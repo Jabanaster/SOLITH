@@ -889,6 +889,25 @@ interface Window {
         executableHashSHA256?: string;
       }) => void,
     ) => (() => void) | undefined;
+    onCatalogProcessCleared?: (
+      callback: (payload: { catalogGameId: string }) => void,
+    ) => (() => void) | undefined;
+    catalogProcessActiveList?: () => Promise<{
+      success: boolean;
+      detections?: Array<{
+        catalogGameId: string;
+        displayName: string;
+        pid: number;
+        executable: string;
+        planAllowed?: boolean;
+        blockReason?: string;
+        fingerprintStatus?: string;
+        hasDefinition?: boolean;
+        prepareReady?: boolean;
+        executableHashSHA256?: string;
+      }>;
+      error?: string;
+    }>;
     onZeroInputReady?: (
       callback: (payload: {
         catalogGameId: string;
@@ -1054,6 +1073,7 @@ interface Window {
       capabilities?: import('../core/definitions/load-catalog-definition.js').CatalogDefinitionCapabilities;
       health?: { catalogGameId: string; status: string; staleReason?: string };
       installed?: { installPath?: string };
+      activeProcessDetection?: { catalogGameId: string; pid: number; executable: string } | null;
       error?: string;
     }>;
     trainerHealthCheck: (payload?: { catalogGameId?: string }) => Promise<{

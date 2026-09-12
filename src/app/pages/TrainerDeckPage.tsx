@@ -65,6 +65,12 @@ export default function TrainerDeckPage({
   const [certifyResult, setCertifyResult] = useState<string | null>(null);
   const [cheatGame, setCheatGame] = useState<GameConfig | null>(null);
   const [offlineConfirmed, setOfflineConfirmed] = useState(false);
+  // Authoritative live PID for THIS catalogGameId, refreshed independently of
+  // the `detectedPid` nav prop — that prop is only ever set when the deck was
+  // opened from the detection toast; opening it from a library card (the
+  // normal path) always passes null even when the game is already running.
+  const [livePid, setLivePid] = useState<number | null>(null);
+  const effectivePid = livePid ?? detectedPid ?? null;
 
   const loadDeck = useCallback(async () => {
     setLoading(true);
@@ -85,6 +91,7 @@ export default function TrainerDeckPage({
       setStaleReason(health?.staleReason ?? null);
       const installed = result.installed as { installPath?: string } | undefined;
       setInstalledPath(installed?.installPath ?? null);
+      setLivePid(result.activeProcessDetection?.pid ?? null);
 
       initializeCheatSystem();
       const local = getGameConfig(catalogGameId);
@@ -109,6 +116,24 @@ export default function TrainerDeckPage({
       void window.electronAPI?.catalogProcessWatchActive?.({ active: false });
     };
   }, [loadDeck]);
+
+  // Keep the PID display live while this deck stays open: bind it when the
+  // game (re)launches (covers game restart — new pid replaces the old one),
+  // and clear it the moment the process exits (session should show detached,
+  // not a PID belonging to a dead process).
+  useEffect(() => {
+    const api = window.electronAPI;
+    const unsubscribeDetected = api?.onCatalogProcessDetected?.((payload) => {
+      if (payload.catalogGameId === catalogGameId) setLivePid(payload.pid);
+    });
+    const unsubscribeCleared = api?.onCatalogProcessCleared?.((payload) => {
+      if (payload.catalogGameId === catalogGameId) setLivePid(null);
+    });
+    return () => {
+      unsubscribeDetected?.();
+      unsubscribeCleared?.();
+    };
+  }, [catalogGameId]);
 
   const title = displayName ?? entry?.displayName ?? catalogGameId;
   const memoryRows = rows.filter((r) => r.kind === 'memory');
@@ -192,7 +217,7 @@ export default function TrainerDeckPage({
       <div className={`${styles.healthStrip} ${healthClass(healthStatus)}`} role="status">
         <span>{healthLabel(healthStatus)}</span>
         {staleReason && <span className={styles.healthReason}> · {staleReason}</span>}
-        {detectedPid != null && <span className={styles.healthReason}> · PID {detectedPid} detected</span>}
+        {effectivePid != null && <span className={styles.healthReason}> · PID {effectivePid} detected</span>}
         {entry && <span className={styles.healthReason}> · {entry.verificationStatus}</span>}
       </div>
 
@@ -215,7 +240,7 @@ export default function TrainerDeckPage({
             className={styles.primaryBtn}
             onClick={() => onOpenLiveTrainer?.(catalogGameId)}
           >
-            Open Live Trainer {detectedPid != null ? `(attach PID ${detectedPid})` : ''}
+            Open Live Trainer {effectivePid != null ? `(attach PID ${effectivePid})` : ''}
           </button>
         )}
         {entry?.verificationStatus !== 'verified' && (

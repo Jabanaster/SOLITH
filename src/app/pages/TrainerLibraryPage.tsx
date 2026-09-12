@@ -6,7 +6,7 @@ import { downloadTextFile } from '../utils/download-text-file.js';
 import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { ROADMAP_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
-import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
+import { resolveCatalogCoverUrl, resolveCatalogHeaderUrl } from '../../core/trainer-catalog/cover-url.js';
 import {
   projectPopularTrainerEntries,
   POPULAR_TRAINER_LIMIT,
@@ -270,7 +270,12 @@ export function CatalogCard({
   onPublish: (entry: TrainerCatalogEntry) => void;
   onToggleOwned?: (entry: TrainerCatalogEntry) => void;
 }) {
-  const coverUrl = resolveCatalogCoverUrl(entry);
+  // The card cover is a short, wide banner strip (see .coverWrap — fixed 96px
+  // height, full width). Steam's landscape header art (460x215) fills that
+  // cleanly; the portrait library poster (600x900) gets sliced to an awkward
+  // horizontal band by object-fit: cover. Prefer the header, fall back to the
+  // poster only when no header is available.
+  const coverUrl = resolveCatalogHeaderUrl(entry) ?? resolveCatalogCoverUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
   const fallback = fallbackArtworkTreatment(entry.displayName);
   const isStale = healthStatus === 'stale' || healthStatus === 'quarantined';
@@ -690,14 +695,39 @@ export default function TrainerLibraryPage({
   }, []);
 
   useEffect(() => {
-    const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+    const api = window.electronAPI;
+    // Recover games already running before this page mounted (e.g. SOLITH
+    // restarted while the game was running) instead of waiting on the next
+    // poll's push event, which only fires for a *new* pid.
+    void api?.catalogProcessActiveList?.().then((result) => {
+      if (result?.success && result.detections) {
+        setRunningIds((prev) => {
+          const next = new Set(prev);
+          for (const d of result.detections!) next.add(d.catalogGameId);
+          return next;
+        });
+      }
+    });
+
+    const unsubscribeDetected = api?.onCatalogProcessDetected?.((payload) => {
       setRunningIds((prev) => {
         const next = new Set(prev);
         next.add(payload.catalogGameId);
         return next;
       });
     });
-    return () => unsubscribe?.();
+    const unsubscribeCleared = api?.onCatalogProcessCleared?.((payload) => {
+      setRunningIds((prev) => {
+        if (!prev.has(payload.catalogGameId)) return prev;
+        const next = new Set(prev);
+        next.delete(payload.catalogGameId);
+        return next;
+      });
+    });
+    return () => {
+      unsubscribeDetected?.();
+      unsubscribeCleared?.();
+    };
   }, []);
 
   const refreshInstalledList = useCallback(async () => {

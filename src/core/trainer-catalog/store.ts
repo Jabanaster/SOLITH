@@ -204,6 +204,51 @@ function resolveArtworkField<T>(
   return incomingPrecedence >= existingPrecedence ? incomingValue : existingValue;
 }
 
+/**
+ * Artwork-only backfill for an existing catalog row that has no Steam app id.
+ * Fills the four artwork columns (steamAppId/coverUrl/headerUrl/iconUrl) ONLY
+ * when the row already exists and currently carries no steamAppId AND no
+ * coverUrl. Never overwrites artwork a source already established, and never
+ * touches verification, cheat, mode, ownership, or source columns. Idempotent —
+ * a row that already has artwork is left untouched. Returns true when a row
+ * was actually updated.
+ *
+ * Why this exists: ensureCatalogSeeded() skips the full curated seed once the
+ * catalog already holds >= minEntries (it is populated first by remote-sync).
+ * Remote-sync rows (plitch/fling/mrantifun/remote-listing) carry no Steam app
+ * ids, so popular installed titles (Palworld, Dredge, Stardew Valley, Atomfall,
+ * Avowed, Crimson Desert, ...) end up with NULL artwork and every card falls
+ * back to the synthetic monogram. This reconciles the curated seed's
+ * authoritative Steam artwork onto those rows without re-importing or
+ * downgrading any other field.
+ */
+export function backfillMissingCatalogArtwork(
+  catalogGameId: string,
+  art: { steamAppId?: number; coverUrl?: string; headerUrl?: string; iconUrl?: string },
+): boolean {
+  if (!art.steamAppId || art.steamAppId <= 0) return false;
+  const row = db
+    .prepare('SELECT steamAppId, coverUrl FROM trainer_catalog_games WHERE catalogGameId = ?')
+    .get(catalogGameId) as { steamAppId: number | null; coverUrl: string | null } | undefined;
+  if (!row) return false;
+  // Only fill genuinely-empty rows — never clobber artwork any source already set.
+  if (row.steamAppId != null || (row.coverUrl != null && row.coverUrl !== '')) return false;
+  const info = db
+    .prepare(
+      `UPDATE trainer_catalog_games
+          SET steamAppId = ?, coverUrl = ?, headerUrl = ?, iconUrl = ?
+        WHERE catalogGameId = ? AND steamAppId IS NULL`,
+    )
+    .run(
+      art.steamAppId,
+      art.coverUrl ?? null,
+      art.headerUrl ?? null,
+      art.iconUrl ?? null,
+      catalogGameId,
+    );
+  return info.changes === 1;
+}
+
 export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
   const existingEntry = getCatalogEntry(entry.catalogGameId);
 
@@ -623,6 +668,27 @@ export function getDefinitionCertificationForGame(
 
 export function countCatalogEntries(): number {
   return (db.prepare('SELECT COUNT(*) as c FROM trainer_catalog_games').get() as { c: number }).c;
+}
+
+/**
+ * Full catalog id/name/executables index for process-watch matching.
+ * Deliberately skips artwork/verification/search columns — this runs on every
+ * poll tick against the whole catalog (thousands of rows), not a paged 200-row
+ * search window, so the fetched columns stay minimal.
+ */
+export function listCatalogExecutableIndex(): Array<{
+  catalogGameId: string;
+  displayName: string;
+  executables: string[];
+}> {
+  const rows = db
+    .prepare('SELECT catalogGameId, displayName, executablesJson FROM trainer_catalog_games')
+    .all() as Array<{ catalogGameId: string; displayName: string; executablesJson: string | null }>;
+  return rows.map((row) => ({
+    catalogGameId: row.catalogGameId,
+    displayName: decodeHtmlEntities(row.displayName),
+    executables: JSON.parse(row.executablesJson || '[]') as string[],
+  }));
 }
 
 /**

@@ -63,20 +63,39 @@ export function matchCatalogProcess(
   processes: LiveProcessListEntry[],
   catalog: CatalogExecutableEntry[],
 ): ProcessWatchDetection | null {
+  return matchAllCatalogProcesses(processes, catalog)[0] ?? null;
+}
+
+/**
+ * Match every running process against catalog executables (not just the
+ * first hit). One detection per matched catalogGameId; if multiple processes
+ * map to the same game the first live match wins for that game.
+ */
+export function matchAllCatalogProcesses(
+  processes: LiveProcessListEntry[],
+  catalog: CatalogExecutableEntry[],
+): ProcessWatchDetection[] {
+  const byExecutable = new Map<string, CatalogExecutableEntry>();
+  for (const entry of catalog) {
+    for (const exe of entry.executables) {
+      const key = exe.toLowerCase();
+      if (!byExecutable.has(key)) byExecutable.set(key, entry);
+    }
+  }
+  const seenGameIds = new Set<string>();
+  const detections: ProcessWatchDetection[] = [];
   for (const proc of processes) {
-    const name = proc.name.toLowerCase();
-    const match = catalog.find((entry) =>
-      entry.executables.some((exe) => exe.toLowerCase() === name),
-    );
-    if (!match) continue;
-    return {
+    const match = byExecutable.get(proc.name.toLowerCase());
+    if (!match || seenGameIds.has(match.catalogGameId)) continue;
+    seenGameIds.add(match.catalogGameId);
+    detections.push({
       catalogGameId: match.catalogGameId,
       displayName: match.displayName,
       pid: proc.pid,
       executable: proc.name,
-    };
+    });
   }
-  return null;
+  return detections;
 }
 
 export interface BuildAttachPlanInput {

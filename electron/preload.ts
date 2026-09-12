@@ -459,6 +459,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('catalog-process-detected', listener);
     return () => ipcRenderer.removeListener('catalog-process-detected', listener);
   },
+  onCatalogProcessCleared: (callback: (payload: { catalogGameId: string }) => void) => {
+    const listener = (_event: unknown, payload: { catalogGameId: string }) => callback(payload);
+    ipcRenderer.on('catalog-process-cleared', listener);
+    return () => ipcRenderer.removeListener('catalog-process-cleared', listener);
+  },
+  catalogProcessActiveList: () => ipcRenderer.invoke('catalog-process-active-list'),
   onZeroInputReady: (callback: (payload: {
     catalogGameId: string;
     pid: number;
