@@ -62,17 +62,34 @@ function rowToEntry(row: DiscoveryCatalogRow): DiscoveryCatalogEntry {
 export interface DiscoveryCatalogQueryOptions {
   /** Free-text search against title/normalizedTitle/aliases (case-insensitive substring). */
   text?: string;
+  /** Single-provider filter (legacy). Prefer `providers` for OR-across-multiple-providers filtering (Phase 3 Mission 17). */
   provider?: LinkedLibraryProvider;
+  /** Phase 3 Mission 17 — OR semantics: entries carrying ANY of these provider IDs. Combined with `provider` via AND if both given. */
+  providers?: LinkedLibraryProvider[];
   trainerAvailable?: boolean;
   /** See module doc comment — best-effort two-step filter, not a guaranteed-correct join. */
   favoriteOrPersonalOnly?: boolean;
   releaseYear?: number;
+  /** Discovery Master Pass, Stage 2 — inclusive range filter, combined with `releaseYear` via AND if both given. */
+  releaseYearMin?: number;
+  releaseYearMax?: number;
   genre?: string;
+  /** Phase 3 Mission 17. Defaults to 'title-asc'. */
+  sort?: 'title-asc' | 'title-desc' | 'release-desc' | 'release-asc';
   limit?: number;
   offset?: number;
 }
 
 const DEFAULT_LIMIT = 50;
+/** Hard ceiling so a caller can never accidentally request the whole 100k+ catalog in one query (Mission 17: "do not return the entire catalog by default"). */
+const MAX_LIMIT = 500;
+
+const SORT_CLAUSES: Record<NonNullable<DiscoveryCatalogQueryOptions['sort']>, string> = {
+  'title-asc': 'normalizedTitle ASC',
+  'title-desc': 'normalizedTitle DESC',
+  'release-desc': 'releaseYear DESC, normalizedTitle ASC',
+  'release-asc': 'releaseYear ASC, normalizedTitle ASC',
+};
 
 /** Reads favorited canonical_game_id values directly (no import from favorites/store.ts to avoid a circular/duplicated-logic dependency beyond a single read-only SELECT). */
 function getFavoritedIds(): string[] {
@@ -98,6 +115,11 @@ export function queryDiscoveryCatalog(options: DiscoveryCatalogQueryOptions = {}
     params.push(`%"${options.provider}":%`);
   }
 
+  if (options.providers && options.providers.length > 0) {
+    conditions.push(`(${options.providers.map(() => 'providerIdsJson LIKE ?').join(' OR ')})`);
+    for (const provider of options.providers) params.push(`%"${provider}":%`);
+  }
+
   if (options.trainerAvailable !== undefined) {
     conditions.push('trainerAvailable = ?');
     params.push(options.trainerAvailable ? 1 : 0);
@@ -106,6 +128,16 @@ export function queryDiscoveryCatalog(options: DiscoveryCatalogQueryOptions = {}
   if (options.releaseYear !== undefined) {
     conditions.push('releaseYear = ?');
     params.push(options.releaseYear);
+  }
+
+  if (options.releaseYearMin !== undefined) {
+    conditions.push('releaseYear >= ?');
+    params.push(options.releaseYearMin);
+  }
+
+  if (options.releaseYearMax !== undefined) {
+    conditions.push('releaseYear <= ?');
+    params.push(options.releaseYearMax);
   }
 
   if (options.genre) {
@@ -123,10 +155,14 @@ export function queryDiscoveryCatalog(options: DiscoveryCatalogQueryOptions = {}
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = options.limit ?? DEFAULT_LIMIT;
+  const limit = Math.min(options.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
   const offset = options.offset ?? 0;
+  // Fixed lookup table, never string-interpolated from caller input directly —
+  // an unrecognized sort value (e.g. an unvalidated value crossing an IPC
+  // boundary) falls back to the safe default rather than producing invalid SQL.
+  const orderBy = SORT_CLAUSES[options.sort ?? 'title-asc'] ?? SORT_CLAUSES['title-asc'];
 
-  const sql = `SELECT * FROM discovery_catalog_entries ${whereClause} ORDER BY normalizedTitle ASC LIMIT ? OFFSET ?`;
+  const sql = `SELECT * FROM discovery_catalog_entries ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
   const rows = db.prepare(sql).all(...params, limit, offset) as DiscoveryCatalogRow[];
   return rows.map(rowToEntry);
 }

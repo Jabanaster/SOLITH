@@ -1,0 +1,74 @@
+/* Shared section styling for GameDetailPage's sub-sections — reuses this
+   app's existing dark/blue design tokens (src/app/styles/index.css :root). */
+
+.section {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-lg, 14px);
+  background: rgba(18, 23, 40, 0.6);
+}
+
+.heading {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary, #eef1fa);
+}
+
+.emptyNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #78819c);
+}
+
+.factList {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem 1.5rem;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fact dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted, #78819c);
+}
+
+.fact dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #aab3cc);
+  word-break: break-word;
+}
+
+.sourceList {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sourceItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #aab3cc);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sourceMeta {
+  color: var(--text-muted, #78819c);
+  font-size: 0.78rem;
+}

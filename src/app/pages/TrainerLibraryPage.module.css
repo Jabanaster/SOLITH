@@ -11,6 +11,7 @@
 
 .header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
@@ -30,6 +31,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -424,6 +426,27 @@
   border-color: rgba(120, 180, 255, 0.32);
 }
 
+/* Owner-directed grid/list view toggle (ViewModeToggle, getLibraryViewMode).
+   List mode lays the same card out as a compact row instead of a tall
+   tile — forceSingleColumn on VirtualCatalogGrid/SectionVirtualGrid already
+   drops the column count to 1, so this only needs to reflow the card's own
+   internal layout to match a row shape. */
+.card[data-view-mode='list'] {
+  flex-direction: row;
+  align-items: stretch;
+  height: auto;
+}
+
+.card[data-view-mode='list'] .coverWrap {
+  width: 140px;
+  flex: 0 0 140px;
+}
+
+.card[data-view-mode='list'] .cardBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* Round 3: a width-relative aspect-ratio still scaled the cover taller as
    cards got wider (169px+ at 300px+ card widths) — still roughly half the
    card. A fixed-height compact banner stays a banner at every breakpoint,
@@ -604,6 +627,96 @@
   padding-top: 0.55rem;
 }
 
+.librarySection {
+  margin: 1rem 0;
+}
+
+.librarySectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 0.4rem 0.1rem;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
+  color: #e2e8f0;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.librarySectionToggle {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+/* Mission 5 — chunked "Show more" control for large sections (see
+   trainer-library-section-chunking.ts). Deliberately a normal in-flow
+   button, not a fixed/sticky element — the page keeps one natural scroll. */
+.showMoreSectionBtn {
+  display: block;
+  width: 100%;
+  margin: 0.6rem 0 1rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.showMoreSectionBtn:hover {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.favoriteBtn {
+  flex: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.1rem 0.2rem;
+  color: #f5d76e;
+}
+
+.favoriteBtn:hover {
+  transform: scale(1.1);
+}
+
+.supportRequestRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notYetSupportedLabel {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.supportRequestedLabel {
+  font-size: 0.82rem;
+  color: #6ad6a2;
+  font-weight: 600;
+}
+
 /* One calm treatment for both states — the label text ("Open Trainer Deck"
    vs. "Run Community Scan") already carries the truthful distinction. The
    prior gold-gradient/glow treatment on the scan-required variant read as a
@@ -762,4 +875,191 @@
 .backToTopBtn:hover {
   border-color: rgba(80, 220, 255, 0.7);
   background: rgba(20, 42, 72, 0.98);
+}
+
+/* ── Compact top-area redesign (owner-directed override of the Mission
+   3/24 filter-wall) ───────────────────────────────────────────────────── */
+
+.collapsiblePanel {
+  margin-bottom: 1rem;
+  border: 1px solid rgba(120, 180, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(14, 22, 38, 0.92);
+}
+
+.collapsiblePanel[open] {
+  padding-bottom: 0.4rem;
+}
+
+.collapsiblePanelSummary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.7rem 1rem;
+  color: #e8f0ff;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.collapsiblePanelSummary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsiblePanelSummary:focus-visible {
+  outline: 2px solid rgba(80, 220, 255, 0.65);
+  outline-offset: 2px;
+}
+
+.collapsiblePanelBody {
+  padding: 0 1rem 0.85rem;
+}
+
+.topControlsRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+  /* Mission 11 (Gate 2.5 responsive E2E pass) — .filtersPanel below is
+     positioned relative to THIS row (not the narrow .filtersPopoverWrap
+     around just the trigger button), and sized via cqw against it. The row
+     always spans the real content-area width (viewport minus the app's
+     320px sidebar), so the popover can never compute a position/width wide
+     enough to spill past the viewport's right edge OR left-overflow
+     underneath the sidebar (both were measured, real bugs at 1200/900/640/
+     900(min) widths before this fix — the sidebar sits in a higher
+     stacking context than .main-content, so anything from this page that
+     visually overlaps it becomes unclickable, not just visually odd). */
+  position: relative;
+  container-type: inline-size;
+}
+
+.topControlsRow .searchRow {
+  flex: 1 1 16rem;
+  margin-bottom: 0;
+  min-width: 12rem;
+}
+
+.filtersPopoverWrap {
+  flex: none;
+}
+
+.filtersTrigger {
+  height: 100%;
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(25, 45, 75, 0.9);
+  color: #e8f0ff;
+  cursor: pointer;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.filtersTrigger[aria-expanded='true'] {
+  border-color: rgba(140, 195, 255, 0.75);
+  background: rgba(40, 75, 120, 0.95);
+}
+
+/* Mission 11 (Gate 2.5 responsive E2E pass) — positioned relative to
+   .topControlsRow (see that rule's comment), anchored to its right edge and
+   width-capped via cqw against that same container. This replaces the prior
+   left:0-relative-to-trigger positioning, which measurably overflowed past
+   the viewport's right edge at 1200/900/640/900(min) widths once the search
+   box (flex:1) pushed the trigger away from the row's own left edge. */
+.filtersPanel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  width: max-content;
+  max-width: min(90cqw, 420px);
+  max-height: min(75vh, 640px);
+  overflow-y: auto;
+  padding: 0.85rem 1rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(10, 16, 28, 0.98);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.filtersPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+  color: #e8f0ff;
+  font-weight: 700;
+}
+
+.sortMenu {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.sortMenuLabel {
+  font-size: 0.82rem;
+  color: #9eb6dc;
+}
+
+.sortMenuSelect {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(25, 45, 75, 0.9);
+  color: #e8f0ff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.quickTabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.activeFilterChips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.activeFilterChip {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 195, 255, 0.5);
+  background: rgba(60, 120, 200, 0.35);
+  color: #dfeaff;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.resultSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.resultSummaryCounts {
+  color: #cde0ff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.browseAllLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #7fc4ff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  text-decoration: underline;
 }

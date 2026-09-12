@@ -274,7 +274,15 @@ export interface Settings {
   notificationsShowUnreadBadge?: boolean;
   /** Tracks whether community catalog sync has ever completed successfully, used to suppress the first-sync notification. Default: false. */
   communitySyncEverSucceeded?: boolean;
-  /** Artwork Notice (Phase 1 online-foundation, Mission 15) -- see src/core/artwork-cache/artwork-notice.ts. Policy version the user last acknowledged. Absent = never acknowledged. One-time, application-level; never shown per-game. */
+  /** Offline Safety Acknowledgment (Policy v1) — see src/core/safety-acknowledgment/policy.ts. Policy version the user last acknowledged. Absent = never acknowledged. UX state only, never authorization. */
+  safetyAckPolicyVersion?: number;
+  /** Epoch-ms timestamp of the last successful acknowledgment. Absent = never acknowledged. */
+  safetyAckAt?: number;
+  /** Epoch-ms timestamp the user last dismissed the 30-day non-blocking reminder. Absent = never dismissed. */
+  safetyReminderDismissedAt?: number;
+  /** Visual Library 2.0 — Home/Library layout mode. Default: 'grid'. */
+  libraryViewMode?: 'grid' | 'list';
+  /** Artwork Notice (Phase 1 online-foundation, Mission 15) — see src/core/artwork-cache/artwork-notice.ts. Policy version the user last acknowledged. Absent = never acknowledged. One-time, application-level; never shown per-game. */
   artworkNoticeAckPolicyVersion?: number;
   /** Epoch-ms timestamp of the last successful Artwork Notice acknowledgment. Absent = never acknowledged. */
   artworkNoticeAckAt?: number;

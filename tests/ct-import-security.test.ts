@@ -65,7 +65,7 @@ describe('ct-import security hardening', () => {
   });
 
   test('rejects an oversized .CT payload before parsing', async () => {
-    const filler = 'A'.repeat(6 * 1024 * 1024);
+    const filler = 'A'.repeat(11 * 1024 * 1024);
     const xml = `<?xml version="1.0"?>\n<CheatTable><CheatEntries><CheatEntry><Description>"${filler}"</Description><VariableType>4 Bytes</VariableType><Address>1</Address></CheatEntry></CheatEntries></CheatTable>`;
 
     const result = await parseCheatTableXml(xml, { title: 'Oversized Test' });

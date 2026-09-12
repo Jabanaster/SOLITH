@@ -1,0 +1,165 @@
+/* DiscoveryPage — Discovery Master Pass, Stage 2. Reuses this app's
+   existing dark/blue design tokens (src/app/styles/index.css :root) and
+   GameCard's own visual language for card consistency with Home/My Games. */
+
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary, #eef1fa);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-muted, #78819c);
+  font-size: 0.95rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.searchInput {
+  flex: 1 1 260px;
+  min-width: 180px;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius, 8px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--surface, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary, #eef1fa);
+  font-size: 0.95rem;
+}
+
+.selectInput,
+.textInput,
+.yearInput {
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--radius, 8px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--surface, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary, #eef1fa);
+  font-size: 0.9rem;
+}
+
+.textInput {
+  width: 130px;
+}
+
+.yearInput {
+  width: 90px;
+}
+
+.emptyState {
+  border: 1px dashed var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius, 10px);
+  padding: 1.5rem 1.75rem;
+  color: var(--text-muted, #78819c);
+}
+
+.gridLayout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.85rem;
+}
+
+.cardWrap {
+  position: relative;
+}
+
+.favoriteOverlay {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 2;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.2));
+  background: rgba(10, 12, 20, 0.72);
+  color: var(--text-primary, #eef1fa);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.favoriteOverlay:hover,
+.favoriteOverlay:focus-visible {
+  background: rgba(10, 12, 20, 0.92);
+  outline: 2px solid var(--accent, #6ea8ff);
+  outline-offset: 1px;
+}
+
+.favoriteOverlay:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.5rem;
+}
+
+.loadMoreButton {
+  padding: 0.55rem 1.25rem;
+  border-radius: var(--radius, 8px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.16));
+  background: var(--surface, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #eef1fa);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.loadMoreButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Responsive — Discovery Master Pass section 10. Matches the app's existing
+   narrow-window breakpoint (App.tsx's NARROW_SIDEBAR_BREAKPOINT_PX) so
+   controls stop trying to fit on one row before the sidebar itself collapses. */
+@media (max-width: 900px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchInput,
+  .selectInput,
+  .textInput,
+  .yearInput {
+    /* Bug found via live responsive review: `flex: 1 1 260px` on
+       .searchInput is written for the row layout above, where flex-basis
+       sets a starting WIDTH. Once .controls switches to
+       flex-direction: column, the same flex-grow: 1 instead grows the
+       input's HEIGHT to fill the column's main axis — the input rendered
+       as a ~950px-tall box at 640px width. flex: none here overrides that
+       growth entirely; width: 100% (already correct) handles sizing. */
+    flex: none;
+    width: 100%;
+  }
+
+  .gridLayout {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}

@@ -176,6 +176,58 @@ describe('fetchArtworkJob', () => {
     assert.match(result.lastError ?? '', /ECONNRESET/);
   });
 
+  // ROADMAP Mission 6 — timeout, corrupt-payload, and stale-cache-row
+  // degrade-cleanly coverage. See tests/artwork-cache-fetch-policy.test.ts
+  // and tests/artwork-cache-personal-game-priority-fill.test.ts for the
+  // adjacent request-storm ("no repeated fetch loop") coverage.
+  describe('failure degrades cleanly (never throws out of fetchArtworkJob, never writes a partial file)', () => {
+    test('a timed-out request (fetchImpl rejects with AbortError, as a real fetch() does once its signal fires) records a failed entry, never a thrown exception', async () => {
+      // fetchArtworkJob wires a real AbortController + 20s timeout
+      // internally (FETCH_TIMEOUT_MS is not test-injectable, so this
+      // exercises the same rejection shape a real fetch() implementation
+      // produces once that internal signal fires, without waiting out the
+      // real 20s timer) and passes the signal through to fetchImpl —
+      // confirmed by asserting the signal argument is present and unaborted
+      // at call time below.
+      const cacheDir = makeTempDir();
+      let sawSignal = false;
+      const result = await fetchArtworkJob(job(), {
+        cacheDir,
+        fetchImpl: async (_url, init) => {
+          sawSignal = init.signal instanceof AbortSignal && !init.signal.aborted;
+          const error = new Error('The operation was aborted');
+          error.name = 'AbortError';
+          throw error;
+        },
+      });
+      assert.equal(sawSignal, true);
+      assert.equal(result.status, 'failed');
+      assert.match(result.lastError ?? '', /aborted/i);
+      assert.deepEqual(fs.readdirSync(cacheDir), []);
+    });
+
+    test('a response with no body at all (0-length) is rejected as failed, not written as a 0-byte "ok" file', async () => {
+      const cacheDir = makeTempDir();
+      const result = await fetchArtworkJob(job(), {
+        cacheDir,
+        fetchImpl: async () => okResponse(''),
+      });
+      assert.equal(result.status, 'failed');
+      assert.match(result.lastError ?? '', /empty/i);
+      assert.deepEqual(fs.readdirSync(cacheDir), []);
+    });
+
+    test('KNOWN GAP (documented, not fixed by this pass): fetch-executor validates content-type and size, but never decodes/verifies the actual image bytes — a "corrupt image" (garbage bytes under an honest image/jpeg header) is written to disk as status "ok". Real-world degrade-to-fallback for this case happens at the RENDER layer, not here: GameCard.tsx / CatalogCard (TrainerLibraryPage.tsx) / DetailBanner.tsx all wire an <img onError> handler that swaps to the SOLITH branded fallback when the browser fails to decode the served file — verified by code inspection of each component\'s onError handler, not by this Node-only test (no DOM/image decoder available here).', async () => {
+      const cacheDir = makeTempDir();
+      const result = await fetchArtworkJob(job(), {
+        cacheDir,
+        fetchImpl: async () => okResponse('this-is-not-real-jpeg-bytes'),
+      });
+      assert.equal(result.status, 'ok');
+      assert.ok(fs.existsSync(result.localPath));
+    });
+  });
+
   describe('persistent-cache rights gate', () => {
     test('remote-unverified-rights (e.g. Steam CDN) is rejected without ever calling fetch', async () => {
       let called = false;

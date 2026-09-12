@@ -13,10 +13,23 @@ import {
   getTrainerHotkeyEntries,
   registerTrainerHotkeyEntries,
   unregisterTrainerHotkeyEntries,
+  type TrainerHotkeyEntry,
 } from '../src/core/cheat-system/trainer-hotkey-registration.js';
 import { hideTrainerOverlay, toggleTrainerOverlay } from './trainer-overlay.js';
 
 let registered = false;
+let lastRegistrationResult: {
+  registered: TrainerHotkeyEntry[];
+  failed: Array<TrainerHotkeyEntry & { reason: string }>;
+} = { registered: [], failed: [] };
+
+/** Slots Electron actually rejected at last registration — for UI "needs remap" state. */
+export function getTrainerHotkeyRegistrationStatus(): {
+  registered: TrainerHotkeyEntry[];
+  failed: Array<TrainerHotkeyEntry & { reason: string }>;
+} {
+  return lastRegistrationResult;
+}
 
 function broadcastHotkey(action: TrainerHotkeyAction): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -34,6 +47,7 @@ export function registerTrainerHotkeys(): void {
   const entries = getTrainerHotkeyEntries(bindings);
   const result = registerTrainerHotkeyEntries(entries, globalShortcut, getTrainerHotkeyCallback, console);
 
+  lastRegistrationResult = result;
   registered = result.registered.length > 0 || result.failed.length > 0;
 }
 
@@ -41,6 +55,7 @@ export function unregisterTrainerHotkeys(): void {
   if (!registered) return;
   unregisterTrainerHotkeyEntries(globalShortcut, console);
   registered = false;
+  lastRegistrationResult = { registered: [], failed: [] };
 }
 
 function requireTrustedSender(
@@ -100,6 +115,15 @@ export function registerTrainerHotkeyIpc(): void {
     refreshTrainerHotkeys();
     return { success: true, hotkeys: merged, conflicts, osWarnings };
   });
+
+  guardedHandle('trainer-hotkeys-get-status', ['main'], async () => ({
+    success: true,
+    failed: lastRegistrationResult.failed.map((entry) => ({
+      action: entry.action,
+      accelerator: entry.accelerator,
+      reason: entry.reason,
+    })),
+  }));
 
   guardedHandle('trainer-overlay-toggle', ['main', 'trainer-overlay'], async () => {
     if (!isTrainerCapabilityEnabled('v2OverlayEnabled')) {

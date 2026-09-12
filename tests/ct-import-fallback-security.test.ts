@@ -21,7 +21,7 @@ import {
 // enforces the same boundary, not just the main parser (already covered by
 // ct-import-security.test.ts).
 
-const OVERSIZED_FILLER = 'A'.repeat(6 * 1024 * 1024);
+const OVERSIZED_FILLER = 'A'.repeat(11 * 1024 * 1024);
 
 function xxePayload(): string {
   return `<?xml version="1.0"?>
@@ -89,7 +89,7 @@ const MALICIOUS_CASES: Array<{ name: string; xml: () => string }> = [
   { name: 'external entity (XXE / SYSTEM)', xml: xxePayload },
   { name: 'bare DOCTYPE with no ENTITY/SYSTEM/PUBLIC', xml: bareDoctypePayload },
   { name: 'entity-expansion ("billion laughs")', xml: billionLaughsPayload },
-  { name: 'oversized payload (> 5MB)', xml: oversizedPayload },
+  { name: 'oversized payload (> 10MB)', xml: oversizedPayload },
   { name: 'extreme nesting depth', xml: deepNestingPayload },
 ];
 

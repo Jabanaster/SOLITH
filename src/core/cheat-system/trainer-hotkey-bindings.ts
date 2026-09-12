@@ -24,6 +24,15 @@ DEFAULT_TRAINER_HOTKEYS.cheat_slot_12 = 'CommandOrControl+Shift+F12';
 
 const SETTINGS_KEY = 'trainerHotkeyBindings';
 
+/**
+ * Bare F12 was the pre-fix default for cheat_slot_12 and registers false
+ * 18/18 in real-Electron testing (see DEFAULT_TRAINER_HOTKEYS comment above).
+ * Bindings persisted before the fix still carry this value, so it never
+ * self-heals from the DEFAULT_TRAINER_HOTKEYS merge below (persisted values
+ * win). Migrate it forward to the working default on load.
+ */
+const LEGACY_UNRELIABLE_SLOT_12_ACCELERATOR = 'F12';
+
 export function getTrainerHotkeyBindings(): Record<string, string> {
   const raw = getSetting(SETTINGS_KEY as never);
   if (typeof raw !== 'string' || !raw.trim()) {
@@ -31,7 +40,12 @@ export function getTrainerHotkeyBindings(): Record<string, string> {
   }
   try {
     const parsed = JSON.parse(raw) as Record<string, string>;
-    return { ...DEFAULT_TRAINER_HOTKEYS, ...parsed };
+    const merged = { ...DEFAULT_TRAINER_HOTKEYS, ...parsed };
+    if (merged.cheat_slot_12 === LEGACY_UNRELIABLE_SLOT_12_ACCELERATOR) {
+      merged.cheat_slot_12 = DEFAULT_TRAINER_HOTKEYS.cheat_slot_12;
+      setSetting(SETTINGS_KEY as never, JSON.stringify(merged));
+    }
+    return merged;
   } catch {
     return { ...DEFAULT_TRAINER_HOTKEYS };
   }

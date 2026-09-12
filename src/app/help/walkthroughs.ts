@@ -246,7 +246,7 @@ export const walkthroughAudit = [
   { viewId: 'journal', label: 'Activity Journal', pageId: 'activity-journal', status: 'PASS' },
   { viewId: 'saves', label: 'Save Editor', pageId: 'save-editor', status: 'PASS' },
   { viewId: 'controls', label: 'Trainer Controls', pageId: 'trainer-controls', status: 'PASS' },
-  { viewId: 'discovery', label: 'Discovery Lab', pageId: 'discovery-lab', status: 'PASS' },
+  { viewId: 'discovery-lab', label: 'Discovery Lab', pageId: 'discovery-lab', status: 'PASS' },
   { viewId: 'trainer-research', label: 'Trainer Research Lab', pageId: 'trainer-research-lab', status: 'PASS' },
   { viewId: 'ct-library', label: 'CT Library', pageId: 'ct-library', status: 'PASS' },
   { viewId: 'registry-explorer', label: 'Registry Explorer', pageId: 'registry-explorer', status: 'PASS' },

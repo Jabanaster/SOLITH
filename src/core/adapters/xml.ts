@@ -108,9 +108,13 @@ function scanXmlStructuralDepth(content: string, maxDepth: number): { exceeded: 
 }
 
 export function validateXmlSafety(content: string): { safe: boolean; error?: string } {
-  // 1. Check file size
-  if (content.length > 5 * 1024 * 1024) {
-    return { safe: false, error: 'XML file size exceeds safe limit of 5MB' };
+  // 1. Check file size. Raised from 5MB to 10MB (2026-09-09): actively
+  // maintained community tables (e.g. The-Grand-Archives Elden Ring TGA
+  // release) legitimately land in the 5-6MB range and were being rejected
+  // outright. 10MB matches DEFAULT_MAX_CT_BYTES already enforced upstream
+  // in compile-ct-registry.ts, so this stays the single ceiling app-wide.
+  if (content.length > 10 * 1024 * 1024) {
+    return { safe: false, error: 'XML file size exceeds safe limit of 10MB' };
   }
 
   // 2. Reject DOCTYPE and entity definitions outright. A bare DOCTYPE with no

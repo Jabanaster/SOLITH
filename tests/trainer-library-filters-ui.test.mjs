@@ -12,7 +12,13 @@ test('§3.6 has a dedicated derived-filter module before UI wiring', () => {
 });
 
 test('Trainer Library exposes the approved §3.6 slice (33/34) and not the still-blocked value', () => {
-  const source = read('src/app/pages/TrainerLibraryPage.tsx') + read('src/core/trainer-catalog/all-games-filters.ts');
+  // Owner-directed redesign: the 7 always-visible filter-chip-rows moved into
+  // one collapsible popover component (TrainerLibraryFiltersPopover.tsx) —
+  // the labels themselves are unchanged, just relocated out of the page file.
+  const source =
+    read('src/app/pages/TrainerLibraryPage.tsx') +
+    read('src/app/pages/TrainerLibraryFiltersPopover.tsx') +
+    read('src/core/trainer-catalog/all-games-filters.ts');
   for (const label of [
     'Installed', 'Not installed', 'Has trainer/profile', 'Verified', 'Community/unverified', 'Owned',
     'Single-player', 'Offline co-op', 'Local multiplayer', 'Online features present',
@@ -77,8 +83,12 @@ test('Mode filter state is remembered via the same trainerLibrary.filters mechan
 });
 
 test('Trainer Library §3.6 UI has result count, Reset, and remembered filter state', () => {
+  // Note: the Personal Library Completion pass replaced the flat `visible`
+  // array (pre-section-hierarchy) with `total` (the count driving the header
+  // summary) plus per-section counts from organizeLibrary. The result-count,
+  // Reset, and persisted-filter behavior this test guards is unchanged.
   const source = read('src/app/pages/TrainerLibraryPage.tsx');
-  assert.match(source, /visible\.length/);
+  assert.match(source, /total\.toLocaleString\(\)/);
   assert.match(source, />\s*Reset\s*</);
   assert.match(source, /trainerLibrary\.filters/);
 });

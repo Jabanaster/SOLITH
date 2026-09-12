@@ -278,10 +278,29 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
         setMessage('The selected process exited or changed identity. Refresh and select the game again.');
         return;
       }
+      // Mission 20 fix: bind canonical game identity at attach time so the
+      // Trainer Deck read bridge's game-binding gate (trainer-deck-read.ts)
+      // isn't permanently unusable via this, the primary attach flow. This
+      // is only a best-effort HINT — the main process independently
+      // re-verifies executableName against the trusted catalog before
+      // trusting it (see live-memory-attach's own lookup), so a stale or
+      // manipulated value here is safely dropped, never blindly accepted.
+      const matchedOption = processOptions.find((option) => option.pid === selectedPid);
+      const catalogGameIdHint =
+        matchedOption &&
+        (matchedOption.matchedBy === 'current-game' ||
+          matchedOption.matchedBy === 'installed-path' ||
+          matchedOption.matchedBy === 'installed-executable' ||
+          matchedOption.matchedBy === 'catalog-executable') &&
+        matchedOption.matchedGameId
+          ? matchedOption.matchedGameId
+          : undefined;
+
       const result: AttachResult = await api.liveMemoryAttach({
         pid: selectedPid,
         executableName: proc.name,
         userConfirmedOffline,
+        ...(catalogGameIdHint ? { catalogGameId: catalogGameIdHint } : {}),
       });
       setLastGuard(result.guard ?? null);
       if (result.success) {

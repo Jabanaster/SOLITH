@@ -1,0 +1,139 @@
+/* AppSidebar — Visual Library 2.0. Renders inside App.tsx's existing
+   `<aside className="sidebar">` nav body (`#app-nav`, itself sized and
+   scrolled by index.css's `.sidebar`/`.sidebar-nav` rules), as an
+   alternative to the legacy NAV_SECTIONS nav — never side by side with it.
+   Fills the parent's width/scroll rather than sizing or scrolling itself,
+   so it doesn't fight the outer `.sidebar`'s 320px/72px-collapsed width or
+   introduce a second scroll container. */
+
+.appSidebar {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.75rem 0.5rem;
+  gap: 1rem;
+}
+
+/* Icon-only compact mode — applied when the outer `.sidebar--collapsed`
+   (App.tsx / index.css) is active, whether from the user's manual toggle or
+   Mission 8's auto-collapse at narrow widths. Centers the icons in the
+   72px-wide rail (index.css's `.sidebar--collapsed { width: 72px }`) instead
+   of left-aligning now-label-less rows. */
+.appSidebarCollapsed .navButton {
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-secondary, #b7bfd6);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition, 0.18s cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.navButton:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary, #eef1fa);
+}
+
+.navButton:focus-visible {
+  outline: 2px solid var(--cyan, #4fb8d9);
+  outline-offset: 2px;
+}
+
+.navButtonActive {
+  background: rgba(79, 184, 217, 0.12);
+  color: var(--text-primary, #eef1fa);
+}
+
+.navIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.navLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickAccess {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.07));
+  padding-top: 0.75rem;
+}
+
+.quickSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.quickSectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.quickSectionTitle {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, #78819c);
+}
+
+.quickSectionEmpty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #78819c);
+}
+
+.quickSectionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.viewAllLink {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--cyan, #4fb8d9);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.1rem 0;
+}
+
+.viewAllLink:hover {
+  text-decoration: underline;
+}
+
+.viewAllLink:focus-visible {
+  outline: 2px solid var(--cyan, #4fb8d9);
+  outline-offset: 2px;
+}

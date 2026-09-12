@@ -31,6 +31,7 @@ import {
   AddUserSelectedLocationSchema,
   CheckGameRunningSchema,
   GetCompatibilityProfileSchema,
+  GetValidationReceiptsForGamesSchema,
   V2MonitorStartSchema,
   TrainerHostStartSchema,
   TrainerHostStopSchema,
@@ -50,9 +51,11 @@ import { destroyTrainerOverlay } from './trainer-overlay.js';
 import { destroyWispOverlay, registerWispOverlayIpc } from './wisp-overlay.js';
 import { registerTrainerCatalogIpc, bootstrapTrainerCatalog } from './trainer-catalog-ipc.js';
 import { registerCtLibraryIpc } from './ct-library-ipc.js';
+import { registerPersonalLibraryIpc } from './personal-library-ipc.js';
 import { registerRegistryVerificationIpc } from './registry-verification-ipc.js';
 import { registerTrustedSolithWindow, applyWindowNavigationPolicy, validateIpcSender } from './sender-validation.js';
 import { registerInstallDiscoveryIpc } from './install-discovery-ipc.js';
+import { registerDiscoveryCatalogIpc } from './discovery-catalog-ipc.js';
 import { registerCanonicalGamesIpc } from './canonical-games-ipc.js';
 import { registerTrainerDeckIpc } from './trainer-deck-ipc.js';
 import { registerTrainerResearchIpc } from './trainer-research-ipc.js';
@@ -60,7 +63,7 @@ import { registerLocalOcrIpc } from './local-ocr-ipc.js';
 import { registerArtworkCacheIpc } from './artwork-cache-ipc.js';
 import { registerCatalogUpdatesIpc } from './catalog-updates-ipc.js';
 import { registerAIConfigIpc } from './ai-config-ipc.js';
-import { startCatalogProcessWatch } from './catalog-process-watch.js';
+import { startCatalogProcessWatch, getLastProcessDetection } from './catalog-process-watch.js';
 import { registerNotificationsIpc, broadcastNotificationCreated } from './notifications-ipc.js';
 import {
   reconcileCommunitySyncPolling,
@@ -102,9 +105,11 @@ registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerTrainerCatalogIpc();
 registerCtLibraryIpc();
+registerPersonalLibraryIpc();
 registerRegistryVerificationIpc();
 registerInstallDiscoveryIpc();
 registerCanonicalGamesIpc();
+registerDiscoveryCatalogIpc();
 registerTrainerDeckIpc();
 registerTrainerResearchIpc();
 registerNotificationsIpc();
@@ -745,6 +750,46 @@ handleGuarded('log-event', async (event, eventData) => {
 
 handleGuarded('get-app-version', () => app.getVersion());
 
+// Offline Safety Acknowledgment (Policy v1, Core Product Completion
+// BLOCKER-01). Deliberately narrow, purpose-built handlers — no renderer-
+// supplied timestamp is ever trusted; the main process's own clock is
+// always the source of truth for "now". This is UX state only, never
+// authorization — see src/core/safety-acknowledgment/policy.ts's header.
+handleGuarded('get-safety-ack-state', async () => {
+  try {
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+    const settingsModule = await import('../src/core/settings/index.js');
+    return { success: true, state: settingsModule.getSafetyAckState() };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+handleGuarded('record-safety-acknowledgment', async () => {
+  try {
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+    const settingsModule = await import('../src/core/settings/index.js');
+    settingsModule.recordSafetyAcknowledgment();
+    return { success: true, state: settingsModule.getSafetyAckState() };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+handleGuarded('record-safety-reminder-dismissal', async () => {
+  try {
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+    const settingsModule = await import('../src/core/settings/index.js');
+    settingsModule.recordSafetyReminderDismissal();
+    return { success: true, state: settingsModule.getSafetyAckState() };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
 handleGuarded('get-settings', async () => {
   try {
     const dbModule = await import('../src/core/database/index.js');
@@ -1181,6 +1226,56 @@ handleGuarded('get-compatibility-profile', async (event, gameId: string) => {
   } catch (error) {
     console.error('get-compatibility-profile error:', error);
     return null;
+  }
+});
+
+// Mission 6 (validation receipts -> accuracy badge integration gap) —
+// minimal READ-ONLY IPC over the EXISTING validation-receipts/store.ts (no
+// second receipt store). Returns the latest receipt per requested catalog
+// game id so the renderer can feed real (never fabricated) evidence into
+// the existing computeTrainerAccuracy(). This catalog's trainer model is
+// one bundled trainer per game, so the store's `trainerId` dimension is
+// keyed to the same catalog gameId here — matching every other bundled-
+// trainer lookup in this codebase (see personal-library-ipc.ts's
+// requireKnownCatalogGameId, which also only ever knows a canonicalGameId).
+// No bulk "list every receipt" capability is added — only per-gameId latest
+// lookups for a bounded, caller-supplied id list (see
+// GetValidationReceiptsForGamesSchema's 10,000-id cap).
+handleGuarded('get-validation-receipts-for-games', async (_event, payload: unknown) => {
+  try {
+    const parsed = GetValidationReceiptsForGamesSchema.parse(payload);
+    const dbModule = await import('../src/core/database/index.js');
+    await dbModule.initDatabase();
+    const receiptsModule = await import('../src/core/validation-receipts/store.js');
+
+    const receipts: Record<string, ReturnType<typeof receiptsModule.getLatestReceipt>> = {};
+    for (const gameId of parsed.gameIds) {
+      receipts[gameId] = receiptsModule.getLatestReceipt(gameId, gameId);
+    }
+    return { success: true, receipts };
+  } catch (error) {
+    console.error('get-validation-receipts-for-games error:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+// Sidebar Running-state audit gap — catalog-process-watch.ts already keeps
+// an internal `lastDetection` module-level snapshot (updated by its own
+// background poller, which this handler does NOT start, attach to, or
+// otherwise touch) but previously exposed it only as a side effect of
+// `trainer-deck-get` (electron/trainer-deck-ipc.ts), which requires an
+// unrelated catalogGameId and would be an abuse of that endpoint as a
+// generic query. This is a minimal, READ-ONLY, narrowly-scoped channel that
+// exposes the SAME existing in-memory snapshot directly — no new process
+// watcher, no attach, no memory read/write — so usePersonalLibraryGames.ts
+// can initialize the "Running" mini-section immediately on mount instead of
+// waiting for the next `catalog-process-detected` poll event.
+handleGuarded('get-current-detected-process', async () => {
+  try {
+    return { success: true, detection: getLastProcessDetection() };
+  } catch (error) {
+    console.error('get-current-detected-process error:', error);
+    return { success: false, error: String(error) };
   }
 });
 

@@ -41,9 +41,18 @@ describe('provider capabilities — full honest capability matrix (Mission 4)', 
     }
   });
 
-  test('no provider claims catalogDiscovery: SUPPORTED (no public-catalog fetcher exists in this codebase)', () => {
-    for (const cap of listProviderCapabilities()) {
-      assert.notEqual(cap.capabilities.catalogDiscovery, 'SUPPORTED');
+  test('Phase 3: only Steam claims catalogDiscovery SUPPORTED (real, documented, wired-up IStoreService adapter)', () => {
+    assert.equal(PROVIDER_CAPABILITIES.steam.capabilities.catalogDiscovery, 'SUPPORTED');
+  });
+
+  test('Phase 3: Epic and GOG claim catalogDiscovery PARTIAL, never SUPPORTED (real code, but built on undocumented/unofficial provider endpoints with no stability guarantee)', () => {
+    assert.equal(PROVIDER_CAPABILITIES.epic.capabilities.catalogDiscovery, 'PARTIAL');
+    assert.equal(PROVIDER_CAPABILITIES.gog.capabilities.catalogDiscovery, 'PARTIAL');
+  });
+
+  test('Ubisoft/EA/Xbox/Battle.net remain catalogDiscovery UNSUPPORTED (Mission 20 audit found no legitimate public catalog API for any of them)', () => {
+    for (const provider of ['ubisoft', 'ea', 'xbox', 'battlenet'] as const) {
+      assert.equal(PROVIDER_CAPABILITIES[provider].capabilities.catalogDiscovery, 'UNSUPPORTED', provider);
     }
   });
 

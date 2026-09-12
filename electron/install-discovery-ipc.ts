@@ -9,6 +9,8 @@ import {
   previewInstallDiscoveryScan,
   runInstallDiscoveryScan,
 } from '../src/core/install-discovery/index.js';
+import { listInstalledGames } from '../src/core/install-discovery/store.js';
+import { listProviderCapabilities } from '../src/core/install-discovery/provider-capabilities.js';
 
 function sanitize(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -128,6 +130,39 @@ export function registerInstallDiscoveryIpc(): void {
         catalogGameIds,
         total: games.length,
       };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  // Mission 8/9: Linked Game Libraries UI foundation. This is read-only,
+  // static capability data plus a real local install count per provider —
+  // never fabricated "Connected"/account-sync state for providers with no
+  // scanner (see provider-capabilities.ts's doc comment for why).
+  guardedHandle('linked-libraries-list', async () => {
+    try {
+      const capabilities = listProviderCapabilities();
+      const installedByPlatform = new Map<string, number>();
+      // Mission 19 — "Last scan" per provider: the most recent lastSeenAt
+      // across that provider's own installed_games rows. This is real,
+      // already-tracked per-row data (install-discovery/store.ts), not a new
+      // persisted field — a provider with zero installed rows has never
+      // produced evidence, so it stays `null` ("Never scanned") rather than
+      // guessing a timestamp.
+      const lastScanByPlatform = new Map<string, string>();
+      for (const game of listInstalledGames()) {
+        installedByPlatform.set(game.platform, (installedByPlatform.get(game.platform) ?? 0) + 1);
+        const existing = lastScanByPlatform.get(game.platform);
+        if (!existing || game.lastSeenAt > existing) {
+          lastScanByPlatform.set(game.platform, game.lastSeenAt);
+        }
+      }
+      const providers = capabilities.map((capability) => ({
+        ...capability,
+        localInstalledCount: installedByPlatform.get(capability.provider) ?? 0,
+        lastScanAt: lastScanByPlatform.get(capability.provider) ?? null,
+      }));
+      return { success: true, providers };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

@@ -16,6 +16,7 @@ import {
   getPendingIdentityReviewCount,
   resolveIdentityReviewItem,
   setCatalogEntryOwnedConfirmed,
+  listOwnedConfirmedCatalogGameIds,
 } from '../src/core/trainer-catalog/store.js';
 import { ensureCatalogSeeded, resolveSeedPath } from '../src/core/trainer-catalog/seed.js';
 import { ensureBundledDefinitions } from '../src/core/trainer-catalog/ensure-bundled-definitions.js';
@@ -170,6 +171,19 @@ export function registerTrainerCatalogIpc(): void {
       const entry = getCatalogEntryForDisplay(parsed.catalogGameId);
       if (!entry) return { success: false, error: 'not_found' };
       return { success: true, entry };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  // Personal Library Completion — Final Closure Pass, Mission 3. Fast,
+  // small-result read (bounded by real user "mark as owned" actions, never
+  // the catalog's total size) so the Trainer Library page's My-Games fast
+  // path never needs the full catalog fetch to learn which games are
+  // confirmed-owned.
+  handleGuarded('trainer-catalog-list-owned', async () => {
+    try {
+      return { success: true, ownedCatalogGameIds: listOwnedConfirmedCatalogGameIds() };
     } catch (error) {
       return { success: false, error: sanitize(error) };
     }

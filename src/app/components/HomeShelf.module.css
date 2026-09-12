@@ -1,0 +1,31 @@
+/* HomeShelf — Visual Library 2.0, Step 5. Horizontal-scroll section shared by
+   HomePage and (optionally) MyGamesPage. Reuses this app's existing dark/blue
+   design tokens (src/app/styles/index.css :root) rather than a new palette. */
+
+.shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary, #eef1fa);
+}
+
+.track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(150px, 190px);
+  gap: 0.85rem;
+  overflow-x: auto;
+  padding: 0.15rem 0.15rem 0.6rem;
+  scroll-snap-type: x proximity;
+}
+
+.item {
+  scroll-snap-align: start;
+  min-width: 0;
+}

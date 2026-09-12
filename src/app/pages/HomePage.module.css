@@ -1,0 +1,88 @@
+/* HomePage — Visual Library 2.0, Step 5. Reuses this app's existing dark/blue
+   design tokens (src/app/styles/index.css :root) rather than a new palette. */
+
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.hero {
+  border: 1px solid var(--border-accent, rgba(79, 184, 217, 0.35));
+  background: linear-gradient(145deg, rgba(21, 27, 46, 0.95), rgba(15, 20, 35, 0.95));
+  border-radius: var(--radius, 10px);
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.heroEmpty {
+  border: 1px dashed var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius, 10px);
+  padding: 1.5rem 1.75rem;
+  color: var(--text-muted, #78819c);
+}
+
+.heroEyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cyan, #4fb8d9);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary, #eef1fa);
+}
+
+.heroMeta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #78819c);
+}
+
+.heroButton {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(30, 55, 90, 0.9);
+  color: #e8f0ff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.browseAllWrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.5rem;
+}
+
+.browseAllButton {
+  padding: 0.65rem 1.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-accent, rgba(79, 184, 217, 0.35));
+  background: transparent;
+  color: var(--text-primary, #eef1fa);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.browseAllButton:hover {
+  border-color: var(--cyan, #4fb8d9);
+  color: var(--cyan, #4fb8d9);
+}

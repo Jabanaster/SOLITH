@@ -211,6 +211,15 @@ button, input, select, textarea {
   z-index: 1;
 }
 
+/* Visual Library 2.0 step-4 placeholder views (home/my-games/game-detail) —
+   real page components land in a later step; this just keeps the content
+   area from looking broken while routed to. */
+.content-placeholder {
+  padding: 2rem;
+  color: var(--text-muted, #78819c);
+  font-size: 0.95rem;
+}
+
 /* Subtle HUD grid — very restrained */
 .app-container::before {
   content: '';
@@ -4562,4 +4571,72 @@ code, .mono {
     outline: 2px solid var(--cyan);
     outline-offset: 2px;
   }
+}
+
+/* Offline Safety Acknowledgment (Policy v1, BLOCKER-01) */
+
+.safety-ack-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 12, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.safety-ack-dialog {
+  max-width: 520px;
+  width: 100%;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  line-height: 1.5;
+}
+
+.safety-ack-title {
+  margin-top: 0;
+  font-size: 1.35rem;
+}
+
+.safety-ack-footnote {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.safety-ack-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.safety-reminder-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-accent);
+  color: var(--text-primary);
+}
+
+.safety-reminder-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.safety-reminder-text span {
+  color: var(--text-secondary);
+}
+
+.safety-reminder-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }

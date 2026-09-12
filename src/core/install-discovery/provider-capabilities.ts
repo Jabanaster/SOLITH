@@ -177,8 +177,13 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
-      // No app-list/catalog fetcher exists in this codebase today.
-      catalogDiscovery: 'UNSUPPORTED',
+      // Phase 3 Mission 3: real, wired-up code (steam-adapter.ts) against
+      // the official, documented Steamworks IStoreService/GetAppList
+      // endpoint. Requires a server-held Steam Web API key (never shipped in
+      // the desktop client) — that is a real operational requirement, not a
+      // reason to downgrade below SUPPORTED, since the endpoint itself is
+      // official and stable.
+      catalogDiscovery: 'SUPPORTED',
       installedDiscovery: 'SUPPORTED',
       // Steam Web API GetOwnedGames is a real, documented path (see Mission 6
       // audit above) but requires a user-provided API key + public profile —
@@ -205,7 +210,14 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
-      catalogDiscovery: 'UNSUPPORTED',
+      // Phase 3 Mission 9/10: real, wired-up code (gog-adapter.ts) against
+      // `gog.com/games/ajax/filtered`, GOG's own storefront's unauthenticated
+      // catalog-browsing endpoint. PARTIAL, not SUPPORTED: this endpoint has
+      // NO official documentation or stability guarantee (community
+      // reverse-engineered via the gogapidocs project) — it could change or
+      // be rate-limited without notice, unlike Steam's officially documented
+      // IStoreService.
+      catalogDiscovery: 'PARTIAL',
       installedDiscovery: 'SUPPORTED',
       // GOG Galaxy's local synced-library DB is a real possibility (Mission 6
       // audit) but explicitly NOT implemented — undocumented schema, depends
@@ -230,7 +242,14 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
-      catalogDiscovery: 'UNSUPPORTED',
+      // Phase 3 Mission 6/7: real, wired-up code (epic-adapter.ts) against
+      // Epic's storefront GraphQL endpoint (www.epicgames.com/graphql) — the
+      // same unauthenticated endpoint the storefront's own JS calls. PARTIAL,
+      // not SUPPORTED: Epic has never published official documentation,
+      // versioning, or an SLA for this endpoint; community-documented only
+      // (woctezuma notes, egs-api crate). Real and legitimate (no scraping,
+      // no login), but structurally less stable than Steam's official API.
+      catalogDiscovery: 'PARTIAL',
       installedDiscovery: 'SUPPORTED',
       // Epic's authenticated Games API is a real, documented path (Mission 6
       // audit) but requires account-authorized OAuth — not implemented here.
@@ -283,6 +302,12 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
+      // Phase 3 Mission 20 audit: `displaycatalog.mp.microsoft.com` is a
+      // real, reachable, unauthenticated Microsoft endpoint for looking up a
+      // SPECIFIC product by Big ID/package family name — but Microsoft has
+      // never documented or published a bulk "browse the whole catalog"
+      // endpoint. Real per-product lookup != a public catalog-browse API,
+      // so this stays UNSUPPORTED for catalogDiscovery specifically.
       catalogDiscovery: 'UNSUPPORTED',
       installedDiscovery: 'PARTIAL',
       ownedLibrarySync: 'UNSUPPORTED',
@@ -314,6 +339,9 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
+      // Phase 3 Mission 20 audit: no official public catalog API found for
+      // Ubisoft Connect. Only unofficial/third-party GitHub reverse-engineering
+      // projects exist, none authoritative enough to build against.
       catalogDiscovery: 'UNSUPPORTED',
       installedDiscovery: 'SUPPORTED',
       ownedLibrarySync: 'UNSUPPORTED',
@@ -357,6 +385,8 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
+      // Phase 3 Mission 20 audit: no official public catalog/storefront API
+      // found for EA app/Origin. No developer portal or documented endpoint located.
       catalogDiscovery: 'UNSUPPORTED',
       installedDiscovery: 'PARTIAL',
       ownedLibrarySync: 'UNSUPPORTED',
@@ -401,6 +431,11 @@ export const PROVIDER_CAPABILITIES: Record<LinkedLibraryProvider, ProviderCapabi
     ownershipDetectionLevel: 'unsupported',
     ownershipSource: 'unavailable',
     capabilities: {
+      // Phase 3 Mission 20 audit: Blizzard's official dev.battle.net Game
+      // Data APIs are real, documented, and OAuth-secured — but scoped to
+      // specific-title game data (WoW/Diablo III/Hearthstone/SC2 items,
+      // auction house, etc.), not "what games exist in the Battle.net
+      // storefront." No catalog-browse API exists for that use case.
       catalogDiscovery: 'UNSUPPORTED',
       installedDiscovery: 'PARTIAL',
       ownedLibrarySync: 'UNSUPPORTED',

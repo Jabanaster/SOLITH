@@ -57,6 +57,9 @@ interface Window {
     getSettings: () => Promise<any>;
     setSetting: (key: string, value: any) => Promise<any>;
     getAppVersion: () => Promise<string>;
+    getSafetyAckState: () => Promise<{ success: boolean; state?: 'ACK_REQUIRED' | 'REMINDER_DUE' | 'NO_ACTION'; error?: string }>;
+    recordSafetyAcknowledgment: () => Promise<{ success: boolean; state?: 'ACK_REQUIRED' | 'REMINDER_DUE' | 'NO_ACTION'; error?: string }>;
+    recordSafetyReminderDismissal: () => Promise<{ success: boolean; state?: 'ACK_REQUIRED' | 'REMINDER_DUE' | 'NO_ACTION'; error?: string }>;
     // Notifications
     listNotifications: () => Promise<any[]>;
     getUnreadNotificationCount: () => Promise<number>;
@@ -127,6 +130,12 @@ interface Window {
     }) => Promise<any>;
     liveMemoryDetach: () => Promise<{ success: boolean; error?: string }>;
     liveMemoryRead: (payload: { address: string; dataType: string }) => Promise<{ success: boolean; value?: number; error?: string }>;
+    /** Trainer-Deck-scoped read only — no raw address/PID/module ever crosses this boundary. */
+    trainerDeckReadValue?: (payload: { libraryEntryId: string }) => Promise<
+      | { status: 'not_attached' }
+      | { status: 'value'; value: number; address: string }
+      | { status: 'blocked'; code?: string; reason: string }
+    >;
     liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) => Promise<any>;
     liveMemoryIssueWriteConsent: (payload: { proposalId: string; userConfirmed?: true }) => Promise<{
       success: boolean;
@@ -370,6 +379,11 @@ interface Window {
       osWarnings?: Array<{ accelerator: string; action: string; reason: string }>;
       error?: string;
     }>;
+    trainerHotkeysGetStatus?: () => Promise<{
+      success: boolean;
+      failed?: Array<{ action: string; accelerator: string; reason: string }>;
+      error?: string;
+    }>;
     onTrainerHotkey: (callback: (payload: { action: string }) => void) => (() => void) | undefined;
 
     trainerCatalogSearch: (payload: {
@@ -385,7 +399,23 @@ interface Window {
       error?: string;
     }>;
     trainerCatalogStats: () => Promise<{ success: boolean; total?: number; error?: string }>;
+    discoveryCatalogSearch: (payload: {
+      text?: string;
+      provider?: string;
+      providers?: string[];
+      trainerAvailable?: boolean;
+      favoriteOrPersonalOnly?: boolean;
+      releaseYear?: number;
+      releaseYearMin?: number;
+      releaseYearMax?: number;
+      genre?: string;
+      sort?: 'title-asc' | 'title-desc' | 'release-desc' | 'release-asc';
+      limit?: number;
+      offset?: number;
+    }) => Promise<{ success: boolean; entries?: unknown[]; error?: string }>;
+    discoveryCatalogGet: (payload: { solithGameId: string }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
     trainerCatalogGet: (payload: { catalogGameId: string }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
+    trainerCatalogListOwned: () => Promise<{ success: boolean; ownedCatalogGameIds?: string[]; error?: string }>;
     trainerCatalogSeed: () => Promise<{ success: boolean; total?: number; error?: string }>;
     trainerCatalogSyncRemote: () => Promise<{
       success: boolean;
@@ -585,6 +615,21 @@ interface Window {
       queued?: number;
       error?: string;
     }>;
+    artworkCachePriorityFill: (payload: {
+      candidates: Array<{
+        catalogGameId: string;
+        running: boolean;
+        installed: boolean;
+        confirmedOwned: boolean;
+        favorite: boolean;
+        recentlyDetected: boolean;
+        canonicalConfidence: 'trusted' | 'weak';
+      }>;
+    }) => Promise<{
+      success: boolean;
+      queued?: number;
+      error?: string;
+    }>;
     artworkCacheRetryMissing: () => Promise<{ success: boolean; queued?: number; error?: string }>;
     artworkCacheStatus: () => Promise<{
       success: boolean;
@@ -702,6 +747,36 @@ interface Window {
       | { status: 'cancelled' }
       | { status: 'error'; error: string; errorCode: string }
     >;
+    favoriteGame?: (payload: { canonicalGameId: string }) => Promise<{ success: boolean; isFavorite?: boolean; error?: string }>;
+    unfavoriteGame?: (payload: { canonicalGameId: string }) => Promise<{ success: boolean; isFavorite?: boolean; error?: string }>;
+    listFavorites?: () => Promise<{ success: boolean; favoriteIds?: string[]; error?: string }>;
+    isFavoriteGame?: (payload: { canonicalGameId: string }) => Promise<{ success: boolean; isFavorite?: boolean; error?: string }>;
+    requestGameSupport?: (payload: {
+      canonicalGameId: string;
+      gameTitle: string;
+      platforms: string[];
+      launcherGameIds?: Record<string, string>;
+      versionHint?: string;
+    }) => Promise<{
+      success: boolean;
+      request?: import('../core/support-requests/store.js').SupportRequest;
+      error?: string;
+    }>;
+    getSupportRequestStatus?: (payload: { canonicalGameId: string }) => Promise<{
+      success: boolean;
+      request?: import('../core/support-requests/store.js').SupportRequest | null;
+      error?: string;
+    }>;
+    getValidationReceiptsForGames?: (gameIds: string[]) => Promise<{
+      success: boolean;
+      receipts?: Record<string, import('../core/validation-receipts/store.js').ValidationReceipt | null>;
+      error?: string;
+    }>;
+    listSupportRequests?: () => Promise<{
+      success: boolean;
+      requests?: import('../core/support-requests/store.js').SupportRequest[];
+      error?: string;
+    }>;
     ctLibraryImportZipPreview: (payload: {
       selectionId: string;
       jobId?: string;
@@ -887,8 +962,32 @@ interface Window {
         hasDefinition?: boolean;
         prepareReady?: boolean;
         executableHashSHA256?: string;
-      }) => void,
+      } | null) => void,
     ) => (() => void) | undefined;
+    /**
+     * Read-only snapshot of catalog-process-watch.ts's existing in-memory
+     * `lastDetection` — the same value `trainer-deck-get` already returns as
+     * `lastProcessDetection`, exposed directly so callers that only need
+     * "what is currently detected as running" don't need to abuse that
+     * unrelated, catalogGameId-scoped endpoint. Starts no watcher, attaches
+     * to nothing, reads/writes no game memory.
+     */
+    getCurrentDetectedProcess?: () => Promise<{
+      success: boolean;
+      detection?: {
+        catalogGameId: string;
+        displayName: string;
+        pid: number;
+        executable: string;
+        planAllowed: boolean;
+        blockReason?: string;
+        fingerprintStatus?: string;
+        hasDefinition: boolean;
+        prepareReady: boolean;
+        executableHashSHA256?: string;
+      } | null;
+      error?: string;
+    }>;
     onZeroInputReady?: (
       callback: (payload: {
         catalogGameId: string;
@@ -1002,6 +1101,24 @@ interface Window {
       }>;
       catalogGameIds?: string[];
       total?: number;
+      error?: string;
+    }>;
+
+    linkedLibrariesList: () => Promise<{
+      success: boolean;
+      providers?: Array<{
+        provider: 'steam' | 'gog' | 'epic' | 'ubisoft' | 'ea' | 'xbox' | 'battlenet';
+        displayName: string;
+        localDiscoverySupported: boolean;
+        fullOwnershipSupported: boolean;
+        accountAuthorizationRequired: boolean;
+        implementationFile: string | null;
+        localInstalledCount: number;
+        installedDetectionLevel: 'supported' | 'partial' | 'unsupported';
+        ownershipDetectionLevel: 'supported' | 'partial' | 'unsupported';
+        ownershipSource: 'local metadata' | 'authorized account' | 'unavailable';
+        lastScanAt: string | null;
+      }>;
       error?: string;
     }>;
 

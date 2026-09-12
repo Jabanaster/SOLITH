@@ -52,9 +52,13 @@ describe('parseSaveFileStrict — Finding R2 save-file XML safety gate', () => {
   });
 
   test('rejects an over-size XML save file', () => {
-    const big = `<save>${'<x>a</x>'.repeat(700_000)}</save>`; // > 5MB
+    // Save files hit the save-specific MAX_SAVE_FILE_BYTES (8MB) stat check
+    // before content ever reaches validateXmlSafety's own 10MB content-length
+    // gate (raised from 5MB 2026-09-09 for CT-table imports) — so an oversize
+    // save file is still rejected end-to-end, just via that earlier gate.
+    const big = `<save>${'<x>a</x>'.repeat(1_400_000)}</save>`; // > 8MB
     withTempXmlFile(big, (filePath) => {
-      assert.throws(() => parseSaveFileStrict(filePath), /size exceeds safe limit/i);
+      assert.throws(() => parseSaveFileStrict(filePath), /too large to parse safely/i);
     });
   });
 

@@ -254,6 +254,65 @@
   background: rgba(14, 28, 48, 0.42);
 }
 
+.statusBanner {
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 180, 255, 0.2);
+  background: rgba(20, 30, 48, 0.6);
+}
+
+.statusBanner strong {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #edf5ff;
+}
+
+.status_ready {
+  border-color: rgba(106, 214, 162, 0.45);
+  background: rgba(14, 42, 32, 0.4);
+}
+
+.status_ready strong {
+  color: #9cf0c2;
+}
+
+.status_oracle {
+  border-color: rgba(255, 190, 120, 0.4);
+  background: rgba(45, 34, 12, 0.4);
+}
+
+.status_oracle strong {
+  color: #ffd59c;
+}
+
+.status_unsupported {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(45, 16, 16, 0.4);
+}
+
+.status_unsupported strong {
+  color: #fca5a5;
+}
+
+.readValuePanel {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(120, 180, 255, 0.2);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.promotionPanel {
+  margin: 0.9rem 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(106, 214, 162, 0.28);
+  border-radius: 10px;
+  background: rgba(14, 42, 32, 0.32);
+  display: grid;
+  gap: 0.5rem;
+}
+
 .metadataPanel h3 {
   margin: 0 0 0.35rem;
   color: #cde5ff;

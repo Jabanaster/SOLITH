@@ -4,6 +4,10 @@ import { searchCatalog } from '../trainer-catalog/store.js';
 import { setSetting } from '../settings/index.js';
 import { scanEpicInstalls } from './epic.js';
 import { scanGogInstalls } from './gog.js';
+import { scanUbisoftInstalls } from './ubisoft.js';
+import { scanEaInstalls } from './ea.js';
+import { scanXboxInstalls } from './xbox.js';
+import { scanBattleNetInstalls } from './battle-net.js';
 import { countMatchedCatalog, matchInstalledToCatalog } from './match.js';
 import { scanSteamInstalls } from './steam.js';
 import { countInstalledGames, getInstalledCatalogGameIds, listInstalledGames, upsertInstalledGames } from './store.js';
@@ -230,6 +234,18 @@ export function discoverRawInstalls(
   if (options.gogFixturePath || !options.offlineRootsOnly) {
     run(options.gogFixturePath ?? 'gog:registry', () => scanGogInstalls(options));
   }
+  if (options.ubisoftFixturePath || !options.offlineRootsOnly) {
+    run(options.ubisoftFixturePath ?? 'ubisoft:registry', () => scanUbisoftInstalls(options));
+  }
+  if (options.eaFixturePath || !options.offlineRootsOnly) {
+    run(options.eaFixturePath ?? 'ea:registry', () => scanEaInstalls(options));
+  }
+  if (options.xboxFixturePath || !options.offlineRootsOnly) {
+    run(options.xboxFixturePath ?? 'xbox:registry', () => scanXboxInstalls(options));
+  }
+  if (options.battleNetFixturePath || !options.offlineRootsOnly) {
+    run(options.battleNetFixturePath ?? 'battlenet:registry', () => scanBattleNetInstalls(options));
+  }
   return results;
 }
 export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {}): InstallDiscoveryPreviewResult {
@@ -240,6 +256,10 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     options.steamInstallPath ? path.resolve(options.steamInstallPath) : 'steam:libraries',
     options.epicManifestsPath ? path.resolve(options.epicManifestsPath) : 'epic:manifests',
     options.gogFixturePath ? path.resolve(options.gogFixturePath) : 'gog:registry',
+    options.ubisoftFixturePath ? path.resolve(options.ubisoftFixturePath) : 'ubisoft:registry',
+    options.eaFixturePath ? path.resolve(options.eaFixturePath) : 'ea:registry',
+    options.xboxFixturePath ? path.resolve(options.xboxFixturePath) : 'xbox:registry',
+    options.battleNetFixturePath ? path.resolve(options.battleNetFixturePath) : 'battlenet:registry',
     ...(options.userSelectedRoots ?? []).map((root) => path.resolve(root)),
     ...(options.includeCommonRoots ? commonInstallRoots() : []),
   ]);
@@ -305,7 +325,11 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
       };
     })(),
     source: record.platform,
-    unsupportedReason: record.catalogGameId ? undefined : 'no_catalog_match',
+    unsupportedReason: record.catalogGameId
+      ? undefined
+      : record.catalogMatchStatus === 'AMBIGUOUS'
+        ? 'no_catalog_match:ambiguous_needs_manual_disambiguation'
+        : 'no_catalog_match',
     classification: record.catalogGameId || (record.platform !== 'manual' && record.platform !== 'xbox')
       ? 'likely_game'
       : 'uncertain',
@@ -322,9 +346,14 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     epic: raw.filter((g) => g.platform === 'epic').length,
     gog: raw.filter((g) => g.platform === 'gog').length,
     xbox: raw.filter((g) => g.platform === 'xbox').length,
-    // Ubisoft Connect, EA app, and Battle.net have no auto-discovery scanner yet
-    // (Step 11) — always 0 here; manually-known installations for these launchers
-    // are counted separately from the `games` table, not from this scan result.
+    // Ubisoft Connect, EA app, Xbox/AppX, and Battle.net now have
+    // registry-based scanners (ubisoft.ts, ea.ts, xbox.ts, battle-net.ts)
+    // counted here like every other platform. See provider-capabilities.ts
+    // for why Battle.net is marked 'partial' rather than 'supported'
+    // (product.db stays rejected as protobuf-encoded and not reasonably
+    // parseable; the standard Windows Uninstall registry entry per title is
+    // real but not exhaustive/guaranteed the way Ubisoft's launcher-written
+    // registry key is).
     ubisoft: raw.filter((g) => g.platform === 'ubisoft').length,
     ea: raw.filter((g) => g.platform === 'ea').length,
     battlenet: raw.filter((g) => g.platform === 'battlenet').length,

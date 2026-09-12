@@ -100,12 +100,21 @@ function toGameLibraryRecord(game: CanonicalGame, activeLegacyGameIds: Set<strin
   const trainerAvailability: GameLibraryTrainerAvailability = game.catalogGameId
     ? (catalogEntry ? 'available' : 'unavailable')
     : 'unknown';
+  // Audit + Mission 7 (partial) — `identityStatus` is exactly the tier-trust
+  // signal computed at migration time (migration.ts: 'verified' when the
+  // canonical identity key was tier 1-3/trusted, 'backfilled' when it was
+  // only a tier-4 title-only match). A 'backfilled' game may have picked up
+  // its catalogGameId link through a weak/ambiguous match (see
+  // install-discovery/match.ts's executable-collision fallback), so the
+  // linked catalog entry could be the wrong edition/remaster — provider-
+  // derived (Steam CDN) artwork must not be trusted in that case.
+  const artworkConfidence = game.identityStatus === 'verified' ? 'trusted' : 'weak';
 
   return {
     canonicalGameId: game.id,
     title: game.displayName,
     aliases: game.aliases,
-    artworkUrl: game.artworkIdentity?.coverUrl ?? (catalogEntry ? resolveCatalogCoverUrl(catalogEntry) : undefined),
+    artworkUrl: game.artworkIdentity?.coverUrl ?? (catalogEntry ? resolveCatalogCoverUrl(catalogEntry, { canonicalConfidence: artworkConfidence }) : undefined),
     supportState: game.supportState,
     trainerAvailability,
     verificationStatus: catalogEntry?.verificationStatus ?? 'unknown',

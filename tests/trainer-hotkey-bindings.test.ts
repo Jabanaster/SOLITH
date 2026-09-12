@@ -46,13 +46,32 @@ describe('trainer-hotkey-bindings', () => {
     assert.ok(warnings.length >= 2);
   });
 
-  test('a stored cheat_slot_12 override survives the default change', async () => {
+  test('a legacy stored bare-F12 binding self-heals to the working accelerator on read', async () => {
     await initDatabase();
     const merged = setTrainerHotkeyBindings({ cheat_slot_12: 'F12' });
     assert.equal(merged.cheat_slot_12, 'F12');
     const reread = getTrainerHotkeyBindings();
-    assert.equal(reread.cheat_slot_12, 'F12');
+    assert.equal(reread.cheat_slot_12, DEFAULT_TRAINER_HOTKEYS.cheat_slot_12);
+    assert.notEqual(reread.cheat_slot_12, 'F12');
     assert.equal(reread.cheat_slot_1, 'F1');
+    setTrainerHotkeyBindings(DEFAULT_TRAINER_HOTKEYS);
+  });
+
+  test('the self-heal persists so it does not re-trigger on every subsequent read', async () => {
+    await initDatabase();
+    setTrainerHotkeyBindings({ cheat_slot_12: 'F12' });
+    getTrainerHotkeyBindings();
+    const secondRead = getTrainerHotkeyBindings();
+    assert.equal(secondRead.cheat_slot_12, DEFAULT_TRAINER_HOTKEYS.cheat_slot_12);
+    setTrainerHotkeyBindings(DEFAULT_TRAINER_HOTKEYS);
+  });
+
+  test('a non-legacy custom cheat_slot_12 override is left untouched', async () => {
+    await initDatabase();
+    const merged = setTrainerHotkeyBindings({ cheat_slot_12: 'Control+Shift+F12' });
+    assert.equal(merged.cheat_slot_12, 'Control+Shift+F12');
+    const reread = getTrainerHotkeyBindings();
+    assert.equal(reread.cheat_slot_12, 'Control+Shift+F12');
     setTrainerHotkeyBindings(DEFAULT_TRAINER_HOTKEYS);
   });
 });

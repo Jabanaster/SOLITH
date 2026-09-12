@@ -51,3 +51,70 @@ export function normalizeCatalogTitle(raw: string | null | undefined): string | 
 
   return value;
 }
+
+/**
+ * Strips ASCII/Unicode control characters (code points 0-31 and 127-159 —
+ * sometimes used to smuggle payloads past naive filters) without touching
+ * legitimate printable Unicode. Implemented as an explicit charCode scan
+ * rather than a regex literal containing control-character escapes, so this
+ * source file never embeds a raw control byte itself.
+ */
+function stripControlCharacters(value: string): string {
+  let result = '';
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    const isControlChar = (code >= 0 && code <= 31) || (code >= 127 && code <= 159);
+    if (!isControlChar) result += value[i];
+  }
+  return result;
+}
+
+const MAX_METADATA_FIELD_LENGTH = 200;
+
+/**
+ * SOLITH Phase 3.1, Mission 8 — sanitizes provider-originated DISPLAY
+ * metadata (developer, publisher, a single genre/tag string) that is stored
+ * and may later be rendered, using the SAME HTML-tag-stripping/entity-decode
+ * pipeline `normalizeCatalogTitle` already applies to titles, but WITHOUT
+ * that function's minimum-length/no-letters-or-digits rejection rules —
+ * legitimate short values (e.g. a 2-3 letter genre or studio initialism)
+ * must not be dropped the way a too-short TITLE correctly would be.
+ *
+ * Returns null (never throws, never stores a fabricated fallback) for a
+ * value that is empty after sanitization or still looks like leftover
+ * HTML-attribute soup. Every provider adapter must route developer/
+ * publisher/genre/tag strings through this before they reach
+ * ProviderGameRecord — see tests/metadata-sanitization.test.ts for the
+ * hostile-payload proof (`<script>`, `<img onerror>`, SVG payloads, entity
+ * tricks, very long strings, control characters).
+ */
+export function sanitizeDisplayMetadata(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string') return null;
+
+  let value = raw.replace(HTML_TAG_RE, ' ');
+  value = decodeHtmlEntities(value);
+  value = stripControlCharacters(value);
+  value = value.replace(/\s+/g, ' ').trim();
+
+  if (!value) return null;
+  if (ATTRIBUTE_FRAGMENT_RE.test(value)) return null;
+  if (URL_ONLY_RE.test(value)) return null;
+
+  if (value.length > MAX_METADATA_FIELD_LENGTH) {
+    value = value.slice(0, MAX_METADATA_FIELD_LENGTH).trim();
+  }
+
+  return value;
+}
+
+/** Applies sanitizeDisplayMetadata to a list of genre/tag strings, dropping any entry that sanitizes to nothing rather than storing an empty/garbage value. */
+export function sanitizeDisplayMetadataList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const result: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const sanitized = sanitizeDisplayMetadata(item);
+    if (sanitized) result.push(sanitized);
+  }
+  return result;
+}

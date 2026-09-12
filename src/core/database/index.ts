@@ -671,16 +671,75 @@ function convertRowDates(row: any): any {
   return newRow;
 }
 
+/**
+ * Phase 3.1 Mission 1/2 — root-caused sql.js statement-handle leak.
+ *
+ * Root cause (confirmed via a deterministic reproducer, not assumed): every
+ * `Database.prepare(sql)` call below creates a REAL sql.js/WASM-backed
+ * `Statement` object holding compiled VDBE bytecode + bound-parameter
+ * buffers in the emscripten WASM heap. `StatementWrapper.free()` existed but
+ * was never called by any of the ~165 call sites across this codebase — the
+ * near-universal pattern is the one-shot chain `db.prepare(sql).run(params)`,
+ * whose returned Statement is immediately unreferenced. Reproduced directly:
+ * ~163,725 leaked statements (3 large multi-column ON-CONFLICT statements ×
+ * ~54,575 iterations) crashed sql.js with a real "Error: out of memory" from
+ * its own WASM heap, RSS having climbed past 1.3 GB — not a hypothesis, an
+ * observed crash with a captured stack trace. A single simpler statement
+ * reused 100k times did NOT crash by 100k (smaller compiled program = less
+ * WASM heap per leaked handle), which is why Phase 1's single-table 100k-row
+ * footprint test never surfaced this: statement COMPLEXITY, not just count,
+ * determines how fast the leak exhausts the WASM heap.
+ *
+ * Fix (this class): a `FinalizationRegistry` frees the underlying WASM
+ * statement handle once its `StatementWrapper` becomes unreachable, with
+ * zero changes required at any of the ~165 existing call sites — including
+ * the handful (discovery/index.ts's `insertCandidate`, games/index.ts's
+ * `insertResource`) that legitimately `.prepare()` ONCE and `.run()` the
+ * SAME statement repeatedly inside a loop, which rules out simply
+ * auto-freeing inside `run()/get()/all()` themselves (that would be a
+ * use-after-free on their second call). `.free()` remains available for
+ * explicit/deterministic freeing (see the new batched-import path in
+ * provider-catalog/batch-import.ts, which frees synchronously and does not
+ * rely on GC timing for its own hot path) and is now idempotent-safe against
+ * being called both explicitly and later by the registry.
+ *
+ * This is a real fix, not a workaround: it does not lower batch sizes,
+ * restart the DB, blindly retry, or throw more memory at the problem — it
+ * releases the exact WASM resource that was never being released.
+ */
+// Minimal ambient type: tsconfig's lib target is ES2020, which predates
+// FinalizationRegistry (ES2021). Node.js has supported it natively since
+// v14.6 regardless of the TS lib target — this just types the runtime API
+// this file actually uses, without bumping the project-wide lib target.
+declare class FinalizationRegistry<T> {
+  constructor(cleanupCallback: (heldValue: T) => void);
+  register(target: object, heldValue: T, unregisterToken?: object): void;
+  unregister(unregisterToken: object): boolean;
+}
+
+const statementFinalizer = new FinalizationRegistry<any>((stmt: any) => {
+  try {
+    stmt.free();
+  } catch {
+    // Already freed explicitly, or the owning Database was already closed
+    // (which itself frees all outstanding statements) — never fatal here,
+    // this is a best-effort GC-triggered safety net, not the primary path.
+  }
+});
+
 // Wrapper for sql.js Statement to present a prepared-statement style API
 class StatementWrapper {
   private stmt: any;
   private sql: string;
   private db: any;
+  private freed = false;
+  private readonly finalizerToken: object = {};
 
   constructor(stmt: any, sql: string, db: any) {
     this.stmt = stmt;
     this.sql = sql;
     this.db = db;
+    statementFinalizer.register(this, stmt, this.finalizerToken);
   }
 
   all(...params: any[]): any[] {
@@ -742,8 +801,32 @@ class StatementWrapper {
     }
   }
 
+  /**
+   * Phase 3.1 Mission 3 — batch-import fast path. Binds, steps, and resets
+   * the SAME already-prepared statement without `run()`'s per-call overhead
+   * (the two extra `last_insert_rowid()`/`changes()` lookups and the
+   * debounced persistDatabase() call), which a 100k+-row import loop cannot
+   * afford to pay per row. Callers are responsible for wrapping a run of
+   * `bindStepReset` calls in an explicit BEGIN/COMMIT transaction and for
+   * calling `.free()` exactly once when the whole batch is done — see
+   * `provider-catalog/batch-import.ts`.
+   */
+  bindStepReset(params: any[]): void {
+    const sanitized = params.map((p) => (p === undefined ? null : p));
+    this.stmt.bind(sanitized);
+    this.stmt.step();
+    this.stmt.reset();
+  }
+
   free(): void {
-    this.stmt.free();
+    if (this.freed) return;
+    this.freed = true;
+    statementFinalizer.unregister(this.finalizerToken);
+    try {
+      this.stmt.free();
+    } catch {
+      // Statement already invalid (e.g. owning Database already closed) — freeing is idempotent by design.
+    }
   }
 }
 
@@ -1405,6 +1488,51 @@ function applySchema(): void {
   `);
 
   rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS favorites (
+      canonical_game_id TEXT PRIMARY KEY,
+      favorited_at TEXT NOT NULL
+    )
+  `);
+
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS support_requests (
+      request_id TEXT PRIMARY KEY,
+      canonical_game_id TEXT NOT NULL,
+      game_title TEXT NOT NULL,
+      platforms_json TEXT NOT NULL DEFAULT '[]',
+      launcher_game_ids_json TEXT NOT NULL DEFAULT '{}',
+      version_hint TEXT,
+      status TEXT NOT NULL DEFAULT 'REQUESTED',
+      requested_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (canonical_game_id)
+    )
+  `);
+
+  // Local validation receipts (Personal Library Mission 8) — metadata-only
+  // record of a real validation event (read/write-confirmed) that happened
+  // elsewhere. No arbitrary memory contents are ever stored here, only the
+  // fields below. Always scoped per game+trainer via the (gameId, trainerId)
+  // index — see src/core/validation-receipts/store.ts.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS validation_receipts (
+      receiptId TEXT PRIMARY KEY,
+      gameId TEXT NOT NULL,
+      trainerId TEXT NOT NULL,
+      cheatId TEXT,
+      executableName TEXT NOT NULL,
+      executableVersion TEXT,
+      executableHash TEXT,
+      trainerSource TEXT NOT NULL,
+      trainerVersionHint TEXT,
+      validatedAt TEXT NOT NULL,
+      validationType TEXT NOT NULL,
+      result TEXT NOT NULL
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_validation_receipts_game_trainer ON validation_receipts(gameId, trainerId)');
+
+  rawDb!.run(`
     CREATE TABLE IF NOT EXISTS canonical_games (
       id TEXT PRIMARY KEY,
       displayName TEXT NOT NULL,
@@ -1427,6 +1555,7 @@ function applySchema(): void {
   `);
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_catalog ON canonical_games(catalogGameId)');
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_games_normalized ON canonical_games(normalizedTitle)');
+
   const canonicalGamesColumns = rawDb!.exec('PRAGMA table_info(canonical_games)')[0];
   const canonicalGamesColumnNames = new Set(
     (canonicalGamesColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
@@ -1442,7 +1571,6 @@ function applySchema(): void {
       rawDb!.run(`ALTER TABLE canonical_games ADD COLUMN ${column}`);
     }
   }
-
 
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS game_installations (
@@ -1645,6 +1773,68 @@ function applySchema(): void {
     )
   `);
   rawDb!.run('CREATE INDEX IF NOT EXISTS idx_provider_catalog_records_title ON provider_catalog_records(title)');
+
+  const providerCatalogColumns = rawDb!.exec('PRAGMA table_info(provider_catalog_records)')[0];
+  const providerCatalogColumnNames = new Set(
+    (providerCatalogColumns?.values ?? []).map((row: unknown[]) => String(row[1])),
+  );
+  const optionalProviderCatalogColumns = [
+    // Phase 3 — opaque provider-supplied change marker for incremental sync (never cross-provider-interpreted).
+    'rawRevision TEXT',
+  ];
+  for (const column of optionalProviderCatalogColumns) {
+    const columnName = column.split(' ')[0];
+    if (!providerCatalogColumnNames.has(columnName)) {
+      rawDb!.run(`ALTER TABLE provider_catalog_records ADD COLUMN ${column}`);
+    }
+  }
+
+  // Phase 3 — cross-provider canonical identity links (Mission 11/13). One row per
+  // (provider, providerGameId) proving/recording which canonical game (if any) it maps to,
+  // with an explicit confidence level. Distinct from `game_installations`, which links a
+  // canonical game to a LOCAL install — this links it to a remote CATALOG record, which may
+  // exist with zero local installs (browsable-but-not-installed). Only EXACT/HIGH confidence
+  // rows represent an applied merge; POSSIBLE/AMBIGUOUS rows are recorded for review and
+  // must never be read as "this record belongs to that canonical game" by any consumer.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS canonical_provider_links (
+      provider TEXT NOT NULL,
+      providerGameId TEXT NOT NULL,
+      canonicalGameId TEXT NOT NULL,
+      confidence TEXT NOT NULL,
+      evidenceJson TEXT NOT NULL DEFAULT '[]',
+      linkedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (provider, providerGameId)
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_provider_links_canonical ON canonical_provider_links(canonicalGameId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_provider_links_confidence ON canonical_provider_links(confidence)');
+
+  // Phase 3.1 Mission 7 — fixes a disclosed P3: previously, a POSSIBLE/AMBIGUOUS
+  // match's full candidate list was written into `canonical_provider_links`
+  // itself, but that table's PRIMARY KEY (provider, providerGameId) meant only
+  // the LAST candidate survived on disk (each upsert overwrote the prior one) —
+  // a misleading storage representation, even though `confidence` correctly
+  // still read AMBIGUOUS. This table is now the ONLY place POSSIBLE/AMBIGUOUS
+  // candidates are recorded, and it can hold MULTIPLE rows per (provider,
+  // providerGameId) — one per candidate canonical game — so no candidate
+  // relationship is ever lost. `canonical_provider_links` remains the sole
+  // AUTHORITATIVE table (EXACT/HIGH only, one applied link per provider
+  // record); this table is advisory-only and must never be read as an applied
+  // link by any consumer.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS canonical_provider_link_candidates (
+      provider TEXT NOT NULL,
+      providerGameId TEXT NOT NULL,
+      candidateCanonicalGameId TEXT NOT NULL,
+      confidence TEXT NOT NULL,
+      evidenceJson TEXT NOT NULL DEFAULT '[]',
+      observedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (provider, providerGameId, candidateCanonicalGameId)
+    )
+  `);
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_link_candidates_record ON canonical_provider_link_candidates(provider, providerGameId)');
+  rawDb!.run('CREATE INDEX IF NOT EXISTS idx_canonical_link_candidates_confidence ON canonical_provider_link_candidates(confidence)');
 
   // ROADMAP §online-foundation — Discovery's shipped local catalog (Mission 6). Deliberately
   // lightweight (no bundled artwork — see ARTWORK POLICY) so it scales to 100k+ rows.

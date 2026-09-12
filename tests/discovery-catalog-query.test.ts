@@ -110,6 +110,23 @@ describe('discovery catalog query model', () => {
     assert.deepEqual(ids, ['stardew-valley', 'unrelated-shooter']);
   });
 
+  test('releaseYearMin/releaseYearMax filter an inclusive range (Discovery Master Pass, Stage 2)', () => {
+    const onlyNewest = queryDiscoveryCatalog({ releaseYearMin: 2018 });
+    assert.deepEqual(onlyNewest.map((r) => r.solithGameId), ['stardew-clone']);
+
+    const onlyOldest = queryDiscoveryCatalog({ releaseYearMax: 2016 });
+    assert.deepEqual(
+      onlyOldest.map((r) => r.solithGameId).sort(),
+      ['stardew-valley', 'unrelated-shooter'],
+    );
+
+    const exactRange = queryDiscoveryCatalog({ releaseYearMin: 2017, releaseYearMax: 2020 });
+    assert.deepEqual(exactRange.map((r) => r.solithGameId), ['stardew-clone']);
+
+    const emptyRange = queryDiscoveryCatalog({ releaseYearMin: 2021, releaseYearMax: 2025 });
+    assert.equal(emptyRange.length, 0);
+  });
+
   test('favoriteOrPersonalOnly is a two-step filter against favorites.canonical_game_id (see query.ts module doc)', () => {
     const results = queryDiscoveryCatalog({ favoriteOrPersonalOnly: true });
     const ids = results.map((r) => r.solithGameId);

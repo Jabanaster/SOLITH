@@ -1,0 +1,56 @@
+/* MyGamesPage — Visual Library 2.0, Step 5. Reuses this app's existing
+   dark/blue design tokens (src/app/styles/index.css :root). */
+
+.page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary, #eef1fa);
+}
+
+.emptyState {
+  border: 1px dashed var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius, 10px);
+  padding: 1.5rem 1.75rem;
+  color: var(--text-muted, #78819c);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary, #eef1fa);
+}
+
+.gridLayout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.85rem;
+}
+
+.listLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}

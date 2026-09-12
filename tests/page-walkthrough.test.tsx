@@ -50,12 +50,19 @@ describe('page walkthrough registry', () => {
   });
 
   test('keeps navigation, audit classifications, registry, and page bindings aligned', () => {
+    // Discovery Master Pass, Stage 1: some nav items now live in
+    // AppSidebar.tsx's STATIC_NAV_ITEMS (e.g. 'backups', promoted to a
+    // primary product destination) rather than App.tsx's legacy
+    // NAV_SECTIONS — a real `{ id, label }` declaration for a walkthrough
+    // entry's viewId can be in either file.
     const appSource = readFileSync('src/app/App.tsx', 'utf8');
+    const appSidebarSource = readFileSync('src/app/components/sidebar/AppSidebar.tsx', 'utf8');
+    const combinedNavSource = `${appSource}\n${appSidebarSource}`;
     assert.equal(walkthroughAudit.length, 17);
     assert.equal(walkthroughAudit.every(({ status }) => status === 'PASS'), true);
 
     for (const entry of walkthroughAudit) {
-      assert.match(appSource, new RegExp(`\\{ id: '${entry.viewId}', label:`));
+      assert.match(combinedNavSource, new RegExp(`\\{ id: '${entry.viewId}', label:`));
       assert.match(sourceByPage[entry.pageId], new RegExp(`(?:walkthroughId|pageId)=(?:"${entry.pageId}"|\\{[^}]*'${entry.pageId}'[^}]*\\})`));
       assert.equal(getWalkthrough(entry.pageId).pageId, entry.pageId);
     }

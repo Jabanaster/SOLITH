@@ -13,6 +13,7 @@ export const HotkeyRebindPanel: React.FC = () => {
   const [bindings, setBindings] = useState<Record<string, string>>({});
   const [conflicts, setConflicts] = useState<Array<{ accelerator: string; actions: string[] }>>([]);
   const [osWarnings, setOsWarnings] = useState<Array<{ accelerator: string; action: string; reason: string }>>([]);
+  const [unavailable, setUnavailable] = useState<Array<{ action: string; accelerator: string; reason: string }>>([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -27,6 +28,9 @@ export const HotkeyRebindPanel: React.FC = () => {
     if (result?.hotkeys) setBindings(result.hotkeys);
     if (result?.conflicts) setConflicts(result.conflicts);
     if (result?.osWarnings) setOsWarnings(result.osWarnings);
+
+    const status = await api.trainerHotkeysGetStatus?.();
+    if (status?.failed) setUnavailable(status.failed);
   }, []);
 
   useEffect(() => {
@@ -48,6 +52,8 @@ export const HotkeyRebindPanel: React.FC = () => {
         setBindings(result.hotkeys ?? bindings);
         setConflicts(result.conflicts ?? []);
         setOsWarnings(result.osWarnings ?? []);
+        const status = await api.trainerHotkeysGetStatus?.();
+        if (status?.failed) setUnavailable(status.failed);
         setMessage(
           result.conflicts?.length
             ? 'Saved with conflicts — resolve duplicate keys.'
@@ -76,24 +82,40 @@ export const HotkeyRebindPanel: React.FC = () => {
         Rebind global trainer shortcuts. Use Electron accelerator syntax (e.g. F5, Control+Shift+O).
       </p>
       <ul className={styles.list}>
-        {actions.map((action) => (
-          <li key={action} className={styles.row}>
-            <label htmlFor={`hk-${action}`}>{SLOT_LABELS[action] ?? action}</label>
-            <input
-              id={`hk-${action}`}
-              type="text"
-              value={bindings[action] ?? ''}
-              onChange={(e) => handleChange(action, e.target.value)}
-              disabled={busy}
-            />
-          </li>
-        ))}
+        {actions.map((action) => {
+          const failure = unavailable.find((entry) => entry.action === action);
+          return (
+            <li key={action} className={styles.row}>
+              <label htmlFor={`hk-${action}`}>
+                {SLOT_LABELS[action] ?? action}
+                {failure && ' — Unassigned / needs remap'}
+              </label>
+              <input
+                id={`hk-${action}`}
+                type="text"
+                value={bindings[action] ?? ''}
+                onChange={(e) => handleChange(action, e.target.value)}
+                disabled={busy}
+                aria-invalid={Boolean(failure)}
+              />
+            </li>
+          );
+        })}
       </ul>
       {conflicts.length > 0 && (
         <ul className={styles.conflicts} role="alert">
           {conflicts.map((c) => (
             <li key={c.accelerator}>
               Conflict: <code>{c.accelerator}</code> used by {c.actions.join(', ')}
+            </li>
+          ))}
+        </ul>
+      )}
+      {unavailable.length > 0 && (
+        <ul className={styles.conflicts} role="alert">
+          {unavailable.map((entry) => (
+            <li key={`${entry.action}-${entry.accelerator}`}>
+              Unavailable: <code>{entry.accelerator}</code> ({SLOT_LABELS[entry.action] ?? entry.action}) — {entry.reason}
             </li>
           ))}
         </ul>

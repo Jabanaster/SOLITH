@@ -1,0 +1,106 @@
+.page {
+  padding: 24px;
+  max-width: 900px;
+}
+
+.intro {
+  color: #94a3b8;
+  margin-bottom: 20px;
+  max-width: 680px;
+  line-height: 1.5;
+}
+
+.providerList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.providerCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid #2a3040;
+  border-radius: 8px;
+  background: #171b26;
+}
+
+.providerName {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.providerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badgeSupported {
+  background: #123524;
+  color: #6ad6a2;
+}
+
+.badgeUnsupported {
+  /* Neutral slate, not alarm-red: "unsupported" is an honest capability
+     statement (no scanner exists yet), not an error/broken state. */
+  background: #2a3040;
+  color: #9aa5b8;
+}
+
+.badgePartial {
+  background: #3a3323;
+  color: #e0c26a;
+}
+
+.count {
+  color: #cbd5e1;
+  font-size: 0.85rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+}
+
+.detailLabel {
+  color: #64748b;
+}
+
+.detailValue {
+  color: #cbd5e1;
+}
+
+.noteColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.note {
+  color: #64748b;
+  font-size: 0.8rem;
+  max-width: 460px;
+  text-align: right;
+}

@@ -32,4 +32,12 @@ export interface ProviderGameRecord {
   popularityRank?: number;
   popularitySource?: string;
   lastUpdated: string;
+  /**
+   * Phase 3 — opaque provider-supplied revision/change marker (an eTag, a
+   * "last modified" value, or any other provider-specific token proving this
+   * exact record changed), used ONLY to decide whether a re-fetched record
+   * needs to be written again. Never parsed/interpreted cross-provider —
+   * Steam's, Epic's, and GOG's revision markers have no shared meaning.
+   */
+  rawRevision?: string;
 }

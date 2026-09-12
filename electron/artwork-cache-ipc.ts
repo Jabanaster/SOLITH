@@ -1,8 +1,8 @@
 import { app, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import { validateIpcSender } from './sender-validation.js';
-import { ArtworkCacheRefreshSchema } from './ipc-validation.js';
-import { searchCatalog } from '../src/core/trainer-catalog/store.js';
+import { ArtworkCacheRefreshSchema, ArtworkCachePriorityFillSchema } from './ipc-validation.js';
+import { searchCatalog, getCatalogEntryForDisplay } from '../src/core/trainer-catalog/store.js';
 import { steamCdnImages, type TrainerCatalogEntry } from '../src/core/trainer-catalog/types.js';
 import { POPULAR_TRAINER_LIMIT } from '../src/core/trainer-catalog/popular-ranking.js';
 import type { ArtworkFetchJob, ArtworkKind } from '../src/core/artwork-cache/types.js';
@@ -15,6 +15,15 @@ import {
   upsertArtworkCacheEntry,
   listOkArtworkCacheKeys,
   listFailedArtworkCacheEntries,
+  listAllArtworkCacheEntries,
+} from '../src/core/artwork-cache/store.js';
+import { artworkCacheKey } from '../src/core/artwork-cache/cache-key.js';
+import {
+  buildPersonalGamePriorityFillJobs,
+  type ArtworkUrlSource,
+  type PersonalGameArtworkCandidate,
+} from '../src/core/artwork-cache/personal-game-priority-fill.js';
+import { getDiscoveryCatalogEntry } from '../src/core/discovery-catalog/store.js';
 import { getSetting } from '../src/core/settings/index.js';
 import { isOnlineOperationAllowed } from '../src/core/settings/online-services-gate.js';
 
@@ -28,7 +37,6 @@ function isArtworkDownloadAllowed(): boolean {
   const onlineServicesEnabled = getSetting('onlineServicesEnabled') !== false;
   return isOnlineOperationAllowed({ onlineServicesEnabled }, 'artwork-download');
 }
-} from '../src/core/artwork-cache/store.js';
 
 // mirrors requireTrustedSender() in electron/main.ts / electron/live-memory-ipc.ts.
 function requireTrustedSender(event: IpcMainInvokeEvent): { ok: true } | { ok: false; reason: string } {
@@ -97,6 +105,17 @@ function buildRetryJobs(): ArtworkFetchJob[] {
   }));
 }
 
+/**
+ * ROADMAP Mission 4/6 request-storm guard — every cache key with ANY
+ * recorded attempt (ok, failed, OR rights-blocked), not only 'ok'. The
+ * automatic priority-fill trigger must never re-queue a just-failed or
+ * just-blocked entry on every app launch; retrying 'failed' entries stays
+ * the existing explicit "Retry Missing" action.
+ */
+function listAttemptedArtworkCacheKeys(): Set<string> {
+  return new Set(listAllArtworkCacheEntries().map((entry) => artworkCacheKey(entry.catalogGameId, entry.kind)));
+}
+
 let activeController: ArtworkFetchQueueController | null = null;
 
 function startQueue(jobs: ArtworkFetchJob[], options: { bypassOkDedup: boolean }): { queued: number } {
@@ -124,6 +143,61 @@ export function registerArtworkCacheIpc(): void {
       }
       const parsed = ArtworkCacheRefreshSchema.parse(payload ?? {});
       const jobs = buildCandidateJobs(parsed.catalogGameIds);
+      const { queued } = startQueue(jobs, { bypassOkDedup: true });
+      return { success: true, queued };
+    } catch (error) {
+      return { success: false, error: sanitize(error) };
+    }
+  });
+
+  ipcMain.handle('artwork-cache-priority-fill', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      // Best-effort background enhancement: quietly no-op (not an error) when
+      // Online Services is off, matching the "no-op quietly" behavior below
+      // for an already-running queue.
+      if (!isArtworkDownloadAllowed()) return { success: true, queued: 0 };
+      // Best-effort background enhancement, not a user-initiated action —
+      // if a refresh/retry/earlier priority-fill is already running, no-op
+      // quietly instead of surfacing an error the renderer never shows.
+      if (activeController && !activeController.isCancelled() && (activeController.activeCount() > 0 || activeController.completedCount() < activeController.totalCount())) {
+        return { success: true, queued: 0 };
+      }
+      const parsed = ArtworkCachePriorityFillSchema.parse(payload ?? {});
+      const candidates: PersonalGameArtworkCandidate[] = parsed.candidates;
+
+      const catalogEntriesById: Record<string, ArtworkUrlSource> = {};
+      for (const candidate of candidates) {
+        const entry = getCatalogEntryForDisplay(candidate.catalogGameId);
+        if (entry) {
+          catalogEntriesById[candidate.catalogGameId] = entry;
+          continue;
+        }
+        // Discovery Master Pass, Stage 2 — no legacy trainer-catalog row (the
+        // normal case for a favorited Discovery-only game). If the Discovery
+        // catalog has a real Steam AppID for this identity, that's a
+        // legitimate, deterministic, non-scraped Steam CDN URL (the exact
+        // same trusted pattern used for trainer-catalog games) — never
+        // fabricated, never fuzzy-matched (this is an exact provider id,
+        // not a title guess).
+        const discoveryEntry = getDiscoveryCatalogEntry(candidate.catalogGameId);
+        const steamId = discoveryEntry?.providerIds?.steam;
+        const steamAppId = steamId ? Number(steamId) : NaN;
+        if (Number.isFinite(steamAppId)) {
+          catalogEntriesById[candidate.catalogGameId] = { steamAppId };
+        }
+      }
+
+      const jobs = buildPersonalGamePriorityFillJobs(candidates, catalogEntriesById, {
+        skipCacheKeys: listAttemptedArtworkCacheKeys(),
+      });
+      if (jobs.length === 0) return { success: true, queued: 0 };
+
+      // skipCacheKeys above already excludes every already-attempted (ok/
+      // failed/rights-blocked) entry, so the queue's own 'ok'-only dedup
+      // would be redundant — bypassOkDedup keeps this one authoritative
+      // filter instead of re-querying the same table twice.
       const { queued } = startQueue(jobs, { bypassOkDedup: true });
       return { success: true, queued };
     } catch (error) {

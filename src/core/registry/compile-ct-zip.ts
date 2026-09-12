@@ -7,6 +7,7 @@ import yauzl from 'yauzl';
 import { parseCheatTableXml } from '../definitions/ct-import.js';
 import { extractAOBsFromCatalog } from '../script-research/aob-parser.js';
 import { extractCheatTableRawScriptCatalog } from '../script-research/ct-script-research.js';
+import { extractVersionHint } from './version-hint.js';
 import {
   DEFAULT_MAX_CT_BYTES,
   compileSolithCtRegistryFromXml,
@@ -18,6 +19,14 @@ export interface CtZipCatalogEntry {
   tableName: string;
   sourceSha256: string;
   sourceBytes: number;
+  /**
+   * Mission 17 — optional, non-authoritative hint pulled from the table's
+   * filename/path (a version number, date, or platform tag) when visibly
+   * present. Never claims compatibility and never affects resolver
+   * eligibility; purely for display/provenance. Absent when nothing
+   * recognizable was found — that is the common case, not an error.
+   */
+  versionHint?: { kind: 'explicit_version' | 'date' | 'platform_only'; hint: string };
   counts: {
     pointers: number;
     scripts: number;
@@ -321,12 +330,16 @@ async function tableEntryFromXml(
     },
   }));
   const cheats = [...pointerCheats, ...scriptCheats, ...aobCheats];
+  const versionHintResult = extractVersionHint(tableName, archivePath);
   return {
     archivePath,
     game,
     tableName,
     sourceSha256,
     sourceBytes: Buffer.byteLength(xmlText, 'utf8'),
+    ...(versionHintResult.kind !== 'none'
+      ? { versionHint: { kind: versionHintResult.kind, hint: versionHintResult.hint! } }
+      : {}),
     counts: {
       pointers: pointers.accepted.length,
       scripts: scripts.scripts.length,

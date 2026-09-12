@@ -240,6 +240,17 @@ export const GetCompatibilityProfileSchema = z.object({
   gameId: z.string().uuid().or(z.literal('demo-game-quest-id-000000000000'))
 });
 
+/**
+ * Mission 6 (validation receipts -> accuracy badge integration) — bounded
+ * batch lookup for the trainer catalog's own gameId shape (a canonical
+ * catalog game id string, NOT the `games` table uuid used above), scoped to
+ * the games currently rendered in the library so this can never become an
+ * unbounded "list every receipt in the database" query.
+ */
+export const GetValidationReceiptsForGamesSchema = z.object({
+  gameIds: z.array(z.string().min(1).max(200)).max(10000),
+});
+
 // ── V2 Session Lifecycle Monitor IPC Schemas ─────────────────────────────────
 
 const SAFE_EXECUTABLE_NAME = z.string().min(1).max(100).regex(
@@ -794,4 +805,31 @@ export function validateSaveDataFileAccess(gameId: string, filePath: string): Ip
 /** ROADMAP §4.5 artwork refresh IPC payload — optional explicit scope, bounded to the same limit as a full Popular projection. */
 export const ArtworkCacheRefreshSchema = z.object({
   catalogGameIds: z.array(z.string().min(1).max(120)).max(POPULAR_TRAINER_LIMIT).optional(),
+});
+
+/**
+ * ROADMAP Mission 4 — personal-games artwork priority-fill IPC payload.
+ * Bounded to a small, realistic ceiling for one renderer's personal-library
+ * signal set (running + installed + owned + favorited + recently-detected
+ * games combined) — never anywhere near the full catalog. `canonicalConfidence`
+ * is renderer-computed from real identity evidence (see
+ * usePersonalLibraryGames.ts / personal-game-priority-fill.ts); the server
+ * side still independently refuses to persist unless the fetch-executor's
+ * own rights gate allows it, so this schema only bounds shape and size, not
+ * trust.
+ */
+export const ArtworkCachePriorityFillSchema = z.object({
+  candidates: z
+    .array(
+      z.object({
+        catalogGameId: z.string().min(1).max(120),
+        running: z.boolean(),
+        installed: z.boolean(),
+        confirmedOwned: z.boolean(),
+        favorite: z.boolean(),
+        recentlyDetected: z.boolean(),
+        canonicalConfidence: z.enum(['trusted', 'weak']),
+      }),
+    )
+    .max(100),
 });

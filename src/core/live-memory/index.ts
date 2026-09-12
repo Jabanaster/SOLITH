@@ -147,3 +147,23 @@ export {
   LOCAL_PACK_SCHEMA_VERSION,
 } from './local-pack-export.js';
 export type { LocalTrainerPack } from './local-pack-export.js';
+export { runReadPreflight, isCardStructurallyReadable } from './read-preflight.js';
+export type {
+  ReadPreflightCardInput,
+  ReadPreflightExpectedTarget,
+  ReadPreflightProcessIdentity,
+  ReadPreflightSessionProbe,
+  ReadPreflightBlockCode,
+  ReadPreflightDiagnostics,
+  ReadPreflightResult,
+} from './read-preflight.js';
+export { createLiveMemorySessionProbe } from './read-preflight-production-adapter.js';
+export { readTrainerDeckCard, parseLibraryEntryId, authorizeTrainerDeckRead } from './trainer-deck-read.js';
+export { verifyCatalogGameIdForExecutable } from './attach-catalog-verification.js';
+export type { CatalogVerificationEntry, MatchCatalogProcessFn } from './attach-catalog-verification.js';
+export type {
+  TrainerDeckReadState,
+  TrainerDeckAuthorizationBlockCode,
+  TrainerDeckLibraryLookup,
+  TrainerDeckGameDetailLike,
+} from './trainer-deck-read.js';

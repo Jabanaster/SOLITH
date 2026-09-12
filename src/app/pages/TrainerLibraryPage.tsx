@@ -2,21 +2,33 @@ import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } 
 import styles from './TrainerLibraryPage.module.css';
 import { PageModuleHeader } from '../components/PageModuleHeader.js';
 import { VirtualCatalogGrid } from '../components/VirtualCatalogGrid.js';
+import { SectionVirtualGrid } from '../components/SectionVirtualGrid.js';
+import { ViewModeToggle, type LibraryViewMode } from '../components/ViewModeToggle.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
 import { getCatalogTagline } from '../../core/trainer-catalog/game-taglines.js';
 import { ROADMAP_GENRE_FILTERS } from '../../core/trainer-catalog/catalog-genres.js';
 import type { TrainerCatalogEntry } from '../../core/trainer-catalog/types.js';
-import { resolveCatalogCoverUrl } from '../../core/trainer-catalog/cover-url.js';
+import { toSafeDisplayText } from '../../shared/safe-display-text.js';
+import { resolveCatalogHeaderUrl } from '../../core/trainer-catalog/cover-url.js';
 import {
   projectPopularTrainerEntries,
   POPULAR_TRAINER_LIMIT,
   type TrainerCatalogPopularityEvidence,
 } from '../../core/trainer-catalog/popular-ranking.js';
+// Owner-directed reversal of the Mission 3/24 sort freeze (see
+// tests/trainer-library-sort-ui.test.ts header comment): a real Sort control
+// is back, scoped to the flat/All-Games browse view only (see
+// trainer-library-sort-options.ts).
 import {
-  sortAllGamesEntries,
-  ALL_GAMES_SORT_MODE_LABELS,
-  type AllGamesSortMode,
-} from '../../core/trainer-catalog/all-games-sorting.js';
+  DEFAULT_TRAINER_LIBRARY_SORT_OPTION,
+  sortTrainerLibraryFlatEntries,
+  type TrainerLibrarySortOption,
+} from './trainer-library-sort-options.js';
+import type { AllGamesSortContext } from '../../core/trainer-catalog/all-games-sorting.js';
+import { TrainerLibrarySortMenu } from './TrainerLibrarySortMenu.js';
+import { TrainerLibraryQuickTabs, type TrainerLibraryQuickTab } from './TrainerLibraryQuickTabs.js';
+import { TrainerLibraryFiltersPopover } from './TrainerLibraryFiltersPopover.js';
+import { TrainerLibraryActiveFilterChips } from './TrainerLibraryActiveFilterChips.js';
 import {
   filterTrainerLibraryEntries,
   TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS,
@@ -40,15 +52,42 @@ import {
   friendlyCtImportError,
   idleCtImportUiState,
 } from '../../core/ct-library/import-state.js';
+import {
+  organizeLibrary,
+  sortLibraryAZ,
+  LIBRARY_SECTION_ORDER,
+  LIBRARY_SECTION_LABELS,
+  LIBRARY_SECTIONS_COLLAPSED_BY_DEFAULT,
+  type LibraryGameEvidence,
+  type LibrarySectionKey,
+} from '../../core/trainer-catalog/library-sections.js';
+// Mission 10 (Personal Library Completion pass, Phase 2) — the accuracy
+// badge sources its value from Phase 1's real computeTrainerAccuracy, never
+// a new invented computation. See TRAINER_ACCURACY_BADGE_LABELS below for
+// which states are worth a badge at all.
+import {
+  computeTrainerAccuracy,
+  type TrainerAccuracyState,
+} from '../../core/trainer-catalog/trainer-accuracy.js';
+// Mission 6 (validation receipts -> accuracy badge integration gap) — the
+// pure receipt-evidence bridge (no I/O; see its header comment) plus a
+// type-only import of the receipt shape. `store.js` itself is never
+// imported at runtime here (it pulls in the Node-only `better-sqlite3` main-
+// process database) — only its exported TYPE crosses into the renderer.
+import { deriveReceiptEvidence } from '../../core/validation-receipts/receipt-evidence.js';
+import type { ValidationReceipt } from '../../core/validation-receipts/store.js';
+// Personal Library Completion — Final Closure Pass, Mission 5 REVERSAL
+// (2026-09-10): the owner explicitly rejected the "Show N more" chunking
+// approach below in favor of real virtualization. trainer-library-section-
+// chunking.ts's pure functions are no longer imported/wired here — see
+// SectionVirtualGrid (../components/SectionVirtualGrid.js) for the
+// replacement, and tests/trainer-library-virtualization-coverage.test.ts for
+// the updated proof. The chunking module and its own pure-logic test file
+// are left in place (unused by this page) rather than deleted, since they
+// still document/prove the now-superseded approach's own bounded-growth
+// logic in isolation.
 
 type TierFilter = 'all' | 'verified' | 'community' | 'metadata-only';
-type SortMode = AllGamesSortMode;
-/** ROADMAP §3.3 — Popular is the default Trainer Library view; All Games preserves prior unranked behavior. */
-type ViewMode = 'popular' | 'all';
-/** ROADMAP §3.4 — All Games first-use notice dismissal, persisted the same way as other local-only UI preferences. */
-const ALL_GAMES_NOTICE_DISMISSED_KEY = 'trainerLibrary.allGamesNoticeDismissed';
-const ALL_GAMES_NOTICE_TEXT =
-  'All Games includes SOLITH’s full eligible catalog, including niche and less widely played titles. Use filters or search to narrow the list.';
 
 const TRAINER_LIBRARY_FILTERS_KEY = 'trainerLibrary.filters';
 
@@ -112,6 +151,31 @@ function writeRememberedTrainerLibraryFilters(filters: RememberedTrainerLibraryF
   }
 }
 
+// Mission 6 (validation receipts -> accuracy badge integration) — plain
+// basename extraction with no `node:path` import (this file bundles into the
+// renderer). Handles both `/` and `\` separators since installed executable
+// paths come from Windows discovery. Real evidence only: this is only ever
+// applied to an actual discovered `executablePath`/`canonicalExecutablePath`
+// string, never a title/display name.
+function basenameOfExecutablePath(executablePath: string): string {
+  const normalized = executablePath.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  return segments[segments.length - 1] ?? executablePath;
+}
+
+function buildInstalledExecutableNameMap(
+  games: Array<{ catalogGameId?: string; canonicalExecutablePath?: string; executablePath?: string }>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const game of games) {
+    if (!game.catalogGameId) continue;
+    const executablePath = game.canonicalExecutablePath ?? game.executablePath;
+    if (!executablePath) continue;
+    map.set(game.catalogGameId, basenameOfExecutablePath(executablePath));
+  }
+  return map;
+}
+
 function buildInstalledPlatformsMap(
   games: Array<{ catalogGameId?: string; platform: string }>,
 ): Map<string, Set<TrainerLibraryLauncherFilter>> {
@@ -126,20 +190,72 @@ function buildInstalledPlatformsMap(
   return map;
 }
 
-function readAllGamesNoticeDismissed(): boolean {
-  try {
-    return window.localStorage.getItem(ALL_GAMES_NOTICE_DISMISSED_KEY) === '1';
-  } catch {
-    return false;
-  }
+/**
+ * Core Product Completion audit, Mission 1 — normalizes every catalog
+ * entry's displayName at the renderer's own IPC-receipt boundary (not the
+ * database, not the IPC payload itself — the local React state copy). One
+ * normalization point here means every downstream consumer (CatalogCard's
+ * title/alt/aria-label, section/search grouping, toast message strings)
+ * automatically sees safe text without needing its own sanitization call.
+ */
+function normalizeCatalogEntryDisplay(entry: TrainerCatalogEntry): TrainerCatalogEntry {
+  const safeDisplayName = toSafeDisplayText(entry.displayName);
+  return safeDisplayName === entry.displayName ? entry : { ...entry, displayName: safeDisplayName };
 }
 
-function writeAllGamesNoticeDismissed(): void {
-  try {
-    window.localStorage.setItem(ALL_GAMES_NOTICE_DISMISSED_KEY, '1');
-  } catch {
-    // Local-only preference is best-effort; notice simply reappears next session.
+/** Prefix marking a synthetic (non-catalog) LibraryGameEvidence/TrainerCatalogEntry built from an unmatched local install — never a real catalogGameId, so IPC calls (favorite/support) must never receive one. */
+const LOCAL_INSTALL_SYNTHETIC_ID_PREFIX = 'local-install:';
+
+function isSyntheticLocalInstallId(catalogGameId: string): boolean {
+  return catalogGameId.startsWith(LOCAL_INSTALL_SYNTHETIC_ID_PREFIX);
+}
+
+function basenameFromPath(p: string): string {
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : p;
+}
+
+/**
+ * Certification-pass fix: install-discovery can detect a real local install
+ * that never matched any catalog entry (`catalogGameId` absent). Before this
+ * fix, such a game was invisible everywhere in Trainer Library — dropped
+ * silently rather than routed to the frozen hierarchy's own "Missing / Not
+ * Yet Supported" section (library-sections.ts's `missing_unsupported`,
+ * reached via `isFromLinkedLibrary: true` with `isKnownToCatalog: false`).
+ * These synthetic entries carry no real catalog identity — Favorite/Request
+ * Support are intentionally not wired for them (see renderLibraryCard).
+ */
+function buildUnmatchedInstalledLibraryData(
+  games: Array<{ installIdentity: string; catalogGameId?: string; displayName?: string; installPath: string; executablePath?: string }>,
+): { evidence: LibraryGameEvidence[]; entries: Map<string, TrainerCatalogEntry> } {
+  const evidence: LibraryGameEvidence[] = [];
+  const entries = new Map<string, TrainerCatalogEntry>();
+  for (const game of games) {
+    if (game.catalogGameId) continue; // catalog-matched installs already flow through the normal 'installed' path
+    const syntheticId = `${LOCAL_INSTALL_SYNTHETIC_ID_PREFIX}${game.installIdentity}`;
+    const displayName = toSafeDisplayText(game.displayName?.trim() || '') || basenameFromPath(game.installPath) || 'Unrecognized local install';
+    evidence.push({
+      canonicalGameId: syntheticId,
+      displayName,
+      isInstalled: false,
+      ownedConfirmed: false,
+      isKnownToCatalog: false,
+      hasTrainerSupport: false,
+      isFromLinkedLibrary: true,
+    });
+    entries.set(syntheticId, {
+      catalogGameId: syntheticId,
+      displayName,
+      executables: game.executablePath ? [basenameFromPath(game.executablePath)] : [],
+      categories: [],
+      verificationStatus: 'unverified',
+      sources: [],
+      hasModPack: false,
+      cheatCount: 0,
+      searchableText: displayName.toLowerCase(),
+    });
   }
+  return { evidence, entries };
 }
 
 const DISCOVERY_PREVIEW_HEIGHT_KEY = 'solith:trainer-library:discovery-preview-height';
@@ -238,6 +354,22 @@ interface PickedCtPayload {
 
 const PAGE_SIZE = 120;
 
+/**
+ * Mission 10 — only these 5 of the 7 TrainerAccuracyState values are worth a
+ * badge; INCOMPATIBLE/NONE are intentionally excluded here to avoid clutter
+ * (mirroring the existing statusRow pattern where "community"/"metadata-only"
+ * verification statuses get no badge — INCOMPATIBLE already surfaces via the
+ * existing stale/quarantine badge path where relevant, and NONE means there
+ * is nothing to say about accuracy at all).
+ */
+const TRAINER_ACCURACY_BADGE_LABELS: Partial<Record<TrainerAccuracyState, string>> = {
+  LOCALLY_VERIFIED: 'Locally Verified',
+  EXACT_VERSION_MATCH: 'Exact Match',
+  STRONG_MATCH: 'Strong Match',
+  VERSION_UNKNOWN: 'Version Unknown',
+  NEEDS_REVERIFY: 'Needs Reverify',
+};
+
 function newImportJobId(): string {
   return `ct-import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -256,6 +388,12 @@ export function CatalogCard({
   onNotify,
   onPublish,
   onToggleOwned,
+  favorite,
+  onToggleFavorite,
+  supportRequestStatus,
+  onRequestSupport,
+  trainerAccuracy,
+  viewMode = 'grid',
 }: {
   entry: TrainerCatalogEntry;
   trust?: TrustMeta;
@@ -269,8 +407,25 @@ export function CatalogCard({
   onNotify: (entry: TrainerCatalogEntry) => void;
   onPublish: (entry: TrainerCatalogEntry) => void;
   onToggleOwned?: (entry: TrainerCatalogEntry) => void;
+  favorite?: boolean;
+  onToggleFavorite?: (entry: TrainerCatalogEntry) => void;
+  /** Mission 6/7 — undefined means "has trainer support, no request UI needed". */
+  supportRequestStatus?: 'none' | 'requested' | 'acknowledged' | 'in_progress';
+  onRequestSupport?: (entry: TrainerCatalogEntry) => void;
+  /** Mission 10 — real TrainerAccuracyState from Phase 1's computeTrainerAccuracy; undefined means "not computed for this card". */
+  trainerAccuracy?: TrainerAccuracyState;
+  /** Owner-directed grid/list toggle (getLibraryViewMode/setLibraryViewMode) — purely a layout hint via data-view-mode; no behavior changes. */
+  viewMode?: 'grid' | 'list';
 }) {
-  const coverUrl = resolveCatalogCoverUrl(entry);
+  // Mission 5 fix: .coverWrap (TrainerLibraryPage.module.css) is a fixed-
+  // height, full-width LANDSCAPE banner strip (96px tall) in both grid and
+  // list view — it was previously fed resolveCatalogCoverUrl's PORTRAIT
+  // library-capsule art (2:3), which object-fit: cover then crops hard into
+  // a thin horizontal sliver. resolveCatalogHeaderUrl returns the actual
+  // landscape header art (Steam header.jpg, ~460x215) this slot's aspect
+  // ratio calls for — same precedence hierarchy (cache -> curated ->
+  // trusted CDN), just the correct artwork kind for a landscape slot.
+  const coverUrl = resolveCatalogHeaderUrl(entry);
   const communityScan = isCommunityScanEntry(entry);
   const fallback = fallbackArtworkTreatment(entry.displayName);
   const isStale = healthStatus === 'stale' || healthStatus === 'quarantined';
@@ -295,9 +450,10 @@ export function CatalogCard({
   ]
     .filter(Boolean)
     .join(' · ');
+  const accuracyBadgeLabel = trainerAccuracy ? TRAINER_ACCURACY_BADGE_LABELS[trainerAccuracy] : undefined;
 
   return (
-    <article className={styles.card}>
+    <article className={styles.card} data-view-mode={viewMode}>
       <div className={styles.coverWrap}>
         {coverUrl ? (
           <img
@@ -348,9 +504,23 @@ export function CatalogCard({
         )}
       </div>
       <div className={styles.cardBody}>
-        <h2 className={styles.title} title={entry.displayName}>
-          {entry.displayName}
-        </h2>
+        <div className={styles.titleRow}>
+          <h2 className={styles.title} title={entry.displayName}>
+            {entry.displayName}
+          </h2>
+          {onToggleFavorite && (
+            <button
+              type="button"
+              className={styles.favoriteBtn}
+              aria-pressed={Boolean(favorite)}
+              aria-label={favorite ? `Remove ${entry.displayName} from favorites` : `Add ${entry.displayName} to favorites`}
+              title={favorite ? 'Favorited' : 'Add to favorites'}
+              onClick={() => onToggleFavorite(entry)}
+            >
+              {favorite ? '★' : '☆'}
+            </button>
+          )}
+        </div>
         <p className={styles.supportingLine} title={capabilitySummary}>
           {supportingLine}
           {trustSuffix ? ` · ${trustSuffix}` : ''}
@@ -371,6 +541,20 @@ export function CatalogCard({
               title={tierHint(entry)}
             >
               {isStale ? 'Needs re-verify' : entry.verificationStatus}
+            </span>
+          )}
+          {/* Mission 10 — a second small badge slot, distinct from the
+              catalog-level tier/staleness badge above (that one is about the
+              CATALOG entry's own verification trust; this one is about THIS
+              user's personal trainer/game accuracy evidence — they can
+              legitimately both be shown at once without being redundant). */}
+          {accuracyBadgeLabel && (
+            <span
+              className={styles.tierBadge}
+              data-accuracy={trainerAccuracy}
+              title="Trainer accuracy for your installed copy of this game, based on local evidence."
+            >
+              {accuracyBadgeLabel}
             </span>
           )}
         </div>
@@ -398,6 +582,18 @@ export function CatalogCard({
             >
               {entry.ownedConfirmed === true ? 'Owned ✓' : 'Mark as owned'}
             </button>
+          )}
+          {!entry.hasModPack && onRequestSupport && (
+            <div className={styles.supportRequestRow}>
+              <span className={styles.notYetSupportedLabel}>Not Yet Supported</span>
+              {supportRequestStatus && supportRequestStatus !== 'none' ? (
+                <span className={styles.supportRequestedLabel}>Support Requested ✓</span>
+              ) : (
+                <button type="button" className={styles.secondaryBtn} onClick={() => onRequestSupport(entry)}>
+                  Request Support
+                </button>
+              )}
+            </div>
           )}
           {entry.hasModPack && (
             <details className={styles.moreActions}>
@@ -448,6 +644,15 @@ export default function TrainerLibraryPage({
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Mission 3 (Personal Library Completion — Final Closure Pass): the full
+  // ~6,800-entry catalog fetch (fetchAllCandidatePages) still runs in full —
+  // completeness is never sacrificed — but it no longer has to finish before
+  // Running/Installed/Owned/Favorites become visible. `catalogFullyLoaded`
+  // only gates the parts of the UI that genuinely need the complete set
+  // (the flat "All Games" browse view, and the true "no catalog data at
+  // all yet" empty state) — never used to fabricate ownership/availability,
+  // which always come from real evidence at every point of the load.
+  const [catalogFullyLoaded, setCatalogFullyLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [hubSyncing, setHubSyncing] = useState(false);
   const [communitySyncEnabled, setCommunitySyncEnabled] = useState(false);
@@ -467,16 +672,77 @@ export default function TrainerLibraryPage({
   const [quarantineCount, setQuarantineCount] = useState(0);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
   const [installedPlatformsByCatalogGameId, setInstalledPlatformsByCatalogGameId] = useState<Map<string, Set<TrainerLibraryLauncherFilter>>>(new Map());
+  // Mission 6 (validation receipts -> accuracy badge integration gap) — real,
+  // never-fabricated evidence for the receipt-currency check: the basename of
+  // the actually-discovered installed executable (install-discovery's own
+  // evidence, same source as installedIds/installedPlatformsByCatalogGameId
+  // above), and the latest validation receipt per catalog game id fetched
+  // from the new read-only get-validation-receipts-for-games IPC.
+  const [installedExecutableNameByCatalogGameId, setInstalledExecutableNameByCatalogGameId] = useState<Map<string, string>>(new Map());
+  const [receiptsByGameId, setReceiptsByGameId] = useState<Record<string, ValidationReceipt | null>>({});
+  const [unmatchedInstalledGames, setUnmatchedInstalledGames] = useState<
+    Array<{ installIdentity: string; catalogGameId?: string; displayName?: string; installPath: string; executablePath?: string }>
+  >([]);
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [healthMap, setHealthMap] = useState<Record<string, { status: string }>>({});
   const [runningOnly, setRunningOnly] = useState(false);
   const [needsReverifyOnly, setNeedsReverifyOnly] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>('installed-first');
-  const [viewMode, setViewMode] = useState<ViewMode>('popular');
+  // Owner-directed redesign — real quick-view tabs (Running/Installed/Owned/
+  // Favorites/All Games) and a real Sort control replace the old hardcoded
+  // 'all' viewMode. These are display-level: the underlying fetch always
+  // pulls the complete personal library (fetchAllCandidatePages, unchanged)
+  // — tabs/sort only narrow/reorder what's already loaded, they never
+  // reintroduce the old retired Popular/AllGames fetch-mode toggle.
+  const [quickTab, setQuickTab] = useState<TrainerLibraryQuickTab>('all');
+  const [sortOption, setSortOption] = useState<TrainerLibrarySortOption>(DEFAULT_TRAINER_LIBRARY_SORT_OPTION);
   const [popularityMap, setPopularityMap] = useState<Map<string, TrainerCatalogPopularityEvidence>>(new Map());
   const [allTimePopularityMap, setAllTimePopularityMap] = useState<Map<string, number>>(new Map());
   const [catalogFilterUniverse, setCatalogFilterUniverse] = useState<TrainerCatalogEntry[] | null>(null);
-  const [allGamesNoticeDismissed, setAllGamesNoticeDismissed] = useState(readAllGamesNoticeDismissed);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [flatAZView, setFlatAZView] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [supportRequestStatuses, setSupportRequestStatuses] = useState<Record<string, string>>({});
+  // Session-only persistence for collapsed-section expand state (Mission 4)
+  // — mirrors the existing sessionStorage-based filter persistence pattern
+  // already used elsewhere on this page, not a new persistence mechanism.
+  const [sectionExpandedOverrides, setSectionExpandedOverrides] = useState<Partial<Record<LibrarySectionKey, boolean>>>(
+    () => {
+      try {
+        const raw = sessionStorage.getItem('trainerLibrary.sectionExpanded');
+        return raw ? JSON.parse(raw) : {};
+      } catch {
+        return {};
+      }
+    },
+  );
+  // Mission 5 REVERSAL — the section view now virtualizes (SectionVirtualGrid)
+  // instead of chunked "Show more" rendering, so there is no per-section
+  // visible-count state to track anymore; every section renders its full,
+  // filtered/sorted game list straight into a windowed grid.
+  // Owner-directed addition: real grid/list view mode, persisted via the
+  // `get-settings`/`set-setting` IPC channel (electron/main.ts,
+  // src/core/settings/index.ts), read once at mount the same way
+  // ViewModeToggle itself does. This page is renderer-side, so it must go
+  // through window.electronAPI rather than importing src/core/settings
+  // directly (that module is main-process-only and crashes the renderer
+  // bundle if imported — it transitively pulls in better-sqlite3 via
+  // src/core/database). ViewModeToggle owns writes to this setting; this
+  // page only mirrors the value locally via onChange.
+  const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>('grid');
+
+  useEffect(() => {
+    let cancelled = false;
+    window.electronAPI.getSettings().then((settings: { libraryViewMode?: unknown }) => {
+      if (!cancelled && (settings?.libraryViewMode === 'grid' || settings?.libraryViewMode === 'list')) {
+        setLibraryViewMode(settings.libraryViewMode);
+      }
+    }).catch(() => {
+      // Fall back to the 'grid' default already set above.
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [dragOver, setDragOver] = useState(false);
   const [scanningInstalls, setScanningInstalls] = useState(false);
   const [addingSelectedInstalls, setAddingSelectedInstalls] = useState(false);
@@ -516,7 +782,8 @@ export default function TrainerLibraryPage({
         categories: genres.length > 0 ? genres : undefined,
       })) as SearchResponse;
       if (result.success && result.entries) {
-        setEntries((prev) => (append ? [...prev, ...result.entries!] : result.entries!));
+        const normalized = result.entries.map(normalizeCatalogEntryDisplay);
+        setEntries((prev) => (append ? [...prev, ...normalized] : normalized));
         setTotal(result.total ?? result.entries.length);
         setOffset(pageOffset + result.entries.length);
       } else {
@@ -536,6 +803,12 @@ export default function TrainerLibraryPage({
   ) => {
     const api = window.electronAPI;
     if (!api?.trainerCatalogSearch) return;
+    // Mission 3: this always runs to completion regardless of what the fast
+    // path above already rendered — completeness is never traded for speed,
+    // only the "is the page blocked waiting for it" behavior changed. Reset
+    // to false at the start of every call (including refetches on filter
+    // change) so the "All Games" flat view's gate stays accurate.
+    setCatalogFullyLoaded(false);
     setLoading(true);
     try {
       await api.trainerCatalogSeed?.();
@@ -554,15 +827,19 @@ export default function TrainerLibraryPage({
           setMessage(result.error ?? 'Search failed');
           return;
         }
-        all.push(...result.entries);
+        all.push(...result.entries.map(normalizeCatalogEntryDisplay));
         expectedTotal = result.total ?? all.length;
         pageOffset += POPULAR_TRAINER_LIMIT;
       }
+      // The complete candidate set always wins over whatever the fast path
+      // rendered first — this is what keeps section completeness identical
+      // to before the fast path existed.
       setEntries(all);
       // Every raw DB page has now been visited; report the actual eligible/search-matched
       // candidate count rather than the store's pre-eligibility SQL count.
       setTotal(all.length);
       setOffset(all.length);
+      setCatalogFullyLoaded(true);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -573,31 +850,45 @@ export default function TrainerLibraryPage({
     searchQuery = query,
     tier: TierFilter = tierFilter,
     genres: string[] = genreFilters,
-    view: ViewMode = viewMode,
-    hasDerivedFilters = availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0 || modeFilters.length > 0,
   ) => {
     setOffset(0);
-    // §3.6 derived filters must see the complete search/genre candidate set;
-    // otherwise a match beyond the first 120-row All Games page can be hidden.
-    if (hasDerivedFilters) {
-      await fetchAllCandidatePages(searchQuery, tier, genres);
-      return;
-    }
-    // Popular is a bounded, non-paginated projection (ROADMAP §3.3 Step 9) — fetch
-    // up to POPULAR_TRAINER_LIMIT in one page instead of the paginated PAGE_SIZE
-    // used by All Games, so ranking always sees the full Popular candidate set.
-    await fetchPage(searchQuery, 0, false, tier, genres, view === 'popular' ? POPULAR_TRAINER_LIMIT : PAGE_SIZE);
-  }, [fetchAllCandidatePages, fetchPage, query, tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters, modeFilters]);
+    // Certification-pass fix: the frozen section hierarchy (Mission 2) must
+    // organize the COMPLETE personal library, not just the first PAGE_SIZE
+    // (120) rows of a single catalog page. Before this fix, `load()` only
+    // took the fetch-everything path when a derived filter (availability/
+    // catalog/launcher/mode) was active — with no filters, the section view
+    // silently built every section (most visibly "All Other Games") from
+    // only the first page's candidates, undercounting and dropping games
+    // that never scrolled into view (the section-hierarchy render path has
+    // no onEndReached/infinite-scroll of its own, unlike the flat A-Z view).
+    // The fetch pipeline always pulls the complete candidate set (the retired
+    // Popular projection never runs here) — the quick-view tabs and sort
+    // control added back on top of this are display-level narrowing/
+    // reordering only, never a different fetch mode.
+    await fetchAllCandidatePages(searchQuery, tier, genres);
+  }, [fetchAllCandidatePages, query, tierFilter, genreFilters]);
 
   useEffect(() => {
-    void load(
-      query,
-      tierFilter,
-      genreFilters,
-      viewMode,
-      availabilityFilters.length > 0 || catalogFilters.length > 0 || launcherFilters.length > 0 || modeFilters.length > 0,
-    );
-  }, [tierFilter, genreFilters, viewMode, availabilityFilters, catalogFilters, launcherFilters, modeFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
+    void load(query, tierFilter, genreFilters);
+  }, [tierFilter, genreFilters, availabilityFilters, catalogFilters, launcherFilters, modeFilters]); // eslint-disable-line react-hooks/exhaustive-deps -- text search uses submit
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (api?.listFavorites) {
+      void api.listFavorites().then((result) => {
+        if (result.success && result.favoriteIds) setFavoriteIds(new Set(result.favoriteIds));
+      });
+    }
+    if (api?.listSupportRequests) {
+      void api.listSupportRequests().then((result) => {
+        if (result.success && result.requests) {
+          setSupportRequestStatuses(
+            Object.fromEntries(result.requests.map((r) => [r.canonicalGameId, r.status.toLowerCase()])),
+          );
+        }
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -654,7 +945,7 @@ export default function TrainerLibraryPage({
           verificationStatus: 'all',
         })) as SearchResponse;
         if (!result.success || !result.entries) return;
-        all.push(...result.entries);
+        all.push(...result.entries.map(normalizeCatalogEntryDisplay));
         expectedTotal = result.total ?? all.length;
         pageOffset += POPULAR_TRAINER_LIMIT;
       }
@@ -682,6 +973,8 @@ export default function TrainerLibraryPage({
       }
       if (result.success && result.games) {
         setInstalledPlatformsByCatalogGameId(buildInstalledPlatformsMap(result.games));
+        setInstalledExecutableNameByCatalogGameId(buildInstalledExecutableNameMap(result.games));
+        setUnmatchedInstalledGames(result.games.filter((g) => !g.catalogGameId));
       }
     });
     void api.trainerHealthList?.().then((result) => {
@@ -689,8 +982,92 @@ export default function TrainerLibraryPage({
     });
   }, []);
 
+  // Mission 6 (validation receipts -> accuracy badge integration gap) — real
+  // receipt evidence for exactly the catalog games currently loaded into the
+  // library (`entries`, the same candidate set the accuracy badge/sort
+  // already renders from), never a bulk "every receipt in the database"
+  // fetch. Re-fires whenever the loaded candidate set changes (search,
+  // filters, sync) so a freshly-matched game always gets a real lookup
+  // instead of a stale/empty one.
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.getValidationReceiptsForGames || entries.length === 0) return;
+    let cancelled = false;
+    const gameIds = Array.from(new Set(entries.map((entry) => entry.catalogGameId)));
+    void api.getValidationReceiptsForGames(gameIds).then((result) => {
+      if (!cancelled && result.success && result.receipts) {
+        setReceiptsByGameId(result.receipts);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
+
+  // Mission 3 (Personal Library Completion — Final Closure Pass) — My-Games
+  // fast path. Running/Installed/Owned/Favorites must not wait on the full
+  // ~6,800-entry catalog fetch (fetchAllCandidatePages, still running in
+  // full below — completeness is never traded away). This effect only reads
+  // already-fast local sources (installDiscoveryList, listFavorites,
+  // trainerCatalogListOwned — all narrow, indexed, small-result queries) and
+  // then resolves catalog METADATA (title/cover/categories/etc.) for just
+  // that small id set via the existing single-entry trainerCatalogGet, never
+  // a new bulk endpoint and never a full scan. It only ever ADOPTS this as a
+  // first-paint shortcut when nothing has rendered yet (`prev.length === 0`)
+  // — it can never clobber a more complete fetch that already landed, and
+  // the background fetchAllCandidatePages below always runs to completion
+  // and unconditionally replaces `entries` with the real complete set, so
+  // section completeness ends up identical to before, just visible sooner.
+  // No ownership is fabricated here: entries with unknown ownedConfirmed
+  // still resolve to `owned: 'unknown'` exactly as project­PersonalLibraryGame
+  // guarantees elsewhere.
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.trainerCatalogGet) return;
+    let cancelled = false;
+    void (async () => {
+      const [installResult, favoritesResult, ownedResult] = await Promise.all([
+        api.installDiscoveryList?.() ?? Promise.resolve(undefined),
+        api.listFavorites?.() ?? Promise.resolve(undefined),
+        api.trainerCatalogListOwned?.() ?? Promise.resolve(undefined),
+      ]);
+      if (cancelled) return;
+
+      const fastIds = new Set<string>();
+      if (installResult?.success && installResult.catalogGameIds) {
+        for (const id of installResult.catalogGameIds) fastIds.add(id);
+      }
+      if (favoritesResult?.success && favoritesResult.favoriteIds) {
+        for (const id of favoritesResult.favoriteIds) fastIds.add(id);
+      }
+      if (ownedResult?.success && ownedResult.ownedCatalogGameIds) {
+        for (const id of ownedResult.ownedCatalogGameIds) fastIds.add(id);
+      }
+      if (fastIds.size === 0) return;
+
+      const fetched = await Promise.all(
+        [...fastIds].map(async (catalogGameId) => {
+          const result = await api.trainerCatalogGet!({ catalogGameId });
+          return result.success && result.entry ? normalizeCatalogEntryDisplay(result.entry as TrainerCatalogEntry) : null;
+        }),
+      );
+      if (cancelled) return;
+
+      const fastEntries = fetched.filter((entry): entry is TrainerCatalogEntry => Boolean(entry));
+      if (fastEntries.length === 0) return;
+
+      setEntries((prev) => (prev.length === 0 ? fastEntries : prev));
+      setTotal((prev) => (prev === 0 ? fastEntries.length : prev));
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const unsubscribe = window.electronAPI?.onCatalogProcessDetected?.((payload) => {
+      if (!payload) return;
       setRunningIds((prev) => {
         const next = new Set(prev);
         next.add(payload.catalogGameId);
@@ -709,6 +1086,7 @@ export default function TrainerLibraryPage({
     }
     if (list.success && list.games) {
       setInstalledPlatformsByCatalogGameId(buildInstalledPlatformsMap(list.games));
+      setUnmatchedInstalledGames(list.games.filter((g) => !g.catalogGameId));
     }
   }, []);
 
@@ -756,9 +1134,6 @@ export default function TrainerLibraryPage({
   };
 
   const handleLoadMore = useCallback(() => {
-    // Popular is a bounded, non-paginated projection (Step 9) — appending further
-    // pages here would mix an unranked tail into the ranked/limited Popular set.
-    if (viewMode === 'popular') return;
     if (loadingMore || loading || entries.length >= total) return;
     void fetchPage(
       queryRef.current,
@@ -767,15 +1142,13 @@ export default function TrainerLibraryPage({
       tierFilterRef.current,
       genreFiltersRef.current,
     );
-  }, [viewMode, loadingMore, loading, entries.length, total, offset, fetchPage]);
+  }, [loadingMore, loading, entries.length, total, offset, fetchPage]);
 
   const toggleGenre = (genre: string) => {
     setGenreFilters((prev) =>
       prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre],
     );
   };
-
-  const clearGenres = () => setGenreFilters([]);
 
   const toggleAvailabilityFilter = (filter: TrainerLibraryAvailabilityFilter) => {
     setAvailabilityFilters((prev) =>
@@ -813,6 +1186,138 @@ export default function TrainerLibraryPage({
     } else {
       setMessage(result.error ?? 'Failed to update ownership.');
     }
+  };
+
+  const handleToggleFavorite = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    const currentlyFavorite = favoriteIds.has(entry.catalogGameId);
+    // Optimistic update — the star should feel instant; roll back on failure.
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (currentlyFavorite) next.delete(entry.catalogGameId);
+      else next.add(entry.catalogGameId);
+      return next;
+    });
+    const result = currentlyFavorite
+      ? await api?.unfavoriteGame?.({ canonicalGameId: entry.catalogGameId })
+      : await api?.favoriteGame?.({ canonicalGameId: entry.catalogGameId });
+    if (!result?.success) {
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (currentlyFavorite) next.add(entry.catalogGameId);
+        else next.delete(entry.catalogGameId);
+        return next;
+      });
+      setMessage(result?.error ?? 'Failed to update favorite.');
+    }
+  };
+
+  const handleRequestSupport = async (entry: TrainerCatalogEntry) => {
+    const api = window.electronAPI;
+    if (!api?.requestGameSupport) return;
+    // Optimistic + server is itself dedup-safe (Mission 16) — a repeated
+    // click here is a harmless no-op on the backend, never a duplicate row.
+    setSupportRequestStatuses((prev) => ({ ...prev, [entry.catalogGameId]: 'requested' }));
+    const result = await api.requestGameSupport({
+      canonicalGameId: entry.catalogGameId,
+      gameTitle: entry.displayName,
+      platforms: [...(installedPlatformsByCatalogGameId.get(entry.catalogGameId) ?? [])],
+    });
+    if (result.success && result.request) {
+      setSupportRequestStatuses((prev) => ({ ...prev, [entry.catalogGameId]: result.request!.status.toLowerCase() }));
+    } else {
+      setMessage(result.error ?? 'Failed to submit support request.');
+    }
+  };
+
+  const toggleSectionExpanded = (sectionKey: LibrarySectionKey) => {
+    setSectionExpandedOverrides((prev) => {
+      const next = { ...prev, [sectionKey]: !prev[sectionKey] };
+      try {
+        sessionStorage.setItem('trainerLibrary.sectionExpanded', JSON.stringify(next));
+      } catch {
+        /* ignore — session-only convenience, not required to persist */
+      }
+      return next;
+    });
+  };
+
+  // Mission 6 (validation receipts -> accuracy badge integration gap) —
+  // real receipt evidence for one catalog entry, built from the latest
+  // receipt fetched via get-validation-receipts-for-games (receiptsByGameId)
+  // and real "current" comparable fields:
+  //  - executableName: the actually-discovered installed executable's
+  //    basename (installedExecutableNameByCatalogGameId), falling back to
+  //    the receipt's own name only when no live install evidence exists at
+  //    all — never a title/display-name guess.
+  //  - trainerSource: the catalog entry's real ModPackSource provider from
+  //    entry.sources (e.g. 'bundled'/'community'), never fabricated.
+  //  - executableVersion/executableHash: no live version/hash evidence
+  //    pipeline exists in this renderer yet, so these are honestly left
+  //    `undefined` rather than guessed — per needsReverify's own rule,
+  //    missing evidence on either side is never treated as a mismatch.
+  // This function never reimplements the reverify decision itself —
+  // deriveReceiptEvidence delegates that entirely to the EXISTING
+  // needsReverify in trainer-catalog/trainer-accuracy.ts.
+  const getReceiptEvidenceForEntry = (entry: TrainerCatalogEntry) => {
+    const latestReceipt = receiptsByGameId[entry.catalogGameId] ?? null;
+    const installedExecutableName = installedExecutableNameByCatalogGameId.get(entry.catalogGameId);
+    return deriveReceiptEvidence(latestReceipt, {
+      executableName: installedExecutableName ?? latestReceipt?.executableName ?? entry.executables[0] ?? '',
+      executableVersion: undefined,
+      executableHash: undefined,
+      trainerSource: entry.sources[0]?.provider ?? latestReceipt?.trainerSource ?? 'unknown',
+      trainerVersionHint: undefined,
+    });
+  };
+
+  const renderLibraryCard = (g: LibraryGameEvidence) => {
+    const entry = entryByGameId.get(g.canonicalGameId);
+    if (!entry) return null;
+    // Synthetic unmatched-local-install entries (see
+    // buildUnmatchedInstalledLibraryData) have no real catalog identity —
+    // Favorite/Request Support IPC would correctly reject them
+    // (personal-library-ipc.ts's requireKnownCatalogGameId), so the controls
+    // are simply not offered rather than surfacing a confusing IPC error.
+    const isSynthetic = isSyntheticLocalInstallId(entry.catalogGameId);
+    const isInstalledForAccuracy = installedIds.has(entry.catalogGameId);
+    // Mission 6 — real receipt evidence (see getReceiptEvidenceForEntry
+    // above) replaces the old hardcoded `hasValidationReceipt: false`.
+    // `strongMatchEvidence` still uses real, non-title evidence: install-
+    // discovery's own executable/canonical-identity match (installedIds),
+    // never a title-text match.
+    const trainerAccuracy = computeTrainerAccuracy({
+      hasTrainer: entry.hasModPack,
+      ...getReceiptEvidenceForEntry(entry),
+      exactVersionEvidence: false,
+      exactVersionMismatch: false,
+      strongMatchEvidence: isInstalledForAccuracy,
+    });
+    return (
+      <CatalogCard
+        key={g.canonicalGameId}
+        entry={entry}
+        trust={trustMeta[entry.catalogGameId]}
+        installed={isInstalledForAccuracy}
+        running={runningIds.has(entry.catalogGameId)}
+        healthStatus={healthMap[entry.catalogGameId]?.status}
+        trainerAccuracy={trainerAccuracy}
+        viewMode={libraryViewMode}
+        onLaunch={handleLaunch}
+        onExport={handleExportYaml}
+        onThumbUp={handleThumbUp}
+        onRequestVerification={handleRequestVerification}
+        onNotify={handleNotifyWhenVerified}
+        onPublish={handlePublish}
+        onToggleOwned={handleToggleOwned}
+        favorite={isSynthetic ? undefined : favoriteIds.has(entry.catalogGameId)}
+        onToggleFavorite={isSynthetic ? undefined : handleToggleFavorite}
+        supportRequestStatus={
+          isSynthetic || entry.hasModPack ? undefined : ((supportRequestStatuses[entry.catalogGameId] as never) ?? 'none')
+        }
+        onRequestSupport={isSynthetic ? undefined : handleRequestSupport}
+      />
+    );
   };
 
   const handleScanInstalled = async () => {
@@ -1320,20 +1825,140 @@ export default function TrainerLibraryPage({
     { installedCatalogGameIds: installedIds, popularCatalogGameIds, installedPlatformsByCatalogGameId },
   );
 
-  const visible = viewMode === 'popular'
-    ? projectPopularTrainerEntries(filteredEntries, {
-        installedCatalogGameIds: installedIds,
-        popularityByCatalogGameId: popularityMap,
-      }).map((ranked) => ranked.entry)
-    : sortAllGamesEntries(filteredEntries, sortMode, {
-        installedCatalogGameIds: installedIds,
-        popularityByCatalogGameId: popularityMap,
-        allTimePopularityByCatalogGameId: allTimePopularityMap,
-      });
+  // Mission 2/7 — the frozen section hierarchy replaces sort-mode selection.
+  // isInstalled/ownedConfirmed/hasTrainerSupport all come from evidence
+  // already tracked on TrainerCatalogEntry / installedIds — nothing here is
+  // fabricated, and an owned-but-unsupported game is never dropped (Mission 7).
+  const catalogLibraryEvidence: LibraryGameEvidence[] = filteredEntries.map((entry) => ({
+    canonicalGameId: entry.catalogGameId,
+    displayName: entry.displayName,
+    isInstalled: installedIds.has(entry.catalogGameId),
+    ownedConfirmed: entry.ownedConfirmed === true,
+    isKnownToCatalog: true,
+    hasTrainerSupport: entry.hasModPack === true,
+    isFromLinkedLibrary: installedIds.has(entry.catalogGameId),
+    isRunning: runningIds.has(entry.catalogGameId),
+  }));
+
+  // Real local installs that never matched a catalog entry — surfaced into
+  // library-sections.ts's 'missing_unsupported' section rather than silently
+  // dropped (see buildUnmatchedInstalledLibraryData's doc comment). These
+  // never came from trainerCatalogSearch's backend query, so the same
+  // free-text query the catalog path already applied server-side is applied
+  // here client-side, keeping Mission 4's "search covers every section"
+  // requirement true for this section too.
+  const { evidence: unmatchedEvidence, entries: unmatchedEntryMap } = buildUnmatchedInstalledLibraryData(unmatchedInstalledGames);
+  const normalizedQuery = query.trim().toLowerCase();
+  const queryFilteredUnmatchedEvidence = normalizedQuery
+    ? unmatchedEvidence.filter((g) => g.displayName.toLowerCase().includes(normalizedQuery))
+    : unmatchedEvidence;
+
+  const libraryEvidence: LibraryGameEvidence[] = [...catalogLibraryEvidence, ...queryFilteredUnmatchedEvidence];
+
+  // Quick-view tabs (Running/Installed/Owned/All Games) — a display-level
+  // narrowing of the same evidence the section hierarchy already computes
+  // from, applied before organizeLibrary so every section a tab produces
+  // still gets assigned/sorted by the frozen, untouched assignLibrarySection
+  // rules. Favorites stays its own independent toggle (see
+  // TrainerLibraryQuickTabs's header comment) and is applied afterward,
+  // exactly as it always was.
+  const quickTabFilteredEvidence = libraryEvidence.filter((g) => {
+    if (quickTab === 'running') return g.isRunning === true;
+    if (quickTab === 'installed') return g.isInstalled;
+    if (quickTab === 'owned') return g.ownedConfirmed;
+    return true;
+  });
+
+  const favoriteFilteredEvidence = showFavoritesOnly
+    ? quickTabFilteredEvidence.filter((g) => favoriteIds.has(g.canonicalGameId))
+    : quickTabFilteredEvidence;
+
+  // Certification-pass fix: a collapsed-by-default section (e.g. "All Other
+  // Games", where most catalog entries land) must not hide a game the user
+  // explicitly favorited — the whole point of switching to the Favorites
+  // view is to see them. Search already overrides collapse (Mission 4);
+  // Favorites-only needs the identical override for the identical reason.
+  const isSearchActive = query.trim().length > 0;
+  const forceSectionsExpanded = isSearchActive || showFavoritesOnly;
+  const organizedLibrary = organizeLibrary(favoriteFilteredEvidence);
+  const flatSortedEntries = flatAZView ? sortLibraryAZ(favoriteFilteredEvidence) : null;
+  const entryByGameId = new Map<string, TrainerCatalogEntry>([
+    ...filteredEntries.map((e): [string, TrainerCatalogEntry] => [e.catalogGameId, e]),
+    ...unmatchedEntryMap,
+  ]);
+
+  // Owner-directed Sort control — scoped to the flat/All-Games browse view
+  // only (see trainer-library-sort-options.ts's header comment). This is a
+  // second pass ON TOP OF the frozen `flatSortedEntries` (A-Z) baseline
+  // above, which stays byte-for-byte the regression-locked expression
+  // tests/trainer-library-card-states.test.tsx pins — it is not replaced,
+  // just further reordered here for actual display when a non-A-Z sort is chosen.
+  // Mission 12 — the same real, non-title evidence the accuracy badge (see
+  // renderLibraryCard) uses, built once per render for every filtered entry
+  // so "Trainer quality" sort can rank by the actual TrainerAccuracyState
+  // instead of the pre-Phase-1 verificationStatus/hasModPack/cheatCount
+  // placeholder heuristic.
+  const trainerAccuracyByCatalogGameId = new Map<string, TrainerAccuracyState>(
+    filteredEntries.map((entry) => [
+      entry.catalogGameId,
+      computeTrainerAccuracy({
+        hasTrainer: entry.hasModPack,
+        ...getReceiptEvidenceForEntry(entry),
+        exactVersionEvidence: false,
+        exactVersionMismatch: false,
+        strongMatchEvidence: installedIds.has(entry.catalogGameId),
+      }),
+    ]),
+  );
+  const sortContext: AllGamesSortContext & {
+    trainerAccuracyByCatalogGameId: Map<string, TrainerAccuracyState>;
+    runningCatalogGameIds: Set<string>;
+    favoriteCatalogGameIds: Set<string>;
+  } = {
+    installedCatalogGameIds: installedIds,
+    popularityByCatalogGameId: popularityMap,
+    allTimePopularityByCatalogGameId: allTimePopularityMap,
+    trainerAccuracyByCatalogGameId,
+    // Mission 2 (Personal Library Completion — Final Closure Pass): real
+    // running/favorite id sets the page already tracks, wired through so
+    // 'Recommended' can route via personal-priority-comparator.ts instead of
+    // the older installed/popularity-only ranking model.
+    runningCatalogGameIds: runningIds,
+    favoriteCatalogGameIds: favoriteIds,
+  };
+  const sortedFlatEntries = flatSortedEntries && sortOption !== 'a-z'
+    ? (() => {
+        const flatCatalogEntries = flatSortedEntries
+          .map((g) => entryByGameId.get(g.canonicalGameId))
+          .filter((e): e is TrainerCatalogEntry => Boolean(e));
+        const sortedCatalogEntries = sortTrainerLibraryFlatEntries(flatCatalogEntries, sortOption, sortContext);
+        const evidenceById = new Map(flatSortedEntries.map((g) => [g.canonicalGameId, g]));
+        return sortedCatalogEntries
+          .map((e) => evidenceById.get(e.catalogGameId))
+          .filter((g): g is LibraryGameEvidence => Boolean(g));
+      })()
+    : flatSortedEntries;
+
+  // "Your Games" — real counts derived from the same section evidence
+  // organizeLibrary already computed (never hardcoded): everything that
+  // isn't a bare catalog browse entry — Installed plus both Owned buckets.
+  const installedCount = organizedLibrary.sections.installed.length;
+  const ownedCount =
+    organizedLibrary.sections.owned_supported.length + organizedLibrary.sections.owned_unsupported.length;
+  const yourGamesCount = installedCount + ownedCount;
+
+  const activeFilterCount =
+    availabilityFilters.length +
+    catalogFilters.length +
+    launcherFilters.length +
+    modeFilters.length +
+    genreFilters.length +
+    (runningOnly ? 1 : 0) +
+    (needsReverifyOnly ? 1 : 0);
 
   const activeFilterSummary =
     [
-      viewMode === 'popular' ? 'Popular' : 'All Games',
+      showFavoritesOnly ? 'Favorites' : null,
       availabilityFilters.length > 0
         ? availabilityFilters.map((filter) => TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS[filter]).join(', ')
         : null,
@@ -1349,7 +1974,6 @@ export default function TrainerLibraryPage({
       genreFilters.length > 0 ? genreFilters.join(', ') : null,
       runningOnly ? 'running' : null,
       needsReverifyOnly ? 'needs re-verify' : null,
-      viewMode === 'all' && sortMode !== 'installed-first' ? ALL_GAMES_SORT_MODE_LABELS[sortMode] : null,
     ]
       .filter(Boolean)
       .join(' · ') || null;
@@ -1362,11 +1986,6 @@ export default function TrainerLibraryPage({
     genreFilters.length > 0 ||
     runningOnly ||
     needsReverifyOnly;
-
-  const handleDismissAllGamesNotice = () => {
-    setAllGamesNoticeDismissed(true);
-    writeAllGamesNoticeDismissed();
-  };
 
   const resetLibraryFilters = () => {
     setAvailabilityFilters([]);
@@ -1393,6 +2012,7 @@ export default function TrainerLibraryPage({
         walkthroughId="trainer-library"
         actions={
           <div className={styles.actions}>
+            <ViewModeToggle onChange={setLibraryViewMode} />
             <input
               ref={importYamlRef}
               type="file"
@@ -1431,43 +2051,52 @@ export default function TrainerLibraryPage({
         }
       />
 
-      <section className={styles.hubPanel} aria-labelledby="community-hub-heading">
-        <div className={styles.hubPanelHeader}>
-          <h2 id="community-hub-heading">Solith Definition Hub</h2>
-          <label className={styles.hubToggle}>
-            <input
-              type="checkbox"
-              checked={communitySyncEnabled}
-              onChange={(e) => void handleToggleCommunitySync(e.target.checked)}
-            />
-            Community sync enabled
-          </label>
+      {/* Owner-directed redesign: this panel used to render open by default,
+          dominating the fold above the actual games. All functionality/
+          handlers/state below are unchanged — only the default visibility
+          moved to a collapsed <details> disclosure. */}
+      <details className={styles.collapsiblePanel}>
+        <summary className={styles.collapsiblePanelSummary} id="community-hub-heading">
+          Community Hub Sync ▾
+        </summary>
+        <div className={styles.collapsiblePanelBody}>
+          <div className={styles.hubPanelHeader}>
+            <h2>Solith Definition Hub</h2>
+            <label className={styles.hubToggle}>
+              <input
+                type="checkbox"
+                checked={communitySyncEnabled}
+                onChange={(e) => void handleToggleCommunitySync(e.target.checked)}
+              />
+              Community sync enabled
+            </label>
+          </div>
+          <p className={styles.hubCopy}>
+            {communitySyncEnabled
+              ? 'Opted in — Solith will delta-fetch JSON definitions from the Hub. L0 stays Scan-Required; Offline Confirm is still required before attach.'
+              : 'Disabled by default — no Hub network requests and no polling interval while off.'}
+          </p>
+          <div className={styles.hubActions}>
+            <button
+              type="button"
+              className={styles.syncBtn}
+              onClick={() => void handleHubSync()}
+              disabled={hubSyncing || !communitySyncEnabled}
+            >
+              {hubSyncing ? 'Syncing Hub…' : 'Sync Hub now'}
+            </button>
+            <label className={styles.hubOverwrite}>
+              <input
+                type="checkbox"
+                checked={overwriteLocalDefs}
+                disabled={!communitySyncEnabled || hubSyncing}
+                onChange={(e) => setOverwriteLocalDefs(e.target.checked)}
+              />
+              Overwrite local definitions (requires confirm)
+            </label>
+          </div>
         </div>
-        <p className={styles.hubCopy}>
-          {communitySyncEnabled
-            ? 'Opted in — Solith will delta-fetch JSON definitions from the Hub. L0 stays Scan-Required; Offline Confirm is still required before attach.'
-            : 'Disabled by default — no Hub network requests and no polling interval while off.'}
-        </p>
-        <div className={styles.hubActions}>
-          <button
-            type="button"
-            className={styles.syncBtn}
-            onClick={() => void handleHubSync()}
-            disabled={hubSyncing || !communitySyncEnabled}
-          >
-            {hubSyncing ? 'Syncing Hub…' : 'Sync Hub now'}
-          </button>
-          <label className={styles.hubOverwrite}>
-            <input
-              type="checkbox"
-              checked={overwriteLocalDefs}
-              disabled={!communitySyncEnabled || hubSyncing}
-              onChange={(e) => setOverwriteLocalDefs(e.target.checked)}
-            />
-            Overwrite local definitions (requires confirm)
-          </label>
-        </div>
-      </section>
+      </details>
 
       {ctImportState.status !== 'idle' && (
         <section
@@ -1513,11 +2142,11 @@ export default function TrainerLibraryPage({
         </section>
       )}
 
-      <section
-        id="trainer-library-discovery-preview"
-        className={styles.scanPreviewPanel}
-        aria-labelledby="install-discovery-preview-heading"
-      >
+      {/* Owner-directed redesign: collapsed by default (was always-open).
+          All functionality/handlers/state below are unchanged. */}
+      <details id="trainer-library-discovery-preview" className={styles.collapsiblePanel}>
+        <summary className={styles.collapsiblePanelSummary}>Scan for Installed Games ▾</summary>
+        <div className={styles.collapsiblePanelBody}>
         <div className={styles.scanPreviewHeader}>
           <div>
             <h2 id="install-discovery-preview-heading">Installed Game Discovery</h2>
@@ -1664,266 +2293,90 @@ export default function TrainerLibraryPage({
             </details>
           </>
         )}
-      </section>
+        </div>
+      </details>
 
-      <form className={styles.searchRow} onSubmit={handleSearch}>
-        <input
-          type="search"
-          placeholder="Search thousands of games…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search trainer library"
+      {/* Owner-directed redesign — compact top area: search + one Filters
+          popover + Sort replace the old always-visible 7 filter-chip-rows.
+          Filtering stays instant/live, exactly as before — there is no
+          separate Apply step. */}
+      <div className={styles.topControlsRow}>
+        <form className={styles.searchRow} onSubmit={handleSearch}>
+          <input
+            type="search"
+            placeholder="Search thousands of games…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search trainer library"
+          />
+          <button type="submit">Search</button>
+        </form>
+        <TrainerLibraryFiltersPopover
+          availabilityFilters={availabilityFilters}
+          onToggleAvailability={toggleAvailabilityFilter}
+          catalogFilters={catalogFilters}
+          onToggleCatalog={toggleCatalogFilter}
+          launcherFilters={launcherFilters}
+          onToggleLauncher={toggleLauncherFilter}
+          modeFilters={modeFilters}
+          onToggleMode={toggleModeFilter}
+          genreFilters={genreFilters}
+          genreOptions={ROADMAP_GENRE_FILTERS}
+          onToggleGenre={toggleGenre}
+          runningOnly={runningOnly}
+          onToggleRunningOnly={() => setRunningOnly((v) => !v)}
+          needsReverifyOnly={needsReverifyOnly}
+          onToggleNeedsReverifyOnly={() => setNeedsReverifyOnly((v) => !v)}
+          activeCount={activeFilterCount}
+          onClearAll={resetLibraryFilters}
         />
-        <button type="submit">Search</button>
-      </form>
-
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Availability</span>
-        <div className={styles.filters}>
-          {(Object.entries(TRAINER_LIBRARY_AVAILABILITY_FILTER_LABELS) as Array<[TrainerLibraryAvailabilityFilter, string]>).map(([filter, label]) => (
-            <button
-              key={filter}
-              type="button"
-              className={availabilityFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
-              onClick={() => toggleAvailabilityFilter(filter)}
-              aria-pressed={availabilityFilters.includes(filter)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Status (existing)</span>
-        <div className={styles.filters}>
-          <button
-            type="button"
-            className={runningOnly ? styles.filterActive : styles.filterBtn}
-            onClick={() => setRunningOnly((v) => !v)}
-            aria-pressed={runningOnly}
-          >
-            Running
-          </button>
-          <button
-            type="button"
-            className={needsReverifyOnly ? styles.filterActive : styles.filterBtn}
-            onClick={() => setNeedsReverifyOnly((v) => !v)}
-            aria-pressed={needsReverifyOnly}
-          >
-            Needs re-verify
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.filterSection} role="group" aria-labelledby="trainer-library-view-label">
-        <span id="trainer-library-view-label" className={styles.filterLabel}>View</span>
-        <div className={styles.filters}>
-          <button
-            id="trainer-library-view-popular"
-            type="button"
-            className={viewMode === 'popular' ? styles.filterActive : styles.filterBtn}
-            onClick={() => setViewMode('popular')}
-            aria-pressed={viewMode === 'popular'}
-          >
-            Popular
-          </button>
-          <button
-            id="trainer-library-view-all"
-            type="button"
-            className={viewMode === 'all' ? styles.filterActive : styles.filterBtn}
-            onClick={() => setViewMode('all')}
-            aria-pressed={viewMode === 'all'}
-          >
-            All Games
-          </button>
-        </div>
-      </div>
-
-      {viewMode === 'all' && !allGamesNoticeDismissed && (
-        <p
-          id="trainer-library-all-games-notice"
-          className={styles.allGamesNotice}
-          role="status"
+        <TrainerLibrarySortMenu value={sortOption} onChange={setSortOption} />
+        <button
+          type="button"
+          className={flatAZView ? styles.filterActive : styles.filterBtn}
+          onClick={() => setFlatAZView((v) => !v)}
+          aria-pressed={flatAZView}
+          title="Sort applies to this flat view; the 5-section hierarchy always stays A-Z within each section."
         >
-          {ALL_GAMES_NOTICE_TEXT}
-          <button
-            type="button"
-            className={styles.allGamesNoticeDismiss}
-            onClick={handleDismissAllGamesNotice}
-            aria-label="Dismiss All Games notice"
-          >
-            Dismiss
-          </button>
-        </p>
-      )}
-
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Mode</span>
-        <div className={styles.filters}>
-          {(Object.entries(TRAINER_LIBRARY_MODE_FILTER_LABELS) as Array<[TrainerLibraryModeFilter, string]>).map(([filter, label]) => (
-            <button
-              key={filter}
-              type="button"
-              className={modeFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
-              onClick={() => toggleModeFilter(filter)}
-              aria-pressed={modeFilters.includes(filter)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+          Flat list
+        </button>
       </div>
 
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Catalog</span>
-        <div className={styles.filters}>
-          {(Object.entries(TRAINER_LIBRARY_CATALOG_FILTER_LABELS) as Array<[TrainerLibraryCatalogFilter, string]>).map(([filter, label]) => (
-            <button
-              key={filter}
-              type="button"
-              className={catalogFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
-              onClick={() => toggleCatalogFilter(filter)}
-              aria-pressed={catalogFilters.includes(filter)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TrainerLibraryQuickTabs
+        activeTab={quickTab}
+        onSelectTab={setQuickTab}
+        favoritesActive={showFavoritesOnly}
+        onToggleFavorites={() => setShowFavoritesOnly((v) => !v)}
+      />
 
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Launcher</span>
-        <div className={styles.filters}>
-          {(Object.entries(TRAINER_LIBRARY_LAUNCHER_FILTER_LABELS) as Array<[TrainerLibraryLauncherFilter, string]>).map(([filter, label]) => (
-            <button
-              key={filter}
-              type="button"
-              className={launcherFilters.includes(filter) ? styles.filterActive : styles.filterBtn}
-              onClick={() => toggleLauncherFilter(filter)}
-              aria-pressed={launcherFilters.includes(filter)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TrainerLibraryActiveFilterChips
+        availabilityFilters={availabilityFilters}
+        onToggleAvailability={toggleAvailabilityFilter}
+        catalogFilters={catalogFilters}
+        onToggleCatalog={toggleCatalogFilter}
+        launcherFilters={launcherFilters}
+        onToggleLauncher={toggleLauncherFilter}
+        modeFilters={modeFilters}
+        onToggleMode={toggleModeFilter}
+        genreFilters={genreFilters}
+        onToggleGenre={toggleGenre}
+        runningOnly={runningOnly}
+        onToggleRunningOnly={() => setRunningOnly((v) => !v)}
+        needsReverifyOnly={needsReverifyOnly}
+        onToggleNeedsReverifyOnly={() => setNeedsReverifyOnly((v) => !v)}
+        onClearAll={resetLibraryFilters}
+      />
 
-      {viewMode === 'all' && (
-        <div className={styles.filterSection}>
-          <span className={styles.filterLabel}>Sort</span>
-          <div className={styles.filters}>
-            <button
-              type="button"
-              className={sortMode === 'recommended' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('recommended')}
-              aria-pressed={sortMode === 'recommended'}
-            >
-              Recommended
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'installed-first' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('installed-first')}
-              aria-pressed={sortMode === 'installed-first'}
-            >
-              Installed first
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'a-z' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('a-z')}
-              aria-pressed={sortMode === 'a-z'}
-            >
-              A–Z
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'verified-first' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('verified-first')}
-              aria-pressed={sortMode === 'verified-first'}
-            >
-              Verified first
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'popular-now' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('popular-now')}
-              aria-pressed={sortMode === 'popular-now'}
-            >
-              Popular now
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'most-trainer-options' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('most-trainer-options')}
-              aria-pressed={sortMode === 'most-trainer-options'}
-            >
-              Most trainer options
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'all-time-popular' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('all-time-popular')}
-              aria-pressed={sortMode === 'all-time-popular'}
-            >
-              All-time popular
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'newest-release' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('newest-release')}
-              aria-pressed={sortMode === 'newest-release'}
-            >
-              Newest release
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'recently-added' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('recently-added')}
-              aria-pressed={sortMode === 'recently-added'}
-            >
-              Recently added to SOLITH
-            </button>
-            <button
-              type="button"
-              className={sortMode === 'recently-updated' ? styles.filterActive : styles.filterBtn}
-              onClick={() => setSortMode('recently-updated')}
-              aria-pressed={sortMode === 'recently-updated'}
-            >
-              Recently updated
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className={styles.filterSection}>
-        <span className={styles.filterLabel}>Genre (optional)</span>
-        <div className={styles.genreFilters}>
-          {ROADMAP_GENRE_FILTERS.map((genre) => (
-            <button
-              key={genre}
-              type="button"
-              className={genreFilters.includes(genre) ? styles.genreChipActive : styles.genreChip}
-              onClick={() => toggleGenre(genre)}
-              aria-pressed={genreFilters.includes(genre)}
-            >
-              {genre}
-            </button>
-          ))}
-          {genreFilters.length > 0 && (
-            <button type="button" className={styles.clearGenresBtn} onClick={clearGenres}>
-              Clear genres
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className={styles.filterSection} role="status" aria-live="polite">
-        <span className={styles.filterLabel}>
-          {visible.length.toLocaleString()} result{visible.length === 1 ? '' : 's'} shown
-          {entries.length < total ? ` from ${entries.length.toLocaleString()} loaded` : ''}
+      <div className={styles.resultSummaryRow} role="status" aria-live="polite">
+        <span className={styles.resultSummaryCounts}>
+          Your Games — {yourGamesCount.toLocaleString()} · {installedCount.toLocaleString()} installed ·{' '}
+          {ownedCount.toLocaleString()} owned
         </span>
+        {quickTab !== 'all' && (
+          <button type="button" className={styles.browseAllLink} onClick={() => setQuickTab('all')}>
+            Browse all {total.toLocaleString()} supported games →
+          </button>
+        )}
         {hasActiveLibraryFilters && (
           <button type="button" className={styles.clearGenresBtn} onClick={resetLibraryFilters}>
             Reset
@@ -1937,38 +2390,96 @@ export default function TrainerLibraryPage({
           {quarantineCount} definition{quarantineCount === 1 ? '' : 's'} queued for re-verification after executable drift.
         </p>
       )}
-      {loading && <p className={styles.loading}>Loading catalog…</p>}
+      {/*
+        Mission 3 (Personal Library Completion — Final Closure Pass): the
+        blocking "Loading catalog…" message now only shows when there is
+        LITERALLY nothing to render yet — as soon as the fast path (or the
+        full fetch) produces any evidence, `favoriteFilteredEvidence` is
+        non-empty and the real content renders immediately, independent of
+        `loading`. `loading` alone no longer gates rendering.
+      */}
+      {loading && favoriteFilteredEvidence.length === 0 && <p className={styles.loading}>Loading catalog…</p>}
+      {!catalogFullyLoaded && favoriteFilteredEvidence.length > 0 && (
+        <p className={styles.loading} role="status" aria-live="polite">
+          Loading the full catalog in the background… ({entries.length.toLocaleString()} of{' '}
+          {total > 0 ? total.toLocaleString() : '…'} loaded)
+        </p>
+      )}
 
-      {!loading && visible.length === 0 && (
+      {!loading && favoriteFilteredEvidence.length === 0 && (
         <p className={styles.loading}>No games match your filters — try clearing genre chips or search.</p>
       )}
 
-      {!loading && visible.length > 0 && (
+      {favoriteFilteredEvidence.length > 0 && flatAZView && (
         <VirtualCatalogGrid
           className={styles.virtualScroll}
           gridClassName={styles.grid}
           backToTopClassName={styles.backToTopBtn}
           backToTopLabel="Back to top"
-          items={visible}
-          getKey={(entry) => entry.catalogGameId}
+          items={sortedFlatEntries!}
+          getKey={(g) => g.canonicalGameId}
           onEndReached={handleLoadMore}
-          renderItem={(entry) => (
-            <CatalogCard
-              entry={entry}
-              trust={trustMeta[entry.catalogGameId]}
-              installed={installedIds.has(entry.catalogGameId)}
-              running={runningIds.has(entry.catalogGameId)}
-              healthStatus={healthMap[entry.catalogGameId]?.status}
-              onLaunch={handleLaunch}
-              onExport={handleExportYaml}
-              onThumbUp={handleThumbUp}
-              onRequestVerification={handleRequestVerification}
-              onNotify={handleNotifyWhenVerified}
-              onPublish={handlePublish}
-              onToggleOwned={handleToggleOwned}
-            />
-          )}
+          renderItem={(g) => renderLibraryCard(g)}
+          forceSingleColumn={libraryViewMode === 'list'}
         />
+      )}
+      {/*
+        Personal Library Completion — Final Closure Pass, Mission 5 REVERSAL
+        (2026-09-10): the owner explicitly rejected the prior chunked "Show N
+        more" rendering below in favor of real virtualization, matching the
+        flat "All Games" view's own approach rather than inventing a second
+        system. Every section (including "All Other Games", where most of
+        the ~6,800-entry catalog lands) now renders through
+        SectionVirtualGrid — only visible rows (+ overscan) ever mount,
+        regardless of how many thousand games are in the section, and there
+        is no nested `overflow: auto` scrollbox: SectionVirtualGrid tracks
+        the page's own window scroll instead of owning its own scroll
+        container (see SectionVirtualGrid.tsx and
+        use-window-scroll-virtualization.ts for exactly how). Filtering/
+        sorting is unaffected — `games` below is already the fully filtered/
+        sorted array; SectionVirtualGrid only changes which of its members
+        are MOUNTED, never which are INCLUDED.
+      */}
+
+      {favoriteFilteredEvidence.length > 0 && !flatAZView && (
+        <>
+          {LIBRARY_SECTION_ORDER.map((sectionKey) => {
+            const games = organizedLibrary.sections[sectionKey];
+            if (games.length === 0) return null;
+            // Mission 4/11: an active search, or the Favorites-only view,
+            // must surface a match inside a normally-collapsed section
+            // without the user manually expanding it.
+            const isCollapsed =
+              LIBRARY_SECTIONS_COLLAPSED_BY_DEFAULT.has(sectionKey) && !forceSectionsExpanded
+                ? !sectionExpandedOverrides[sectionKey]
+                : false;
+            return (
+              <section key={sectionKey} className={styles.librarySection} aria-label={LIBRARY_SECTION_LABELS[sectionKey]}>
+                <button
+                  type="button"
+                  className={styles.librarySectionHeader}
+                  onClick={() => toggleSectionExpanded(sectionKey)}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span>{LIBRARY_SECTION_LABELS[sectionKey]} ({games.length.toLocaleString()})</span>
+                  {LIBRARY_SECTIONS_COLLAPSED_BY_DEFAULT.has(sectionKey) && (
+                    <span className={styles.librarySectionToggle}>{isCollapsed ? 'Expand ▾' : 'Collapse ▴'}</span>
+                  )}
+                </button>
+                {!isCollapsed && (
+                  <SectionVirtualGrid
+                    gridClassName={styles.grid}
+                    items={games}
+                    getKey={(g) => g.canonicalGameId}
+                    renderItem={(g) => renderLibraryCard(g)}
+                    ariaLabel={`${LIBRARY_SECTION_LABELS[sectionKey]} results`}
+                    forceSingleColumn={libraryViewMode === 'list'}
+                  />
+                )}
+              </section>
+            );
+          })}
+        </>
       )}
 
       {loadingMore && <p className={styles.loading}>Loading more… ({entries.length} / {total})</p>}

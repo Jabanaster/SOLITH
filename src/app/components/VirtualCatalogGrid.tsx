@@ -1,31 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CARD_HEIGHT,
+  CARD_MIN_WIDTH,
+  GRID_GAP,
+  OVERSCAN_ROWS,
+  computeColumnCount,
+  computeVisibleRowRange,
+} from './virtual-grid-math.js';
 
-// 180px produced 10-11 columns at 2560px wide — cards that narrow read as a
-// wall of near-identical tiles rather than distinct game entries. Raised to
-// 300px so cards stay wide enough to carry a readable title, a short cover
-// band, and one clear action at every breakpoint. Column count is derived
-// from container width only (no fixed cap) so wide viewports use the full
-// available width instead of leaving unused space beyond a capped count.
-const CARD_MIN_WIDTH = 300;
-// Re-measured after round 3: the cover band shrank from a 16:9 band (~169px
-// at 300px wide) to a fixed 96px compact banner, and the card content lost
-// its redundant tagline line — total rendered height is well under the
-// previous 300px estimate.
-const CARD_HEIGHT = 250;
-const GRID_GAP = 20;
-const OVERSCAN_ROWS = 2;
-
-/**
- * Pure so it can be unit-tested without rendering the component.
- * Guards against non-finite input (NaN/±Infinity) — a ResizeObserver
- * contentRect.width should never produce one, but Math.max(1, NaN) is NaN
- * and would otherwise propagate into gridTemplateColumns/rowCount as a
- * broken, non-numeric render.
- */
-export function computeColumnCount(containerWidth: number): number {
-  if (!Number.isFinite(containerWidth)) return 1;
-  return Math.max(1, Math.floor((containerWidth + GRID_GAP) / (CARD_MIN_WIDTH + GRID_GAP)));
-}
+// Re-exported for backward compatibility — existing tests and call sites
+// import computeColumnCount from this module. The real implementation now
+// lives in virtual-grid-math.ts (Personal Library Completion — Final
+// Closure Pass, Mission 5 reversal) so the "All Other Games" section's
+// SectionVirtualGrid.tsx shares the exact same math instead of a second,
+// independently-maintained copy.
+export { computeColumnCount };
 
 export interface VirtualCatalogGridProps<T> {
   items: T[];
@@ -37,6 +26,8 @@ export interface VirtualCatalogGridProps<T> {
   renderItem: (item: T) => React.ReactNode;
   onEndReached?: () => void;
   endReachedThresholdPx?: number;
+  /** When true, renders a single column regardless of measured width — used for the library's "list" view mode. */
+  forceSingleColumn?: boolean;
 }
 
 /**
@@ -52,22 +43,26 @@ export function VirtualCatalogGrid<T>({
   renderItem,
   onEndReached,
   endReachedThresholdPx = 480,
+  forceSingleColumn = false,
 }: VirtualCatalogGridProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 1200, height: 720 });
   const [scrollTop, setScrollTop] = useState(0);
   const endLockRef = useRef(false);
 
-  const columnCount = useMemo(() => computeColumnCount(viewport.width), [viewport.width]);
+  const columnCount = useMemo(
+    () => (forceSingleColumn ? 1 : computeColumnCount(viewport.width)),
+    [forceSingleColumn, viewport.width],
+  );
 
   const rowCount = Math.ceil(items.length / columnCount);
   const rowStride = CARD_HEIGHT + GRID_GAP;
   const totalHeight = rowCount > 0 ? rowCount * rowStride - GRID_GAP : 0;
 
-  const firstVisibleRow = Math.max(0, Math.floor(scrollTop / rowStride) - OVERSCAN_ROWS);
-  const visibleRowCount =
-    Math.ceil(viewport.height / rowStride) + OVERSCAN_ROWS * 2 + 1;
-  const lastVisibleRow = Math.min(rowCount, firstVisibleRow + visibleRowCount);
+  const { firstVisibleRow, lastVisibleRow } = useMemo(
+    () => computeVisibleRowRange(scrollTop, viewport.height, rowStride, rowCount, OVERSCAN_ROWS),
+    [scrollTop, viewport.height, rowStride, rowCount],
+  );
 
   const visibleItems = useMemo(() => {
     const start = firstVisibleRow * columnCount;

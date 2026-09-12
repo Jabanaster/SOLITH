@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSetting: (key: string, value: any) => ipcRenderer.invoke('set-setting', key, value),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getSafetyAckState: () => ipcRenderer.invoke('get-safety-ack-state'),
+  recordSafetyAcknowledgment: () => ipcRenderer.invoke('record-safety-acknowledgment'),
+  recordSafetyReminderDismissal: () => ipcRenderer.invoke('record-safety-reminder-dismissal'),
   listNotifications: () => ipcRenderer.invoke('list-notifications'),
   getUnreadNotificationCount: () => ipcRenderer.invoke('get-unread-notification-count'),
   createNotification: (payload: {
@@ -120,6 +123,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryDetach: () => ipcRenderer.invoke('live-memory-detach'),
   liveMemoryRead: (payload: { address: string; dataType: string }) =>
     ipcRenderer.invoke('live-memory-read', payload),
+  /** Trainer-Deck-scoped read only — no raw address/PID ever crosses this boundary. */
+  trainerDeckReadValue: (payload: { libraryEntryId: string }) =>
+    ipcRenderer.invoke('trainer-deck-read-value', payload),
   liveMemoryProposeWrite: (payload: { address: string; dataType: string; requestedValue: number }) =>
     ipcRenderer.invoke('live-memory-propose-write', payload),
   liveMemoryIssueWriteConsent: (payload: { proposalId: string; userConfirmed?: true }) =>
@@ -252,6 +258,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerHotkeysGetBindings: () => ipcRenderer.invoke('trainer-hotkeys-get-bindings'),
   trainerHotkeysSetBindings: (payload: { hotkeys: Record<string, string> }) =>
     ipcRenderer.invoke('trainer-hotkeys-set-bindings', payload),
+  trainerHotkeysGetStatus: () => ipcRenderer.invoke('trainer-hotkeys-get-status'),
   onTrainerHotkey: (callback: (payload: { action: string }) => void) => {
     const listener = (_event: unknown, payload: { action: string }) => callback(payload);
     ipcRenderer.on('trainer-hotkey', listener);
@@ -266,7 +273,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     verificationStatus?: 'all' | 'verified' | 'community' | 'metadata-only' | 'unverified';
   }) => ipcRenderer.invoke('trainer-catalog-search', payload),
   trainerCatalogStats: () => ipcRenderer.invoke('trainer-catalog-stats'),
+  // Discovery Master Pass, Stage 1 — local Discovery catalog (provider-neutral
+  // game universe), separate from the trainer-focused catalog above.
+  discoveryCatalogSearch: (payload: {
+    text?: string;
+    provider?: string;
+    providers?: string[];
+    trainerAvailable?: boolean;
+    favoriteOrPersonalOnly?: boolean;
+    releaseYear?: number;
+    releaseYearMin?: number;
+    releaseYearMax?: number;
+    genre?: string;
+    sort?: 'title-asc' | 'title-desc' | 'release-desc' | 'release-asc';
+    limit?: number;
+    offset?: number;
+  }) => ipcRenderer.invoke('discovery-catalog-search', payload),
+  discoveryCatalogGet: (payload: { solithGameId: string }) => ipcRenderer.invoke('discovery-catalog-get', payload),
   trainerCatalogGet: (payload: { catalogGameId: string }) => ipcRenderer.invoke('trainer-catalog-get', payload),
+  trainerCatalogListOwned: () => ipcRenderer.invoke('trainer-catalog-list-owned'),
   trainerCatalogSeed: () => ipcRenderer.invoke('trainer-catalog-seed'),
   trainerCatalogSyncRemote: () => ipcRenderer.invoke('trainer-catalog-sync-remote'),
   trainerCatalogSyncHub: (payload?: { overwriteUserDefinitions?: boolean }) =>
@@ -308,6 +333,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerCatalogSetOwned: (payload: { catalogGameId: string; owned: boolean }) =>
     ipcRenderer.invoke('trainer-catalog-set-owned', payload),
   artworkCacheRefresh: (payload?: { catalogGameIds?: string[] }) => ipcRenderer.invoke('artwork-cache-refresh', payload ?? {}),
+  artworkCachePriorityFill: (payload: {
+    candidates: Array<{
+      catalogGameId: string;
+      running: boolean;
+      installed: boolean;
+      confirmedOwned: boolean;
+      favorite: boolean;
+      recentlyDetected: boolean;
+      canonicalConfidence: 'trusted' | 'weak';
+    }>;
+  }) => ipcRenderer.invoke('artwork-cache-priority-fill', payload),
   artworkCacheRetryMissing: () => ipcRenderer.invoke('artwork-cache-retry-missing'),
   artworkCacheStatus: () => ipcRenderer.invoke('artwork-cache-status'),
   artworkCachePause: () => ipcRenderer.invoke('artwork-cache-pause'),
@@ -337,6 +373,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('ct-library-search', payload),
   ctLibraryGameDetail: (payload: { gameId: string }) => ipcRenderer.invoke('ct-library-game-detail', payload),
   ctLibraryPickZip: () => ipcRenderer.invoke('ct-library-pick-zip'),
+  favoriteGame: (payload: { canonicalGameId: string }) => ipcRenderer.invoke('favorite-game', payload),
+  unfavoriteGame: (payload: { canonicalGameId: string }) => ipcRenderer.invoke('unfavorite-game', payload),
+  listFavorites: () => ipcRenderer.invoke('list-favorites'),
+  isFavoriteGame: (payload: { canonicalGameId: string }) => ipcRenderer.invoke('is-favorite-game', payload),
+  requestGameSupport: (payload: {
+    canonicalGameId: string;
+    gameTitle: string;
+    platforms: string[];
+    launcherGameIds?: Record<string, string>;
+    versionHint?: string;
+  }) => ipcRenderer.invoke('request-game-support', payload),
+  getSupportRequestStatus: (payload: { canonicalGameId: string }) => ipcRenderer.invoke('get-support-request-status', payload),
+  listSupportRequests: () => ipcRenderer.invoke('list-support-requests'),
+  getValidationReceiptsForGames: (gameIds: string[]) =>
+    ipcRenderer.invoke('get-validation-receipts-for-games', { gameIds }),
   ctLibraryImportZipPreview: (payload: {
     selectionId: string;
     jobId?: string;
@@ -443,7 +494,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     fingerprintStatus?: string;
     hasDefinition?: boolean;
     prepareReady?: boolean;
-  }) => void) => {
+  } | null) => void) => {
     const listener = (_event: unknown, payload: {
       catalogGameId: string;
       displayName: string;
@@ -499,6 +550,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installDiscoveryCommit: (payload: { records: unknown[] }) =>
     ipcRenderer.invoke('install-discovery-commit', payload),
   installDiscoveryList: () => ipcRenderer.invoke('install-discovery-list'),
+  linkedLibrariesList: () => ipcRenderer.invoke('linked-libraries-list'),
 
   listGameLibrary: (payload?: { view?: 'installed' | 'all' | 'owned' }) =>
     ipcRenderer.invoke('list-game-library', payload ?? {}),
@@ -521,4 +573,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('install-discovery-open-path', payload),
   catalogProcessWatchActive: (payload: { active: boolean }) =>
     ipcRenderer.invoke('catalog-process-watch-active', payload),
+  getCurrentDetectedProcess: () => ipcRenderer.invoke('get-current-detected-process'),
 });

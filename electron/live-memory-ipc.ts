@@ -1,6 +1,10 @@
 import { app, ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import { defaultCtLibraryPaths, getCtLibraryGameDetail } from '../src/core/ct-library/search.js';
+import { verifyCatalogGameIdForExecutable } from '../src/core/live-memory/attach-catalog-verification.js';
 import {
   LiveMemoryListProcessesSchema,
   LiveMemoryAttachSchema,
@@ -91,6 +95,23 @@ async function getLiveMemoryModule() {
   return liveMemoryModule;
 }
 
+const ctLibraryPaths = defaultCtLibraryPaths(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+
+/**
+ * Renderer never supplies a PID, module name, address, or offset — only an
+ * opaque reference into the trusted, on-disk CT library. Everything the
+ * actual read needs (module/baseOffset/pointerChain/dataType) is re-derived
+ * server-side from that trusted data, never taken from the payload. This is
+ * the "approved trainer card identity, not an arbitrary raw memory request"
+ * boundary Mission 3 requires.
+ */
+const TrainerDeckReadValueSchema = z
+  .object({
+    /** Format: "<gameId>:<sourceSha256>:<cheatId>" — matches CtLibrarySearchResult.id exactly. */
+    libraryEntryId: z.string().min(1).max(500),
+  })
+  .strict();
+
 export function registerLiveMemoryIpc(): void {
   ipcMain.handle('live-memory-list-processes', async (event) => {
     try {
@@ -115,12 +136,36 @@ export function registerLiveMemoryIpc(): void {
       const parsed = LiveMemoryAttachSchema.parse(payload);
 
       const mod = await getLiveMemoryModule();
+
+      // Mission 20 hardening: never trust a renderer-supplied catalogGameId
+      // verbatim — a Trainer Deck card's game-binding gate (trainer-deck-read.ts)
+      // relies entirely on this value being genuine, so it must be
+      // independently re-derived from the trusted catalog here, the same way
+      // catalog-process-watch.ts's background poller does it, not accepted
+      // as-is from the IPC payload.
+      let verifiedCatalogGameId: string | undefined;
+      if (parsed.catalogGameId) {
+        const { searchCatalog } = await import('../src/core/trainer-catalog/store.js');
+        const catalogEntries = searchCatalog('', 500, 0).entries.map((entry) => ({
+          catalogGameId: entry.catalogGameId,
+          displayName: entry.displayName,
+          executables: entry.executables,
+        }));
+        verifiedCatalogGameId = verifyCatalogGameIdForExecutable(
+          parsed.catalogGameId,
+          parsed.executableName,
+          parsed.pid,
+          catalogEntries,
+          mod.matchCatalogProcess,
+        );
+      }
+
       disposeSession(event.sender.id);
       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
       const executableHashSHA256 =
         parsed.executableHashSHA256 ??
-        (parsed.catalogGameId
-          ? hashInstalledExecutableForCatalog(parsed.catalogGameId, parsed.executableName) ??
+        (verifiedCatalogGameId
+          ? hashInstalledExecutableForCatalog(verifiedCatalogGameId, parsed.executableName) ??
             undefined
           : undefined);
 
@@ -139,33 +184,33 @@ export function registerLiveMemoryIpc(): void {
         executableHashSHA256 ||
         parsed.executableHashPrefixes?.length ||
         parsed.targetSHA256 ||
-        parsed.catalogGameId
+        verifiedCatalogGameId
       ) {
         fingerprint = {
           executableHashSHA256,
           executableHashPrefixes: parsed.executableHashPrefixes,
           targetSHA256: parsed.targetSHA256,
           driftAcknowledged: parsed.driftAcknowledged,
-          catalogGameId: parsed.catalogGameId,
+          catalogGameId: verifiedCatalogGameId,
         };
       }
 
-      if (parsed.catalogGameId) {
+      if (verifiedCatalogGameId) {
         const { getModPackForGame, getDefinitionPayload } = await import('../src/core/trainer-catalog/store.js');
         const { modPackToSolithDefinition, definitionFingerprintFields } = await import(
           '../src/core/definitions/mod-pack-adapter.js'
         );
         const definition =
-          getDefinitionPayload(parsed.catalogGameId) ??
+          getDefinitionPayload(verifiedCatalogGameId) ??
           (() => {
-            const pack = getModPackForGame(parsed.catalogGameId!);
+            const pack = getModPackForGame(verifiedCatalogGameId!);
             return pack ? modPackToSolithDefinition(pack) : null;
           })();
         if (definition) {
           const fields = definitionFingerprintFields(definition);
           fingerprint = {
             ...fingerprint,
-            catalogGameId: parsed.catalogGameId,
+            catalogGameId: verifiedCatalogGameId,
             executableHashPrefixes:
               fingerprint?.executableHashPrefixes && fingerprint.executableHashPrefixes.length > 0
                 ? fingerprint.executableHashPrefixes
@@ -189,12 +234,12 @@ export function registerLiveMemoryIpc(): void {
         refreshCrashContext(bundle);
         maybeStartAvowedWingdkBackups({
           executableName: parsed.executableName,
-          catalogGameId: parsed.catalogGameId,
+          catalogGameId: verifiedCatalogGameId,
           manager: bundle.manager,
         });
-        if (result.fingerprintWarning && parsed.catalogGameId) {
+        if (result.fingerprintWarning && verifiedCatalogGameId) {
           const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
-          quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
+          quarantineDefinition(verifiedCatalogGameId, result.fingerprintWarning);
         }
       }
       return result;
@@ -211,8 +256,42 @@ export function registerLiveMemoryIpc(): void {
 
       const parsed = LiveMemoryZeroInputPrepareSchema.parse(payload);
       const mod = await getLiveMemoryModule();
+
+      // Mission 1 fix (hostile review follow-up): zero-input-prepare trusted
+      // the renderer-supplied catalogGameId verbatim, exactly like
+      // live-memory-attach did before its own fix. Concretely exploitable
+      // here too: hashInstalledExecutableForCatalog(catalogGameId, exeName)
+      // returns null when that (catalogGameId, executableName) pairing
+      // isn't a real installed record, which makes verifyDefinitionFingerprint
+      // return status:'skipped' (not 'mismatch') — and fingerprintBlocksAttach
+      // only blocks on 'mismatch', never on 'skipped'. So a lie about
+      // catalogGameId silently degrades to "no fingerprint check" instead of
+      // being rejected. Reusing the exact same verification used for
+      // live-memory-attach, not a second weaker verifier.
+      const { searchCatalog } = await import('../src/core/trainer-catalog/store.js');
+      const zeroInputCatalogEntries = searchCatalog('', 500, 0).entries.map((entry) => ({
+        catalogGameId: entry.catalogGameId,
+        displayName: entry.displayName,
+        executables: entry.executables,
+      }));
+      const verifiedZeroInputCatalogGameId = verifyCatalogGameIdForExecutable(
+        parsed.catalogGameId,
+        parsed.executableName,
+        parsed.pid,
+        zeroInputCatalogEntries,
+        mod.matchCatalogProcess,
+      );
+      if (!verifiedZeroInputCatalogGameId) {
+        return {
+          success: false,
+          error: 'catalog_identity_unverified',
+          planAllowed: false,
+          blockReason: 'The claimed game does not match the trusted catalog for this executable.',
+        };
+      }
+
       const { loadCatalogDefinition } = await import('../src/core/definitions/load-catalog-definition.js');
-      const definition = loadCatalogDefinition(parsed.catalogGameId);
+      const definition = loadCatalogDefinition(verifiedZeroInputCatalogGameId);
 
       disposeSession(event.sender.id);
       const session = new mod.LiveMemorySession(mod.nativeMemoryDriver);
@@ -220,9 +299,9 @@ export function registerLiveMemoryIpc(): void {
 
       const executableHashSHA256 =
         parsed.executableHashSHA256 ??
-        hashInstalledExecutableForCatalog(parsed.catalogGameId, parsed.executableName) ??
+        hashInstalledExecutableForCatalog(verifiedZeroInputCatalogGameId, parsed.executableName) ??
         undefined;
-      const storedHints = featureHintStore.get(parsed.catalogGameId) ?? {};
+      const storedHints = featureHintStore.get(verifiedZeroInputCatalogGameId) ?? {};
       const featureHints = { ...storedHints, ...(parsed.featureHints ?? {}) };
 
       const evidence = await mod.observeRemoteConnections(parsed.pid);
@@ -230,8 +309,8 @@ export function registerLiveMemoryIpc(): void {
         session,
         {
           detection: {
-            catalogGameId: parsed.catalogGameId,
-            displayName: definition?.title ?? parsed.catalogGameId,
+            catalogGameId: verifiedZeroInputCatalogGameId,
+            displayName: definition?.title ?? verifiedZeroInputCatalogGameId,
             pid: parsed.pid,
             executable: parsed.executableName,
           },
@@ -263,7 +342,7 @@ export function registerLiveMemoryIpc(): void {
 
       if (result.fingerprintWarning) {
         const { quarantineDefinition } = await import('../src/core/trainer-catalog/definition-quarantine.js');
-        quarantineDefinition(parsed.catalogGameId, result.fingerprintWarning);
+        quarantineDefinition(verifiedZeroInputCatalogGameId, result.fingerprintWarning);
       }
 
       const nextHints: Record<string, string> = { ...storedHints };
@@ -272,17 +351,17 @@ export function registerLiveMemoryIpc(): void {
           nextHints[feature.featureId] = feature.address;
         }
       }
-      featureHintStore.set(parsed.catalogGameId, nextHints);
+      featureHintStore.set(verifiedZeroInputCatalogGameId, nextHints);
       refreshCrashContext(bundle);
 
       maybeStartAvowedWingdkBackups({
         executableName: parsed.executableName,
-        catalogGameId: parsed.catalogGameId,
+        catalogGameId: verifiedZeroInputCatalogGameId,
         manager: bundle.manager,
       });
 
       const readyPayload = {
-        catalogGameId: parsed.catalogGameId,
+        catalogGameId: verifiedZeroInputCatalogGameId,
         pid: parsed.pid,
         executable: parsed.executableName,
         counts: result.counts,
@@ -335,6 +414,40 @@ export function registerLiveMemoryIpc(): void {
       return { success: true, value };
     } catch (error) {
       return { success: false, error: sanitize(error, 'read_failed') };
+    }
+  });
+
+  /**
+   * Read-only, Trainer-Deck-scoped bridge (Mission 2/3). Deliberately does
+   * NOT reuse LiveMemoryReadSchema's raw {address,dataType} shape — this
+   * handler never trusts a renderer-supplied address at all. It re-resolves
+   * the card's moduleName/baseOffset/pointerChain/dataType itself from the
+   * trusted CT-library shard on disk, keyed only by an opaque reference id,
+   * then delegates the actual read to readTrainerDeckCard (read-preflight.ts
+   * + the production adapter) — no write/freeze/Lua/AA capability anywhere
+   * in this path.
+   */
+  ipcMain.handle('trainer-deck-read-value', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { status: 'blocked', reason: `sender_rejected:${senderCheck.reason}` };
+
+      if (event.sender.isDestroyed()) return { status: 'blocked', reason: 'sender_invalid' };
+      const bundle = sessions.get(event.sender.id);
+      if (!bundle || !bundle.session.isAttached()) return { status: 'not_attached' };
+
+      const parsed = TrainerDeckReadValueSchema.parse(payload);
+      const sessionCatalogGameId =
+        typeof bundle.session.getCatalogGameId === 'function' ? bundle.session.getCatalogGameId() : null;
+
+      const mod = await getLiveMemoryModule();
+      const lookup = mod.parseLibraryEntryId(parsed.libraryEntryId);
+      const detail = lookup ? await getCtLibraryGameDetail(ctLibraryPaths, lookup.gameId) : null;
+      const readState = mod.authorizeTrainerDeckRead(parsed.libraryEntryId, sessionCatalogGameId, detail, bundle.session);
+      refreshCrashContext(bundle);
+      return readState;
+    } catch (error) {
+      return { status: 'blocked', reason: sanitize(error, 'trainer_deck_read_failed') };
     }
   });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import GameLibrary from './routes/GameLibrary';
 import TrainerPage from './pages/TrainerPage';
 import SaveEditor from './pages/SaveEditor';
@@ -14,10 +14,18 @@ import SessionMonitorPage from './pages/SessionMonitorPage';
 import TrainerControlPanel from './pages/TrainerControlPanel';
 import LiveMemoryTrainerPage from './pages/LiveMemoryTrainerPage';
 import TrainerLibraryPage from './pages/TrainerLibraryPage';
+import LinkedLibrariesPage from './pages/LinkedLibrariesPage';
 import TrainerDeckPage from './pages/TrainerDeckPage';
 import CatalogTrainerControlsPage from './pages/CatalogTrainerControlsPage';
 import RegistryExplorerPage from './pages/RegistryExplorerPage';
 import CtLibraryExplorerPage from './pages/CtLibraryExplorerPage';
+import HomePage from './pages/HomePage.js';
+import MyGamesPage from './pages/MyGamesPage.js';
+import GameDetailPage from './pages/GameDetailPage.js';
+import DiscoveryPage from './pages/DiscoveryPage.js';
+import CommunityPage from './pages/CommunityPage.js';
+import { usePersonalLibraryGames } from './hooks/usePersonalLibraryGames.js';
+import { useArtworkCachePriorityFillTrigger } from './hooks/useArtworkCachePriorityFillTrigger.js';
 import { ProcessDetectToast } from './components/ProcessDetectToast.js';
 import { LibraryLaunchDialog, type LibraryLaunchChoice, type LibraryLaunchMode } from './components/LibraryLaunchDialog.js';
 import { Icon, type IconName } from './components/icons/index.js';
@@ -27,6 +35,9 @@ import { SolithTopBanner } from './components/SolithTopBanner.js';
 import { OnboardingWizard } from './components/OnboardingWizard.js';
 import { OpeningCinematic } from './components/OpeningCinematic.js';
 import { SolithWispCompanion } from './components/SolithWispCompanion.js';
+import { SafetyAcknowledgmentModal } from './components/SafetyAcknowledgmentModal.js';
+import { SafetyReminderBanner } from './components/SafetyReminderBanner.js';
+import { SafetyInfoPanel } from './components/SafetyInfoPanel.js';
 import { NAV_MODULE_ARTWORK, SECTION_ARTWORK } from './assets/branding/module-artwork.js';
 import openingCinematicUrl from '../../SOLITH OPENEING SEQUENCE.mp4';
 import { WalkthroughOwner } from './components/PageWalkthrough.js';
@@ -36,8 +47,9 @@ import { useNotifications } from './hooks/useNotifications.js';
 import { NotificationBell } from './components/NotificationBell.js';
 import { NotificationCenter } from './components/NotificationCenter.js';
 import { ToastHost } from './components/ToastHost.js';
+import { AppSidebar } from './components/sidebar/AppSidebar.js';
 import type { Settings, NotificationAction } from '../shared/types/index.js';
-import { type View, isValidView } from './nav-views.js';
+import { type View, isValidView, APP_SIDEBAR_VIEWS } from './nav-views.js';
 
 class ContentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -111,12 +123,14 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'library', label: 'Game Library', icon: 'game' },
       { id: 'trainer-library', label: 'Trainer Library', icon: 'search' },
+      { id: 'linked-libraries', label: 'Linked Libraries', icon: 'database' },
     ],
   },
   {
+    // 'backups' moved to AppSidebar (Discovery Master Pass: Backups is one
+    // of the five primary product destinations) — no longer listed here.
     title: 'Recovery',
     items: [
-      { id: 'backups', label: 'Backups', icon: 'backups' },
       { id: 'locations', label: 'Save Locations', icon: 'search' },
       { id: 'journal', label: 'Journal', icon: 'log' },
     ],
@@ -131,7 +145,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Specialized',
     items: [
-      { id: 'discovery', label: 'Discovery Lab', icon: 'discovery' },
+      { id: 'discovery-lab', label: 'Discovery Lab', icon: 'discovery' },
       { id: 'trainer-research', label: 'Trainer Research Lab', icon: 'search' },
       { id: 'ct-library', label: 'CT Library', icon: 'database' },
       { id: 'registry-explorer', label: 'Registry Explorer', icon: 'database' },
@@ -152,19 +166,81 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 const SIDEBAR_COLLAPSED_KEY = 'solith-sidebar-collapsed';
+// Mission 8: at this width the full 320px sidebar squeezes main content to
+// an unusable ~325px (at a 640px viewport). Matches the narrow breakpoint
+// already used elsewhere in this stylesheet for the same "shrink chrome so
+// content stays usable" purpose (index.css's `.settings-categories` and
+// `.notification-center` `@media (max-width: 900px)` rules) — reusing it
+// here keeps one consistent "narrow app window" threshold across the app
+// instead of inventing a second one. Also covers the real
+// `BrowserWindow.minWidth` (electron/main.ts: 900) so the sidebar is never
+// full-width at the smallest window the app can actually be resized to.
+const NARROW_SIDEBAR_BREAKPOINT_PX = 900;
 
 const App: React.FC = () => {
   const e2eTrainerState = (window as any).electronAPI?.e2eTrainerState as string | null;
   const [showOpeningCinematic, setShowOpeningCinematic] = useState(
     () => !navigator.webdriver && !e2eTrainerState,
   );
-  const [currentView, setCurrentView] = useState<View>(e2eTrainerState ? 'trainer' : 'library');
+  // Visual Library 2.0: cold launch must open on the personal-library Home
+  // page, not the legacy Game Library view — this is the owner's explicit
+  // success condition ("SOLITH opens like a personal gaming application").
+  // No persisted last-view setting exists yet (checked src/core/settings) —
+  // when one is added, it should take precedence over this default and only
+  // fall back to 'home' when nothing is persisted.
+  const [currentView, setCurrentView] = useState<View>(e2eTrainerState ? 'trainer' : 'home');
   const [selectedGame, setSelectedGame] = useState<{ id: string; name: string } | null>(
     e2eTrainerState ? { id: 'e2e-renderer-state-fixture', name: 'Renderer State Fixture' } : null
   );
   const [selectedCategory, setSelectedCategory] = useState('all');
+  // Visual Library 2.0 sidebar: which canonical game a card selection should
+  // open on the (placeholder, this step) game-detail view. Deliberately
+  // separate from `selectedGame` above, which belongs to the older
+  // Game Library / trainer-category flow and uses a different id space.
+  const [selectedLibraryGameId, setSelectedLibraryGameId] = useState<string | null>(null);
+  // Discovery Master Pass, Stage 2 — game-detail's "Back" previously always
+  // returned to 'home' regardless of where the selection came from, which
+  // is a real return-navigation bug for the Discovery -> card -> detail ->
+  // Back flow (section 12's click-through review explicitly covers "return
+  // navigation"). Captured at selection time in handleLibraryGameSelect.
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<View>('home');
+  // Real personal-library data (Visual Library 2.0, Step 5) — feeds
+  // HomePage and MyGamesPage below. See usePersonalLibraryGames.ts's header
+  // for exactly which fields are real vs. reduced-fidelity.
+  const { myGames, runningGame, favoriteGames, loading: personalLibraryLoading } = usePersonalLibraryGames();
+  // ROADMAP Mission 4 — fire-and-forget artwork-cache auto-population for
+  // the user's own personal games, scoped by real priority signals (running
+  // > installed > confirmed-owned > favorited > recently-detected). App.tsx
+  // is the single long-lived mount point for usePersonalLibraryGames' data,
+  // so this fires once per real signal-set change rather than once per
+  // call site (HomePage/MyGamesPage/AppSidebar/etc. each mount their own
+  // instance of the hook). See useArtworkCachePriorityFillTrigger.ts.
+  useArtworkCachePriorityFillTrigger({ runningGame, favoriteGames, myGames });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+    try {
+      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      if (stored !== null) return stored === '1';
+    } catch { /* ignore — fall through to width-based default below */ }
+    // No manual preference recorded yet (first launch, or a fresh profile):
+    // default to collapsed when starting at a narrow width so main content
+    // isn't squeezed before the user ever touches the toggle. See Mission 8
+    // — matches the auto-collapse-at-narrow-width effect below.
+    try {
+      return window.matchMedia(`(max-width: ${NARROW_SIDEBAR_BREAKPOINT_PX}px)`).matches;
+    } catch {
+      return false;
+    }
+  });
+  // Tracks whether the app window is currently at/below the narrow-sidebar
+  // breakpoint, independent of `sidebarCollapsed` (the user's manual/
+  // persisted preference) — see the transition effect below for how the two
+  // interact.
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() => {
+    try {
+      return window.matchMedia(`(max-width: ${NARROW_SIDEBAR_BREAKPOINT_PX}px)`).matches;
+    } catch {
+      return false;
+    }
   });
   const [games, setGames] = useState<
     Array<{ id: string; name: string; path: string; dateAdded: string; lastScan: string; engine: string }>
@@ -186,6 +262,13 @@ const App: React.FC = () => {
   const [pendingLibraryLaunch, setPendingLibraryLaunch] = useState<LibraryLaunchChoice | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
+  // Offline Safety Acknowledgment (Policy v1, BLOCKER-01). null = not yet
+  // loaded — the app shell renders a minimal loading screen rather than
+  // flashing full content before we know whether acknowledgment is required.
+  const [safetyAckState, setSafetyAckState] = useState<'ACK_REQUIRED' | 'REMINDER_DUE' | 'NO_ACTION' | null>(null);
+  const [safetyAckBusy, setSafetyAckBusy] = useState(false);
+  const [showSafetyReminderBanner, setShowSafetyReminderBanner] = useState(false);
+  const [showSafetyInfo, setShowSafetyInfo] = useState(false);
   const finishOpeningCinematic = useCallback(() => {
     setShowOpeningCinematic(false);
   }, []);
@@ -204,6 +287,54 @@ const App: React.FC = () => {
         // ignore — browser mode
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const api = (window as any).electronAPI;
+        if (!api?.getSafetyAckState) {
+          // Browser/no-Electron-bridge mode — never block on safety
+          // acknowledgment when there is no real app to gate.
+          setSafetyAckState('NO_ACTION');
+          return;
+        }
+        const result = await api.getSafetyAckState();
+        const state = result?.success ? result.state : undefined;
+        setSafetyAckState(state === 'ACK_REQUIRED' || state === 'REMINDER_DUE' || state === 'NO_ACTION' ? state : 'ACK_REQUIRED');
+        setShowSafetyReminderBanner(state === 'REMINDER_DUE');
+      } catch {
+        // Fail closed — an error determining safety-ack state must never
+        // silently grant access; worst case is the dialog appears.
+        setSafetyAckState('ACK_REQUIRED');
+      }
+    })();
+  }, []);
+
+  const handleSafetyAcknowledge = useCallback(async () => {
+    setSafetyAckBusy(true);
+    try {
+      const api = (window as any).electronAPI;
+      const result = await api?.recordSafetyAcknowledgment?.();
+      // Regardless of the persistence outcome, an explicit user click on
+      // "I Understand — Continue" is honored for the current session —
+      // failing to persist means the dialog will reappear on next launch
+      // (fail-closed for FUTURE sessions), not a stuck dialog THIS session.
+      setSafetyAckState(result?.success && result.state ? result.state : 'NO_ACTION');
+      setShowSafetyReminderBanner(false);
+    } finally {
+      setSafetyAckBusy(false);
+    }
+  }, []);
+
+  const handleDismissSafetyReminder = useCallback(async () => {
+    setShowSafetyReminderBanner(false);
+    try {
+      await (window as any).electronAPI?.recordSafetyReminderDismissal?.();
+    } catch {
+      // Non-blocking UX — a failed persist just means the reminder may
+      // reappear sooner than 30 days on next evaluation; never fatal.
+    }
   }, []);
 
   const updateSetting = useCallback((key: keyof Settings, value: Settings[keyof Settings]) => {
@@ -262,6 +393,50 @@ const App: React.FC = () => {
 
   useEffect(() => { loadGames(); }, []);
 
+  // Mission 8 — auto-collapse the sidebar at narrow widths so main content
+  // never gets squeezed to the sidebar's full 320px, while still respecting
+  // whatever the user does manually. Listens for real viewport crossings of
+  // NARROW_SIDEBAR_BREAKPOINT_PX (not a one-time check) so resizing the
+  // Electron window live re-evaluates it.
+  useEffect(() => {
+    let mql: MediaQueryList;
+    try {
+      mql = window.matchMedia(`(max-width: ${NARROW_SIDEBAR_BREAKPOINT_PX}px)`);
+    } catch {
+      return;
+    }
+    const handleChange = (event: MediaQueryListEvent) => setIsNarrowViewport(event.matches);
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, []);
+
+  // `null` on first run means "we haven't observed a starting viewport
+  // category yet" — this makes the very first effect run below behave like
+  // an initial-mount check (apply the narrow default if we start narrow)
+  // rather than a transition, without duplicating the transition logic.
+  const prevIsNarrowViewportRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const wasNarrow = prevIsNarrowViewportRef.current;
+    prevIsNarrowViewportRef.current = isNarrowViewport;
+    if (wasNarrow === isNarrowViewport) return; // no real crossing — never fight a manual toggle mid-session
+    if (isNarrowViewport) {
+      // Entering (or starting at) a narrow width: prefer the compact state.
+      // This does NOT touch localStorage — it's an automatic suggestion, not
+      // a user choice, so it must not overwrite what the user asked for the
+      // next time they're at a wide width.
+      setSidebarCollapsed(true);
+    } else if (wasNarrow !== null) {
+      // Leaving narrow for wide (a real transition, not the initial mount):
+      // restore the user's manual/persisted preference rather than staying
+      // auto-collapsed forever.
+      try {
+        setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1');
+      } catch {
+        setSidebarCollapsed(false);
+      }
+    }
+  }, [isNarrowViewport]);
+
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -272,6 +447,12 @@ const App: React.FC = () => {
 
   const navigateTo = (view: View) => {
     setCurrentView(view);
+  };
+
+  const handleLibraryGameSelect = (gameId: string) => {
+    setGameDetailOrigin(currentView);
+    setSelectedLibraryGameId(gameId);
+    setCurrentView('game-detail');
   };
 
   const loadGames = async () => {
@@ -324,6 +505,11 @@ const App: React.FC = () => {
   };
 
   const isNavActive = (view: View) => currentView === view;
+  // Exactly ONE nav surface renders per view — see nav-views.ts's
+  // APP_SIDEBAR_VIEWS doc comment for the partition rationale. This is a
+  // plain if/else on membership, not two independently-evaluated
+  // conditions, so the two surfaces are structurally mutually exclusive.
+  const isAppSidebarView = APP_SIDEBAR_VIEWS.includes(currentView);
   const activeSectionTitle = NAV_SECTIONS.find((section) =>
     section.items.some((item) => item.id === currentView),
   )?.title ?? null;
@@ -378,8 +564,12 @@ const App: React.FC = () => {
         return <SaveEditor gameId={selectedGame?.id ?? null} />;
       case 'data':
         return <SaveEditor gameId={selectedGame?.id ?? null} mode="data" />;
-      case 'discovery':
+      case 'discovery-lab':
         return <DiscoveryLab gameId={selectedGame?.id ?? null} />;
+      case 'discovery':
+        return <DiscoveryPage onSelectGame={handleLibraryGameSelect} />;
+      case 'community':
+        return <CommunityPage />;
       case 'trainer-research':
         return <ExternalTrainerResearchLab />;
       case 'registry-explorer':
@@ -402,6 +592,8 @@ const App: React.FC = () => {
         return <SessionMonitorPage />;
       case 'trainer-library':
         return <TrainerLibraryPage onLaunchGame={handleLibraryLaunch} />;
+      case 'linked-libraries':
+        return <LinkedLibrariesPage />;
       case 'live-memory':
         return <LiveMemoryTrainerPage initialCatalogGameId={libraryLaunchGameId} />;
       case 'catalog-save-controls':
@@ -427,6 +619,47 @@ const App: React.FC = () => {
         );
       case 'controls':
         return <TrainerControlPanel />;
+      // 'home' / 'my-games': real View ids (nav-views.ts), now wired to
+      // their real page components (Visual Library 2.0, Step 5).
+      case 'home':
+        return (
+          <HomePage
+            myGames={myGames}
+            loading={personalLibraryLoading}
+            onSelectGame={handleLibraryGameSelect}
+            onBrowseAll={() => setCurrentView('trainer-library')}
+          />
+        );
+      case 'my-games':
+        return (
+          <MyGamesPage
+            myGames={myGames}
+            loading={personalLibraryLoading}
+            onSelectGame={handleLibraryGameSelect}
+          />
+        );
+      case 'game-detail':
+        // Visual Library 2.0, Step 7: real GameDetailPage, wired to the same
+        // myGames data Home/My Games already load. Back-navigation returns
+        // to gameDetailOrigin (Discovery Master Pass, Stage 2 fix — see
+        // gameDetailOrigin's declaration above) rather than always 'home';
+        // see GameDetailPage.tsx's header for the full audit of which
+        // actions are real vs. omitted.
+        return selectedLibraryGameId ? (
+          <GameDetailPage
+            gameId={selectedLibraryGameId}
+            myGames={myGames}
+            onBack={() => setCurrentView(gameDetailOrigin)}
+            onOpenTrainer={openLiveTrainerFromDeck}
+          />
+        ) : (
+          <HomePage
+            myGames={myGames}
+            loading={personalLibraryLoading}
+            onSelectGame={handleLibraryGameSelect}
+            onBrowseAll={() => setCurrentView('trainer-library')}
+          />
+        );
       case 'settings':
         return (
           <SettingsPage
@@ -441,8 +674,38 @@ const App: React.FC = () => {
     }
   };
 
+  // Offline Safety Acknowledgment (Policy v1, BLOCKER-01): while required,
+  // this is the ENTIRE returned tree — no sidebar, no content, nothing to
+  // Tab or click into behind the dialog. This is what makes the dialog
+  // un-bypassable, not a focus trap layered on top of a rendered app.
+  if (safetyAckState === null) {
+    return (
+      <div className="app-container">
+        <div className="loading-state">
+          <div className="loading-brand" aria-hidden="true">
+            <img src={solithBranding.solithEmblem} alt="" />
+          </div>
+          <div className="loading-spinner" aria-hidden="true" />
+          <span>Loading Solith…</span>
+        </div>
+      </div>
+    );
+  }
+  if (safetyAckState === 'ACK_REQUIRED') {
+    return <SafetyAcknowledgmentModal onAcknowledge={handleSafetyAcknowledge} busy={safetyAckBusy} />;
+  }
+
   return (
     <div className={`app-container${sidebarCollapsed ? ' app-container--sidebar-collapsed' : ''}${navCompactMode ? ' app-container--nav-compact' : ''}`}>
+      {showSafetyReminderBanner && (
+        <SafetyReminderBanner
+          onDismiss={handleDismissSafetyReminder}
+          onShowSafetyInfo={() => setShowSafetyInfo(true)}
+        />
+      )}
+      {showSafetyInfo && (
+        <SafetyInfoPanel onClose={() => setShowSafetyInfo(false)} />
+      )}
       <aside
         className={`sidebar${sidebarCollapsed ? ' sidebar--collapsed' : ''}${navCompactMode ? ' sidebar--compact' : ''}`}
         aria-label="Main navigation"
@@ -500,85 +763,96 @@ const App: React.FC = () => {
         </div>
 
         <div id="app-nav" className="sidebar-nav">
-          {NAV_SECTIONS.map((section) => {
-            const collapsed = isSectionCollapsed(section.title);
-            return (
-            <nav
-              key={section.title}
-              className={`nav-section${section.secondary ? ' nav-section--secondary' : ''}${collapsed ? ' nav-section--collapsed' : ''}`}
-              aria-label={section.title}
-            >
-              <h3>
-                {SECTION_ARTWORK[section.title] && !sidebarCollapsed ? (
-                  <BrandingArtwork artwork={SECTION_ARTWORK[section.title]!} size="section" />
-                ) : null}
-                {!sidebarCollapsed && navShowSectionLabels && <span>{section.title}</span>}
-                {!sidebarCollapsed && canManuallyToggleSection && (
+          {isAppSidebarView ? (
+            <AppSidebar
+              currentView={currentView}
+              onNavigate={navigateTo}
+              onSelectGame={handleLibraryGameSelect}
+              isCollapsed={sidebarCollapsed}
+            />
+          ) : (
+            <>
+              {NAV_SECTIONS.map((section) => {
+                const collapsed = isSectionCollapsed(section.title);
+                return (
+                <nav
+                  key={section.title}
+                  className={`nav-section${section.secondary ? ' nav-section--secondary' : ''}${collapsed ? ' nav-section--collapsed' : ''}`}
+                  aria-label={section.title}
+                >
+                  <h3>
+                    {SECTION_ARTWORK[section.title] && !sidebarCollapsed ? (
+                      <BrandingArtwork artwork={SECTION_ARTWORK[section.title]!} size="section" />
+                    ) : null}
+                    {!sidebarCollapsed && navShowSectionLabels && <span>{section.title}</span>}
+                    {!sidebarCollapsed && canManuallyToggleSection && (
+                      <button
+                        type="button"
+                        className="nav-section-toggle"
+                        onClick={() => toggleSection(section.title)}
+                        aria-expanded={!collapsed}
+                        aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${section.title} section`}
+                        title={`${collapsed ? 'Expand' : 'Collapse'} ${section.title}`}
+                      >
+                        <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                      </button>
+                    )}
+                  </h3>
+                  {(!collapsed || sidebarCollapsed) && section.items.map((item) => {
+                    const artwork = NAV_MODULE_ARTWORK[item.id];
+                    return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => navigateTo(item.id)}
+                      className={isNavActive(item.id) ? 'active' : ''}
+                      title={item.label}
+                      data-testid={item.testId}
+                    >
+                      <span className={`nav-icon-slot${artwork ? ' nav-icon-slot--artwork' : ''}`}>
+                        {artwork ? (
+                          <BrandingArtwork artwork={artwork} size="nav" className="w-6 h-6 object-contain" />
+                        ) : (
+                          <Icon name={item.icon} size={54} />
+                        )}
+                      </span>
+                      <span className="nav-label">{item.label}</span>
+                    </button>
+                  );
+                  })}
+                </nav>
+                );
+              })}
+
+              {selectedGame && (
+                <nav className="nav-section nav-section--context" aria-label="Game trainer categories">
+                  <h3>{sidebarCollapsed ? 'Game' : selectedGame.name}</h3>
                   <button
                     type="button"
-                    className="nav-section-toggle"
-                    onClick={() => toggleSection(section.title)}
-                    aria-expanded={!collapsed}
-                    aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${section.title} section`}
-                    title={`${collapsed ? 'Expand' : 'Collapse'} ${section.title}`}
+                    onClick={() => navigateTo('trainer')}
+                    className={currentView === 'trainer' && selectedCategory === 'all' ? 'active' : ''}
+                    title="Game Trainer"
                   >
-                    <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                    <span className="nav-icon-slot nav-icon-slot--artwork">
+                      <BrandingArtwork artwork="trainerController" size="nav" />
+                    </span>
+                    <span className="nav-label">Game Trainer</span>
                   </button>
-                )}
-              </h3>
-              {(!collapsed || sidebarCollapsed) && section.items.map((item) => {
-                const artwork = NAV_MODULE_ARTWORK[item.id];
-                return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => navigateTo(item.id)}
-                  className={isNavActive(item.id) ? 'active' : ''}
-                  title={item.label}
-                  data-testid={item.testId}
-                >
-                  <span className={`nav-icon-slot${artwork ? ' nav-icon-slot--artwork' : ''}`}>
-                    {artwork ? (
-                      <BrandingArtwork artwork={artwork} size="nav" className="w-6 h-6 object-contain" />
-                    ) : (
-                      <Icon name={item.icon} size={54} />
-                    )}
-                  </span>
-                  <span className="nav-label">{item.label}</span>
-                </button>
-              );
-              })}
-            </nav>
-            );
-          })}
-
-          {selectedGame && (
-            <nav className="nav-section nav-section--context" aria-label="Game trainer categories">
-              <h3>{sidebarCollapsed ? 'Game' : selectedGame.name}</h3>
-              <button
-                type="button"
-                onClick={() => navigateTo('trainer')}
-                className={currentView === 'trainer' && selectedCategory === 'all' ? 'active' : ''}
-                title="Game Trainer"
-              >
-                <span className="nav-icon-slot nav-icon-slot--artwork">
-                  <BrandingArtwork artwork="trainerController" size="nav" />
-                </span>
-                <span className="nav-label">Game Trainer</span>
-              </button>
-              {!sidebarCollapsed && TRAINER_CATEGORIES.filter((cat) => cat.id !== 'all').map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => { setSelectedCategory(cat.id); navigateTo('trainer'); }}
-                  className={currentView === 'trainer' && selectedCategory === cat.id ? 'active' : ''}
-                  title={cat.label}
-                >
-                  <span className="nav-category-dot" aria-hidden="true" />
-                  <span className="nav-label">{cat.label}</span>
-                </button>
-              ))}
-            </nav>
+                  {!sidebarCollapsed && TRAINER_CATEGORIES.filter((cat) => cat.id !== 'all').map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => { setSelectedCategory(cat.id); navigateTo('trainer'); }}
+                      className={currentView === 'trainer' && selectedCategory === cat.id ? 'active' : ''}
+                      title={cat.label}
+                    >
+                      <span className="nav-category-dot" aria-hidden="true" />
+                      <span className="nav-label">{cat.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              )}
+            </>
           )}
         </div>
       </aside>

@@ -346,6 +346,23 @@ export function setCatalogEntryOwnedConfirmed(catalogGameId: string, owned: bool
   );
 }
 
+/**
+ * Personal Library Completion — Final Closure Pass, Mission 3. A narrow,
+ * indexed read (WHERE ownedConfirmed = 1) so the Trainer Library page's
+ * fast path (Running/Installed/Owned/Favorites) never needs to fetch or
+ * scan the full ~6,800-row catalog just to learn which handful of games the
+ * user explicitly confirmed owning — mirrors listFavoriteIds()'s shape
+ * (favorites/store.ts) and is intentionally just as small/fast: the number
+ * of user-confirmed-owned rows is bounded by real user action, never the
+ * catalog's total size.
+ */
+export function listOwnedConfirmedCatalogGameIds(): string[] {
+  const rows = db.prepare('SELECT catalogGameId FROM trainer_catalog_games WHERE ownedConfirmed = 1').all() as Array<{
+    catalogGameId: string;
+  }>;
+  return rows.map((row) => row.catalogGameId);
+}
+
 export function upsertModPack(pack: ModPack): void {
   const certLevel: HubCertificationLevel =
     pack.source.provider === 'bundled' ? 'L3_Certified' : 'L0_Community';

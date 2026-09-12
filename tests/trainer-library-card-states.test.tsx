@@ -86,16 +86,23 @@ describe('card markup — badge separation and action hierarchy (source-level, m
     assert.match(PAGE_SOURCE, /healthStatus === 'stale' \|\| healthStatus === 'quarantined'/);
   });
 
-  test('corrective pass: status row renders exactly one badge per card, not a tier badge plus a separate scan-required chip', () => {
-    // The original redesign still paired a tier badge with a second
-    // "Scan required" chip — two chips saying overlapping things. The
-    // scan-required signal now lives in this one badge's title tooltip
-    // (tierHint) and in the primary action's own label, not a second chip.
-    const detailsBlockMatch = PAGE_SOURCE.match(/<div className=\{styles\.statusRow\}>[\s\S]*?<\/div>/);
+  test('corrective pass (Mission 10 reversal): status row renders AT MOST two badges — the catalog tier/stale badge, plus Mission 10\'s distinct personal trainer-accuracy badge — never a redundant third chip', () => {
+    // REVERSAL NOTICE (Personal Library Completion pass, Phase 2, Mission 10,
+    // 2026-09-10): the "exactly one badge" invariant this test used to
+    // enforce predates the accuracy-badge requirement. Mission 10's spec
+    // explicitly authorizes "a second small one" badge slot when merging
+    // would cause more confusion than clutter (a catalog-trust signal and a
+    // personal trainer-accuracy signal are genuinely different facts, not
+    // overlapping ones the way the old "tier badge + Scan required chip"
+    // pair was) — see TrainerLibraryPage.tsx's own comment on
+    // accuracyBadgeLabel. The original "Scan required" duplicate-chip bug
+    // this test was written to catch is still checked below and still must
+    // never come back; only the raw badge *count* ceiling changed, from 1 to 2.
+    const detailsBlockMatch = PAGE_SOURCE.match(/<div className=\{styles\.statusRow\}>[\s\S]*?\n {8}<\/div>/);
     assert.ok(detailsBlockMatch, 'expected a statusRow block');
     const block = detailsBlockMatch[0];
     const badgeCount = (block.match(/<span/g) ?? []).length;
-    assert.equal(badgeCount, 1, 'statusRow should render exactly one <span> badge');
+    assert.equal(badgeCount, 2, 'statusRow should render at most 2 distinct <span> badge slots (tier/stale, and Mission 10 accuracy)');
     assert.ok(!PAGE_SOURCE.includes('Scan required</span>'), 'no separate "Scan required" chip should remain');
   });
 
@@ -218,21 +225,24 @@ describe('round 5 — generic cards drop the redundant monogram and the contradi
   });
 });
 
-describe('round 4 — default ordering uses the pure orderCatalogDefault helper', () => {
-  test('the page imports and calls orderCatalogDefault for the default sort mode, not an inline installed+alpha comparator', () => {
-    assert.match(PAGE_SOURCE, /import \{ orderCatalogDefault \} from '\.\/trainer-catalog-default-order\.js';/);
-    assert.match(PAGE_SOURCE, /orderCatalogDefault\(filteredEntries, installedIds\)/);
+describe('round 4 — default ordering uses the frozen section-hierarchy organizer (supersedes orderCatalogDefault)', () => {
+  // Personal Library Completion pass (ROADMAP §3.3, FROZEN) replaced the
+  // old default-order helper (orderCatalogDefault) and the old inline
+  // installed+alpha comparator with organizeLibrary's 5-section hierarchy.
+  // orderCatalogDefault itself is not deleted (other callers may still use
+  // it) but it no longer drives the Trainer Library page.
+  test('the page imports and calls organizeLibrary for the default section ordering, not orderCatalogDefault', () => {
+    assert.match(PAGE_SOURCE, /from '\.\.\/\.\.\/core\/trainer-catalog\/library-sections\.js'/);
+    assert.match(PAGE_SOURCE, /organizeLibrary\(favoriteFilteredEvidence\)/);
+    assert.doesNotMatch(PAGE_SOURCE, /orderCatalogDefault\(/, 'the retired default-order helper must not drive the page');
   });
 
-  test('explicit A-Z mode stays a separate, untouched pure alphabetical branch', () => {
-    assert.match(
-      PAGE_SOURCE,
-      /sortMode === 'a-z'\s*\n\s*\? filteredEntries\.slice\(\)\.sort\(\(a, b\) => a\.displayName\.localeCompare\(b\.displayName\)\)/,
-    );
+  test('explicit flat A-Z view stays a separate, untouched pure alphabetical branch', () => {
+    assert.match(PAGE_SOURCE, /flatAZView \? sortLibraryAZ\(favoriteFilteredEvidence\) : null/);
   });
 
-  test('filters run before ordering — filteredEntries is computed once and shared by both branches', () => {
-    assert.match(PAGE_SOURCE, /const filteredEntries = entries\.filter\(/);
+  test('filters run before ordering — filteredEntries is computed once and shared by every section/flat branch', () => {
+    assert.match(PAGE_SOURCE, /const filteredEntries = filterTrainerLibraryEntries\(/);
   });
 });
 

@@ -1,5 +1,6 @@
 import db from '../database';
 import { Settings, NavSectionBehaviorMode } from '../../shared/types';
+import { SAFETY_POLICY_VERSION, evaluateSafetyAckState, type SafetyAckState } from '../safety-acknowledgment/policy';
 
 const NAV_SECTION_BEHAVIOR_MODES: NavSectionBehaviorMode[] = [
   'remember', 'always-expand', 'always-collapse-inactive',
@@ -7,6 +8,12 @@ const NAV_SECTION_BEHAVIOR_MODES: NavSectionBehaviorMode[] = [
 
 function isValidNavSectionBehaviorMode(value: unknown): value is NavSectionBehaviorMode {
   return typeof value === 'string' && (NAV_SECTION_BEHAVIOR_MODES as string[]).includes(value);
+}
+
+const LIBRARY_VIEW_MODES: Array<Settings['libraryViewMode']> = ['grid', 'list'];
+
+function isValidLibraryViewMode(value: unknown): value is 'grid' | 'list' {
+  return typeof value === 'string' && (LIBRARY_VIEW_MODES as string[]).includes(value);
 }
 
 export function getSettings(): Settings {
@@ -29,6 +36,8 @@ export function getSettings(): Settings {
     'notificationsArtworkEnabled', 'notificationsTrainerProfileEnabled',
     'notificationsMaintenanceEnabled', 'notificationsShowUnreadBadge',
     'communitySyncEverSucceeded',
+    'safetyAckPolicyVersion', 'safetyAckAt', 'safetyReminderDismissedAt',
+    'libraryViewMode',
     'artworkNoticeAckPolicyVersion', 'artworkNoticeAckAt',
   ];
   
@@ -86,10 +95,18 @@ export function getSettings(): Settings {
     notificationsMaintenanceEnabled: settings.notificationsMaintenanceEnabled !== false,
     notificationsShowUnreadBadge: settings.notificationsShowUnreadBadge !== false,
     communitySyncEverSucceeded: settings.communitySyncEverSucceeded === true,
-    // Game Artwork Notice (Policy v1) -- deliberately left absent (undefined)
-    // rather than defaulted to 0/false when no row exists, matching the
-    // Offline Safety Acknowledgment pattern: "never acknowledged" must stay
-    // distinguishable from "explicitly acknowledged policy version 0".
+    // Offline Safety Acknowledgment (Policy v1) — deliberately left absent
+    // (undefined) rather than defaulted to 0/false when no row exists.
+    // "Never acknowledged" must be a distinct, honest state from "explicitly
+    // acknowledged policy version 0" — see evaluateSafetyAckState's
+    // fail-closed handling of a missing value.
+    safetyAckPolicyVersion: typeof settings.safetyAckPolicyVersion === 'number' ? settings.safetyAckPolicyVersion : undefined,
+    safetyAckAt: typeof settings.safetyAckAt === 'number' ? settings.safetyAckAt : undefined,
+    safetyReminderDismissedAt: typeof settings.safetyReminderDismissedAt === 'number' ? settings.safetyReminderDismissedAt : undefined,
+    libraryViewMode: isValidLibraryViewMode(settings.libraryViewMode) ? settings.libraryViewMode : 'grid',
+    // Artwork Notice (Policy v1) — same "absent, not defaulted" honesty as
+    // the Offline Safety Acknowledgment above: "never acknowledged" must
+    // stay distinguishable from "explicitly acknowledged policy version 0".
     artworkNoticeAckPolicyVersion: typeof settings.artworkNoticeAckPolicyVersion === 'number' ? settings.artworkNoticeAckPolicyVersion : undefined,
     artworkNoticeAckAt: typeof settings.artworkNoticeAckAt === 'number' ? settings.artworkNoticeAckAt : undefined,
   };
@@ -243,6 +260,54 @@ export function setNotificationsShowUnreadBadge(enabled: boolean): void {
 
 export function getNotificationsShowUnreadBadge(): boolean {
   return getSetting('notificationsShowUnreadBadge') !== false;
+}
+
+/**
+ * Records a fresh Offline Safety Acknowledgment at the CURRENT policy
+ * version and the current time — this is the only writer for these two
+ * settings; there is no path that sets them independently of an actual
+ * acknowledgment action.
+ */
+export function recordSafetyAcknowledgment(nowMs: number = Date.now()): void {
+  setSetting('safetyAckPolicyVersion', SAFETY_POLICY_VERSION);
+  setSetting('safetyAckAt', nowMs);
+}
+
+export function recordSafetyReminderDismissal(nowMs: number = Date.now()): void {
+  setSetting('safetyReminderDismissedAt', nowMs);
+}
+
+export function getSafetyAckState(nowMs: number = Date.now()): SafetyAckState {
+  // Mirrors the existing onboarding test-bypass pattern (see
+  // getSettings()'s NODE_ENV === 'test' handling above) so the many
+  // existing Electron/Playwright fixtures that never seed a safety
+  // acknowledgment (generic smoke, Personal Library fixtures) do not
+  // suddenly start hitting the blocking dialog. The DEDICATED safety-ack
+  // e2e suite opts back into real evaluation via SOLITH_TEST_FORCE_SAFETY_ACK,
+  // since it specifically exists to exercise this real behavior.
+  const testBypassActive =
+    (process.env.NODE_ENV === 'test' || process.env.SOLITH_SKIP_ONBOARDING === '1') &&
+    process.env.SOLITH_TEST_FORCE_SAFETY_ACK !== '1';
+  if (testBypassActive) return 'NO_ACTION';
+
+  const settings = getSettings();
+  return evaluateSafetyAckState(
+    {
+      safetyAckPolicyVersion: settings.safetyAckPolicyVersion,
+      safetyAckAt: settings.safetyAckAt,
+      safetyReminderDismissedAt: settings.safetyReminderDismissedAt,
+    },
+    nowMs,
+  );
+}
+
+export function getLibraryViewMode(): 'grid' | 'list' {
+  const value = getSetting('libraryViewMode');
+  return isValidLibraryViewMode(value) ? value : 'grid';
+}
+
+export function setLibraryViewMode(mode: 'grid' | 'list'): void {
+  setSetting('libraryViewMode', mode);
 }
 
 export function getCommunitySyncEverSucceeded(): boolean {
