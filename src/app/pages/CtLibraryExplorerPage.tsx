@@ -33,7 +33,8 @@ interface DetailResponse {
 interface CtZipPreviewResponse {
   success: boolean;
   jobId: string;
-  archivePath?: string;
+  receiptId?: string;
+  expiresAt?: number;
   filename?: string;
   totals?: CtZipCatalogEntry extends never ? never : {
     ctFiles: number;
@@ -46,6 +47,7 @@ interface CtZipPreviewResponse {
   };
   rejected?: Array<{ archivePath: string; reason: string }>;
   games?: Array<{
+    id: string;
     game: string;
     tableName: string;
     archivePath: string;
@@ -212,6 +214,7 @@ export default function CtLibraryExplorerPage() {
   const [importState, dispatchImport] = useReducer(ctImportUiReducer, idleCtImportUiState);
   const [pendingPreview, setPendingPreview] = useState<CtZipPreviewResponse | null>(null);
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
+  const [selectedPreviewIds, setSelectedPreviewIds] = useState<Set<string>>(new Set());
   const importSingleFlight = useRef(createCtImportSingleFlight()).current;
 
   const selected = useMemo(
@@ -288,6 +291,7 @@ export default function CtLibraryExplorerPage() {
     dispatchImport({ type: 'start', jobId, label: 'Building Preview...' });
     setPendingPreview(null);
     setPendingSelectionId(null);
+    setSelectedPreviewIds(new Set());
     setMessage('');
     try {
       const result = await api.ctLibraryImportZipPreview({ selectionId: picked.selectionId, jobId }) as CtZipPreviewResponse;
@@ -304,6 +308,7 @@ export default function CtLibraryExplorerPage() {
         });
         setPendingPreview(result);
         setPendingSelectionId(picked.selectionId);
+        setSelectedPreviewIds(new Set(result.games?.map((entry) => entry.id) ?? []));
         setMessage(
           `Preview ready — ${formatNumber(result.totals?.compiledTables)} tables, ${formatNumber(result.totals?.cheats)} metadata entries. Confirm Import to persist.`,
         );
@@ -325,8 +330,12 @@ export default function CtLibraryExplorerPage() {
   const handleConfirmImportZip = async () => {
     await importSingleFlight.run(async () => {
     const api = window.electronAPI;
-    if (!api?.ctLibraryImportZipStart || !pendingSelectionId) {
+    if (!api?.ctLibraryImportZipStart || !pendingSelectionId || !pendingPreview?.receiptId) {
       setMessage('No CT ZIP preview is ready to confirm.');
+      return;
+    }
+    if (selectedPreviewIds.size === 0) {
+      setMessage('Select at least one previewed CT table before confirming import.');
       return;
     }
     const confirmed = window.confirm(
@@ -340,7 +349,12 @@ export default function CtLibraryExplorerPage() {
     dispatchImport({ type: 'start', jobId, label: 'Writing Metadata Catalog...' });
     setMessage('');
     try {
-      const result = await api.ctLibraryImportZipStart({ selectionId: pendingSelectionId, jobId });
+      const result = await api.ctLibraryImportZipStart({
+        selectionId: pendingSelectionId,
+        receiptId: pendingPreview.receiptId,
+        selectedIds: [...selectedPreviewIds].sort(),
+        jobId,
+      });
       if (result.success) {
         dispatchImport({
           type: 'complete',
@@ -357,6 +371,7 @@ export default function CtLibraryExplorerPage() {
         );
         setPendingPreview(null);
         setPendingSelectionId(null);
+        setSelectedPreviewIds(new Set());
         await load();
       } else {
         dispatchImport({
@@ -376,6 +391,7 @@ export default function CtLibraryExplorerPage() {
   const handleDeclineImportZip = () => {
     setPendingPreview(null);
     setPendingSelectionId(null);
+    setSelectedPreviewIds(new Set());
     dispatchImport({ type: 'reset' });
     setMessage('CT ZIP import declined. Preview wrote no catalog records.');
   };
@@ -466,10 +482,24 @@ export default function CtLibraryExplorerPage() {
               {' · '}AOBs: {formatNumber(pendingPreview.totals?.aobSignatures)}
             </small>
             {(pendingPreview.games?.length ?? 0) > 0 && (
-              <small>
-                Preview sample: {pendingPreview.games!.slice(0, 5).map((entry) => entry.game).join(', ')}
-                {pendingPreview.games!.length > 5 ? '…' : ''}
-              </small>
+              <fieldset className={styles.previewSelection}>
+                <legend>Select CT tables ({selectedPreviewIds.size} of {pendingPreview.games!.length})</legend>
+                {pendingPreview.games!.map((entry) => (
+                  <label key={entry.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedPreviewIds.has(entry.id)}
+                      onChange={(event) => setSelectedPreviewIds((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(entry.id);
+                        else next.delete(entry.id);
+                        return next;
+                      })}
+                    />
+                    <span>{entry.game} — {entry.tableName}</span>
+                  </label>
+                ))}
+              </fieldset>
             )}
             {(pendingPreview.rejected?.length ?? 0) > 0 && (
               <small>
@@ -479,7 +509,7 @@ export default function CtLibraryExplorerPage() {
             )}
           </div>
           <div className={styles.importActions}>
-            <button type="button" className={styles.primaryBtn} onClick={() => void handleConfirmImportZip()}>
+            <button type="button" className={styles.primaryBtn} disabled={selectedPreviewIds.size === 0} onClick={() => void handleConfirmImportZip()}>
               Confirm Import
             </button>
             <button type="button" className={styles.cancelBtn} onClick={handleDeclineImportZip}>

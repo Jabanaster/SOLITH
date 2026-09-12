@@ -114,3 +114,19 @@ test('production CT ZIP flow has no renderer File.path fallback and is token-wir
   assert.match(sources[1], /selectionId: string/);
   assert.match(sources[2], /selectionId: picked\.selectionId/);
 });
+
+test('selective commit and history IPC remain main-window authorized and bounded', async () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const ipcSource = await fs.readFile(path.join(root, 'electron/ct-library-ipc.ts'), 'utf8');
+  const preloadSource = await fs.readFile(path.join(root, 'electron/preload.ts'), 'utf8');
+  assert.match(ipcSource, /validateIpcSender\(event, \['main'\]\)/);
+  assert.match(ipcSource, /selectedIds: z\.array[\s\S]*\.max\(5_000\)/);
+  assert.match(ipcSource, /receiptId: z\.string\(\)\.uuid\(\)/);
+  assert.match(ipcSource, /importService\.commit\(\{/);
+  assert.match(ipcSource, /ct-library-import-history-list/);
+  assert.match(ipcSource, /limit: z\.number\(\)\.int\(\)\.min\(1\)\.max\(100\)/);
+  assert.match(ipcSource, /ct-library-import-history-detail/);
+  assert.match(preloadSource, /receiptId: string/);
+  assert.match(preloadSource, /selectedIds: string\[\]/);
+  assert.doesNotMatch(ipcSource, /parsed\.data\.(archivePath|sourceSha256|tables|definitions)/);
+});

@@ -276,3 +276,16 @@
     grid-template-columns: 1fr;
   }
 }
+.previewSelection {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 14rem;
+  margin-top: 0.75rem;
+  overflow: auto;
+}
+
+.previewSelection label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}

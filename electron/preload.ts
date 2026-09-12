@@ -295,10 +295,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('ct-library-import-zip-preview', payload),
   ctLibraryImportZipStart: (payload: {
     selectionId: string;
+    receiptId: string;
+    selectedIds: string[];
     jobId?: string;
     limit?: number;
     maxShardBytes?: number;
   }) => ipcRenderer.invoke('ct-library-import-zip-start', payload),
+  ctLibraryImportHistoryList: (payload: {
+    limit?: number;
+    offset?: number;
+    status?: 'succeeded' | 'failed' | 'cancelled' | 'rolled-back';
+    sourceType?: 'zip-archive';
+  } = {}) => ipcRenderer.invoke('ct-library-import-history-list', payload),
+  ctLibraryImportHistoryDetail: (payload: { historyId: string }) =>
+    ipcRenderer.invoke('ct-library-import-history-detail', payload),
   ctLibraryImportZipCancel: (payload: { jobId: string }) => ipcRenderer.invoke('ct-library-import-zip-cancel', payload),
   onCtLibraryImportProgress: (callback: (payload: {
     jobId: string;

@@ -86,3 +86,76 @@ test('preview receipt is single-use and permits a selective subset', () => {
     { success: false, errorCode: 'PREVIEW_RECEIPT_NOT_FOUND' },
   );
 });
+
+test('preview receipt rejects duplicates, oversized selections, and concurrent reservation', () => {
+  const store = createCtPreviewReceiptStore({
+    createId: () => 'receipt-3',
+    maxSelectionIds: 2,
+  });
+  store.issue({
+    ownerId: 4,
+    selectionId: 'selection-3',
+    sourceSha256: 'c'.repeat(64),
+    allowedIds: ['one', 'two', 'three'],
+  });
+
+  assert.deepEqual(store.reserve({
+    receiptId: 'receipt-3',
+    ownerId: 4,
+    selectionId: 'selection-3',
+    selectedIds: ['one', 'one'],
+  }), { success: false, errorCode: 'PREVIEW_SELECTION_DUPLICATE' });
+  assert.deepEqual(store.reserve({
+    receiptId: 'receipt-3',
+    ownerId: 4,
+    selectionId: 'selection-3',
+    selectedIds: ['one', 'two', 'three'],
+  }), { success: false, errorCode: 'PREVIEW_SELECTION_TOO_LARGE' });
+
+  const reserved = store.reserve({
+    receiptId: 'receipt-3',
+    ownerId: 4,
+    selectionId: 'selection-3',
+    selectedIds: ['two'],
+  });
+  assert.equal(reserved.success, true);
+  assert.deepEqual(store.reserve({
+    receiptId: 'receipt-3',
+    ownerId: 4,
+    selectionId: 'selection-3',
+    selectedIds: ['two'],
+  }), { success: false, errorCode: 'PREVIEW_RECEIPT_IN_USE' });
+  store.release('receipt-3');
+  assert.equal(store.reserve({
+    receiptId: 'receipt-3',
+    ownerId: 4,
+    selectionId: 'selection-3',
+    selectedIds: ['two'],
+  }).success, true);
+});
+
+test('reserved receipt survives expiry purge and owner revocation until finalization', () => {
+  let currentTime = 5_000;
+  let id = 0;
+  const store = createCtPreviewReceiptStore({
+    ttlMs: 10,
+    now: () => currentTime,
+    createId: () => `reserved-${++id}`,
+  });
+  const receipt = store.issue({
+    ownerId: 12,
+    selectionId: 'selection-reserved',
+    sourceSha256: 'd'.repeat(64),
+    allowedIds: ['one'],
+  });
+  assert.equal(store.reserve({
+    receiptId: receipt.receiptId,
+    ownerId: 12,
+    selectionId: 'selection-reserved',
+    selectedIds: ['one'],
+  }).success, true);
+  currentTime = 6_000;
+  store.issue({ ownerId: 13, selectionId: 'purge-trigger', sourceSha256: 'e'.repeat(64), allowedIds: ['two'] });
+  store.revokeOwner(12);
+  assert.equal(store.commit(receipt.receiptId), true);
+});

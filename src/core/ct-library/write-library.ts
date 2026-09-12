@@ -11,6 +11,13 @@ export interface CompileCtLibraryArchiveOptions extends CompileCtZipOptions {
   fullLibraryOutputPath?: string;
 }
 
+export type WriteCtLibraryIndexOptions = Pick<
+  CompileCtLibraryArchiveOptions,
+  'libraryOutputPath' | 'shardDirectory' | 'maxShardBytes' | 'fullLibraryOutputPath'
+> & {
+  shardReferenceDirectory?: string;
+};
+
 export interface CompileCtLibraryArchiveResult {
   index: CtZipCatalogIndex;
   library: CtLibraryIndex;
@@ -33,12 +40,11 @@ function relativePath(fromDirectory: string, targetPath: string): string {
   return path.relative(fromDirectory, targetPath).replace(/\\/g, '/');
 }
 
-export async function compileCtLibraryArchive(
-  zipPath: string,
-  options: CompileCtLibraryArchiveOptions,
+export async function writeCtLibraryIndex(
+  index: CtZipCatalogIndex,
+  options: WriteCtLibraryIndexOptions,
 ): Promise<CompileCtLibraryArchiveResult> {
   const maxShardBytes = options.maxShardBytes ?? 25 * 1024 * 1024;
-  const index = await compileCtZipArchive(zipPath, options);
   const library = buildCtLibraryIndex(index);
   const summaryDirectory = path.dirname(options.libraryOutputPath);
   const shards: NonNullable<CtLibrarySummaryIndex['shards']> = [];
@@ -89,13 +95,19 @@ export async function compileCtLibraryArchive(
         displayName: game.displayName,
         tableCount: chunkTables.length,
         cheatCount: chunkTables.reduce((count, table) => count + table.cheats.length, 0),
-        path: relativePath(process.cwd(), shardPath),
+        path: relativePath(
+          process.cwd(),
+          path.join(options.shardReferenceDirectory ?? options.shardDirectory, shardName),
+        ),
       });
     }
   }
 
   const summary = summarizeCtLibraryIndex(library, {
-    shardDirectory: relativePath(summaryDirectory, options.shardDirectory),
+    shardDirectory: relativePath(
+      summaryDirectory,
+      options.shardReferenceDirectory ?? options.shardDirectory,
+    ),
     shards,
   });
   await fs.mkdir(summaryDirectory, { recursive: true });
@@ -114,4 +126,12 @@ export async function compileCtLibraryArchive(
     shardDirectory: options.shardDirectory,
     shards,
   };
+}
+
+export async function compileCtLibraryArchive(
+  zipPath: string,
+  options: CompileCtLibraryArchiveOptions,
+): Promise<CompileCtLibraryArchiveResult> {
+  const index = await compileCtZipArchive(zipPath, options);
+  return writeCtLibraryIndex(index, options);
 }

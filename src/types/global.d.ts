@@ -581,11 +581,13 @@ interface Window {
     }) => Promise<{
       success: boolean;
       jobId: string;
-      archivePath?: string;
+      receiptId?: string;
+      expiresAt?: number;
       filename?: string;
       totals?: import('../core/registry/compile-ct-zip.js').CtZipCatalogIndex['totals'];
       rejected?: import('../core/registry/compile-ct-zip.js').CtZipCatalogIndex['rejected'];
       games?: Array<{
+        id: string;
         game: string;
         tableName: string;
         archivePath: string;
@@ -596,17 +598,37 @@ interface Window {
     }>;
     ctLibraryImportZipStart: (payload: {
       selectionId: string;
+      receiptId: string;
+      selectedIds: string[];
       jobId?: string;
       limit?: number;
       maxShardBytes?: number;
     }) => Promise<{
       success: boolean;
       jobId: string;
-      libraryOutputPath?: string;
-      shardDirectory?: string;
-      shards?: number;
+      historyId?: string;
+      importedCount?: number;
+      skippedCount?: number;
       totals?: import('../core/registry/compile-ct-zip.js').CtZipCatalogIndex['totals'];
       error?: string;
+      errorCode?: string;
+    }>;
+    ctLibraryImportHistoryList: (payload?: {
+      limit?: number;
+      offset?: number;
+      status?: 'succeeded' | 'failed' | 'cancelled' | 'rolled-back';
+      sourceType?: 'zip-archive';
+    }) => Promise<{
+      success: boolean;
+      total: number;
+      limit?: number;
+      offset?: number;
+      entries: import('../core/ct-library/selective-import.js').CtImportHistoryEntry[];
+      errorCode?: string;
+    }>;
+    ctLibraryImportHistoryDetail: (payload: { historyId: string }) => Promise<{
+      success: boolean;
+      entry?: import('../core/ct-library/selective-import.js').CtImportHistoryEntry;
       errorCode?: string;
     }>;
     ctLibraryImportZipCancel: (payload: { jobId: string }) => Promise<{
