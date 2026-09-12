@@ -127,3 +127,24 @@ artifacts/
 
 
 .tools/
+
+# ── Signing / private-key material (MUST NOT be committed) ───────────────────
+# Verified 2026-09-12: no ref in this repo (any branch, any commit) has ever
+# tracked a file matching these extensions — safe to ignore broadly.
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+
+# ── Windows redirection artifact (repo-root only) ─────────────────────────────
+# Anchored to root only — a nested file literally named `nul` could plausibly
+# be an intentional fixture for Windows reserved-filename handling tests.
+/nul
+
+# ── Stranded/de-registered duplicate checkout directories (2026-09-12) ───────
+# Full nested repo copies with zero unique source per Audit 2. Root-anchored
+# by exact name so this cannot hide any differently-named future source.
+/solith-b11-integration/
+/solith-val-bf97e8b/
+/solith-baseline-comparison-worktree/
