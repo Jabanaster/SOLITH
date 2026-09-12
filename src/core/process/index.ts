@@ -77,9 +77,23 @@ function checkWindowsProcessList(executableNames: string[]): GameRunningCheck {
     // Use tasklist to get current processes
     // Output format: "Image Name","PID","Session Name","Session Number","Memory Usage"
     // execFileSync (array args, no shell) — no command/shell interpolation, only fixed literal args.
+    //
+    // Root-caused via a real hostile-fix investigation (SOLITH Phase 3.2
+    // Owner Follow-up Mission 3), not assumed: `/V` (verbose) makes
+    // `tasklist` enumerate per-process module/service detail, which measured
+    // ~8s on real hardware under ordinary (non-adversarial) load — already
+    // past the previous 5000ms timeout on its own, with no test concurrency
+    // or contention involved. That made `tests/process.test.ts`'s idempotency
+    // check flaky (a timeout mid-run silently falls back to "assuming not
+    // running" with different evidence text than a completed call), but the
+    // SAME timeout sits in front of every real caller of `isGameRunning`, so
+    // this was a genuine production correctness bug, not merely a test
+    // artifact: a real running game could be reported as not-running under
+    // ordinary system load. 15000ms leaves real margin above the measured
+    // ~8s baseline.
     const output = execFileSync(systemBinaryPath('tasklist.exe'), ['/V', '/FO', 'CSV'], {
       encoding: 'utf-8',
-      timeout: 5000,
+      timeout: 15000,
     });
 
     const lines = output.split('\n');
