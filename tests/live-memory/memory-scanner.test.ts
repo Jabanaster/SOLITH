@@ -324,7 +324,10 @@ test('scanFirstRange skips unreadable regions without aborting later matches', (
   assert.equal(result.matches.length, 1);
   assert.equal(result.matches[0].address, 0xb000n);
   assert.equal(result.regionsScanned, 1);
-  assert.equal(result.truncated, false);
+  // A region was skipped because it was unreadable, so the scan did not
+  // cover the full address space it was asked to cover. Reporting
+  // truncated: false here would certify a false completeness claim.
+  assert.equal(result.truncated, true);
 });
 
 test('scanFirstAutoMatrix scans all requested modes and value types in one read-only matrix', () => {
