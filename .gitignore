@@ -127,3 +127,13 @@ artifacts/
 
 
 .tools/
+
+# ── Signing / private-key material (MUST NOT be committed) ───────────────────
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+
+# ── Windows redirection artifact (repo-root only) ─────────────────────────────
+/nul
