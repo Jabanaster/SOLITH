@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('security overrides pin fixed postcss, brace-expansion, fast-uri, and undici', () => {
+test('security overrides pin the complete intended set: postcss, brace-expansion, fast-uri, undici, @xmldom/xmldom, and joi', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
     overrides?: Record<string, unknown>;
   };
@@ -15,6 +15,8 @@ test('security overrides pin fixed postcss, brace-expansion, fast-uri, and undic
   assert.equal(pkg.overrides?.['brace-expansion'], '5.0.9');
   assert.equal(pkg.overrides?.['fast-uri'], '3.1.7');
   assert.equal(pkg.overrides?.undici, '7.29.0');
+  assert.equal(pkg.overrides?.['@xmldom/xmldom'], '0.9.12');
+  assert.equal(pkg.overrides?.joi, '18.2.8');
   assert.equal(
     (pkg.overrides?.['@electron/rebuild'] as Record<string, string> | undefined)?.undici,
     '6.28.0',

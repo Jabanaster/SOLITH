@@ -330,6 +330,80 @@ test('scanFirstRange skips unreadable regions without aborting later matches', (
   assert.equal(result.truncated, true);
 });
 
+test('scanFirstRange continues past an unreadable middle region and still finds a later match', () => {
+  const driver = new FakeMemoryDriver();
+  const before = filledBuffer(16, 0);
+  before.writeFloatLE(61.0, 0);
+  const after = filledBuffer(16, 0);
+  after.writeFloatLE(61.0, 0);
+  driver.addRegion(0x11000n, before, true);
+  driver.addUnreadableRegion(0x12000n, 16, true);
+  driver.addRegion(0x13000n, after, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.deepEqual(
+    result.matches.map((m) => m.address),
+    [0x11000n, 0x13000n],
+  );
+  assert.equal(result.regionsScanned, 2);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange preserves earlier matches when the final region is unreadable', () => {
+  const driver = new FakeMemoryDriver();
+  const good = filledBuffer(16, 0);
+  good.writeFloatLE(61.0, 0);
+  driver.addRegion(0x14000n, good, true);
+  driver.addUnreadableRegion(0x15000n, 16, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x14000n);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange reports truncated: false when every requested region is readable', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(16, 0);
+  region.writeFloatLE(61.0, 0);
+  driver.addRegion(0x16000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.truncated, false);
+});
+
+test('scanFirstRange reports truncated: true with zero matches when the only region is unreadable', () => {
+  const driver = new FakeMemoryDriver();
+  driver.addUnreadableRegion(0x17000n, 16, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.regionsScanned, 0);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange keeps scanning after multiple unreadable regions and still reports truncated', () => {
+  const driver = new FakeMemoryDriver();
+  const good = filledBuffer(16, 0);
+  good.writeFloatLE(61.0, 0);
+  driver.addUnreadableRegion(0x18000n, 16, true);
+  driver.addRegion(0x19000n, good, true);
+  driver.addUnreadableRegion(0x1a000n, 16, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x19000n);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, true);
+});
+
 test('scanFirstAutoMatrix scans all requested modes and value types in one read-only matrix', () => {
   const driver = new FakeMemoryDriver();
   const region = filledBuffer(64, 0);

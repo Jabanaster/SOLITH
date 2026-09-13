@@ -94,6 +94,13 @@ export class FakeMemoryDriver implements MemoryDriver {
   private lastDataType = new Map<string, LiveValueType>();
   private regions: FakeRegion[] = [];
   private unreadableRegions: { baseAddress: bigint; size: number; writable: boolean }[] = [];
+  /**
+   * Insertion-ordered record of every addRegion/addUnreadableRegion call, so
+   * getRegions() can preserve the caller's intended scan order (readable and
+   * unreadable regions interleaved as seeded) instead of always sorting all
+   * unreadable regions after all readable ones regardless of call order.
+   */
+  private regionOrder: Array<{ kind: 'readable' | 'unreadable'; baseAddress: bigint }> = [];
   private modules: MemoryModule[] = [];
   private processNames = new Map<number, string>();
   private processPaths = new Map<number, string>();
@@ -132,6 +139,7 @@ export class FakeMemoryDriver implements MemoryDriver {
   /** Seed a simulated memory region for scanner tests. */
   addRegion(baseAddress: bigint, buffer: Buffer, writable = true): void {
     this.regions.push({ baseAddress, buffer, writable });
+    this.regionOrder.push({ kind: 'readable', baseAddress });
   }
 
   /**
@@ -142,6 +150,7 @@ export class FakeMemoryDriver implements MemoryDriver {
    */
   addUnreadableRegion(baseAddress: bigint, size: number, writable = true): void {
     this.unreadableRegions.push({ baseAddress, size, writable });
+    this.regionOrder.push({ kind: 'unreadable', baseAddress });
   }
 
   /** Seed a simulated loaded module for pointer-path tests. */
@@ -283,9 +292,18 @@ export class FakeMemoryDriver implements MemoryDriver {
   }
 
   getRegions(_handle: LiveProcessHandle): MemoryRegion[] {
-    const readable = this.regions.map((r) => ({ baseAddress: r.baseAddress, size: r.buffer.length, writable: r.writable }));
-    const unreadable = this.unreadableRegions.map((r) => ({ baseAddress: r.baseAddress, size: r.size, writable: r.writable }));
-    return [...readable, ...unreadable];
+    // Preserve the caller's seeding order (readable/unreadable interleaved as
+    // addRegion/addUnreadableRegion were called) rather than grouping all
+    // unreadable regions after all readable ones — production code must not
+    // assume unreadable regions only ever appear last in a real scan.
+    return this.regionOrder.map(({ kind, baseAddress }) => {
+      if (kind === 'readable') {
+        const r = this.regions.find((region) => region.baseAddress === baseAddress)!;
+        return { baseAddress: r.baseAddress, size: r.buffer.length, writable: r.writable };
+      }
+      const r = this.unreadableRegions.find((region) => region.baseAddress === baseAddress)!;
+      return { baseAddress: r.baseAddress, size: r.size, writable: r.writable };
+    });
   }
 
   readBuffer(_handle: LiveProcessHandle, address: bigint, size: number): Buffer {

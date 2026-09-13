@@ -28,7 +28,12 @@ export interface ScanResult {
   matches: ScanMatch[];
   regionsScanned: number;
   bytesScanned: number;
-  /** True if the scan stopped early due to maxTotalBytes or maxMatches — results are a partial view. */
+  /**
+   * True if the results do not represent complete coverage of the requested
+   * scan — the scan stopped early due to maxTotalBytes or maxMatches, or (in
+   * scanFirstRange) a region could not be read and was skipped. Never claim
+   * completeness when part of the requested range was not actually scanned.
+   */
   truncated: boolean;
 }
 
@@ -227,6 +232,10 @@ export function scanFirstRange(
     try {
       buf = driver.readBuffer(handle, region.baseAddress, region.size);
     } catch {
+      // Region became unreadable mid-scan (freed, protection changed). Skip it and
+      // keep scanning later regions, but the requested address space is no longer
+      // fully covered — truncated must reflect that rather than claim completeness.
+      truncated = true;
       continue;
     }
 
