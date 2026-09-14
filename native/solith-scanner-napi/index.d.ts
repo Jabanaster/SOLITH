@@ -135,6 +135,30 @@ export declare class NativeScanTarget {
    * supplied, per `primitiveType` (see module doc's value contract).
    */
   scanExact(region: JsRegion, primitiveType: string, valueNumber: number | undefined | null, valueBigint: bigint | undefined | null, alignment: string, chunkSizeBytes: bigint, overlapBytes: bigint, maxResults: bigint | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsExactScanOutcome>
+  /**
+   * Scans `region` for every occurrence of an exact raw byte sequence
+   * (mission §5.3). `bytes` must not be empty.
+   */
+  scanBytes(region: JsRegion, bytes: Buffer, chunkSizeBytes: bigint, maxResults: bigint | undefined | null, firstMatchOnly: boolean | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsPatternScanOutcome>
+  /**
+   * Scans `region` for `text`, encoded per `encoding` ("utf8" or
+   * "utf16le") — mission §5.2. `caseSensitive` (default-recommended:
+   * true) controls ASCII-only case folding (module doc for the
+   * justification); `nullTerminator` is "none" (match the content
+   * anywhere) or "required" (match only when immediately followed by a
+   * real encoding-native null terminator).
+   */
+  scanString(region: JsRegion, text: string, encoding: string, caseSensitive: boolean, nullTerminator: string, chunkSizeBytes: bigint, maxResults: bigint | undefined | null, firstMatchOnly: boolean | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsPatternScanOutcome>
+  /**
+   * Scans `region` for the AOB pattern `pattern` (mission §5.4's
+   * grammar: whitespace-separated exact-byte/`??`/`?`/`*`/nibble-wildcard
+   * tokens — see `solith_scanner_core::pattern::parse_aob`'s doc). A
+   * malformed pattern is rejected with a stable
+   * `invalid_hex_token:`/`malformed_wildcard:`/`empty_pattern:`/
+   * `unsupported_token:`/`invalid_separator:`-prefixed error, synchronously,
+   * before any async work begins.
+   */
+  scanAob(region: JsRegion, pattern: string, chunkSizeBytes: bigint, maxResults: bigint | undefined | null, firstMatchOnly: boolean | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsPatternScanOutcome>
 }
 
 export declare class ScanCancellationHandle {
@@ -206,6 +230,23 @@ export interface JsGenerationRecord {
   skippedReads: bigint
   completeness: JsCompleteness
   durationMillis: bigint
+}
+
+export interface JsPatternMatch {
+  address: bigint
+  length: number
+}
+
+export interface JsPatternScanOutcome {
+  /**
+   * One of "raw_bytes", "utf8", "utf16le", "aob" — echoes which Stage 5
+   * surface produced this result (mission §5.10's "pattern/string type"
+   * result field).
+   */
+  kind: string
+  matches: Array<JsPatternMatch>
+  metrics: JsProgress
+  completeness: JsCompleteness
 }
 
 export interface JsProgress {

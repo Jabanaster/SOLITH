@@ -29,6 +29,13 @@ use solith_scanner_core::error::ScannerError;
 use solith_scanner_core::exact_scan::{
     scan_exact, AlignmentMode, ScanMatch as CoreScanMatch, ScanOptions,
 };
+use solith_scanner_core::pattern::{
+    parse_aob, pattern_from_raw_bytes, pattern_from_utf16le_str, pattern_from_utf8_str,
+    NullTerminatorMode, Pattern, PatternKind, PatternParseError,
+};
+use solith_scanner_core::pattern_scan::{
+    scan_pattern, PatternMatch as CorePatternMatch, PatternScanOptions,
+};
 use solith_scanner_core::policy::RegionSelectionPolicy;
 use solith_scanner_core::reader::{
     read_region_chunked_with_progress, ChunkReadResult, ChunkReadStatus, ReadBudget,
@@ -930,6 +937,248 @@ impl NativeScanTarget {
             policy: RegionSelectionPolicy::default_writable_value_scan(),
             primitive_type: pt,
             target,
+            options,
+            cancellation: cancellation.inner.clone(),
+            progress: progress.inner.clone(),
+        }))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — string/byte/AOB pattern scanning (mission §5.15). Reuses every
+// Stage 2/3 primitive unchanged (`JsRegion`, cancellation/progress handles,
+// `JsCompleteness`/`JsProgress`) — only the pattern itself and its match
+// shape are new. Unlike `scanExact`'s writable-value-scan default, pattern
+// scans default to `RegionSelectionPolicy::readable_any()`: an AOB
+// signature or a UI string commonly lives in read-only or executable image
+// regions, not just writable heap/stack, so restricting to writable-only
+// would silently miss the exact regions this feature exists to search.
+// ---------------------------------------------------------------------------
+
+fn null_terminator_from_str(s: &str) -> Result<NullTerminatorMode> {
+    match s {
+        "none" => Ok(NullTerminatorMode::None),
+        "required" => Ok(NullTerminatorMode::Required),
+        other => Err(Error::new(
+            Status::InvalidArg,
+            format!("invalid_configuration: unknown null terminator mode \"{other}\""),
+        )),
+    }
+}
+
+fn pattern_parse_err(e: PatternParseError) -> Error {
+    Error::new(Status::InvalidArg, e.to_string())
+}
+
+fn build_pattern_options(
+    pattern: &Pattern,
+    chunk_size_bytes: BigInt,
+    max_results: Option<BigInt>,
+    first_match_only: Option<bool>,
+) -> PatternScanOptions {
+    let (_, chunk_size, _) = chunk_size_bytes.get_u64();
+    let max_results_u64 = max_results.map(|b| {
+        let (_, v, _) = b.get_u64();
+        v
+    });
+    let mut options = PatternScanOptions::default_for(pattern, chunk_size);
+    options.max_results = max_results_u64;
+    options.first_match_only = first_match_only.unwrap_or(false);
+    options
+}
+
+#[napi(object)]
+pub struct JsPatternMatch {
+    pub address: BigInt,
+    pub length: u32,
+}
+
+fn pattern_match_to_js(m: CorePatternMatch) -> JsPatternMatch {
+    JsPatternMatch {
+        address: BigInt::from(m.address),
+        length: m.length,
+    }
+}
+
+#[napi(object)]
+pub struct JsPatternScanOutcome {
+    /// One of "raw_bytes", "utf8", "utf16le", "aob" — echoes which Stage 5
+    /// surface produced this result (mission §5.10's "pattern/string type"
+    /// result field).
+    pub kind: String,
+    pub matches: Vec<JsPatternMatch>,
+    pub metrics: JsProgress,
+    pub completeness: JsCompleteness,
+}
+
+pub struct PatternScanTask {
+    handle: Arc<Mutex<Option<ProcessHandle>>>,
+    region: Region,
+    pattern: Pattern,
+    kind: PatternKind,
+    options: PatternScanOptions,
+    cancellation: CancellationToken,
+    progress: Arc<Mutex<ScanMetrics>>,
+}
+
+impl Task for PatternScanTask {
+    type Output = solith_scanner_core::pattern_scan::PatternScanResult;
+    type JsValue = JsPatternScanOutcome;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        let guard = self.handle.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: target mutex poisoned",
+            )
+        })?;
+        let handle_ref = guard.as_ref().ok_or_else(detached_err)?;
+
+        let progress = self.progress.clone();
+        let mut on_progress = move |m: &ScanMetrics| {
+            if let Ok(mut slot) = progress.lock() {
+                *slot = *m;
+            }
+        };
+
+        scan_pattern(
+            handle_ref,
+            std::slice::from_ref(&self.region),
+            &RegionSelectionPolicy::readable_any(),
+            &self.pattern,
+            self.kind,
+            &self.options,
+            &self.cancellation,
+            Some(&mut on_progress),
+        )
+        .map_err(to_napi_err)
+    }
+
+    fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(JsPatternScanOutcome {
+            kind: output.kind.to_string(),
+            matches: output
+                .matches
+                .into_iter()
+                .map(pattern_match_to_js)
+                .collect(),
+            metrics: metrics_to_js(&output.metrics),
+            completeness: completeness_to_js(output.completeness),
+        })
+    }
+}
+
+#[napi]
+impl NativeScanTarget {
+    /// Scans `region` for every occurrence of an exact raw byte sequence
+    /// (mission §5.3). `bytes` must not be empty.
+    #[napi(ts_return_type = "Promise<JsPatternScanOutcome>")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn scan_bytes(
+        &self,
+        region: JsRegion,
+        bytes: Buffer,
+        chunk_size_bytes: BigInt,
+        max_results: Option<BigInt>,
+        first_match_only: Option<bool>,
+        cancellation: &ScanCancellationHandle,
+        progress: &ScanProgressHandle,
+    ) -> Result<AsyncTask<PatternScanTask>> {
+        let region = js_to_region(&region)?;
+        let pattern = pattern_from_raw_bytes(&bytes).map_err(to_napi_err)?;
+        let options =
+            build_pattern_options(&pattern, chunk_size_bytes, max_results, first_match_only);
+        Ok(AsyncTask::new(PatternScanTask {
+            handle: self.handle.clone(),
+            region,
+            pattern,
+            kind: PatternKind::RawBytes,
+            options,
+            cancellation: cancellation.inner.clone(),
+            progress: progress.inner.clone(),
+        }))
+    }
+
+    /// Scans `region` for `text`, encoded per `encoding` ("utf8" or
+    /// "utf16le") — mission §5.2. `caseSensitive` (default-recommended:
+    /// true) controls ASCII-only case folding (module doc for the
+    /// justification); `nullTerminator` is "none" (match the content
+    /// anywhere) or "required" (match only when immediately followed by a
+    /// real encoding-native null terminator).
+    #[napi(ts_return_type = "Promise<JsPatternScanOutcome>")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn scan_string(
+        &self,
+        region: JsRegion,
+        text: String,
+        encoding: String,
+        case_sensitive: bool,
+        null_terminator: String,
+        chunk_size_bytes: BigInt,
+        max_results: Option<BigInt>,
+        first_match_only: Option<bool>,
+        cancellation: &ScanCancellationHandle,
+        progress: &ScanProgressHandle,
+    ) -> Result<AsyncTask<PatternScanTask>> {
+        let region = js_to_region(&region)?;
+        let nt = null_terminator_from_str(&null_terminator)?;
+        let (pattern, kind) = match encoding.as_str() {
+            "utf8" => (
+                pattern_from_utf8_str(&text, case_sensitive, nt).map_err(to_napi_err)?,
+                PatternKind::Utf8,
+            ),
+            "utf16le" => (
+                pattern_from_utf16le_str(&text, case_sensitive, nt).map_err(to_napi_err)?,
+                PatternKind::Utf16Le,
+            ),
+            other => {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    format!("invalid_configuration: unknown string encoding \"{other}\""),
+                ))
+            }
+        };
+        let options =
+            build_pattern_options(&pattern, chunk_size_bytes, max_results, first_match_only);
+        Ok(AsyncTask::new(PatternScanTask {
+            handle: self.handle.clone(),
+            region,
+            pattern,
+            kind,
+            options,
+            cancellation: cancellation.inner.clone(),
+            progress: progress.inner.clone(),
+        }))
+    }
+
+    /// Scans `region` for the AOB pattern `pattern` (mission §5.4's
+    /// grammar: whitespace-separated exact-byte/`??`/`?`/`*`/nibble-wildcard
+    /// tokens — see `solith_scanner_core::pattern::parse_aob`'s doc). A
+    /// malformed pattern is rejected with a stable
+    /// `invalid_hex_token:`/`malformed_wildcard:`/`empty_pattern:`/
+    /// `unsupported_token:`/`invalid_separator:`-prefixed error, synchronously,
+    /// before any async work begins.
+    #[napi(ts_return_type = "Promise<JsPatternScanOutcome>")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn scan_aob(
+        &self,
+        region: JsRegion,
+        pattern: String,
+        chunk_size_bytes: BigInt,
+        max_results: Option<BigInt>,
+        first_match_only: Option<bool>,
+        cancellation: &ScanCancellationHandle,
+        progress: &ScanProgressHandle,
+    ) -> Result<AsyncTask<PatternScanTask>> {
+        let region = js_to_region(&region)?;
+        let compiled = parse_aob(&pattern).map_err(pattern_parse_err)?;
+        let options =
+            build_pattern_options(&compiled, chunk_size_bytes, max_results, first_match_only);
+        Ok(AsyncTask::new(PatternScanTask {
+            handle: self.handle.clone(),
+            region,
+            pattern: compiled,
+            kind: PatternKind::Aob,
             options,
             cancellation: cancellation.inner.clone(),
             progress: progress.inner.clone(),
