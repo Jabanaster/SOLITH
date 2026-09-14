@@ -27,6 +27,18 @@ pub struct RegionSelectionPolicy {
     /// kept as a policy knob, not hardcoded, so a future caller can widen
     /// or remove it with evidence rather than editing this crate).
     pub max_region_bytes: Option<u64>,
+    /// Restricts selection to regions that *overlap* `[start, end)`
+    /// (Stage 5 mission §5.9's "explicit address range" scope hook). A
+    /// region only partially inside the range is still selected whole —
+    /// this policy answers "which regions are relevant," not "clip this
+    /// region to a sub-range"; a caller wanting byte-exact range clipping
+    /// composes this with its own post-scan address filtering. Module-based
+    /// filtering deliberately is not implemented here: mission §5.9
+    /// explicitly defers module-name resolution to Phase 2/3's identity
+    /// infrastructure and instructs this stage to "keep the scanner API
+    /// range-based" — a caller with a resolved module base/size passes it
+    /// through this same `address_range` field.
+    pub address_range: Option<(u64, u64)>,
 }
 
 impl RegionSelectionPolicy {
@@ -44,6 +56,7 @@ impl RegionSelectionPolicy {
             allowed_kinds: None,
             allowed_commit_states: Some(vec![CommitState::Committed]),
             max_region_bytes: Some(64 * 1024 * 1024),
+            address_range: None,
         }
     }
 
@@ -59,6 +72,7 @@ impl RegionSelectionPolicy {
             allowed_kinds: None,
             allowed_commit_states: Some(vec![CommitState::Committed]),
             max_region_bytes: None,
+            address_range: None,
         }
     }
 
@@ -90,6 +104,13 @@ impl RegionSelectionPolicy {
         }
         if let Some(max) = self.max_region_bytes {
             if region.size > max {
+                return false;
+            }
+        }
+        if let Some((start, end)) = self.address_range {
+            let region_end = region.base_address.saturating_add(region.size);
+            let overlaps = region.base_address < end && region_end > start;
+            if !overlaps {
                 return false;
             }
         }

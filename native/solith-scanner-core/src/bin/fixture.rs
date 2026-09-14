@@ -110,6 +110,83 @@ const BOUNDARY_U64_VALUE: u64 = 0x0123_4567_89AB_CDEF;
 // pure Rust arrays" instruction).
 const REFINE_REGION_SIZE: usize = 64 * 1024;
 
+// ── Stage 5 (mission §5.13): string/byte/AOB test content. 8 MiB so four
+// chunk-boundary offsets (at the 1×/3×/5×/7× 1 MiB marks, matching
+// ChunkPlanConfig::default_for_testing()'s 1 MiB chunk size) each have
+// comfortable room on both sides, and a "beyond old 1 MiB cap" marker can
+// sit safely mid-region.
+const PATTERN_REGION_SIZE: usize = 8 * 1024 * 1024;
+
+const UTF8_ASCII_OFFSET: usize = 64;
+const UTF8_ASCII_TEXT: &str = "PlayerHealth100";
+const UTF8_MULTIBYTE_OFFSET: usize = 256;
+// Real multibyte UTF-8: Latin-1-supplement accents, a Cyrillic word, and a
+// CJK word — exercises 2-byte, (Cyrillic, 2-byte) and 3-byte UTF-8 sequences
+// in one fixture string (mission §5.2's "multibyte UTF-8" requirement).
+const UTF8_MULTIBYTE_TEXT: &str =
+    "café \u{041F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442} \u{65E5}\u{672C}\u{8A9E}";
+const UTF16LE_OFFSET: usize = 512;
+const UTF16LE_TEXT: &str = "ScoreValue";
+const UTF16LE_NONBMP_OFFSET: usize = 768;
+// Contains a real non-BMP character (U+1F600 GRINNING FACE), requiring a
+// genuine UTF-16 surrogate pair — mission §5.2's "surrogate pairs / non-BMP
+// characters" requirement.
+const UTF16LE_NONBMP_TEXT: &str = "Win\u{1F600}!";
+
+const RAW_BYTES_OFFSET: usize = 1024;
+const RAW_BYTES_PATTERN: [u8; 6] = [0x13, 0x37, 0xC0, 0xDE, 0x99, 0x88];
+const RAW_BYTES_DUPLICATE_OFFSET: usize = 200_000; // far from the first occurrence
+
+const AOB_EXACT_OFFSET: usize = 2048;
+const AOB_EXACT_PATTERN: [u8; 8] = [0x48, 0x8B, 0x05, 0x11, 0x22, 0x33, 0x44, 0x89];
+const AOB_WILDCARD_OFFSET: usize = 2112;
+// Same structural bytes as AOB_EXACT_PATTERN but with a DIFFERENT marker
+// byte at the position the test's query pattern wildcards out — proves the
+// wildcard genuinely ignores content rather than coincidentally matching an
+// identical value.
+const AOB_WILDCARD_PATTERN: [u8; 8] = [0x48, 0x8B, 0x05, 0xFF, 0x22, 0x33, 0x44, 0x89];
+const AOB_NIBBLE_OFFSET: usize = 2176;
+// Plant A7/00/B3 so a nibble-wildcard query "A? 00 ?3" matches (high
+// nibble A / low nibble 3 fixed) while an exact "A7 00 B3" query also still
+// matches — proves the nibble mask ignores exactly the wildcarded nibble.
+const AOB_NIBBLE_PATTERN: [u8; 3] = [0xA7, 0x00, 0xB3];
+
+const NEAR_MISS_OFFSET: usize = 2240;
+// Differs from RAW_BYTES_PATTERN by exactly the last byte — proves no
+// false positive from almost-matching noise.
+const NEAR_MISS_PATTERN: [u8; 6] = [0x13, 0x37, 0xC0, 0xDE, 0x99, 0x77];
+
+// Chunk-boundary-straddling patterns (mission §5.7): each offset is chosen
+// so the pattern of that exact length straddles a 1 MiB chunk boundary
+// under the default 1 MiB/7-byte-overlap test config — analogous to
+// TYPES_REGION's BOUNDARY_U16/U32/U64 offsets above, extended to Stage 5's
+// variable-length patterns (2/8/16-as-string/32-as-wildcard-capable bytes).
+const PATTERN_BOUNDARY_2_OFFSET: usize = 1_048_576 - 1;
+const PATTERN_BOUNDARY_2: [u8; 2] = [0xAB, 0xCD];
+const PATTERN_BOUNDARY_8_OFFSET: usize = 3 * 1_048_576 - 4;
+const PATTERN_BOUNDARY_8: [u8; 8] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+const PATTERN_BOUNDARY_STRING_OFFSET: usize = 5 * 1_048_576 - 8;
+const PATTERN_BOUNDARY_STRING_TEXT: &str = "STRADDLE16CHARS!"; // exactly 16 bytes
+const PATTERN_BOUNDARY_32_OFFSET: usize = 7 * 1_048_576 - 16;
+const PATTERN_BOUNDARY_32: [u8; 32] = [
+    0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
+    0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF,
+];
+
+// Well beyond the old 1 MiB cap and beyond every chunk-boundary offset
+// above — proves the native path finds a signature no matter how deep into
+// a large region it sits (mission §5.14).
+const FAR_MARKER_OFFSET: usize = 6_291_456; // 6 MiB
+const FAR_MARKER_PATTERN: [u8; 5] = [0xDE, 0xAD, 0xC0, 0xDE, 0x42];
+
+// Planted *inside* GUARD_REGION_SIZE's PAGE_NOACCESS middle page (written
+// before VirtualProtect is applied): real bytes exist there, but they
+// become unreadable once protected — proving "zero matches + incomplete
+// coverage != authoritative not found" (mission §5.11/§5.14) against a real
+// OS-level unreadable page, not a simulated one.
+const GUARD_HIDDEN_PATTERN_OFFSET: usize = GUARD_NOACCESS_PAGE_OFFSET + 100;
+const GUARD_HIDDEN_PATTERN: [u8; 4] = [0x5E, 0xC4, 0x37, 0x21];
+
 #[cfg(windows)]
 fn main() {
     let pid = std::process::id();
@@ -170,6 +247,12 @@ fn main() {
     assert!(!guard_region.is_null(), "VirtualAlloc(guard_region) failed");
     let guard_base = guard_region as usize;
 
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(guard_region as *mut u8, GUARD_REGION_SIZE);
+        slice[GUARD_HIDDEN_PATTERN_OFFSET..GUARD_HIDDEN_PATTERN_OFFSET + 4]
+            .copy_from_slice(&GUARD_HIDDEN_PATTERN);
+    }
+
     let mut old_protect: u32 = 0;
     let middle_page_ptr = unsafe { guard_region.add(GUARD_NOACCESS_PAGE_OFFSET) };
     let protect_ok = unsafe {
@@ -227,6 +310,72 @@ fn main() {
             .copy_from_slice(&BOUNDARY_U32_VALUE.to_le_bytes());
         slice[BOUNDARY_U64_OFFSET..BOUNDARY_U64_OFFSET + 8]
             .copy_from_slice(&BOUNDARY_U64_VALUE.to_le_bytes());
+    }
+
+    let pattern_region = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            PATTERN_REGION_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(
+        !pattern_region.is_null(),
+        "VirtualAlloc(pattern_region) failed"
+    );
+    let pattern_base = pattern_region as usize;
+
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(pattern_region as *mut u8, PATTERN_REGION_SIZE);
+        for (i, b) in slice.iter_mut().enumerate() {
+            *b = ((i as u32).wrapping_mul(0x85EBCA6B) >> 22) as u8;
+        }
+
+        let utf8_ascii = UTF8_ASCII_TEXT.as_bytes();
+        slice[UTF8_ASCII_OFFSET..UTF8_ASCII_OFFSET + utf8_ascii.len()].copy_from_slice(utf8_ascii);
+        let utf8_multibyte = UTF8_MULTIBYTE_TEXT.as_bytes();
+        slice[UTF8_MULTIBYTE_OFFSET..UTF8_MULTIBYTE_OFFSET + utf8_multibyte.len()]
+            .copy_from_slice(utf8_multibyte);
+        let mut utf16le: Vec<u8> = Vec::new();
+        for unit in UTF16LE_TEXT.encode_utf16() {
+            utf16le.extend_from_slice(&unit.to_le_bytes());
+        }
+        slice[UTF16LE_OFFSET..UTF16LE_OFFSET + utf16le.len()].copy_from_slice(&utf16le);
+        let mut utf16le_nonbmp: Vec<u8> = Vec::new();
+        for unit in UTF16LE_NONBMP_TEXT.encode_utf16() {
+            utf16le_nonbmp.extend_from_slice(&unit.to_le_bytes());
+        }
+        slice[UTF16LE_NONBMP_OFFSET..UTF16LE_NONBMP_OFFSET + utf16le_nonbmp.len()]
+            .copy_from_slice(&utf16le_nonbmp);
+
+        slice[RAW_BYTES_OFFSET..RAW_BYTES_OFFSET + RAW_BYTES_PATTERN.len()]
+            .copy_from_slice(&RAW_BYTES_PATTERN);
+        slice[RAW_BYTES_DUPLICATE_OFFSET..RAW_BYTES_DUPLICATE_OFFSET + RAW_BYTES_PATTERN.len()]
+            .copy_from_slice(&RAW_BYTES_PATTERN);
+
+        slice[AOB_EXACT_OFFSET..AOB_EXACT_OFFSET + AOB_EXACT_PATTERN.len()]
+            .copy_from_slice(&AOB_EXACT_PATTERN);
+        slice[AOB_WILDCARD_OFFSET..AOB_WILDCARD_OFFSET + AOB_WILDCARD_PATTERN.len()]
+            .copy_from_slice(&AOB_WILDCARD_PATTERN);
+        slice[AOB_NIBBLE_OFFSET..AOB_NIBBLE_OFFSET + AOB_NIBBLE_PATTERN.len()]
+            .copy_from_slice(&AOB_NIBBLE_PATTERN);
+        slice[NEAR_MISS_OFFSET..NEAR_MISS_OFFSET + NEAR_MISS_PATTERN.len()]
+            .copy_from_slice(&NEAR_MISS_PATTERN);
+
+        slice[PATTERN_BOUNDARY_2_OFFSET..PATTERN_BOUNDARY_2_OFFSET + PATTERN_BOUNDARY_2.len()]
+            .copy_from_slice(&PATTERN_BOUNDARY_2);
+        slice[PATTERN_BOUNDARY_8_OFFSET..PATTERN_BOUNDARY_8_OFFSET + PATTERN_BOUNDARY_8.len()]
+            .copy_from_slice(&PATTERN_BOUNDARY_8);
+        let boundary_string = PATTERN_BOUNDARY_STRING_TEXT.as_bytes();
+        slice[PATTERN_BOUNDARY_STRING_OFFSET
+            ..PATTERN_BOUNDARY_STRING_OFFSET + boundary_string.len()]
+            .copy_from_slice(boundary_string);
+        slice[PATTERN_BOUNDARY_32_OFFSET..PATTERN_BOUNDARY_32_OFFSET + PATTERN_BOUNDARY_32.len()]
+            .copy_from_slice(&PATTERN_BOUNDARY_32);
+
+        slice[FAR_MARKER_OFFSET..FAR_MARKER_OFFSET + FAR_MARKER_PATTERN.len()]
+            .copy_from_slice(&FAR_MARKER_PATTERN);
     }
 
     let refine_region = unsafe {
@@ -301,6 +450,47 @@ fn main() {
     writeln!(out, "BOUNDARY_U64_VALUE={BOUNDARY_U64_VALUE}").unwrap();
     writeln!(out, "REFINE_REGION_BASE=0x{refine_base:x}").unwrap();
     writeln!(out, "REFINE_REGION_SIZE={REFINE_REGION_SIZE}").unwrap();
+    writeln!(out, "PATTERN_REGION_BASE=0x{pattern_base:x}").unwrap();
+    writeln!(out, "PATTERN_REGION_SIZE={PATTERN_REGION_SIZE}").unwrap();
+    writeln!(out, "UTF8_ASCII_OFFSET={UTF8_ASCII_OFFSET}").unwrap();
+    writeln!(out, "UTF8_ASCII_TEXT={UTF8_ASCII_TEXT}").unwrap();
+    writeln!(out, "UTF8_MULTIBYTE_OFFSET={UTF8_MULTIBYTE_OFFSET}").unwrap();
+    writeln!(out, "UTF16LE_OFFSET={UTF16LE_OFFSET}").unwrap();
+    writeln!(out, "UTF16LE_TEXT={UTF16LE_TEXT}").unwrap();
+    writeln!(out, "UTF16LE_NONBMP_OFFSET={UTF16LE_NONBMP_OFFSET}").unwrap();
+    writeln!(out, "RAW_BYTES_OFFSET={RAW_BYTES_OFFSET}").unwrap();
+    writeln!(
+        out,
+        "RAW_BYTES_DUPLICATE_OFFSET={RAW_BYTES_DUPLICATE_OFFSET}"
+    )
+    .unwrap();
+    writeln!(out, "AOB_EXACT_OFFSET={AOB_EXACT_OFFSET}").unwrap();
+    writeln!(out, "AOB_WILDCARD_OFFSET={AOB_WILDCARD_OFFSET}").unwrap();
+    writeln!(out, "AOB_NIBBLE_OFFSET={AOB_NIBBLE_OFFSET}").unwrap();
+    writeln!(out, "NEAR_MISS_OFFSET={NEAR_MISS_OFFSET}").unwrap();
+    writeln!(out, "PATTERN_BOUNDARY_2_OFFSET={PATTERN_BOUNDARY_2_OFFSET}").unwrap();
+    writeln!(out, "PATTERN_BOUNDARY_8_OFFSET={PATTERN_BOUNDARY_8_OFFSET}").unwrap();
+    writeln!(
+        out,
+        "PATTERN_BOUNDARY_STRING_OFFSET={PATTERN_BOUNDARY_STRING_OFFSET}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "PATTERN_BOUNDARY_STRING_TEXT={PATTERN_BOUNDARY_STRING_TEXT}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "PATTERN_BOUNDARY_32_OFFSET={PATTERN_BOUNDARY_32_OFFSET}"
+    )
+    .unwrap();
+    writeln!(out, "FAR_MARKER_OFFSET={FAR_MARKER_OFFSET}").unwrap();
+    writeln!(
+        out,
+        "GUARD_HIDDEN_PATTERN_OFFSET={GUARD_HIDDEN_PATTERN_OFFSET}"
+    )
+    .unwrap();
     writeln!(out, "READY").unwrap();
     out.flush().unwrap();
 
