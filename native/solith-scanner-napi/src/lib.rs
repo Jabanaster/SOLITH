@@ -34,6 +34,9 @@ use solith_scanner_core::reader::{
     read_region_chunked_with_progress, ChunkReadResult, ChunkReadStatus, ReadBudget,
 };
 use solith_scanner_core::region::{enumerate_regions, CommitState, Region, RegionKind};
+use solith_scanner_core::session::{
+    GenerationRecord, RefineMode, ScanSession as CoreScanSession, SessionResourceLimits,
+};
 use solith_scanner_core::target::{ProcessHandle, TargetArchitecture};
 use solith_scanner_core::types::{PrimitiveType, PrimitiveValue};
 use solith_scanner_core::ChunkPlanConfig;
@@ -931,5 +934,473 @@ impl NativeScanTarget {
             cancellation: cancellation.inner.clone(),
             progress: progress.inner.clone(),
         }))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stage 4 — scan-session / refinement engine (mission §4.14's napi session
+// API). A `NativeScanSession` starts empty (`inner: None`); the first call
+// must be `createUnknownInitial`, which opens its own `ProcessHandle` (this
+// session's for its entire lifetime — mission §4.1's "process handle
+// ownership" bullet) and performs the real baseline capture. Every
+// subsequent `refine` call re-reads only the current candidate set. Neither
+// method leaks the underlying Rust `ScanSession`/`ProcessHandle` to JS
+// (mission §4.14's explicit "do not leak Rust/internal handles" rule) — JS
+// only ever sees this opaque class plus the plain-data result/status shapes
+// below.
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::too_many_arguments)]
+fn refine_mode_from_js(
+    session_pt: PrimitiveType,
+    mode: &str,
+    value_number: Option<f64>,
+    value_bigint: Option<BigInt>,
+    min_number: Option<f64>,
+    min_bigint: Option<BigInt>,
+    max_number: Option<f64>,
+    max_bigint: Option<BigInt>,
+) -> Result<RefineMode> {
+    Ok(match mode {
+        "changed" => RefineMode::Changed,
+        "unchanged" => RefineMode::Unchanged,
+        "increased" => RefineMode::Increased,
+        "decreased" => RefineMode::Decreased,
+        "increased_by" => {
+            let delta = primitive_value_from_js(session_pt, value_number, value_bigint)?;
+            RefineMode::IncreasedBy(delta)
+        }
+        "decreased_by" => {
+            let delta = primitive_value_from_js(session_pt, value_number, value_bigint)?;
+            RefineMode::DecreasedBy(delta)
+        }
+        "between" => {
+            let min = primitive_value_from_js(session_pt, min_number, min_bigint)?;
+            let max = primitive_value_from_js(session_pt, max_number, max_bigint)?;
+            RefineMode::Between(min, max)
+        }
+        other => {
+            return Err(Error::new(
+                Status::InvalidArg,
+                format!("invalid_configuration: unknown refine mode \"{other}\""),
+            ))
+        }
+    })
+}
+
+#[napi(object)]
+pub struct JsRefineOutcome {
+    pub generation: u32,
+    pub input_candidate_count: BigInt,
+    pub output_candidate_count: BigInt,
+    pub bytes_reread: BigInt,
+    pub skipped_reads: BigInt,
+    pub completeness: JsCompleteness,
+    pub duration_millis: BigInt,
+}
+
+#[napi(object)]
+pub struct JsGenerationRecord {
+    pub generation: u32,
+    pub mode_label: String,
+    pub input_candidate_count: BigInt,
+    pub output_candidate_count: BigInt,
+    pub bytes_reread: BigInt,
+    pub skipped_reads: BigInt,
+    pub completeness: JsCompleteness,
+    pub duration_millis: BigInt,
+}
+
+fn generation_record_to_js(r: GenerationRecord) -> JsGenerationRecord {
+    JsGenerationRecord {
+        generation: r.generation as u32,
+        mode_label: r.mode_label.to_string(),
+        input_candidate_count: BigInt::from(r.input_candidate_count),
+        output_candidate_count: BigInt::from(r.output_candidate_count),
+        bytes_reread: BigInt::from(r.bytes_reread),
+        skipped_reads: BigInt::from(r.skipped_reads),
+        completeness: completeness_to_js(r.completeness),
+        duration_millis: BigInt::from(r.duration.as_millis() as u64),
+    }
+}
+
+#[napi(object)]
+pub struct JsSessionStatus {
+    pub pid: u32,
+    pub primitive_type: String,
+    pub alignment: String,
+    pub generation: u32,
+    pub candidate_count: BigInt,
+    pub candidate_memory_bytes: BigInt,
+    pub last_completeness: JsCompleteness,
+    /// `false` once the session's target process has exited — checked live
+    /// via `GetExitCodeProcess` on every call, never cached (mission §4.2).
+    pub is_stale: bool,
+}
+
+fn session_not_initialized_err() -> Error {
+    Error::new(
+        Status::GenericFailure,
+        "invalid_configuration: session not yet initialized — call createUnknownInitial first",
+    )
+}
+
+fn session_already_initialized_err() -> Error {
+    Error::new(
+        Status::GenericFailure,
+        "invalid_configuration: session already initialized — createUnknownInitial may only be called once per session",
+    )
+}
+
+fn alignment_str(a: AlignmentMode) -> &'static str {
+    match a {
+        AlignmentMode::Bytewise => "bytewise",
+        AlignmentMode::AlignedToType => "aligned_to_type",
+    }
+}
+
+pub struct CreateUnknownInitialTask {
+    inner: Arc<Mutex<Option<CoreScanSession>>>,
+    pid: u32,
+    regions: Vec<Region>,
+    policy: RegionSelectionPolicy,
+    primitive_type: PrimitiveType,
+    alignment: AlignmentMode,
+    chunk_config: ChunkPlanConfig,
+    resource_limits: SessionResourceLimits,
+    cancellation: CancellationToken,
+    progress: Arc<Mutex<ScanMetrics>>,
+}
+
+impl Task for CreateUnknownInitialTask {
+    type Output = JsRefineOutcome;
+    type JsValue = JsRefineOutcome;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        {
+            let guard = self.inner.lock().map_err(|_| {
+                Error::new(
+                    Status::GenericFailure,
+                    "internal_invariant_violation: session mutex poisoned",
+                )
+            })?;
+            if guard.is_some() {
+                return Err(session_already_initialized_err());
+            }
+        }
+
+        let handle = ProcessHandle::open_read_only(self.pid).map_err(to_napi_err)?;
+        let progress = self.progress.clone();
+        let mut on_progress = move |m: &ScanMetrics| {
+            if let Ok(mut slot) = progress.lock() {
+                *slot = *m;
+            }
+        };
+
+        let (session, metrics) = CoreScanSession::create_unknown_initial(
+            handle,
+            &self.regions,
+            &self.policy,
+            self.primitive_type,
+            self.alignment,
+            self.chunk_config,
+            self.resource_limits,
+            &self.cancellation,
+            Some(&mut on_progress),
+        )
+        .map_err(to_napi_err)?;
+
+        let completeness = session.last_completeness().clone();
+        let candidate_count = session.candidate_count();
+        let mut guard = self.inner.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: session mutex poisoned",
+            )
+        })?;
+        *guard = Some(session);
+
+        Ok(JsRefineOutcome {
+            generation: 0,
+            input_candidate_count: BigInt::from(0u64),
+            output_candidate_count: BigInt::from(candidate_count),
+            bytes_reread: BigInt::from(metrics.bytes_read),
+            skipped_reads: BigInt::from(0u64),
+            completeness: completeness_to_js(completeness),
+            duration_millis: BigInt::from(metrics.elapsed.as_millis() as u64),
+        })
+    }
+
+    fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(output)
+    }
+}
+
+pub struct RefineTask {
+    inner: Arc<Mutex<Option<CoreScanSession>>>,
+    mode: RefineMode,
+    cancellation: CancellationToken,
+    progress: Arc<Mutex<ScanMetrics>>,
+}
+
+impl Task for RefineTask {
+    type Output = JsRefineOutcome;
+    type JsValue = JsRefineOutcome;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        let mut guard = self.inner.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: session mutex poisoned",
+            )
+        })?;
+        let session = guard.as_mut().ok_or_else(session_not_initialized_err)?;
+
+        let progress = self.progress.clone();
+        let mut on_progress = move |m: &ScanMetrics| {
+            if let Ok(mut slot) = progress.lock() {
+                *slot = *m;
+            }
+        };
+
+        let outcome = session
+            .refine(self.mode, &self.cancellation, Some(&mut on_progress))
+            .map_err(to_napi_err)?;
+
+        Ok(JsRefineOutcome {
+            generation: outcome.generation as u32,
+            input_candidate_count: BigInt::from(outcome.input_candidate_count),
+            output_candidate_count: BigInt::from(outcome.output_candidate_count),
+            bytes_reread: BigInt::from(outcome.bytes_reread),
+            skipped_reads: BigInt::from(outcome.skipped_reads),
+            completeness: completeness_to_js(outcome.completeness),
+            duration_millis: BigInt::from(outcome.duration.as_millis() as u64),
+        })
+    }
+
+    fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(output)
+    }
+}
+
+/// A native scan-session (mission §4.1/§4.14). See the module-level comment
+/// above for the create-once/refine-many lifecycle and the leak-nothing
+/// boundary discipline this class follows.
+#[napi]
+pub struct NativeScanSession {
+    inner: Arc<Mutex<Option<CoreScanSession>>>,
+}
+
+#[napi]
+impl NativeScanSession {
+    #[napi(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Establishes the `UNKNOWN_INITIAL` baseline (mission §4.4): opens a
+    /// fresh, session-owned handle to `pid` and captures every eligible
+    /// candidate across `regions` (as returned by
+    /// `NativeScanTarget.enumerateRegions()`, or a caller-constructed list)
+    /// per `alignment`. May be called exactly once per session instance.
+    #[napi(ts_return_type = "Promise<JsRefineOutcome>")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_unknown_initial(
+        &self,
+        pid: u32,
+        regions: Vec<JsRegion>,
+        primitive_type: String,
+        alignment: String,
+        chunk_size_bytes: BigInt,
+        overlap_bytes: BigInt,
+        max_candidates: Option<BigInt>,
+        max_snapshot_bytes: Option<BigInt>,
+        max_session_bytes: Option<BigInt>,
+        cancellation: &ScanCancellationHandle,
+        progress: &ScanProgressHandle,
+    ) -> Result<AsyncTask<CreateUnknownInitialTask>> {
+        {
+            let guard = self.inner.lock().map_err(|_| {
+                Error::new(
+                    Status::GenericFailure,
+                    "internal_invariant_violation: session mutex poisoned",
+                )
+            })?;
+            if guard.is_some() {
+                return Err(session_already_initialized_err());
+            }
+        }
+
+        let pt = primitive_type_from_str(&primitive_type)?;
+        let alignment_mode = alignment_from_str(&alignment)?;
+        let regions: Result<Vec<Region>> = regions.iter().map(js_to_region).collect();
+        let regions = regions?;
+        let (_, chunk_size, _) = chunk_size_bytes.get_u64();
+        let (_, overlap, _) = overlap_bytes.get_u64();
+
+        fn opt_u64(b: Option<BigInt>) -> Option<u64> {
+            b.map(|v| v.get_u64().1)
+        }
+
+        let resource_limits = SessionResourceLimits {
+            max_candidates: opt_u64(max_candidates),
+            max_snapshot_bytes: opt_u64(max_snapshot_bytes),
+            max_session_bytes: opt_u64(max_session_bytes),
+            max_generations_retained: SessionResourceLimits::default_safe()
+                .max_generations_retained,
+        };
+
+        Ok(AsyncTask::new(CreateUnknownInitialTask {
+            inner: self.inner.clone(),
+            pid,
+            regions,
+            policy: RegionSelectionPolicy::default_writable_value_scan(),
+            primitive_type: pt,
+            alignment: alignment_mode,
+            chunk_config: ChunkPlanConfig {
+                chunk_size_bytes: chunk_size,
+                overlap_bytes: overlap,
+            },
+            resource_limits,
+            cancellation: cancellation.inner.clone(),
+            progress: progress.inner.clone(),
+        }))
+    }
+
+    /// Re-reads the current candidate set and filters by `mode` (mission
+    /// §4.5-§4.8): one of `"changed"`, `"unchanged"`, `"increased"`,
+    /// `"decreased"`, `"increased_by"`, `"decreased_by"`, `"between"`.
+    /// `valueNumber`/`valueBigint` supply the delta for
+    /// `increased_by`/`decreased_by`; `minNumber`/`minBigint` and
+    /// `maxNumber`/`maxBigint` supply the inclusive bounds for `between` —
+    /// exactly one of the Number/BigInt pair per slot, per the session's own
+    /// primitive type (same value-duality contract as `scanExact`).
+    #[napi(ts_return_type = "Promise<JsRefineOutcome>")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn refine(
+        &self,
+        mode: String,
+        value_number: Option<f64>,
+        value_bigint: Option<BigInt>,
+        min_number: Option<f64>,
+        min_bigint: Option<BigInt>,
+        max_number: Option<f64>,
+        max_bigint: Option<BigInt>,
+        cancellation: &ScanCancellationHandle,
+        progress: &ScanProgressHandle,
+    ) -> Result<AsyncTask<RefineTask>> {
+        let session_pt = {
+            let guard = self.inner.lock().map_err(|_| {
+                Error::new(
+                    Status::GenericFailure,
+                    "internal_invariant_violation: session mutex poisoned",
+                )
+            })?;
+            let session = guard.as_ref().ok_or_else(session_not_initialized_err)?;
+            session.primitive_type()
+        };
+
+        let refine_mode = refine_mode_from_js(
+            session_pt,
+            &mode,
+            value_number,
+            value_bigint,
+            min_number,
+            min_bigint,
+            max_number,
+            max_bigint,
+        )?;
+
+        Ok(AsyncTask::new(RefineTask {
+            inner: self.inner.clone(),
+            mode: refine_mode,
+            cancellation: cancellation.inner.clone(),
+            progress: progress.inner.clone(),
+        }))
+    }
+
+    /// A bounded, deterministically-ordered page of the current candidate
+    /// set (mission §4.3/§4.14's pagination requirement) — synchronous,
+    /// since it is a plain in-memory slice, not a re-read of target memory.
+    #[napi]
+    pub fn get_results(&self, offset: BigInt, limit: u32) -> Result<Vec<JsScanMatch>> {
+        let guard = self.inner.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: session mutex poisoned",
+            )
+        })?;
+        let session = guard.as_ref().ok_or_else(session_not_initialized_err)?;
+        let (_, offset_u64, _) = offset.get_u64();
+        let page = session.candidates_page(offset_u64, limit as u64);
+        Ok(page
+            .into_iter()
+            .map(|(address, value)| scan_match_to_js(CoreScanMatch { address, value }))
+            .collect())
+    }
+
+    /// Full generation history recorded so far (mission §4.9), oldest
+    /// first, bounded by `maxGenerationsRetained`.
+    #[napi]
+    pub fn generation_history(&self) -> Result<Vec<JsGenerationRecord>> {
+        let guard = self.inner.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: session mutex poisoned",
+            )
+        })?;
+        let session = guard.as_ref().ok_or_else(session_not_initialized_err)?;
+        Ok(session
+            .generation_history()
+            .iter()
+            .cloned()
+            .map(generation_record_to_js)
+            .collect())
+    }
+
+    /// Current status snapshot, including a live (never cached)
+    /// stale-target check (mission §4.2).
+    #[napi]
+    pub fn status(&self) -> Result<JsSessionStatus> {
+        let guard = self.inner.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: session mutex poisoned",
+            )
+        })?;
+        let session = guard.as_ref().ok_or_else(session_not_initialized_err)?;
+        Ok(JsSessionStatus {
+            pid: session.identity().pid,
+            primitive_type: session.primitive_type().to_string(),
+            alignment: alignment_str(session.alignment()).to_string(),
+            generation: session.generation() as u32,
+            candidate_count: BigInt::from(session.candidate_count()),
+            candidate_memory_bytes: BigInt::from(session.candidate_memory_bytes()),
+            last_completeness: completeness_to_js(session.last_completeness().clone()),
+            is_stale: session.verify_not_stale().is_err(),
+        })
+    }
+
+    /// Releases the session's handle and candidate storage immediately
+    /// (mission §4.15) rather than waiting for garbage collection. Safe to
+    /// call more than once, and safe to call before `createUnknownInitial`.
+    #[napi]
+    pub fn close(&self) {
+        if let Ok(mut guard) = self.inner.lock() {
+            *guard = None;
+        }
+    }
+
+    #[napi]
+    pub fn is_initialized(&self) -> bool {
+        self.inner.lock().map(|g| g.is_some()).unwrap_or(false)
+    }
+}
+
+impl Default for NativeScanSession {
+    fn default() -> Self {
+        Self::new()
     }
 }

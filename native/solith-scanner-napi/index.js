@@ -699,6 +699,7 @@ if (!nativeBinding) {
 }
 
 module.exports = nativeBinding
+module.exports.NativeScanSession = nativeBinding.NativeScanSession
 module.exports.NativeScanTarget = nativeBinding.NativeScanTarget
 module.exports.ScanCancellationHandle = nativeBinding.ScanCancellationHandle
 module.exports.ScanProgressHandle = nativeBinding.ScanProgressHandle

@@ -2,6 +2,57 @@
 /* eslint-disable */
 
 /**
+ * A native scan-session (mission §4.1/§4.14). See the module-level comment
+ * above for the create-once/refine-many lifecycle and the leak-nothing
+ * boundary discipline this class follows.
+ */
+export declare class NativeScanSession {
+  constructor()
+  /**
+   * Establishes the `UNKNOWN_INITIAL` baseline (mission §4.4): opens a
+   * fresh, session-owned handle to `pid` and captures every eligible
+   * candidate across `regions` (as returned by
+   * `NativeScanTarget.enumerateRegions()`, or a caller-constructed list)
+   * per `alignment`. May be called exactly once per session instance.
+   */
+  createUnknownInitial(pid: number, regions: Array<JsRegion>, primitiveType: string, alignment: string, chunkSizeBytes: bigint, overlapBytes: bigint, maxCandidates: bigint | undefined | null, maxSnapshotBytes: bigint | undefined | null, maxSessionBytes: bigint | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsRefineOutcome>
+  /**
+   * Re-reads the current candidate set and filters by `mode` (mission
+   * §4.5-§4.8): one of `"changed"`, `"unchanged"`, `"increased"`,
+   * `"decreased"`, `"increased_by"`, `"decreased_by"`, `"between"`.
+   * `valueNumber`/`valueBigint` supply the delta for
+   * `increased_by`/`decreased_by`; `minNumber`/`minBigint` and
+   * `maxNumber`/`maxBigint` supply the inclusive bounds for `between` —
+   * exactly one of the Number/BigInt pair per slot, per the session's own
+   * primitive type (same value-duality contract as `scanExact`).
+   */
+  refine(mode: string, valueNumber: number | undefined | null, valueBigint: bigint | undefined | null, minNumber: number | undefined | null, minBigint: bigint | undefined | null, maxNumber: number | undefined | null, maxBigint: bigint | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsRefineOutcome>
+  /**
+   * A bounded, deterministically-ordered page of the current candidate
+   * set (mission §4.3/§4.14's pagination requirement) — synchronous,
+   * since it is a plain in-memory slice, not a re-read of target memory.
+   */
+  getResults(offset: bigint, limit: number): Array<JsScanMatch>
+  /**
+   * Full generation history recorded so far (mission §4.9), oldest
+   * first, bounded by `maxGenerationsRetained`.
+   */
+  generationHistory(): Array<JsGenerationRecord>
+  /**
+   * Current status snapshot, including a live (never cached)
+   * stale-target check (mission §4.2).
+   */
+  status(): JsSessionStatus
+  /**
+   * Releases the session's handle and candidate storage immediately
+   * (mission §4.15) rather than waiting for garbage collection. Safe to
+   * call more than once, and safe to call before `createUnknownInitial`.
+   */
+  close(): void
+  isInitialized(): boolean
+}
+
+/**
  * A live attach to a target process, scan-mechanics only (no policy — see
  * module doc). Wraps the handle in `Arc<Mutex<Option<...>>>` so it can be
  * shared with a background `Task` while still allowing an explicit
@@ -146,6 +197,17 @@ export interface JsExactScanOutcome {
   completeness: JsCompleteness
 }
 
+export interface JsGenerationRecord {
+  generation: number
+  modeLabel: string
+  inputCandidateCount: bigint
+  outputCandidateCount: bigint
+  bytesReread: bigint
+  skippedReads: bigint
+  completeness: JsCompleteness
+  durationMillis: bigint
+}
+
 export interface JsProgress {
   regionsTotal: number
   regionsConsidered: number
@@ -165,6 +227,16 @@ export interface JsReadRegionOutcome {
   chunks: Array<JsChunkReadResult>
   metrics: JsProgress
   completeness: JsCompleteness
+}
+
+export interface JsRefineOutcome {
+  generation: number
+  inputCandidateCount: bigint
+  outputCandidateCount: bigint
+  bytesReread: bigint
+  skippedReads: bigint
+  completeness: JsCompleteness
+  durationMillis: bigint
 }
 
 export interface JsRegion {
@@ -190,6 +262,21 @@ export interface JsScanMatch {
   valueNumber?: number
   /** Populated only for i64/u64 — exact, never routed through `f64`. */
   valueBigint?: bigint
+}
+
+export interface JsSessionStatus {
+  pid: number
+  primitiveType: string
+  alignment: string
+  generation: number
+  candidateCount: bigint
+  candidateMemoryBytes: bigint
+  lastCompleteness: JsCompleteness
+  /**
+   * `false` once the session's target process has exited — checked live
+   * via `GetExitCodeProcess` on every call, never cached (mission §4.2).
+   */
+  isStale: boolean
 }
 
 export interface JsSkippedRange {
