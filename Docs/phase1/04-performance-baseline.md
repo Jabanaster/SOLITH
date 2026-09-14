@@ -17,7 +17,9 @@ No hyperfine, no existing benchmark suite, and no CI-wired performance test exis
 - Node: v22.23.2, run via `tsx` (unbundled TS-to-JS-on-the-fly dev execution, **not** a production `build:electron` release binary — real packaged-app numbers will differ, likely favorably, since the shipped bundle is pre-transpiled)
 - Build mode: dev/tsx, single-threaded (no worker pool; matches current production architecture, which has none)
 
-## Results — synthetic fixtures (median of 5–7 runs; min/max recorded for spread)
+## Results — IN-MEMORY MICROBENCHMARK (synthetic fixtures; median of 5–7 runs; min/max recorded for spread)
+
+**Wording correction (Stage 2 normalization):** every number in this section is an **in-memory microbenchmark** — pure V8/Node JS execution against a synthetic in-process `Buffer`, with zero real Windows process-memory I/O involved. These numbers are explicitly **not**: Windows process-memory throughput, real-game scanner throughput, syscall throughput, or end-to-end native scanner performance. Real syscall-inclusive throughput was first measured in Stage 2 (`Docs/phase1/16-stage2-performance-results.md`, against a real spawned process's real memory) and is 3–4 orders of magnitude lower than the numbers below at comparable region sizes — that gap is expected and is itself evidence for where the real bottleneck lives (see that document's interpretation section).
 
 | Scan | Region shape | Median | Min | Max | Throughput |
 |---|---|---|---|---|---|

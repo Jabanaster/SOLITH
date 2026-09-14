@@ -58,7 +58,7 @@ scanAobInProcess result: null (not found)
 ```
 A genuinely present pattern reports as `null` with zero signal that its containing region was never scanned.
 
-**Status: REPRODUCED.** Matches ROADMAP.md's cited Audit 2 §16 S2 finding (all 120,245 CT AOB signatures effectively disabled against real heaps above the cap).
+**Status: REPRODUCED.** Consistent with ROADMAP.md's cited Audit 2 §16 S2 finding. Wording correction (Stage 2 normalization, per the mission's explicit instruction): 120,245 AOB signatures exist in the compiled CT corpus, and the coverage defect demonstrated above can make any signature whose required searchable memory lies outside successfully-read coverage unresolvable — this is not the same claim as "all 120,245 signatures are categorically broken," which has not been independently verified against the real corpus by execution and is not asserted here.
 
 No caps on match count, and no Vectorscan/napi-rs pattern engine is wired in anywhere (confirmed via repo-wide grep — the only `napi-rs`-adjacent hit is an unrelated transitive dependency in a separate backend service, `solith-hub-backend`).
 
