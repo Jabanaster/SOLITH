@@ -72,6 +72,18 @@ export declare class NativeScanTarget {
    * `read_region_chunked()` per-region directly with its own policy.
    */
   defaultRegionPolicySummary(): Array<JsRegion>
+  /**
+   * Scans `region` for an exact match of the given primitive value.
+   * Runs on napi's worker-thread pool (mission §3.13's async
+   * requirement) — see `read_region_chunked` above for the same
+   * cancellation/progress contract, which this reuses unchanged.
+   *
+   * `primitiveType`: one of "i8","u8","i16","u16","i32","u32","i64",
+   * "u64","f32","f64". `alignment`: "bytewise" (default/recommended) or
+   * "aligned_to_type". `valueNumber`/`valueBigint`: exactly one must be
+   * supplied, per `primitiveType` (see module doc's value contract).
+   */
+  scanExact(region: JsRegion, primitiveType: string, valueNumber: number | undefined | null, valueBigint: bigint | undefined | null, alignment: string, chunkSizeBytes: bigint, overlapBytes: bigint, maxResults: bigint | undefined | null, cancellation: ScanCancellationHandle, progress: ScanProgressHandle): Promise<JsExactScanOutcome>
 }
 
 export declare class ScanCancellationHandle {
@@ -128,6 +140,12 @@ export interface JsCompleteness {
   failedReason?: string
 }
 
+export interface JsExactScanOutcome {
+  matches: Array<JsScanMatch>
+  metrics: JsProgress
+  completeness: JsCompleteness
+}
+
 export interface JsProgress {
   regionsTotal: number
   regionsConsidered: number
@@ -162,6 +180,16 @@ export interface JsRegion {
   isNoaccess: boolean
   rawProtect: number
   rawType: number
+}
+
+export interface JsScanMatch {
+  address: bigint
+  /** One of the 10 canonical type strings ("i8".."f64"). */
+  primitiveType: string
+  /** Populated for every type except i64/u64. */
+  valueNumber?: number
+  /** Populated only for i64/u64 — exact, never routed through `f64`. */
+  valueBigint?: bigint
 }
 
 export interface JsSkippedRange {

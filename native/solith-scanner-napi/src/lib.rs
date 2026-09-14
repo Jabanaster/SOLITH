@@ -26,12 +26,16 @@ use napi_derive::napi;
 use solith_scanner_core::cancellation::CancellationToken;
 use solith_scanner_core::completeness::{ScanCompleteness, ScanMetrics, SkipReason, SkippedRange};
 use solith_scanner_core::error::ScannerError;
+use solith_scanner_core::exact_scan::{
+    scan_exact, AlignmentMode, ScanMatch as CoreScanMatch, ScanOptions,
+};
 use solith_scanner_core::policy::RegionSelectionPolicy;
 use solith_scanner_core::reader::{
     read_region_chunked_with_progress, ChunkReadResult, ChunkReadStatus, ReadBudget,
 };
 use solith_scanner_core::region::{enumerate_regions, CommitState, Region, RegionKind};
 use solith_scanner_core::target::{ProcessHandle, TargetArchitecture};
+use solith_scanner_core::types::{PrimitiveType, PrimitiveValue};
 use solith_scanner_core::ChunkPlanConfig;
 
 fn to_napi_err(e: ScannerError) -> Error {
@@ -659,5 +663,273 @@ impl NativeScanTarget {
         let policy = RegionSelectionPolicy::default_writable_value_scan();
         let (selected, _excluded) = policy.partition(&result.regions);
         Ok(selected.into_iter().map(region_to_js).collect())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — exact primitive-value scanning (mission §3.13).
+//
+// Value contract: a value crosses the boundary as EITHER a plain JS
+// `number` (i8/u8/i16/u16/i32/u32/f32/f64 — all exactly representable) OR a
+// `BigInt` (i64/u64 only), never both, and never coerced from one to the
+// other. Callers pass `valueNumber` for the former group and `valueBigint`
+// for the latter, matching `primitiveType`; passing the wrong one for a
+// given type is a thrown `invalid_configuration` error, not a silent
+// truncation. `PrimitiveType::requires_bigint_for_js()` is the single
+// source of truth this crate and any caller should consult for which slot
+// to use.
+// ---------------------------------------------------------------------------
+
+fn primitive_type_from_str(s: &str) -> Result<PrimitiveType> {
+    Ok(match s {
+        "i8" => PrimitiveType::I8,
+        "u8" => PrimitiveType::U8,
+        "i16" => PrimitiveType::I16,
+        "u16" => PrimitiveType::U16,
+        "i32" => PrimitiveType::I32,
+        "u32" => PrimitiveType::U32,
+        "i64" => PrimitiveType::I64,
+        "u64" => PrimitiveType::U64,
+        "f32" => PrimitiveType::F32,
+        "f64" => PrimitiveType::F64,
+        other => {
+            return Err(Error::new(
+                Status::InvalidArg,
+                format!("invalid_configuration: unknown primitive type \"{other}\""),
+            ))
+        }
+    })
+}
+
+fn primitive_value_from_js(
+    pt: PrimitiveType,
+    value_number: Option<f64>,
+    value_bigint: Option<BigInt>,
+) -> Result<PrimitiveValue> {
+    if pt.requires_bigint_for_js() {
+        let big = value_bigint.ok_or_else(|| {
+            Error::new(
+                Status::InvalidArg,
+                format!("invalid_configuration: {pt} requires valueBigint, not valueNumber"),
+            )
+        })?;
+        return Ok(match pt {
+            PrimitiveType::I64 => {
+                let (v, lossless) = big.get_i64();
+                if !lossless {
+                    return Err(Error::new(
+                        Status::InvalidArg,
+                        "invalid_configuration: valueBigint does not fit in i64 exactly",
+                    ));
+                }
+                PrimitiveValue::I64(v)
+            }
+            PrimitiveType::U64 => {
+                let (sign, v, lossless) = big.get_u64();
+                if sign || !lossless {
+                    return Err(Error::new(
+                        Status::InvalidArg,
+                        "invalid_configuration: valueBigint does not fit in u64 exactly",
+                    ));
+                }
+                PrimitiveValue::U64(v)
+            }
+            _ => unreachable!("requires_bigint_for_js() only true for I64/U64"),
+        });
+    }
+
+    let num = value_number.ok_or_else(|| {
+        Error::new(
+            Status::InvalidArg,
+            format!("invalid_configuration: {pt} requires valueNumber, not valueBigint"),
+        )
+    })?;
+    Ok(match pt {
+        PrimitiveType::I8 => PrimitiveValue::I8(num as i8),
+        PrimitiveType::U8 => PrimitiveValue::U8(num as u8),
+        PrimitiveType::I16 => PrimitiveValue::I16(num as i16),
+        PrimitiveType::U16 => PrimitiveValue::U16(num as u16),
+        PrimitiveType::I32 => PrimitiveValue::I32(num as i32),
+        PrimitiveType::U32 => PrimitiveValue::U32(num as u32),
+        PrimitiveType::F32 => PrimitiveValue::F32(num as f32),
+        PrimitiveType::F64 => PrimitiveValue::F64(num),
+        PrimitiveType::I64 | PrimitiveType::U64 => {
+            unreachable!("handled in the bigint branch above")
+        }
+    })
+}
+
+fn alignment_from_str(s: &str) -> Result<AlignmentMode> {
+    match s {
+        "bytewise" => Ok(AlignmentMode::Bytewise),
+        "aligned_to_type" => Ok(AlignmentMode::AlignedToType),
+        other => Err(Error::new(
+            Status::InvalidArg,
+            format!("invalid_configuration: unknown alignment mode \"{other}\""),
+        )),
+    }
+}
+
+#[napi(object)]
+pub struct JsScanMatch {
+    pub address: BigInt,
+    /// One of the 10 canonical type strings ("i8".."f64").
+    pub primitive_type: String,
+    /// Populated for every type except i64/u64.
+    pub value_number: Option<f64>,
+    /// Populated only for i64/u64 — exact, never routed through `f64`.
+    pub value_bigint: Option<BigInt>,
+}
+
+fn scan_match_to_js(m: CoreScanMatch) -> JsScanMatch {
+    let pt = m.value.primitive_type();
+    let (value_number, value_bigint) = if pt.requires_bigint_for_js() {
+        let big = match m.value {
+            PrimitiveValue::I64(v) => BigInt::from(v),
+            PrimitiveValue::U64(v) => BigInt::from(v),
+            _ => unreachable!(),
+        };
+        (None, Some(big))
+    } else {
+        let num = match m.value {
+            PrimitiveValue::I8(v) => v as f64,
+            PrimitiveValue::U8(v) => v as f64,
+            PrimitiveValue::I16(v) => v as f64,
+            PrimitiveValue::U16(v) => v as f64,
+            PrimitiveValue::I32(v) => v as f64,
+            PrimitiveValue::U32(v) => v as f64,
+            PrimitiveValue::F32(v) => v as f64,
+            PrimitiveValue::F64(v) => v,
+            PrimitiveValue::I64(_) | PrimitiveValue::U64(_) => unreachable!(),
+        };
+        (Some(num), None)
+    };
+    JsScanMatch {
+        address: BigInt::from(m.address),
+        primitive_type: pt.to_string(),
+        value_number,
+        value_bigint,
+    }
+}
+
+#[napi(object)]
+pub struct JsExactScanOutcome {
+    pub matches: Vec<JsScanMatch>,
+    pub metrics: JsProgress,
+    pub completeness: JsCompleteness,
+}
+
+pub struct ExactScanTask {
+    handle: Arc<Mutex<Option<ProcessHandle>>>,
+    region: Region,
+    policy: RegionSelectionPolicy,
+    primitive_type: PrimitiveType,
+    target: PrimitiveValue,
+    options: ScanOptions,
+    cancellation: CancellationToken,
+    progress: Arc<Mutex<ScanMetrics>>,
+}
+
+impl Task for ExactScanTask {
+    type Output = solith_scanner_core::exact_scan::ExactScanResult;
+    type JsValue = JsExactScanOutcome;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        let guard = self.handle.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: target mutex poisoned",
+            )
+        })?;
+        let handle_ref = guard.as_ref().ok_or_else(detached_err)?;
+
+        let progress = self.progress.clone();
+        let mut on_progress = move |m: &ScanMetrics| {
+            if let Ok(mut slot) = progress.lock() {
+                *slot = *m;
+            }
+        };
+
+        scan_exact(
+            handle_ref,
+            std::slice::from_ref(&self.region),
+            &self.policy,
+            self.primitive_type,
+            self.target,
+            &self.options,
+            &self.cancellation,
+            Some(&mut on_progress),
+        )
+        .map_err(to_napi_err)
+    }
+
+    fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(JsExactScanOutcome {
+            matches: output.matches.into_iter().map(scan_match_to_js).collect(),
+            metrics: metrics_to_js(&output.metrics),
+            completeness: completeness_to_js(output.completeness),
+        })
+    }
+}
+
+#[napi]
+impl NativeScanTarget {
+    /// Scans `region` for an exact match of the given primitive value.
+    /// Runs on napi's worker-thread pool (mission §3.13's async
+    /// requirement) — see `read_region_chunked` above for the same
+    /// cancellation/progress contract, which this reuses unchanged.
+    ///
+    /// `primitiveType`: one of "i8","u8","i16","u16","i32","u32","i64",
+    /// "u64","f32","f64". `alignment`: "bytewise" (default/recommended) or
+    /// "aligned_to_type". `valueNumber`/`valueBigint`: exactly one must be
+    /// supplied, per `primitiveType` (see module doc's value contract).
+    #[napi(ts_return_type = "Promise<JsExactScanOutcome>")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn scan_exact(
+        &self,
+        region: JsRegion,
+        primitive_type: String,
+        value_number: Option<f64>,
+        value_bigint: Option<BigInt>,
+        alignment: String,
+        chunk_size_bytes: BigInt,
+        overlap_bytes: BigInt,
+        max_results: Option<BigInt>,
+        cancellation: &ScanCancellationHandle,
+        progress: &ScanProgressHandle,
+    ) -> Result<AsyncTask<ExactScanTask>> {
+        let pt = primitive_type_from_str(&primitive_type)?;
+        let target = primitive_value_from_js(pt, value_number, value_bigint)?;
+        let alignment_mode = alignment_from_str(&alignment)?;
+        let region = js_to_region(&region)?;
+        let (_, chunk_size, _) = chunk_size_bytes.get_u64();
+        let (_, overlap, _) = overlap_bytes.get_u64();
+        let max_results_u64 = match max_results {
+            Some(b) => {
+                let (_, v, _) = b.get_u64();
+                Some(v)
+            }
+            None => None,
+        };
+
+        let options = ScanOptions {
+            alignment: alignment_mode,
+            chunk_config: ChunkPlanConfig {
+                chunk_size_bytes: chunk_size,
+                overlap_bytes: overlap,
+            },
+            max_results: max_results_u64,
+        };
+
+        Ok(AsyncTask::new(ExactScanTask {
+            handle: self.handle.clone(),
+            region,
+            policy: RegionSelectionPolicy::default_writable_value_scan(),
+            primitive_type: pt,
+            target,
+            options,
+            cancellation: cancellation.inner.clone(),
+            progress: progress.inner.clone(),
+        }))
     }
 }
