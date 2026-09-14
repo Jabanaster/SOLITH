@@ -1,0 +1,33 @@
+[package]
+name = "solith-scanner-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Pure Windows process-memory scanner mechanics for SOLITH Phase 1 (region enumeration, chunked reading, completeness/error model). No Electron or Node dependency."
+
+[lib]
+name = "solith_scanner_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "solith-scanner-fixture"
+path = "src/bin/fixture.rs"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+# Same windows-sys major version already frozen/proven in this repo by
+# native/solith-readonly-scanner (Step 0.13.5 adoption freeze) — reused for
+# consistency, not re-decided here.
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Memory",
+  "Win32_System_ProcessStatus",
+  "Win32_System_Threading",
+  "Win32_System_SystemInformation",
+] }
+
+[dev-dependencies]
