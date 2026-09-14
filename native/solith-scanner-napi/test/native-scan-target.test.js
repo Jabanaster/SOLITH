@@ -220,3 +220,50 @@ test('spawnSync sanity: fixture binary exists and exits cleanly on the "exit" co
   assert.equal(result.error, undefined, 'fixture binary failed to launch');
   assert.equal(result.status, 0, 'fixture did not exit cleanly on "exit"');
 });
+
+test('NativeScanTarget: detach is idempotent and a detached target is used cleanly, not accessed unsafely', async () => {
+  // Stage 6 §6.20: "cannot double-close unsafely" / "cannot access stale
+  // target."
+  await withFixture(async (child) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    assert.equal(target.isAttached(), true);
+    target.detach();
+    assert.equal(target.isAttached(), false);
+    target.detach(); // idempotent — must not throw
+    assert.equal(target.isAttached(), false);
+
+    // A synchronous method on a detached target throws cleanly (never a
+    // native crash/UB from touching a freed handle).
+    assert.throws(() => target.enumerateRegions());
+
+    // An async method on a detached target throws synchronously (before
+    // any AsyncTask/Promise is constructed) or rejects — either way the
+    // Promise it produces (via the async wrapper) must reject, not hang or
+    // crash the process.
+    const region = { baseAddress: 0n, size: 4096n, allocationBase: 0n, commitState: 'committed', kind: 'private', isReadable: true, isWritable: true, isExecutable: false, isGuard: false, isNoaccess: false, rawProtect: 0, rawType: 0 };
+    await assert.rejects(async () =>
+      target.readRegionChunked(region, 4096n, 0n, new addon.ScanCancellationHandle(), new addon.ScanProgressHandle()),
+    );
+  });
+});
+
+test('NativeScanTarget: scanExact rejects an unrecognized primitiveType/alignment before any scan starts', async () => {
+  // Stage 6 §6.20: "reject invalid input predictably."
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const regions = target.enumerateRegions();
+    const base = BigInt(fields.TYPES_REGION_BASE);
+    const region = regions.find((r) => r.baseAddress <= base && base < r.baseAddress + r.size);
+    const cancellation = new addon.ScanCancellationHandle();
+    const progress = new addon.ScanProgressHandle();
+
+    await assert.rejects(
+      async () => target.scanExact(region, 'not_a_real_type', 1, null, 'bytewise', 1024n * 1024n, 3n, null, cancellation, progress),
+      /invalid_configuration/,
+    );
+    await assert.rejects(
+      async () => target.scanExact(region, 'i32', 1, null, 'not_a_real_alignment', 1024n * 1024n, 3n, null, cancellation, progress),
+      /invalid_configuration/,
+    );
+  });
+});

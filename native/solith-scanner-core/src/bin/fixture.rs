@@ -32,7 +32,8 @@ use std::time::Duration;
 
 #[cfg(windows)]
 use windows_sys::Win32::System::Memory::{
-    VirtualAlloc, VirtualProtect, MEM_COMMIT, MEM_RESERVE, PAGE_NOACCESS, PAGE_READWRITE,
+    VirtualAlloc, VirtualFree, VirtualProtect, MEM_COMMIT, MEM_DECOMMIT, MEM_RELEASE, MEM_RESERVE,
+    PAGE_NOACCESS, PAGE_READWRITE,
 };
 
 const BIG_REGION_SIZE: usize = 4 * 1024 * 1024; // 4 MiB — well above the old 1 MiB cap
@@ -48,6 +49,16 @@ const BOUNDARY_PATTERN: [u8; 8] = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x8
 
 const GUARD_REGION_SIZE: usize = 3 * 4096; // 3 pages
 const GUARD_NOACCESS_PAGE_OFFSET: usize = 4096; // the middle page becomes PAGE_NOACCESS
+
+// ── Stage 6 (mission §6.16/§6.17): a dedicated region the parent test
+// process can mutate at the OS level — change protection, decommit,
+// recommit, or fully free (make it "disappear") — while a real scan is
+// in-flight, proving truthful completeness/no-crash behavior under real
+// region mutation rather than a synthetic/mocked region-state change.
+// Starts fully committed, readable/writable, with a known marker planted.
+const MUTATION_REGION_SIZE: usize = 3 * 4096; // 3 pages, matching GUARD_REGION's shape
+const MUTATION_MARKER_OFFSET: usize = 4096; // middle page, mirroring GUARD's layout
+const MUTATION_MARKER_PATTERN: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
 
 // ── Stage 3 (mission §3.11): all 10 primitive types, aligned/unaligned,
 // repeated, boundary-straddling, extreme 64-bit values, float specials,
@@ -264,6 +275,26 @@ fn main() {
         )
     };
     assert_ne!(protect_ok, 0, "VirtualProtect(guard middle page) failed");
+
+    let mutation_region = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            MUTATION_REGION_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(
+        !mutation_region.is_null(),
+        "VirtualAlloc(mutation_region) failed"
+    );
+    let mutation_base = mutation_region as usize;
+    unsafe {
+        let slice =
+            std::slice::from_raw_parts_mut(mutation_region as *mut u8, MUTATION_REGION_SIZE);
+        slice[MUTATION_MARKER_OFFSET..MUTATION_MARKER_OFFSET + MUTATION_MARKER_PATTERN.len()]
+            .copy_from_slice(&MUTATION_MARKER_PATTERN);
+    }
 
     let types_region = unsafe {
         VirtualAlloc(
@@ -491,6 +522,9 @@ fn main() {
         "GUARD_HIDDEN_PATTERN_OFFSET={GUARD_HIDDEN_PATTERN_OFFSET}"
     )
     .unwrap();
+    writeln!(out, "MUTATION_REGION_BASE=0x{mutation_base:x}").unwrap();
+    writeln!(out, "MUTATION_REGION_SIZE={MUTATION_REGION_SIZE}").unwrap();
+    writeln!(out, "MUTATION_MARKER_OFFSET={MUTATION_MARKER_OFFSET}").unwrap();
     writeln!(out, "READY").unwrap();
     out.flush().unwrap();
 
@@ -531,6 +565,14 @@ fn main() {
             Ok(cmd) => {
                 if let Some(rest) = cmd.strip_prefix("write ") {
                     apply_write_command(refine_slice, rest, &mut out);
+                } else if let Some(rest) = cmd.strip_prefix("protect_mutation ") {
+                    apply_protect_mutation_command(mutation_region, rest, &mut out);
+                } else if cmd == "decommit_mutation" {
+                    apply_decommit_mutation_command(mutation_region, &mut out);
+                } else if cmd == "recommit_mutation" {
+                    apply_recommit_mutation_command(mutation_region, &mut out);
+                } else if cmd == "free_mutation" {
+                    apply_free_mutation_command(mutation_region, &mut out);
                 } else {
                     writeln!(out, "UNKNOWN_CMD {cmd}").unwrap();
                     out.flush().unwrap();
@@ -598,6 +640,91 @@ fn apply_write_command(region: &mut [u8], rest: &str, out: &mut impl Write) {
 
     region[offset..offset + bytes.len()].copy_from_slice(&bytes);
     writeln!(out, "WROTE {offset}").unwrap();
+    out.flush().unwrap();
+}
+
+/// Stage 6 §6.16/§6.17 region-mutation commands. Each acts on the whole
+/// `MUTATION_REGION_SIZE`-byte allocation starting at `region`, at the real
+/// OS level (`VirtualProtect`/`VirtualFree`), so a concurrently-running real
+/// scan observes a genuine, real protection/commit-state change — not a
+/// simulated one.
+#[cfg(windows)]
+fn apply_protect_mutation_command(
+    region: *mut core::ffi::c_void,
+    rest: &str,
+    out: &mut impl Write,
+) {
+    let flag = match rest.trim() {
+        "readwrite" => PAGE_READWRITE,
+        "noaccess" => PAGE_NOACCESS,
+        other => {
+            writeln!(out, "PROTECT_ERROR unknown_flag_{other}").unwrap();
+            out.flush().unwrap();
+            return;
+        }
+    };
+    let mut old_protect: u32 = 0;
+    let ok = unsafe {
+        VirtualProtect(
+            region,
+            MUTATION_REGION_SIZE,
+            flag,
+            &mut old_protect as *mut u32,
+        )
+    };
+    if ok == 0 {
+        writeln!(out, "PROTECT_ERROR virtual_protect_failed").unwrap();
+    } else {
+        writeln!(out, "PROTECTED {}", rest.trim()).unwrap();
+    }
+    out.flush().unwrap();
+}
+
+#[cfg(windows)]
+fn apply_decommit_mutation_command(region: *mut core::ffi::c_void, out: &mut impl Write) {
+    let ok = unsafe { VirtualFree(region, MUTATION_REGION_SIZE, MEM_DECOMMIT) };
+    if ok == 0 {
+        writeln!(out, "DECOMMIT_ERROR virtual_free_failed").unwrap();
+    } else {
+        writeln!(out, "DECOMMITTED").unwrap();
+    }
+    out.flush().unwrap();
+}
+
+#[cfg(windows)]
+fn apply_recommit_mutation_command(region: *mut core::ffi::c_void, out: &mut impl Write) {
+    // Re-commit at the SAME address (the reservation from the original
+    // VirtualAlloc(MEM_RESERVE) survives a MEM_DECOMMIT, only MEM_RELEASE
+    // would give the address back to the OS) and replant the known marker
+    // so a test can prove recommit genuinely restores a writable, readable
+    // page, not just that the call returned success.
+    let recommitted =
+        unsafe { VirtualAlloc(region, MUTATION_REGION_SIZE, MEM_COMMIT, PAGE_READWRITE) };
+    if recommitted.is_null() {
+        writeln!(out, "RECOMMIT_ERROR virtual_alloc_failed").unwrap();
+        out.flush().unwrap();
+        return;
+    }
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(region as *mut u8, MUTATION_REGION_SIZE);
+        slice[MUTATION_MARKER_OFFSET..MUTATION_MARKER_OFFSET + MUTATION_MARKER_PATTERN.len()]
+            .copy_from_slice(&MUTATION_MARKER_PATTERN);
+    }
+    writeln!(out, "RECOMMITTED").unwrap();
+    out.flush().unwrap();
+}
+
+#[cfg(windows)]
+fn apply_free_mutation_command(region: *mut core::ffi::c_void, out: &mut impl Write) {
+    // MEM_RELEASE requires size 0 and frees the entire reservation — the
+    // region genuinely disappears from the address space from this point
+    // on (a subsequent VirtualQueryEx sees MEM_FREE, not merely decommitted).
+    let ok = unsafe { VirtualFree(region, 0, MEM_RELEASE) };
+    if ok == 0 {
+        writeln!(out, "FREE_ERROR virtual_free_failed").unwrap();
+    } else {
+        writeln!(out, "FREED").unwrap();
+    }
     out.flush().unwrap();
 }
 

@@ -14,7 +14,9 @@ use solith_scanner_core::cancellation::CancellationToken;
 use solith_scanner_core::completeness::ScanCompleteness;
 use solith_scanner_core::exact_scan::{scan_exact, AlignmentMode, ScanOptions};
 use solith_scanner_core::policy::RegionSelectionPolicy;
-use solith_scanner_core::region::{enumerate_regions, CommitState, Region, RegionKind};
+use solith_scanner_core::region::{
+    enumerate_regions, enumerate_regions_with_cancellation, CommitState, Region, RegionKind,
+};
 use solith_scanner_core::target::ProcessHandle;
 use solith_scanner_core::types::{PrimitiveType, PrimitiveValue};
 use solith_scanner_core::ChunkPlanConfig;
@@ -467,6 +469,14 @@ fn incomplete_scan_never_claims_authoritative_not_found() {
         !result.completeness.is_complete(),
         "zero matches from an incomplete scan must not be reported as Complete"
     );
+    // Stage 6 §6.3's shared rule, exercised against a real scan result: zero
+    // matches under incomplete coverage is never authoritative.
+    assert!(
+        !solith_scanner_core::completeness::is_authoritative_absence(
+            &result.completeness,
+            result.matches.len()
+        )
+    );
     match result.completeness {
         ScanCompleteness::CompleteWithSkippedRegions { ref skipped } => {
             assert!(!skipped.is_empty())
@@ -493,6 +503,30 @@ fn authoritative_not_found_is_distinct_from_incomplete_zero_matches() {
         hits.is_empty(),
         "this value was never planted; scan_one already asserts Complete internally"
     );
+
+    // Stage 6 §6.3's shared rule, exercised against this real Complete +
+    // zero-matches scan result: this IS the case it must call authoritative.
+    let region = types_region(&fixture);
+    let policy = RegionSelectionPolicy {
+        max_region_bytes: None,
+        ..RegionSelectionPolicy::default_writable_value_scan()
+    };
+    let cancellation = CancellationToken::new();
+    let result = scan_exact(
+        &handle,
+        &[region],
+        &policy,
+        PrimitiveType::I32,
+        PrimitiveValue::I32(0x7EAD_BEEF_u32 as i32),
+        &default_options(PrimitiveType::I32),
+        &cancellation,
+        None,
+    )
+    .expect("scan failed");
+    assert!(solith_scanner_core::completeness::is_authoritative_absence(
+        &result.completeness,
+        result.matches.len()
+    ));
 }
 
 #[test]
@@ -581,6 +615,90 @@ fn cancellation_stops_a_scan_before_full_region_is_covered() {
 }
 
 #[test]
+fn cancellation_preserves_matches_found_before_the_cancellation_point() {
+    // Stage 6 §6.6: "return partial results only if architecture permits" —
+    // must be proven with a real match actually surviving cancellation, not
+    // just an absent-value scan that happens to also report Cancelled.
+    let fixture = Fixture::spawn();
+    let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
+    let region = types_region(&fixture);
+    let policy = RegionSelectionPolicy {
+        max_region_bytes: None,
+        ..RegionSelectionPolicy::default_writable_value_scan()
+    };
+    let value = fixture.dec_i64("REPEATED_I32_VALUE") as i32;
+    let base = fixture.hex("TYPES_REGION_BASE");
+    let offset_a = fixture.dec_u64("REPEATED_I32_OFFSET_A"); // 800
+    let offset_b = fixture.dec_u64("REPEATED_I32_OFFSET_B"); // 900
+    let expected_a = base + offset_a;
+    let expected_b = base + offset_b;
+
+    // A 64-byte chunk size (61-byte stride once the 3-byte overlap is
+    // subtracted) puts offsets 800 and 900 in different chunks — cancelling
+    // right after the chunk containing A has been read, but before reaching
+    // B's chunk, is deterministic. Chunk indices are computed exactly
+    // (not assumed) to avoid an off-by-one from the overlap math.
+    const CHUNK_SIZE: u64 = 64;
+    const OVERLAP: u64 = 3;
+    let stride = CHUNK_SIZE - OVERLAP;
+    let chunk_index_for = |offset: u64| -> u64 {
+        let mut i = 0u64;
+        loop {
+            let start = i * stride;
+            if start <= offset && offset < start + CHUNK_SIZE {
+                return i;
+            }
+            i += 1;
+        }
+    };
+    let index_a = chunk_index_for(offset_a);
+    let index_b = chunk_index_for(offset_b);
+    assert!(
+        index_a < index_b,
+        "test setup requires A (chunk {index_a}) strictly before B (chunk {index_b})"
+    );
+    let mut opts = ScanOptions::default_for(PrimitiveType::I32, 64 * 1024);
+    opts.chunk_config = ChunkPlanConfig {
+        chunk_size_bytes: CHUNK_SIZE,
+        overlap_bytes: OVERLAP,
+    };
+    let target_chunk = index_a + 1; // chunks 0..=index_a read (index_a+1 reads) before cancel fires
+    let cancellation = CancellationToken::new();
+    let mut observed_chunks: u64 = 0;
+    let mut on_progress = |_m: &solith_scanner_core::completeness::ScanMetrics| {
+        observed_chunks += 1;
+        if observed_chunks == target_chunk {
+            cancellation.cancel();
+        }
+    };
+    let result = scan_exact(
+        &handle,
+        &[region],
+        &policy,
+        PrimitiveType::I32,
+        PrimitiveValue::I32(value),
+        &opts,
+        &cancellation,
+        Some(&mut on_progress),
+    )
+    .expect("scan failed");
+
+    assert!(matches!(
+        result.completeness,
+        ScanCompleteness::Cancelled { .. }
+    ));
+    let hit_addrs: Vec<u64> = result.matches.iter().map(|m| m.address).collect();
+    assert!(
+        hit_addrs.contains(&expected_a),
+        "the match found before cancellation must be preserved, got {hit_addrs:?}"
+    );
+    assert!(
+        !hit_addrs.contains(&expected_b),
+        "the match past the cancellation point must not appear, got {hit_addrs:?}"
+    );
+}
+
+#[test]
 fn process_exit_during_scan_is_reported_truthfully() {
     let mut fixture = Fixture::spawn();
     let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
@@ -642,6 +760,28 @@ fn insufficient_overlap_for_primitive_width_is_rejected_up_front() {
         err.kind,
         solith_scanner_core::ErrorKind::InvalidConfiguration
     );
+}
+
+#[test]
+fn region_enumeration_stops_immediately_when_pre_cancelled() {
+    // Stage 6 §6.5: region enumeration must be cooperatively cancellable.
+    // A token cancelled BEFORE the call proves the check fires on the very
+    // first loop iteration, not just "eventually" — against a real
+    // process's real (non-trivial) address space, not a synthetic stub.
+    let fixture = Fixture::spawn();
+    let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
+    let cancellation = CancellationToken::new();
+    cancellation.cancel();
+    let result = enumerate_regions_with_cancellation(&handle, 0, Some(&cancellation))
+        .expect("enumeration call itself must not error");
+    assert!(result.cancelled);
+    assert!(!result.is_complete);
+    assert_eq!(result.stopped_at, Some(0));
+    // A real, uncancelled enumeration of the same process finds regions —
+    // proving the pre-cancelled run above stopped for cancellation, not
+    // because this process genuinely has no regions.
+    let uncancelled = enumerate_regions(&handle, 0).expect("enumeration failed");
+    assert!(!uncancelled.regions.is_empty());
 }
 
 #[test]

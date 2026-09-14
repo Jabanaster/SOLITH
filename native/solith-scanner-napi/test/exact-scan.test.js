@@ -313,6 +313,8 @@ test('exact scan: incomplete coverage never reports authoritative complete (zero
     // demonstrates with a value that truly exists many times over.
     assert.equal(outcome.matches.length, 0);
     assert.equal(outcome.completeness.state, 'complete', 'a value that is genuinely absent, with coverage that never hit any limit, must report complete');
+    // Stage 6 §6.3's shared rule, via the real compiled addon.
+    assert.equal(outcome.isAuthoritativeAbsence, true);
   });
 });
 

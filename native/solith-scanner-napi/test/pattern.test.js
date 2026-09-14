@@ -572,6 +572,8 @@ test('pattern: a real unreadable page reports skipped-region incompleteness, nev
     assert.equal(outcome.matches.length, 0);
     assert.notEqual(outcome.completeness.state, 'complete');
     assert.equal(outcome.completeness.state, 'complete_with_skipped_regions');
+    // Stage 6 §6.3's shared rule, via the real compiled addon.
+    assert.equal(outcome.isAuthoritativeAbsence, false);
   });
 });
 
@@ -592,6 +594,7 @@ test('pattern: a genuinely absent pattern under full coverage is authoritatively
     );
     assert.equal(outcome.matches.length, 0);
     assert.equal(outcome.completeness.state, 'complete');
+    assert.equal(outcome.isAuthoritativeAbsence, true);
   });
 });
 

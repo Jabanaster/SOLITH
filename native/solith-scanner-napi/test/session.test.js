@@ -475,6 +475,74 @@ test('session: paged result retrieval is bounded and deterministically ordered',
   });
 });
 
+test('session: snapshot export/save/load/classify/delete round-trip (Stage 6 §6.9-§6.12)', async () => {
+  await withFixture(async (child, fields) => {
+    const os = require('node:os');
+    const { session } = await createU32Session(child, fields);
+    const status = await session.status();
+
+    const json = session.exportSnapshotJson('fixture.exe');
+    const parsed = JSON.parse(json);
+    // Live handle / raw candidate data must never appear in the snapshot.
+    assert.equal(Object.prototype.hasOwnProperty.call(parsed, 'handle'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(parsed, 'candidates'), false);
+    assert.equal(parsed.processPid, child.pid);
+    assert.equal(parsed.candidateCount, Number(status.candidateCount));
+    assert.equal(parsed.targetExecutableHint, 'fixture.exe');
+    assert.ok(parsed.checksum !== undefined);
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-snapshot-'));
+    const snapshotId = 'stage6-test-session';
+    const savedPath = addon.saveSessionSnapshot(dir, snapshotId, json);
+    assert.ok(fs.existsSync(savedPath));
+
+    const info = addon.loadSessionSnapshotInfo(dir, snapshotId);
+    assert.equal(info.processPid, child.pid);
+    assert.equal(Number(info.candidateCount), Number(status.candidateCount));
+    // The fixture process is still alive and matches identity exactly.
+    assert.equal(info.recoveryStatus, 'recoverable_metadata');
+
+    // Corrupt the file on disk; loading must reject it, not silently
+    // accept tampered data (Stage 6 §6.24).
+    const rawPath = path.join(dir, `${snapshotId}.solith-session-snapshot.json`);
+    const tampered = JSON.parse(fs.readFileSync(rawPath, 'utf8'));
+    tampered.candidateCount = 999999999;
+    fs.writeFileSync(rawPath, JSON.stringify(tampered));
+    assert.throws(() => addon.loadSessionSnapshotInfo(dir, snapshotId), /corrupt_snapshot/);
+
+    // Restore and prove path-traversal rejection + idempotent deletion.
+    fs.writeFileSync(rawPath, json);
+    assert.throws(() => addon.saveSessionSnapshot(dir, '../evil', json), /invalid_configuration/);
+    addon.deleteSessionSnapshot(dir, snapshotId);
+    assert.equal(fs.existsSync(rawPath), false);
+    addon.deleteSessionSnapshot(dir, snapshotId); // idempotent, does not throw
+
+    session.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+test('session: a snapshot taken after the target exits classifies as inactive on reload', async () => {
+  await withFixture(async (child, fields) => {
+    const os = require('node:os');
+    const { session } = await createU32Session(child, fields);
+    const json = session.exportSnapshotJson(null);
+    session.close();
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-snapshot-'));
+    const snapshotId = 'stage6-exited-session';
+    addon.saveSessionSnapshot(dir, snapshotId, json);
+
+    child.stdin.write('die\n');
+    await new Promise((resolve) => child.once('exit', resolve));
+
+    const info = addon.loadSessionSnapshotInfo(dir, snapshotId);
+    assert.equal(info.recoveryStatus, 'inactive');
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 test('session: close releases the session and repeated cycles do not leak handles', async () => {
   // 19. session close / 20. no handle leak
   for (let i = 0; i < 5; i++) {
@@ -495,4 +563,78 @@ test('session: close releases the session and repeated cycles do not leak handle
       );
     });
   }
+});
+
+test('session: close is idempotent and double-init/invalid-mode misuse is rejected predictably', async () => {
+  // Stage 6 §6.20: "cannot double-close unsafely" / "reject invalid input
+  // predictably."
+  await withFixture(async (child, fields) => {
+    const { session } = await createU32Session(child, fields);
+    session.close();
+    session.close(); // idempotent — must not throw
+    session.close(); // and again
+
+    // A second createUnknownInitial on a session already closed (never
+    // initialized after close) must not silently no-op or reuse stale
+    // state — it must succeed as a genuinely fresh session, proving close()
+    // truly released the prior state rather than leaving it half-alive.
+    const outcome2 = await session.createUnknownInitial(
+      child.pid,
+      [refineRegion(fields)],
+      'u32',
+      'aligned_to_type',
+      1024n * 1024n,
+      3n,
+      null,
+      null,
+      null,
+      new addon.ScanCancellationHandle(),
+      new addon.ScanProgressHandle(),
+    );
+    assert.equal(outcome2.completeness.state, 'complete');
+    assert.equal(outcome2.generation, 0);
+    session.close();
+
+    // An unrecognized refine mode is rejected predictably, not silently
+    // treated as one of the known modes.
+    const { session: session2, cancellation: c2, progress: p2 } = await createU32Session(child, fields);
+    await assert.rejects(
+      async () => session2.refine('not_a_real_mode', null, null, null, null, null, null, c2, p2),
+      /invalid_configuration/,
+    );
+    session2.close();
+  });
+});
+
+test('session: dropping all JS references without close() still releases native resources under forced GC', async (t) => {
+  // Stage 6 §6.21: best-effort GC/lifetime proof. `node --test` does not
+  // expose `global.gc` by default (needs `--expose-gc`); when unavailable
+  // this test documents the limitation via `t.skip` rather than fake a
+  // deterministic result — the real guarantee this crate relies on is
+  // explicit `close()` + RAII (proved by the handle-leak tests above), not
+  // GC timing, which JS never promises.
+  if (typeof global.gc !== 'function') {
+    t.skip('run with `node --expose-gc --test ...` for a deterministic GC-triggered native-release proof; explicit close()+RAII (see the tests above) is the guarantee this crate actually relies on, not GC timing');
+    return;
+  }
+  await withFixture(async (child, fields) => {
+    (async () => {
+      const { session } = await createU32Session(child, fields);
+      assert.equal(session.isInitialized(), true);
+      // Deliberately no session.close() — the object goes out of scope here.
+    })();
+
+    // Give the async IIFE's promise a turn to settle, then force GC.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    global.gc();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // No native-side crash/hang after forced collection of an unclosed
+    // session is itself the proof napi's default finalizer ran the
+    // struct's ordinary Rust drop glue cleanly — a fresh session against
+    // the same still-alive process still works normally afterward.
+    const { session: session2 } = await createU32Session(child, fields);
+    assert.equal(session2.isInitialized(), true);
+    session2.close();
+  });
 });

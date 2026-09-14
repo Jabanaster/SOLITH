@@ -442,6 +442,41 @@ fn continuous_hex_aob_matches_real_memory_and_normalizes_identically_to_spaced()
 }
 
 #[test]
+fn zero_matches_under_full_coverage_is_authoritative() {
+    // Stage 6 §6.3's shared rule, positive case: a genuinely absent
+    // pattern, scanned under a policy that fully covers a real, fully
+    // readable region, must report Complete + zero matches, and the shared
+    // helper must call that authoritative.
+    let fixture = Fixture::spawn();
+    let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
+    let region = pattern_region(&fixture);
+    // Same genuinely-absent byte sequence already proven safe against this
+    // exact fixture's deterministic filler by the napi-side equivalent test
+    // (`pattern.test.js`'s "a genuinely absent pattern..." case).
+    let pattern =
+        pattern_from_raw_bytes(&[0x00, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33]).unwrap();
+    let options = PatternScanOptions::default_for(&pattern, 1024 * 1024);
+    let cancellation = CancellationToken::new();
+    let result = scan_pattern(
+        &handle,
+        &[region],
+        &readable_any_policy(),
+        &pattern,
+        PatternKind::RawBytes,
+        &options,
+        &cancellation,
+        None,
+    )
+    .expect("scan failed");
+    assert!(result.matches.is_empty());
+    assert_eq!(result.completeness, ScanCompleteness::Complete);
+    assert!(solith_scanner_core::completeness::is_authoritative_absence(
+        &result.completeness,
+        result.matches.len()
+    ));
+}
+
+#[test]
 fn near_miss_bytes_do_not_produce_a_false_positive() {
     let fixture = Fixture::spawn();
     let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
@@ -694,6 +729,15 @@ fn zero_matches_under_unreadable_page_is_not_authoritative_not_found() {
         result.completeness,
         ScanCompleteness::CompleteWithSkippedRegions { .. }
     ));
+    // Stage 6 §6.3's shared rule, exercised against a real string/byte/AOB
+    // (`PatternKind`) scan result: zero matches under a skipped region is
+    // never authoritative.
+    assert!(
+        !solith_scanner_core::completeness::is_authoritative_absence(
+            &result.completeness,
+            result.matches.len()
+        )
+    );
 }
 
 #[test]
