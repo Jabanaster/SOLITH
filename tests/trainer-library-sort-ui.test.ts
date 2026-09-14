@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { ALL_GAMES_SORT_MODE_LABELS } from '../src/core/trainer-catalog/all-games-sorting.js';
 
 const ROOT = path.resolve(import.meta.dirname ?? '.', '..');
 
@@ -11,30 +12,20 @@ function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').replace(/\r\n/g, '\n');
 }
 
-test('ROADMAP §3.5 lists exactly 10 sort keys, and all 10 are wired as functional sort buttons', () => {
-  const roadmap = readSource('ROADMAP.md');
-  const section = roadmap.match(/## 3\.5 Sorting\n([\s\S]*?)\n## 3\.6/);
-  assert.ok(section, 'ROADMAP.md §3.5 section not found');
-  const keys = section![1].split('\n').filter((line) => line.startsWith('- '));
-  assert.equal(keys.length, 10, 'ROADMAP §3.5 key count changed — re-run reconciliation before trusting this test');
+test('every AllGamesSortMode key has a functional, correctly labeled sort button', () => {
+  // Source of truth is the exported, TypeScript-checked registry in
+  // all-games-sorting.ts (Record<AllGamesSortMode, string>) — not ROADMAP.md
+  // prose. The compiler itself already refuses to build if a sort mode is
+  // ever added to AllGamesSortMode without a label here, which the old
+  // roadmap-parsing version of this test could not guarantee. See
+  // Docs/roadmap/STEP_0.14.1_ROADMAP_CONTRACT_REPAIR.md.
+  const modeToLabel = ALL_GAMES_SORT_MODE_LABELS;
+  assert.equal(Object.keys(modeToLabel).length, 10, 'AllGamesSortMode key count changed — update this test\'s expectations deliberately');
 
   const pageSource = readSource('src/app/pages/TrainerLibraryPage.tsx');
-  const modeToLabel: Record<string, string> = {
-    recommended: 'Recommended',
-    'popular-now': 'Popular now',
-    'all-time-popular': 'All-time popular',
-    'newest-release': 'Newest release',
-    'recently-added': 'Recently added to SOLITH',
-    'recently-updated': 'Recently updated',
-    'a-z': 'A–Z',
-    'installed-first': 'Installed first',
-    'verified-first': 'Verified first',
-    'most-trainer-options': 'Most trainer options',
-  };
-  assert.equal(Object.keys(modeToLabel).length, 10);
   for (const [mode, label] of Object.entries(modeToLabel)) {
     assert.ok(pageSource.includes(`setSortMode('${mode}')`), `"${mode}" must be wired as a functional sort button`);
-    assert.ok(pageSource.includes(label), `expected sort label "${label}" (exact ROADMAP terminology) in TrainerLibraryPage.tsx`);
+    assert.ok(pageSource.includes(label), `expected sort label "${label}" (from ALL_GAMES_SORT_MODE_LABELS) in TrainerLibraryPage.tsx`);
   }
 });
 

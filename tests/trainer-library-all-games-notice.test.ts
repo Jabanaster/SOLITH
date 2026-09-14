@@ -11,19 +11,22 @@ function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').replace(/\r\n/g, '\n');
 }
 
-test('ROADMAP §3.4 All Games first-use notice text matches the page implementation exactly', () => {
-  const roadmap = readSource('ROADMAP.md');
+// Regression-locked exact copy for the All Games first-use notice. This was
+// previously derived from ROADMAP.md §3.4 prose, which made the test's
+// expected value depend on a document that is not itself a runtime contract
+// and is not guaranteed to retain that section across roadmap rewrites (see
+// Docs/roadmap/STEP_0.14.1_ROADMAP_CONTRACT_REPAIR.md). The production
+// constant below is the actual single source of truth for this copy.
+const EXPECTED_ALL_GAMES_NOTICE_TEXT =
+  'All Games includes SOLITH’s full eligible catalog, including niche and less widely played titles. Use filters or search to narrow the list.';
+
+test('All Games first-use notice text matches the approved, regression-locked copy exactly', () => {
   const pageSource = readSource('src/app/pages/TrainerLibraryPage.tsx');
 
-  const roadmapMatch = roadmap.match(/> (All Games includes SOLITH.s full eligible catalog[^\n]*)/);
-  assert.ok(roadmapMatch, 'ROADMAP.md §3.4 notice text not found');
-  const roadmapNotice = roadmapMatch![1];
-
-  assert.match(pageSource, /ALL_GAMES_NOTICE_TEXT =\s*\n?\s*'([^']*All Games includes SOLITH[^']*)'/);
   const pageMatch = pageSource.match(/ALL_GAMES_NOTICE_TEXT =\s*\n?\s*'([^']*)'/);
   assert.ok(pageMatch, 'ALL_GAMES_NOTICE_TEXT constant not found in TrainerLibraryPage.tsx');
 
-  assert.equal(pageMatch![1], roadmapNotice);
+  assert.equal(pageMatch![1], EXPECTED_ALL_GAMES_NOTICE_TEXT);
 });
 
 test('All Games notice only renders in All Games view and is dismissible', () => {
