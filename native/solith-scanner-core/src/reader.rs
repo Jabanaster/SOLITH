@@ -247,7 +247,14 @@ pub fn read_region_chunked_with_progress(
 }
 
 #[cfg(windows)]
-fn read_chunk(handle: &ProcessHandle, spec: &ChunkSpec) -> ChunkReadResult {
+/// `pub(crate)` (not private) so `exact_scan.rs` can reuse the exact same
+/// single-chunk read + classification logic instead of duplicating the raw
+/// `ReadProcessMemory` call and its error-code mapping — Stage 3's exact
+/// scanner needs a decode-then-drop-the-buffer loop (mission §3.8's
+/// scalability requirement), which is a different retention shape than
+/// this module's own `read_region_chunked` (which keeps every chunk's raw
+/// bytes), not a different read mechanism.
+pub(crate) fn read_chunk(handle: &ProcessHandle, spec: &ChunkSpec) -> ChunkReadResult {
     if spec.requested_size == 0 {
         return ChunkReadResult {
             spec: *spec,

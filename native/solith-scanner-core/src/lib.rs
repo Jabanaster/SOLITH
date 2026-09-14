@@ -13,15 +13,18 @@ pub mod cancellation;
 pub mod chunk;
 pub mod completeness;
 pub mod error;
+pub mod exact_scan;
 pub mod policy;
 pub mod reader;
 pub mod region;
 pub mod target;
+pub mod types;
 
 pub use cancellation::CancellationToken;
 pub use chunk::{plan_chunks, ChunkPlanConfig, ChunkSpec};
 pub use completeness::{ScanCompleteness, ScanMetrics, SkipReason, SkippedRange};
 pub use error::{ErrorKind, ScannerError, ScannerResult};
+pub use exact_scan::{scan_exact, AlignmentMode, ExactScanResult, ScanMatch, ScanOptions};
 pub use policy::RegionSelectionPolicy;
 pub use reader::{
     read_region_chunked, read_region_chunked_with_progress, read_regions_chunked,
@@ -29,3 +32,4 @@ pub use reader::{
 };
 pub use region::{enumerate_regions, CommitState, Region, RegionEnumerationResult, RegionKind};
 pub use target::{HandleStatus, ProcessHandle, TargetArchitecture, TargetDescriptor};
+pub use types::{PrimitiveType, PrimitiveValue};
