@@ -35,3 +35,7 @@
 1. The 120,245-vs-111,467 reconciliation (doc 49) — would need the September 9 run's exact original invocation/environment, which does not appear to be recoverable from anything currently on this machine.
 2. Continuous-hex/nibble-via-`x`-or-`*` grammar support (doc 51) — a real, CE-documented, evidenced gap requiring a tokenizer re-architecture, deliberately not attempted here.
 3. Production migration of the native AOB scanner (unrelated to this mission; tracked since Stage 5's original defect-status doc, doc 44).
+
+## Stage 5.4 update — superseded
+
+Item 1 (reconciliation) remains open by explicit owner decision (doc 54) — 120,245 is locked as `HISTORICAL_CERTIFIED_RUN_COUNT_UNRECONCILED` and 111,467 as the corpus-of-record, with no further estimation attempted. Item 2 (continuous-hex/nibble-via-`x`-or-`*` grammar) is now implemented (doc 55) and achieves 100.000% grammar coverage against the corpus-of-record with zero unsupported valid syntax (doc 56). Item 3 remains open. See doc 58 for Stage 5's superseding final certification determination.

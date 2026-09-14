@@ -98,3 +98,5 @@ This doc's 93.5%/104,246 grammar-support figures and 6,565 "malformedOther" coun
 | Raw-corpus nibble-wildcard prevalence known | Met — 426, precise, complete count (was UNKNOWN after Stage 5.1) |
 
 **Stage 5 corpus-certification verdict does not change to CERTIFIED in this mission** — the reconciliation gap against the specific 120,245 figure ROADMAP.md cites remains open (doc 47), and two real unsupported-syntax families now have evidence-backed fixes intentionally deferred rather than implemented, per this mission's explicit scope limits. See the Stage 5.2 FINAL RESPONSE for the full verdict.
+
+**Stage 5.4 update — superseded:** the two unsupported-syntax families flagged above (`xx`/`x` full-wildcard, and continuous/unspaced hex) are now both implemented and certified. Doc 54 formally establishes 111,467 as the sole reproducible corpus-of-record denominator for grammar-coverage certification going forward (120,245 preserved as `HISTORICAL_CERTIFIED_RUN_COUNT_UNRECONCILED`, never used as a denominator). Doc 56 supersedes this document's grammar-coverage numbers with a full corpus reanalysis against the new grammar.

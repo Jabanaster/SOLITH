@@ -72,3 +72,5 @@ Re-examining `normalizeAobPattern`'s three-branch grammar (quoted above): becaus
 ## What this analysis does not prove
 
 It does not produce an exact per-signature-type count across the real 120,245-signature corpus (e.g., "N% are exact-byte-only") — that would require the actual corpus data, which is not present in this repository. Any such percentage would be fabricated. What it does prove, from real and audited in-repo evidence, is the *syntax vocabulary* the corpus's own certified ingest pipeline recognizes and has been exercised against with a real sample from an actual game's CT table.
+
+**Stage 5.4 update:** the 120,245 figure referenced throughout this document is preserved strictly as historical evidence (`HISTORICAL_CERTIFIED_RUN_COUNT_UNRECONCILED`, doc 54) and is never used as a grammar-coverage certification denominator. The current reproducible corpus-of-record is 111,467 (doc 47/48), reanalyzed against the full continuous-hex/nibble-aware grammar in doc 56.
