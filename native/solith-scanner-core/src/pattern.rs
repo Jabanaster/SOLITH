@@ -287,7 +287,14 @@ pub fn pattern_from_utf16le_str(
 //                        '*' — both accepted, matching the tolerance this
 //                        repo's own already-certified CT AOB parser
 //                        (`src/core/script-research/aob-parser.ts`) already
-//                        extends to real-world Cheat Engine scripts (doc 39)
+//                        extends to real-world Cheat Engine scripts (doc 39);
+//                        also "xx"/"x" (case-insensitive) as a complete
+//                        token only — a real, widespread community CT
+//                        convention found 16,392 times across the recovered
+//                        corpus (Stage 5.2/5.3, doc 48/50) and not
+//                        interpreted when embedded inside a mixed
+//                        hex/"x" token (e.g. "4x"), which remains rejected
+//                        as `InvalidHexToken`
 //   - nibble wildcard:   exactly one hex digit + one '?', in either order
 //                        ("A?" = high nibble A, low wildcard; "?F" = low
 //                        nibble F, high wildcard) — supported for broader
@@ -366,6 +373,15 @@ fn parse_token(token: &str) -> Result<PatternByte, PatternParseError> {
     if !chars.is_empty() && chars.len() <= 2 && chars.iter().all(|&c| c == '*') {
         return Ok(PatternByte::wildcard());
     }
+    // "xx"/"XX"/"x"/"X" (case-insensitive), as a complete wildcard token
+    // only — never when 'x' is mixed with a hex digit in the same token
+    // (e.g. "4x" falls through to the hex-digit-adjacent-to-'x' check below
+    // and is correctly rejected, per this syntax's real-corpus evidence,
+    // doc 50).
+    if !chars.is_empty() && chars.len() <= 2 && chars.iter().all(|&c| c.eq_ignore_ascii_case(&'x'))
+    {
+        return Ok(PatternByte::wildcard());
+    }
 
     if chars.len() == 2 {
         let (a, b) = (chars[0], chars[1]);
@@ -402,9 +418,15 @@ fn parse_token(token: &str) -> Result<PatternByte, PatternParseError> {
         });
     }
 
-    let looks_hex_like = chars
-        .iter()
-        .any(|&c| c.is_ascii_alphanumeric() && hex_digit_value(c).is_none());
+    // A run of 3+ 'x'/'X' (e.g. "xxx") is not a mixed hex/'x' token — it is
+    // an over-long attempt at the "xx" wildcard alias, so it is excluded
+    // here and classified as `MalformedWildcard` below instead of
+    // `InvalidHexToken`, matching how an over-long "???" run is classified.
+    let all_x = !chars.is_empty() && chars.iter().all(|&c| c.eq_ignore_ascii_case(&'x'));
+    let looks_hex_like = !all_x
+        && chars
+            .iter()
+            .any(|&c| c.is_ascii_alphanumeric() && hex_digit_value(c).is_none());
     if looks_hex_like {
         return Err(PatternParseError {
             kind: PatternParseErrorKind::InvalidHexToken,
@@ -412,12 +434,12 @@ fn parse_token(token: &str) -> Result<PatternByte, PatternParseError> {
         });
     }
 
-    let all_wildcard_ish = chars.iter().all(|&c| c == '?' || c == '*');
+    let all_wildcard_ish = all_x || chars.iter().all(|&c| c == '?' || c == '*');
     if all_wildcard_ish {
         return Err(PatternParseError {
             kind: PatternParseErrorKind::MalformedWildcard,
             message: format!(
-                "wildcard token \"{token}\" is malformed; use \"??\" for a full-byte wildcard or \"A?\"/\"?A\" for a nibble wildcard"
+                "wildcard token \"{token}\" is malformed; use \"??\"/\"xx\" for a full-byte wildcard or \"A?\"/\"?A\" for a nibble wildcard"
             ),
         });
     }
@@ -578,6 +600,85 @@ mod tests {
         assert!(!pattern.matches_at(&[0xB0, 0x0F], 0));
         // "?F": low nibble F, high wildcard.
         assert!(!pattern.matches_at(&[0xA0, 0x00], 0));
+    }
+
+    #[test]
+    fn aob_parses_xx_wildcard_lowercase() {
+        let p = parse_aob("AA xx CC").unwrap();
+        assert!(p.matches_at(&[0xAA, 0x00, 0xCC], 0));
+        assert!(p.matches_at(&[0xAA, 0xFF, 0xCC], 0));
+        assert!(!p.matches_at(&[0xAA, 0x00, 0xCD], 0));
+    }
+
+    #[test]
+    fn aob_parses_xx_wildcard_uppercase() {
+        let p = parse_aob("AA XX CC").unwrap();
+        assert!(p.matches_at(&[0xAA, 0x00, 0xCC], 0));
+        assert!(p.matches_at(&[0xAA, 0xFF, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_parses_x_wildcard_lowercase() {
+        let p = parse_aob("AA x CC").unwrap();
+        assert!(p.matches_at(&[0xAA, 0x00, 0xCC], 0));
+        assert!(p.matches_at(&[0xAA, 0xFF, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_parses_x_wildcard_uppercase() {
+        let p = parse_aob("AA X CC").unwrap();
+        assert!(p.matches_at(&[0xAA, 0x00, 0xCC], 0));
+        assert!(p.matches_at(&[0xAA, 0xFF, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_parses_xx_mixed_with_exact_bytes() {
+        let p = parse_aob("48 8B xx 89 45 F8").unwrap();
+        assert_eq!(p.len(), 6);
+        assert!(p.matches_at(&[0x48, 0x8B, 0x00, 0x89, 0x45, 0xF8], 0));
+        assert!(p.matches_at(&[0x48, 0x8B, 0x77, 0x89, 0x45, 0xF8], 0));
+        assert!(!p.matches_at(&[0x48, 0x8B, 0x00, 0x89, 0x45, 0xF9], 0));
+    }
+
+    #[test]
+    fn aob_parses_xx_mixed_with_qq_wildcard() {
+        let p = parse_aob("AA ?? xx BB").unwrap();
+        assert_eq!(p.len(), 4);
+        assert!(p.matches_at(&[0xAA, 0x11, 0x22, 0xBB], 0));
+    }
+
+    #[test]
+    fn aob_parses_xx_mixed_with_star_wildcard() {
+        let p = parse_aob("AA * xx BB").unwrap();
+        assert_eq!(p.len(), 4);
+        assert!(p.matches_at(&[0xAA, 0x11, 0x22, 0xBB], 0));
+    }
+
+    #[test]
+    fn aob_parses_xx_mixed_with_nibble_wildcard() {
+        let p = parse_aob("A? xx ?F").unwrap();
+        assert_eq!(p.len(), 3);
+        assert!(p.matches_at(&[0xA5, 0x99, 0x1F], 0));
+        assert!(!p.matches_at(&[0xB5, 0x99, 0x1F], 0));
+    }
+
+    #[test]
+    fn aob_rejects_x_embedded_in_hex_token() {
+        // "4x"/"x4" mix a hex digit with 'x' in the same token — this is
+        // NOT the "xx"/"x" full-wildcard alias (which must be a complete
+        // token of only x/X characters) and must remain rejected, per the
+        // mission's explicit "do not interpret arbitrary x characters
+        // embedded inside hex bytes as wildcards" instruction.
+        let err1 = parse_aob("AA 4x CC").unwrap_err();
+        assert_eq!(err1.kind, PatternParseErrorKind::InvalidHexToken);
+        let err2 = parse_aob("AA x4 CC").unwrap_err();
+        assert_eq!(err2.kind, PatternParseErrorKind::InvalidHexToken);
+    }
+
+    #[test]
+    fn aob_rejects_overlong_x_run_as_malformed_wildcard() {
+        let err = parse_aob("AA xxx CC").unwrap_err();
+        assert_eq!(err.kind, PatternParseErrorKind::MalformedWildcard);
     }
 
     #[test]
