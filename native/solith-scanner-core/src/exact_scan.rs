@@ -34,6 +34,27 @@ pub enum AlignmentMode {
     AlignedToType,
 }
 
+impl AlignmentMode {
+    /// Stable, machine-readable label — the single source of truth reused
+    /// by both the napi adapter's JS-facing string conversion and the
+    /// session-snapshot metadata format (Stage 6 §6.9), so the two never
+    /// drift into inconsistent spellings.
+    pub fn label(self) -> &'static str {
+        match self {
+            AlignmentMode::Bytewise => "bytewise",
+            AlignmentMode::AlignedToType => "aligned_to_type",
+        }
+    }
+
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s {
+            "bytewise" => Some(AlignmentMode::Bytewise),
+            "aligned_to_type" => Some(AlignmentMode::AlignedToType),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ScanOptions {
     pub alignment: AlignmentMode,

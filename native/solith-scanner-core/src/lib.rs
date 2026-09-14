@@ -20,12 +20,15 @@ pub mod policy;
 pub mod reader;
 pub mod region;
 pub mod session;
+pub mod session_snapshot;
 pub mod target;
 pub mod types;
 
 pub use cancellation::CancellationToken;
 pub use chunk::{plan_chunks, ChunkPlanConfig, ChunkSpec};
-pub use completeness::{ScanCompleteness, ScanMetrics, SkipReason, SkippedRange};
+pub use completeness::{
+    is_authoritative_absence, ScanCompleteness, ScanMetrics, SkipReason, SkippedRange,
+};
 pub use error::{ErrorKind, ScannerError, ScannerResult};
 pub use exact_scan::{scan_exact, AlignmentMode, ExactScanResult, ScanMatch, ScanOptions};
 pub use pattern::{
@@ -39,10 +42,14 @@ pub use reader::{
     read_region_chunked, read_region_chunked_with_progress, read_regions_chunked,
     read_regions_chunked_with_progress, ChunkReadResult, ChunkReadStatus, ReadBudget,
 };
-pub use region::{enumerate_regions, CommitState, Region, RegionEnumerationResult, RegionKind};
+pub use region::{
+    enumerate_regions, enumerate_regions_with_cancellation, CommitState, Region,
+    RegionEnumerationResult, RegionKind,
+};
 pub use session::{
     CandidateStore, GenerationRecord, ProcessIdentity, RefineMode, RefineOutcome, ScanSession,
     SessionResourceLimits,
 };
+pub use session_snapshot::{SessionRecoveryStatus, SessionSnapshot, SNAPSHOT_SCHEMA_VERSION};
 pub use target::{HandleStatus, ProcessHandle, TargetArchitecture, TargetDescriptor};
 pub use types::{PrimitiveType, PrimitiveValue};

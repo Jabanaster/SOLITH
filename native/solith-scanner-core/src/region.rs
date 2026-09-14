@@ -152,6 +152,12 @@ pub struct RegionEnumerationResult {
     /// stopped, and why.
     pub stopped_at: Option<u64>,
     pub stop_reason: Option<ErrorKind>,
+    /// True iff the stop was due to caller-requested cancellation (Stage 6
+    /// §6.5) rather than a genuine enumeration failure — kept as its own
+    /// field rather than folded into `stop_reason: Option<ErrorKind>`
+    /// because cancellation is not an error, matching how
+    /// `ScanCompleteness::Cancelled` is kept distinct from `Failed`.
+    pub cancelled: bool,
 }
 
 const USER_MODE_ADDRESS_CEILING: u64 = 0x0000_7FFF_FFFF_0000;
@@ -165,16 +171,46 @@ pub fn enumerate_regions(
     handle: &ProcessHandle,
     start: u64,
 ) -> ScannerResult<RegionEnumerationResult> {
+    enumerate_regions_with_cancellation(handle, start, None)
+}
+
+/// Same as [`enumerate_regions`], but checked cooperatively against
+/// `cancellation` once per `VirtualQueryEx` iteration (Stage 6 §6.5). The
+/// plain `enumerate_regions` above is the unaffected, still-synchronous
+/// default every existing caller keeps using; this variant exists for
+/// callers (and tests) that want enumeration to stop early on request. See
+/// doc 61 for why the current napi `enumerate_regions()` binding remains
+/// synchronous and does not yet wire a live JS-facing cancel signal through
+/// to this parameter.
+#[cfg(windows)]
+pub fn enumerate_regions_with_cancellation(
+    handle: &ProcessHandle,
+    start: u64,
+    cancellation: Option<&crate::cancellation::CancellationToken>,
+) -> ScannerResult<RegionEnumerationResult> {
     let mut regions = Vec::new();
     let mut address = start;
 
     loop {
+        if let Some(token) = cancellation {
+            if token.is_cancelled() {
+                return Ok(RegionEnumerationResult {
+                    regions,
+                    is_complete: false,
+                    stopped_at: Some(address),
+                    stop_reason: None,
+                    cancelled: true,
+                });
+            }
+        }
+
         if address >= USER_MODE_ADDRESS_CEILING {
             return Ok(RegionEnumerationResult {
                 regions,
                 is_complete: true,
                 stopped_at: None,
                 stop_reason: None,
+                cancelled: false,
             });
         }
 
@@ -209,6 +245,7 @@ pub fn enumerate_regions(
                 is_complete: false,
                 stopped_at: Some(address),
                 stop_reason: Some(reason),
+                cancelled: false,
             });
         }
 
@@ -225,6 +262,7 @@ pub fn enumerate_regions(
                 is_complete: false,
                 stopped_at: Some(address),
                 stop_reason: Some(ErrorKind::InternalInvariantViolation),
+                cancelled: false,
             });
         }
 
@@ -260,6 +298,7 @@ pub fn enumerate_regions(
                     is_complete: false,
                     stopped_at: Some(region_base),
                     stop_reason: Some(ErrorKind::AddressOverflow),
+                    cancelled: false,
                 });
             }
         };

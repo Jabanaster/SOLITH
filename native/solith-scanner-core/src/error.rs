@@ -46,6 +46,15 @@ pub enum ErrorKind {
     /// A configured resource bound (byte budget, region count, etc.) was
     /// reached. Not itself a failure of the underlying OS operation.
     ResourceExhaustion,
+    /// A persisted session-snapshot file failed its integrity checksum, or
+    /// otherwise could not be trusted as an unmodified, complete artifact
+    /// (Stage 6 §6.11/§6.24).
+    CorruptSnapshot,
+    /// A persisted session-snapshot file's schema version does not match
+    /// the version this build supports (either older or newer than what
+    /// this build knows how to read) — rejected rather than guessed at
+    /// (Stage 6 §6.11).
+    UnsupportedSnapshotVersion,
 }
 
 impl fmt::Display for ErrorKind {
@@ -61,6 +70,8 @@ impl fmt::Display for ErrorKind {
             ErrorKind::UnsupportedArchitecture => "unsupported_architecture",
             ErrorKind::InternalInvariantViolation => "internal_invariant_violation",
             ErrorKind::ResourceExhaustion => "resource_exhaustion",
+            ErrorKind::CorruptSnapshot => "corrupt_snapshot",
+            ErrorKind::UnsupportedSnapshotVersion => "unsupported_snapshot_version",
         };
         f.write_str(s)
     }
