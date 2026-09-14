@@ -21,6 +21,9 @@ out/
 build/
 *.tsbuildinfo
 native/**/target/
+# Compiled napi-rs addon (machine/ABI-specific build output, not vendored — see
+# Docs/phase1/11-stage2-native-layout.md and scripts/build-scanner-native-foundation.mjs).
+native/solith-scanner-napi/*.node
 
 # ── Electron Builder installer artifacts ─────────────────────────────────────
 *.exe

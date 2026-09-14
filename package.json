@@ -22,6 +22,7 @@
     "dev:electron:launch": "electron dist-electron/main.js --dev",
     "build:vite": "vite build",
     "build:scanner": "node scripts/build-readonly-scanner.mjs",
+    "build:scanner-native-foundation": "node scripts/build-scanner-native-foundation.mjs",
     "build:electron": "npm run build:scanner && tsup --config tsup.config.ts && node scripts/verify-electron-output.mjs",
     "build": "npm run build:vite && npm run build:electron && electron-builder",
     "build:msix": "node scripts/check-msix-identity-env.mjs && node scripts/generate-msix-assets.mjs && npm run build:vite && npm run build:electron && electron-builder --win appx --config electron-builder.msix.config.cjs",
