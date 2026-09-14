@@ -322,6 +322,41 @@ fn full_byte_wildcard_aob_matches_regardless_of_wildcarded_byte() {
 }
 
 #[test]
+fn xx_and_x_wildcard_aob_matches_real_memory_regardless_of_wildcarded_byte() {
+    let fixture = Fixture::spawn();
+    let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
+    let region = pattern_region(&fixture);
+    // Same real planted bytes as the "??" case above — proves "xx"/"x" are
+    // genuinely equivalent full-byte-wildcard spellings against real
+    // process memory, not just at the parser level (mission 5.3 §F/§G).
+    let expected_addr = region.base_address + fixture.dec_u64("AOB_WILDCARD_OFFSET");
+    for pattern_str in [
+        "48 8B 05 xx 22 33 44 89",
+        "48 8B 05 XX 22 33 44 89",
+        "48 8B 05 x 22 33 44 89",
+    ] {
+        let pattern = parse_aob(pattern_str).unwrap();
+        let options = PatternScanOptions::default_for(&pattern, 1024 * 1024);
+        let cancellation = CancellationToken::new();
+        let result = scan_pattern(
+            &handle,
+            std::slice::from_ref(&region),
+            &readable_any_policy(),
+            &pattern,
+            PatternKind::Aob,
+            &options,
+            &cancellation,
+            None,
+        )
+        .expect("scan failed");
+        assert!(
+            result.matches.iter().any(|m| m.address == expected_addr),
+            "pattern {pattern_str:?} did not match the real planted wildcard byte"
+        );
+    }
+}
+
+#[test]
 fn nibble_wildcard_aob_matches_regardless_of_wildcarded_nibble() {
     let fixture = Fixture::spawn();
     let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");

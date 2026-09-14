@@ -251,6 +251,20 @@ test('pattern: full-byte wildcard AOB matches regardless of the wildcarded byte'
   });
 });
 
+test('pattern: xx/x full-byte wildcard AOB matches real compiled addon regardless of the wildcarded byte', async () => {
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const region = patternRegion(fields, target.enumerateRegions());
+    const expected = region.baseAddress + BigInt(fields.AOB_WILDCARD_OFFSET);
+    for (const query of ['48 8B 05 xx 22 33 44 89', '48 8B 05 XX 22 33 44 89', '48 8B 05 x 22 33 44 89']) {
+      const cancellation = new addon.ScanCancellationHandle();
+      const progress = new addon.ScanProgressHandle();
+      const outcome = await target.scanAob(region, query, 1024n * 1024n, null, null, cancellation, progress);
+      assert.ok(outcome.matches.some((m) => m.address === expected), `query ${query} did not match`);
+    }
+  });
+});
+
 test('pattern: nibble wildcard AOB matches regardless of the wildcarded nibble', async () => {
   await withFixture(async (child, fields) => {
     const target = addon.NativeScanTarget.attach(child.pid);
