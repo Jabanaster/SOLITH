@@ -704,4 +704,7 @@ module.exports.NativeScanTarget = nativeBinding.NativeScanTarget
 module.exports.ScanCancellationHandle = nativeBinding.ScanCancellationHandle
 module.exports.ScanProgressHandle = nativeBinding.ScanProgressHandle
 module.exports.debugEchoU64 = nativeBinding.debugEchoU64
+module.exports.deleteSessionSnapshot = nativeBinding.deleteSessionSnapshot
+module.exports.loadSessionSnapshotInfo = nativeBinding.loadSessionSnapshotInfo
+module.exports.saveSessionSnapshot = nativeBinding.saveSessionSnapshot
 module.exports.validateAobPattern = nativeBinding.validateAobPattern

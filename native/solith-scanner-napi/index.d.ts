@@ -50,6 +50,16 @@ export declare class NativeScanSession {
    */
   close(): void
   isInitialized(): boolean
+  /**
+   * Captures the session's current persistable-safe metadata (Stage 6
+   * §6.9) as a JSON string — a live OS handle and raw candidate
+   * addresses/values are never included (see
+   * `solith_scanner_core::session_snapshot`'s module doc for why).
+   * `target_executable_hint` is an optional, caller-supplied, unverified
+   * display label. Purely in-memory; does not touch disk — pair with
+   * `saveSessionSnapshot` to persist it.
+   */
+  exportSnapshotJson(targetExecutableHint?: string | undefined | null): string
 }
 
 /**
@@ -192,6 +202,12 @@ export declare class ScanProgressHandle {
  */
 export declare function debugEchoU64(value: bigint): bigint
 
+/**
+ * Deletes the snapshot named `snapshot_id` under `dir`. Idempotent — a
+ * missing file is not an error.
+ */
+export declare function deleteSessionSnapshot(dir: string, snapshotId: string): void
+
 export interface JsAobValidation {
   valid: boolean
   byteLength?: number
@@ -226,6 +242,14 @@ export interface JsExactScanOutcome {
   matches: Array<JsScanMatch>
   metrics: JsProgress
   completeness: JsCompleteness
+  /**
+   * Stage 6 §6.3's shared authoritative-absence rule, evaluated once here
+   * so callers never have to re-derive "zero matches AND fully covered"
+   * themselves: true iff `matches` is empty AND `completeness` is
+   * `Complete`. False for every other completeness state, even with
+   * zero matches — absence is not authoritative there.
+   */
+  isAuthoritativeAbsence: boolean
 }
 
 export interface JsGenerationRecord {
@@ -254,6 +278,12 @@ export interface JsPatternScanOutcome {
   matches: Array<JsPatternMatch>
   metrics: JsProgress
   completeness: JsCompleteness
+  /**
+   * Stage 6 §6.3's shared authoritative-absence rule (see
+   * `JsExactScanOutcome`'s field of the same name for the exact
+   * definition) — identical semantics here for string/byte/AOB scans.
+   */
+  isAuthoritativeAbsence: boolean
 }
 
 export interface JsProgress {
@@ -312,6 +342,26 @@ export interface JsScanMatch {
   valueBigint?: bigint
 }
 
+export interface JsSessionSnapshotInfo {
+  schemaVersion: number
+  scannerCoreVersion: string
+  primitiveType: string
+  alignment: string
+  processPid: number
+  targetExecutableHint?: string
+  generation: number
+  candidateCount: bigint
+  lastCompletenessLabel: string
+  takenAtUnixMillis: bigint
+  /**
+   * One of `"inactive"`, `"stale"`, `"recoverable_metadata"` (Stage 6
+   * §6.12) — never `"live"`. A caller must always perform an explicit,
+   * user-initiated reattach (a fresh `createUnknownInitial`) even when
+   * this is `"recoverable_metadata"`; nothing here constructs a session.
+   */
+  recoveryStatus: string
+}
+
 export interface JsSessionStatus {
   pid: number
   primitiveType: string
@@ -332,6 +382,22 @@ export interface JsSkippedRange {
   size: bigint
   reason: string
 }
+
+/**
+ * Loads, fully validates, and classifies the recovery status of the
+ * snapshot named `snapshot_id` under `dir` — never constructs a live
+ * session (Stage 6 §6.12).
+ */
+export declare function loadSessionSnapshotInfo(dir: string, snapshotId: string): JsSessionSnapshotInfo
+
+/**
+ * Validates `snapshot_json` (schema version + checksum) and atomically
+ * writes it to `<dir>/<snapshot_id>.solith-session-snapshot.json`
+ * (temp-file-then-rename). `snapshot_id` must be a bare identifier
+ * (ASCII letters/digits/`_`/`-` only) — path separators and `..` are
+ * rejected outright (Stage 6 §6.24's "no arbitrary path traversal").
+ */
+export declare function saveSessionSnapshot(dir: string, snapshotId: string, snapshotJson: string): string
 
 /**
  * Parses `pattern` per `solith_scanner_core::pattern::parse_aob`'s grammar

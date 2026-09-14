@@ -44,6 +44,10 @@ use solith_scanner_core::region::{enumerate_regions, CommitState, Region, Region
 use solith_scanner_core::session::{
     GenerationRecord, RefineMode, ScanSession as CoreScanSession, SessionResourceLimits,
 };
+use solith_scanner_core::session_snapshot::{
+    delete_snapshot_from_dir, load_snapshot_from_dir, save_snapshot_to_dir, SessionRecoveryStatus,
+    SessionSnapshot,
+};
 use solith_scanner_core::target::{ProcessHandle, TargetArchitecture};
 use solith_scanner_core::types::{PrimitiveType, PrimitiveValue};
 use solith_scanner_core::ChunkPlanConfig;
@@ -809,14 +813,12 @@ fn primitive_value_from_js(
 }
 
 fn alignment_from_str(s: &str) -> Result<AlignmentMode> {
-    match s {
-        "bytewise" => Ok(AlignmentMode::Bytewise),
-        "aligned_to_type" => Ok(AlignmentMode::AlignedToType),
-        other => Err(Error::new(
+    AlignmentMode::from_label(s).ok_or_else(|| {
+        Error::new(
             Status::InvalidArg,
-            format!("invalid_configuration: unknown alignment mode \"{other}\""),
-        )),
-    }
+            format!("invalid_configuration: unknown alignment mode \"{s}\""),
+        )
+    })
 }
 
 #[napi(object)]
@@ -866,6 +868,12 @@ pub struct JsExactScanOutcome {
     pub matches: Vec<JsScanMatch>,
     pub metrics: JsProgress,
     pub completeness: JsCompleteness,
+    /// Stage 6 §6.3's shared authoritative-absence rule, evaluated once here
+    /// so callers never have to re-derive "zero matches AND fully covered"
+    /// themselves: true iff `matches` is empty AND `completeness` is
+    /// `Complete`. False for every other completeness state, even with
+    /// zero matches — absence is not authoritative there.
+    pub is_authoritative_absence: bool,
 }
 
 pub struct ExactScanTask {
@@ -913,10 +921,15 @@ impl Task for ExactScanTask {
     }
 
     fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        let is_authoritative_absence = solith_scanner_core::completeness::is_authoritative_absence(
+            &output.completeness,
+            output.matches.len(),
+        );
         Ok(JsExactScanOutcome {
             matches: output.matches.into_iter().map(scan_match_to_js).collect(),
             metrics: metrics_to_js(&output.metrics),
             completeness: completeness_to_js(output.completeness),
+            is_authoritative_absence,
         })
     }
 }
@@ -1048,6 +1061,10 @@ pub struct JsPatternScanOutcome {
     pub matches: Vec<JsPatternMatch>,
     pub metrics: JsProgress,
     pub completeness: JsCompleteness,
+    /// Stage 6 §6.3's shared authoritative-absence rule (see
+    /// `JsExactScanOutcome`'s field of the same name for the exact
+    /// definition) — identical semantics here for string/byte/AOB scans.
+    pub is_authoritative_absence: bool,
 }
 
 pub struct PatternScanTask {
@@ -1094,6 +1111,10 @@ impl Task for PatternScanTask {
     }
 
     fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        let is_authoritative_absence = solith_scanner_core::completeness::is_authoritative_absence(
+            &output.completeness,
+            output.matches.len(),
+        );
         Ok(JsPatternScanOutcome {
             kind: output.kind.to_string(),
             matches: output
@@ -1103,6 +1124,7 @@ impl Task for PatternScanTask {
                 .collect(),
             metrics: metrics_to_js(&output.metrics),
             completeness: completeness_to_js(output.completeness),
+            is_authoritative_absence,
         })
     }
 }
@@ -1341,10 +1363,7 @@ fn session_already_initialized_err() -> Error {
 }
 
 fn alignment_str(a: AlignmentMode) -> &'static str {
-    match a {
-        AlignmentMode::Bytewise => "bytewise",
-        AlignmentMode::AlignedToType => "aligned_to_type",
-    }
+    a.label()
 }
 
 pub struct CreateUnknownInitialTask {
@@ -1685,10 +1704,115 @@ impl NativeScanSession {
     pub fn is_initialized(&self) -> bool {
         self.inner.lock().map(|g| g.is_some()).unwrap_or(false)
     }
+
+    /// Captures the session's current persistable-safe metadata (Stage 6
+    /// §6.9) as a JSON string — a live OS handle and raw candidate
+    /// addresses/values are never included (see
+    /// `solith_scanner_core::session_snapshot`'s module doc for why).
+    /// `target_executable_hint` is an optional, caller-supplied, unverified
+    /// display label. Purely in-memory; does not touch disk — pair with
+    /// `saveSessionSnapshot` to persist it.
+    #[napi]
+    pub fn export_snapshot_json(&self, target_executable_hint: Option<String>) -> Result<String> {
+        let guard = self.inner.lock().map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "internal_invariant_violation: session mutex poisoned",
+            )
+        })?;
+        let session = guard.as_ref().ok_or_else(session_not_initialized_err)?;
+        let snapshot =
+            SessionSnapshot::capture(session, target_executable_hint).map_err(to_napi_err)?;
+        snapshot.to_json().map_err(to_napi_err)
+    }
 }
 
 impl Default for NativeScanSession {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Session-snapshot file persistence (Stage 6 §6.9-§6.12, §6.24). Kept as
+// standalone functions, not `NativeScanSession` methods, because loading or
+// deleting a snapshot never needs — and must never construct — a live
+// session; only `exportSnapshotJson` above touches a live `NativeScanSession`.
+// ---------------------------------------------------------------------------
+
+#[napi(object)]
+pub struct JsSessionSnapshotInfo {
+    pub schema_version: u32,
+    pub scanner_core_version: String,
+    pub primitive_type: String,
+    pub alignment: String,
+    pub process_pid: u32,
+    pub target_executable_hint: Option<String>,
+    pub generation: u32,
+    pub candidate_count: BigInt,
+    pub last_completeness_label: String,
+    pub taken_at_unix_millis: BigInt,
+    /// One of `"inactive"`, `"stale"`, `"recoverable_metadata"` (Stage 6
+    /// §6.12) — never `"live"`. A caller must always perform an explicit,
+    /// user-initiated reattach (a fresh `createUnknownInitial`) even when
+    /// this is `"recoverable_metadata"`; nothing here constructs a session.
+    pub recovery_status: String,
+}
+
+fn recovery_status_label(status: SessionRecoveryStatus) -> &'static str {
+    status.label()
+}
+
+fn snapshot_to_js_info(snapshot: &SessionSnapshot) -> JsSessionSnapshotInfo {
+    let recovery_status = recovery_status_label(snapshot.classify_recovery_status()).to_string();
+    JsSessionSnapshotInfo {
+        schema_version: snapshot.payload.schema_version,
+        scanner_core_version: snapshot.payload.scanner_core_version.clone(),
+        primitive_type: snapshot.payload.primitive_type.clone(),
+        alignment: snapshot.payload.alignment.clone(),
+        process_pid: snapshot.payload.process_pid,
+        target_executable_hint: snapshot.payload.target_executable_hint.clone(),
+        generation: snapshot.payload.generation as u32,
+        candidate_count: BigInt::from(snapshot.payload.candidate_count),
+        last_completeness_label: snapshot.payload.last_completeness_label.clone(),
+        taken_at_unix_millis: BigInt::from(snapshot.payload.taken_at_unix_millis),
+        recovery_status,
+    }
+}
+
+/// Validates `snapshot_json` (schema version + checksum) and atomically
+/// writes it to `<dir>/<snapshot_id>.solith-session-snapshot.json`
+/// (temp-file-then-rename). `snapshot_id` must be a bare identifier
+/// (ASCII letters/digits/`_`/`-` only) — path separators and `..` are
+/// rejected outright (Stage 6 §6.24's "no arbitrary path traversal").
+#[napi]
+pub fn save_session_snapshot(
+    dir: String,
+    snapshot_id: String,
+    snapshot_json: String,
+) -> Result<String> {
+    let snapshot = SessionSnapshot::from_json(&snapshot_json).map_err(to_napi_err)?;
+    let path = save_snapshot_to_dir(std::path::Path::new(&dir), &snapshot_id, &snapshot)
+        .map_err(to_napi_err)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Loads, fully validates, and classifies the recovery status of the
+/// snapshot named `snapshot_id` under `dir` — never constructs a live
+/// session (Stage 6 §6.12).
+#[napi]
+pub fn load_session_snapshot_info(
+    dir: String,
+    snapshot_id: String,
+) -> Result<JsSessionSnapshotInfo> {
+    let snapshot =
+        load_snapshot_from_dir(std::path::Path::new(&dir), &snapshot_id).map_err(to_napi_err)?;
+    Ok(snapshot_to_js_info(&snapshot))
+}
+
+/// Deletes the snapshot named `snapshot_id` under `dir`. Idempotent — a
+/// missing file is not an error.
+#[napi]
+pub fn delete_session_snapshot(dir: String, snapshot_id: String) -> Result<()> {
+    delete_snapshot_from_dir(std::path::Path::new(&dir), &snapshot_id).map_err(to_napi_err)
 }
