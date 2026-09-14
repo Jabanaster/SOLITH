@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "solith-scanner-fixture"
 path = "src/bin/fixture.rs"
 
+[[bin]]
+name = "bench_reader"
+path = "src/bin/bench_reader.rs"
+
 [dependencies]
 
 [target.'cfg(windows)'.dependencies]

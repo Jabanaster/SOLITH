@@ -44,6 +44,33 @@ const GUARD_NOACCESS_PAGE_OFFSET: usize = 4096; // the middle page becomes PAGE_
 fn main() {
     let pid = std::process::id();
 
+    // Optional first CLI arg: allocate an additional region of this many
+    // MiB, for Stage 2's native-reader benchmarks (src/bin/bench_reader.rs,
+    // mission §25) — separate from the fixed-size correctness fixtures
+    // below, since benchmark region sizes need to vary (1/16/64/256 MiB)
+    // while the correctness sentinels stay fixed and small.
+    let bench_region_mib: Option<usize> = std::env::args().nth(1).and_then(|s| s.parse().ok());
+    if let Some(mib) = bench_region_mib {
+        let size = mib * 1024 * 1024;
+        let region = unsafe {
+            VirtualAlloc(
+                std::ptr::null(),
+                size,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_READWRITE,
+            )
+        };
+        assert!(!region.is_null(), "VirtualAlloc(bench_region) failed");
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(region as *mut u8, size);
+            for (i, b) in slice.iter_mut().enumerate() {
+                *b = ((i as u32).wrapping_mul(2654435761) >> 24) as u8;
+            }
+        }
+        println!("BENCH_REGION_BASE=0x{:x}", region as usize);
+        println!("BENCH_REGION_SIZE={size}");
+    }
+
     let big_region = unsafe {
         VirtualAlloc(
             std::ptr::null(),
