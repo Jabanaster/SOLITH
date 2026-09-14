@@ -18,6 +18,10 @@ path = "src/bin/fixture.rs"
 name = "bench_reader"
 path = "src/bin/bench_reader.rs"
 
+[[bin]]
+name = "bench_exact_scan"
+path = "src/bin/bench_exact_scan.rs"
+
 [dependencies]
 
 [target.'cfg(windows)'.dependencies]
