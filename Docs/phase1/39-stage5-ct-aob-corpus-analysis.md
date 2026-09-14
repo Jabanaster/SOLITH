@@ -45,6 +45,24 @@ This single real signature already exercises: exact bytes (`48`, `8B`, `89`, `45
 
 Full-byte wildcards (both spellings) and exact bytes are unambiguously required — directly evidenced by the real, certified corpus's own ingest pipeline and its real test samples. Nibble wildcards have **no evidence of necessity** from this repository's own audited data, but were implemented anyway (doc 38) because the marginal engineering cost is near-zero given `PatternByte`'s existing mask/value design — an honest "implemented without evidence of current need, for compatibility" status, not an overclaim of corpus support.
 
+## Stage 5.1 — exhaustive corpus-recovery search (repeat, read-only)
+
+Stage 5.1's mission required a second, exhaustive attempt to recover the real 120,245-signature corpus before accepting this scope limit as final. The following locations were searched, read-only, with no CT scripts executed and no corpus data mutated:
+
+- This worktree's tracked and untracked files, including `data/` (contains only `trainer-catalog-seed.json`) and every `.gitignore`d path pattern.
+- Every local and remote-tracking branch/ref in this repository (91 refs, enumerated via `git branch -a`), via `git ls-tree -r` per ref, for any `registry`/`corpus`/`SOLITH_PHASE0_EVIDENCE` path.
+- The three preserved refs the mission named by name: `preserve/ct-selective-import-2026-09-12`, `preserve/review-gate2-5-working-tree-2026-09-12`, `review/gate2-5-doc-audit` — inspected via `git ls-tree`/`git show`, not merged. `preserve/ct-selective-import-2026-09-12`'s own registered worktree (`solith-ct-import-phase2`) contains exactly one real `.CT` file (`fixtures/community-ct/CrimsonDesert.CT`), not a 23,953-file corpus.
+- Dangling/unreachable git objects (`git fsck --unreachable --dangling`) — every dangling commit's tree was checked for a `SOLITH_PHASE0_EVIDENCE`-named path; none found.
+- The exact citation trail ROADMAP.md itself gives for its own certified figures: `> **Reconstruction evidence.** 38-step-0.14-roadmap-source-reconciliation.md, 39-step-0.14-roadmap-consistency-audit.md, 40-step-0.14-final-roadmap-certification.md in SOLITH_PHASE0_EVIDENCE/2026-09-12/`. This directory does not exist anywhere in this repository's git history (any ref) and was not found on local disk under this worktree.
+- The registry-compilation tooling's own declared output path (`scripts/compile-ct-registry.mjs` defaults to `data/registry/Avowed_Master_Registry.json`, a single-CT-file, single-game compile) — that path does not exist on disk in any worktree checked, and by its own design compiles one CT file at a time, not a 23,953-file corpus in one artifact.
+- Common real-world CT-library locations on the local machine (Desktop, Downloads) — found exactly one real, single CT file (`Downloads/Avowed-Win64-Shipping.CT`), not a corpus.
+
+**Conclusion: the full 120,245-signature corpus and the `SOLITH_PHASE0_EVIDENCE/2026-09-12/` artifact trail that certified it are genuinely unavailable in this repository and on this machine's accessible, documented locations.** This is not a new limit — it is the same limit this doc already reported, now confirmed by a second, exhaustive, read-only pass rather than accepted on the first search alone. Per the mission's own instruction, Stage 5 corpus certification (mission §5.1-J's first checklist item) **cannot be marked complete** on this evidence; see doc 46 for the certification-repair verdict.
+
+## Stronger structural finding on nibble wildcards (Stage 5.1)
+
+Re-examining `normalizeAobPattern`'s three-branch grammar (quoted above): because this is the *exact, unmodified function* that performed the certified ingest producing the 120,245-signature count, and because it has no nibble-wildcard branch at all, the conclusion is stronger than "zero occurrences in the sampled test corpus" — **it is structurally impossible for any of the 120,245 certified signatures to be a valid nibble-wildcard pattern**, because any such token would have hit the `Invalid AOB token` branch during that same certified ingest and been excluded from (or marked invalid within) the certified count. This is proof by construction from the real, certified, unmodified ingest code — not a sampling inference — even though the raw corpus data itself remains unavailable for direct enumeration.
+
 ## What this analysis does not prove
 
 It does not produce an exact per-signature-type count across the real 120,245-signature corpus (e.g., "N% are exact-byte-only") — that would require the actual corpus data, which is not present in this repository. Any such percentage would be fabricated. What it does prove, from real and audited in-repo evidence, is the *syntax vocabulary* the corpus's own certified ingest pipeline recognizes and has been exercised against with a real sample from an actual game's CT table.
