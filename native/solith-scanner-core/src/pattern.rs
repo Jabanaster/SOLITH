@@ -44,7 +44,7 @@ impl PatternByte {
         }
     }
 
-    /// High nibble fixed, low nibble wildcard (AOB syntax `A?`).
+    /// High nibble fixed, low nibble wildcard (AOB syntax `A?`/`Ax`/`A*`).
     pub fn nibble_high(high_nibble: u8) -> Self {
         PatternByte {
             mask: 0xF0,
@@ -52,7 +52,7 @@ impl PatternByte {
         }
     }
 
-    /// Low nibble fixed, high nibble wildcard (AOB syntax `?A`).
+    /// Low nibble fixed, high nibble wildcard (AOB syntax `?A`/`xA`/`*A`).
     pub fn nibble_low(low_nibble: u8) -> Self {
         PatternByte {
             mask: 0x0F,
@@ -280,28 +280,46 @@ pub fn pattern_from_utf16le_str(
 }
 
 // ---------------------------------------------------------------------------
-// AOB grammar (mission §5.4). Canonical SOLITH AOB grammar:
-//   - whitespace-separated tokens
-//   - exact byte:        two hex digits, e.g. "AA"
-//   - full wildcard:     one-or-more '?' (canonically "??"), or one-or-more
-//                        '*' — both accepted, matching the tolerance this
-//                        repo's own already-certified CT AOB parser
-//                        (`src/core/script-research/aob-parser.ts`) already
-//                        extends to real-world Cheat Engine scripts (doc 39);
-//                        also "xx"/"x" (case-insensitive) as a complete
-//                        token only — a real, widespread community CT
-//                        convention found 16,392 times across the recovered
-//                        corpus (Stage 5.2/5.3, doc 48/50) and not
-//                        interpreted when embedded inside a mixed
-//                        hex/"x" token (e.g. "4x"), which remains rejected
-//                        as `InvalidHexToken`
-//   - nibble wildcard:   exactly one hex digit + one '?', in either order
-//                        ("A?" = high nibble A, low wildcard; "?F" = low
-//                        nibble F, high wildcard) — supported for broader
-//                        signature compatibility per mission §5.4, though
-//                        doc 39's real-corpus-evidence review found no
-//                        occurrence of this syntax in this repo's own
-//                        already-certified CT ingest pipeline
+// AOB grammar (mission §5.4, extended Stage 5.4 §D-§G to full Cheat Engine
+// continuous-hex grammar per doc 51's authoritative wiki evidence). Canonical
+// SOLITH/CE AOB grammar:
+//
+//   - Whitespace between bytes is OPTIONAL and purely cosmetic. A pattern is
+//     first split on whitespace into tokens; each token is independently
+//     tokenized 2-characters-at-a-time into byte groups (matching Cheat
+//     Engine's own real tokenizer, doc 51) — so "AA BB CC" and "AABBCC"
+//     compile to the identical `Vec<PatternByte>` (Stage 5.4 §G normalization
+//     requirement). Tabs/newlines/repeated spaces are all valid separators
+//     (`str::split_whitespace`'s standard Unicode-whitespace behavior).
+//   - A single-character token consisting of exactly one wildcard character
+//     (`?`, `*`, or `x`/`X`) surrounded by whitespace is a standalone
+//     full-byte wildcard — the "isolated wildcard character" form doc 51's
+//     wiki citation documents (e.g. "x 48 8D x 24 E0").
+//   - Every other token must have EVEN length (an odd-length continuous run
+//     cannot be split into whole bytes and is rejected — Stage 5.4 §F). It is
+//     split into consecutive 2-character byte groups; each group represents
+//     one byte:
+//       - two hex digits            -> exact byte ("AA")
+//       - one hex digit + one       -> nibble wildcard, either order
+//         wildcard char                ("A?"/"Ax"/"A*" = high nibble fixed;
+//                                       "?A"/"xA"/"*A" = low nibble fixed) —
+//                                      any of `?`/`x`/`X`/`*` is accepted in
+//                                      the nibble position (doc 51's finding
+//                                      that CE's nibble wildcard is not
+//                                      limited to '?')
+//       - two wildcard chars        -> full-byte wildcard ("??", "xx", "**",
+//                                      or any mixed pair such as "x?")
+//       - anything else             -> `InvalidHexToken`
+//   - An odd-length run composed entirely of wildcard characters (e.g.
+//     "???", "xxx") is `MalformedWildcard` (an over-long attempt at a
+//     wildcard alias); an odd-length run containing any hex digit is
+//     `OddLengthToken` (a truncated/malformed continuous-hex run).
+//
+// This single 2-char-group tokenizer subsumes both the historical
+// whitespace-token grammar (every historical token happened to already be 1
+// or 2 characters) and Stage 5.4's continuous-hex requirement — spaced and
+// unspaced input are not two code paths, they are the same path fed
+// differently-separated input.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -311,6 +329,7 @@ pub enum PatternParseErrorKind {
     EmptyPattern,
     UnsupportedToken,
     InvalidSeparator,
+    OddLengthToken,
 }
 
 impl std::fmt::Display for PatternParseErrorKind {
@@ -321,6 +340,7 @@ impl std::fmt::Display for PatternParseErrorKind {
             PatternParseErrorKind::EmptyPattern => "empty_pattern",
             PatternParseErrorKind::UnsupportedToken => "unsupported_token",
             PatternParseErrorKind::InvalidSeparator => "invalid_separator",
+            PatternParseErrorKind::OddLengthToken => "odd_length_token",
         };
         f.write_str(s)
     }
@@ -350,7 +370,59 @@ fn hex_digit_value(c: char) -> Option<u8> {
     c.to_digit(16).map(|d| d as u8)
 }
 
-fn parse_token(token: &str) -> Result<PatternByte, PatternParseError> {
+/// `?`, `*`, and `x`/`X` are the three wildcard characters Cheat Engine's
+/// real AOB tokenizer recognizes (doc 51). Disjoint from `hex_digit_value`'s
+/// domain (`x`/`X` is not a hex digit), so every character is classified as
+/// exactly one of: hex digit, wildcard, or invalid.
+fn is_wildcard_char(c: char) -> bool {
+    c == '?' || c == '*' || c.eq_ignore_ascii_case(&'x')
+}
+
+/// Parses one 2-character byte group — the fixed unit Cheat Engine's real
+/// tokenizer operates on regardless of whitespace (doc 51). `token` is only
+/// used for error messages.
+fn parse_byte_group(a: char, b: char, token: &str) -> Result<PatternByte, PatternParseError> {
+    let a_hex = hex_digit_value(a);
+    let b_hex = hex_digit_value(b);
+    let a_wild = is_wildcard_char(a);
+    let b_wild = is_wildcard_char(b);
+    match (a_hex, b_hex) {
+        (Some(hi), Some(lo)) => Ok(PatternByte::exact((hi << 4) | lo)),
+        (Some(hi), None) if b_wild => Ok(PatternByte::nibble_high(hi)),
+        (None, Some(lo)) if a_wild => Ok(PatternByte::nibble_low(lo)),
+        (None, None) if a_wild && b_wild => Ok(PatternByte::wildcard()),
+        _ => {
+            // Distinguish "looks like a typo'd hex digit" (alphanumeric but
+            // not a valid hex digit or wildcard char, e.g. "GG") from
+            // "not hex-like at all" (symbols, e.g. "#!") — matching the
+            // pre-Stage-5.4 error classification so existing callers keyed
+            // on error kind see no behavior change for these cases.
+            let a_bad_alnum = a.is_ascii_alphanumeric() && a_hex.is_none() && !a_wild;
+            let b_bad_alnum = b.is_ascii_alphanumeric() && b_hex.is_none() && !b_wild;
+            if a_bad_alnum || b_bad_alnum {
+                Err(PatternParseError {
+                    kind: PatternParseErrorKind::InvalidHexToken,
+                    message: format!(
+                        "byte group \"{a}{b}\" in token \"{token}\" contains a non-hex character"
+                    ),
+                })
+            } else {
+                Err(PatternParseError {
+                    kind: PatternParseErrorKind::UnsupportedToken,
+                    message: format!(
+                        "unrecognized byte group \"{a}{b}\" in token \"{token}\" (expected a 2-hex-digit byte, a full wildcard, or a nibble wildcard)"
+                    ),
+                })
+            }
+        }
+    }
+}
+
+/// Parses one whitespace-delimited token into one or more `PatternByte`s —
+/// one for a normal 2-character byte, more than one for a continuous
+/// multi-byte run (e.g. "AABBCC" -> 3 bytes), exactly one for the isolated
+/// single-wildcard-character form (e.g. standalone "x").
+fn parse_token(token: &str) -> Result<Vec<PatternByte>, PatternParseError> {
     if token.contains(',') || token.contains(';') {
         return Err(PatternParseError {
             kind: PatternParseErrorKind::InvalidSeparator,
@@ -362,49 +434,14 @@ fn parse_token(token: &str) -> Result<PatternByte, PatternParseError> {
 
     let chars: Vec<char> = token.chars().collect();
 
-    // A full-byte wildcard represents exactly one byte, so only a 1- or
-    // 2-character run of '?'/'*' is accepted as an alias for it (matching
-    // this repo's own already-certified CT AOB parser's "??"/"?" tolerance
-    // — doc 39); a longer run does not correspond to any single-byte token
-    // and falls through to the malformed-wildcard classification below.
-    if !chars.is_empty() && chars.len() <= 2 && chars.iter().all(|&c| c == '?') {
-        return Ok(PatternByte::wildcard());
-    }
-    if !chars.is_empty() && chars.len() <= 2 && chars.iter().all(|&c| c == '*') {
-        return Ok(PatternByte::wildcard());
-    }
-    // "xx"/"XX"/"x"/"X" (case-insensitive), as a complete wildcard token
-    // only — never when 'x' is mixed with a hex digit in the same token
-    // (e.g. "4x" falls through to the hex-digit-adjacent-to-'x' check below
-    // and is correctly rejected, per this syntax's real-corpus evidence,
-    // doc 50).
-    if !chars.is_empty() && chars.len() <= 2 && chars.iter().all(|&c| c.eq_ignore_ascii_case(&'x'))
-    {
-        return Ok(PatternByte::wildcard());
-    }
-
-    if chars.len() == 2 {
-        let (a, b) = (chars[0], chars[1]);
-        let a_hex = hex_digit_value(a);
-        let b_hex = hex_digit_value(b);
-        match (a_hex, b_hex, a == '?', b == '?') {
-            (Some(hi), Some(lo), false, false) => {
-                return Ok(PatternByte::exact((hi << 4) | lo));
-            }
-            (Some(hi), None, false, true) => {
-                return Ok(PatternByte::nibble_high(hi));
-            }
-            (None, Some(lo), true, false) => {
-                return Ok(PatternByte::nibble_low(lo));
-            }
-            _ => {
-                // Falls through to the length-based classification below.
-            }
-        }
-    }
-
     if chars.len() == 1 {
-        if hex_digit_value(chars[0]).is_some() {
+        let c = chars[0];
+        if is_wildcard_char(c) {
+            // Isolated wildcard character surrounded by whitespace: a
+            // standalone full-byte wildcard (doc 51's "x 48 8D x 24 E0").
+            return Ok(vec![PatternByte::wildcard()]);
+        }
+        if hex_digit_value(c).is_some() {
             return Err(PatternParseError {
                 kind: PatternParseErrorKind::InvalidHexToken,
                 message: format!(
@@ -418,36 +455,34 @@ fn parse_token(token: &str) -> Result<PatternByte, PatternParseError> {
         });
     }
 
-    // A run of 3+ 'x'/'X' (e.g. "xxx") is not a mixed hex/'x' token — it is
-    // an over-long attempt at the "xx" wildcard alias, so it is excluded
-    // here and classified as `MalformedWildcard` below instead of
-    // `InvalidHexToken`, matching how an over-long "???" run is classified.
-    let all_x = !chars.is_empty() && chars.iter().all(|&c| c.eq_ignore_ascii_case(&'x'));
-    let looks_hex_like = !all_x
-        && chars
-            .iter()
-            .any(|&c| c.is_ascii_alphanumeric() && hex_digit_value(c).is_none());
-    if looks_hex_like {
+    if !chars.len().is_multiple_of(2) {
+        // An odd-length run cannot be split into whole 2-character byte
+        // groups. A run made entirely of wildcard characters (e.g. "xxx",
+        // "???") is a recognizable over-long wildcard-alias typo, kept as
+        // `MalformedWildcard` for message continuity with prior stages;
+        // any other odd-length continuous run (e.g. "AAB") is a genuinely
+        // truncated continuous-hex pattern, Stage 5.4 §F's `OddLengthToken`.
+        if chars.iter().all(|&c| is_wildcard_char(c)) {
+            return Err(PatternParseError {
+                kind: PatternParseErrorKind::MalformedWildcard,
+                message: format!(
+                    "wildcard token \"{token}\" is malformed; use \"??\"/\"xx\" for a full-byte wildcard or \"A?\"/\"?A\" for a nibble wildcard"
+                ),
+            });
+        }
         return Err(PatternParseError {
-            kind: PatternParseErrorKind::InvalidHexToken,
-            message: format!("token \"{token}\" contains a non-hex character"),
-        });
-    }
-
-    let all_wildcard_ish = all_x || chars.iter().all(|&c| c == '?' || c == '*');
-    if all_wildcard_ish {
-        return Err(PatternParseError {
-            kind: PatternParseErrorKind::MalformedWildcard,
+            kind: PatternParseErrorKind::OddLengthToken,
             message: format!(
-                "wildcard token \"{token}\" is malformed; use \"??\"/\"xx\" for a full-byte wildcard or \"A?\"/\"?A\" for a nibble wildcard"
+                "continuous token \"{token}\" has odd length ({}) and cannot be split into whole bytes",
+                chars.len()
             ),
         });
     }
 
-    Err(PatternParseError {
-        kind: PatternParseErrorKind::UnsupportedToken,
-        message: format!("unrecognized token \"{token}\" (expected a 2-hex-digit byte, \"??\", or a nibble wildcard like \"A?\")"),
-    })
+    chars
+        .chunks(2)
+        .map(|pair| parse_byte_group(pair[0], pair[1], token))
+        .collect()
 }
 
 /// Parses one AOB pattern string per the grammar documented above. Returns a
@@ -461,19 +496,24 @@ pub fn parse_aob(input: &str) -> Result<Pattern, PatternParseError> {
             message: "AOB pattern must contain at least one token".to_string(),
         });
     }
-    if tokens.len() > MAX_PATTERN_BYTES {
+    // Every byte consumes at least one non-whitespace character, so the
+    // total non-whitespace character count is always an upper bound on the
+    // resulting byte count — a safe, correctness-preserving fail-fast guard
+    // against unbounded allocation from adversarially long input, now that a
+    // single token can expand into many bytes (continuous-hex runs).
+    let total_chars: usize = input.chars().filter(|c| !c.is_whitespace()).count();
+    if total_chars > MAX_PATTERN_BYTES {
         return Err(PatternParseError {
             kind: PatternParseErrorKind::MalformedWildcard,
             message: format!(
-                "pattern has {} tokens, exceeding the maximum of {MAX_PATTERN_BYTES}",
-                tokens.len()
+                "pattern has {total_chars} non-whitespace characters, exceeding the maximum representable length of {MAX_PATTERN_BYTES} bytes"
             ),
         });
     }
-    let bytes: Vec<PatternByte> = tokens
-        .into_iter()
-        .map(parse_token)
-        .collect::<Result<_, _>>()?;
+    let mut bytes: Vec<PatternByte> = Vec::new();
+    for token in tokens {
+        bytes.extend(parse_token(token)?);
+    }
     Pattern::new(bytes).map_err(|e| PatternParseError {
         kind: PatternParseErrorKind::EmptyPattern,
         message: e.message,
@@ -663,16 +703,126 @@ mod tests {
     }
 
     #[test]
-    fn aob_rejects_x_embedded_in_hex_token() {
-        // "4x"/"x4" mix a hex digit with 'x' in the same token — this is
-        // NOT the "xx"/"x" full-wildcard alias (which must be a complete
-        // token of only x/X characters) and must remain rejected, per the
-        // mission's explicit "do not interpret arbitrary x characters
-        // embedded inside hex bytes as wildcards" instruction.
-        let err1 = parse_aob("AA 4x CC").unwrap_err();
-        assert_eq!(err1.kind, PatternParseErrorKind::InvalidHexToken);
-        let err2 = parse_aob("AA x4 CC").unwrap_err();
-        assert_eq!(err2.kind, PatternParseErrorKind::InvalidHexToken);
+    fn aob_parses_x_as_nibble_wildcard() {
+        // Stage 5.3 rejected "4x"/"x4" (hex digit mixed with 'x' in one
+        // token) because no evidence then supported 'x' as a nibble
+        // wildcard character. Stage 5.4's doc 51 (Cheat Engine's own wiki,
+        // e.g. "5x 48 8D 6x 24 E0") proves 'x' IS a real nibble-position
+        // wildcard, same as '?' — so this syntax is now accepted, not
+        // rejected. "4x" = high nibble 4, low wildcard; "x4" = low nibble
+        // 4, high wildcard.
+        let p1 = parse_aob("AA 4x CC").unwrap();
+        assert!(p1.matches_at(&[0xAA, 0x40, 0xCC], 0));
+        assert!(p1.matches_at(&[0xAA, 0x4F, 0xCC], 0));
+        assert!(!p1.matches_at(&[0xAA, 0x50, 0xCC], 0));
+
+        let p2 = parse_aob("AA x4 CC").unwrap();
+        assert!(p2.matches_at(&[0xAA, 0x04, 0xCC], 0));
+        assert!(p2.matches_at(&[0xAA, 0xF4, 0xCC], 0));
+        assert!(!p2.matches_at(&[0xAA, 0x05, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_parses_star_as_nibble_wildcard() {
+        // Doc 51's wiki example "*D" — '*' as a nibble-position wildcard.
+        let p = parse_aob("AA *D CC").unwrap();
+        assert!(p.matches_at(&[0xAA, 0x0D, 0xCC], 0));
+        assert!(p.matches_at(&[0xAA, 0xFD, 0xCC], 0));
+        assert!(!p.matches_at(&[0xAA, 0x0E, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_parses_mixed_wildcard_chars_as_full_byte_wildcard() {
+        // "Two consecutive wildcard characters" per doc 51 need not be the
+        // same character.
+        let p = parse_aob("AA x? CC").unwrap();
+        assert!(p.matches_at(&[0xAA, 0x00, 0xCC], 0));
+        assert!(p.matches_at(&[0xAA, 0xFF, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_parses_continuous_exact_bytes() {
+        // Stage 5.4 §G: spaced and continuous exact-byte input must
+        // normalize to the identical compiled pattern.
+        let spaced = parse_aob("AA BB CC DD").unwrap();
+        let continuous = parse_aob("AABBCCDD").unwrap();
+        assert_eq!(spaced.as_slice(), continuous.as_slice());
+        assert!(continuous.matches_at(&[0xAA, 0xBB, 0xCC, 0xDD], 0));
+    }
+
+    #[test]
+    fn aob_parses_continuous_full_wildcard_forms() {
+        // Doc 51's "AA??BB"/"AA**BB"/"AAxxBB" continuous-wildcard family
+        // (Stage 5.4 §E).
+        for src in ["AA??BB", "AA**BB", "AAxxBB", "AAXXBB"] {
+            let p = parse_aob(src).unwrap();
+            assert_eq!(p.len(), 3);
+            assert!(p.matches_at(&[0xAA, 0x00, 0xBB], 0));
+            assert!(p.matches_at(&[0xAA, 0xFF, 0xBB], 0));
+            assert!(!p.matches_at(&[0xAA, 0x00, 0xBC], 0));
+        }
+    }
+
+    #[test]
+    fn aob_parses_continuous_nibble_wildcard_forms() {
+        // "A?BB"/"?ABB" continuous nibble family (Stage 5.4 §E), and their
+        // spaced equivalents must normalize identically.
+        let p1 = parse_aob("A?BB").unwrap();
+        let p1_spaced = parse_aob("A? BB").unwrap();
+        assert_eq!(p1.as_slice(), p1_spaced.as_slice());
+        assert!(p1.matches_at(&[0xA5, 0xBB], 0));
+        assert!(!p1.matches_at(&[0xB5, 0xBB], 0));
+
+        let p2 = parse_aob("?ABB").unwrap();
+        assert!(p2.matches_at(&[0x5A, 0xBB], 0));
+        assert!(!p2.matches_at(&[0x5B, 0xBB], 0));
+    }
+
+    #[test]
+    fn aob_parses_wiki_verbatim_examples() {
+        // Doc 51's exact verbatim Cheat Engine wiki examples.
+        let p1 = parse_aob("5x 48 8D 6x 24 E0").unwrap();
+        assert_eq!(p1.len(), 6);
+        assert!(p1.matches_at(&[0x5A, 0x48, 0x8D, 0x6F, 0x24, 0xE0], 0));
+
+        let p2 = parse_aob("xx 48 8D xx 24 E0").unwrap();
+        assert_eq!(p2.len(), 6);
+        assert!(p2.matches_at(&[0x00, 0x48, 0x8D, 0xFF, 0x24, 0xE0], 0));
+
+        let p3 = parse_aob("x 48 8D x 24 E0").unwrap();
+        assert_eq!(p3.len(), 6);
+        assert!(p3.matches_at(&[0x00, 0x48, 0x8D, 0xFF, 0x24, 0xE0], 0));
+
+        // Fully unspaced: tokenizes as 00 5x 8x xx xx E0.
+        let p4 = parse_aob("005x8xxxxxE0").unwrap();
+        assert_eq!(p4.len(), 6);
+        assert!(p4.matches_at(&[0x00, 0x5A, 0x81, 0x00, 0xFF, 0xE0], 0));
+        assert!(!p4.matches_at(&[0x01, 0x5A, 0x81, 0x00, 0xFF, 0xE0], 0));
+    }
+
+    #[test]
+    fn aob_rejects_odd_length_continuous_hex() {
+        let err = parse_aob("AAB").unwrap_err();
+        assert_eq!(err.kind, PatternParseErrorKind::OddLengthToken);
+    }
+
+    #[test]
+    fn aob_rejects_odd_length_wildcard_run_as_malformed_wildcard() {
+        let err = parse_aob("?????").unwrap_err();
+        assert_eq!(err.kind, PatternParseErrorKind::MalformedWildcard);
+    }
+
+    #[test]
+    fn aob_accepts_tabs_and_newlines_as_separators() {
+        let p = parse_aob("AA\tBB\nCC").unwrap();
+        assert_eq!(p.len(), 3);
+        assert!(p.matches_at(&[0xAA, 0xBB, 0xCC], 0));
+    }
+
+    #[test]
+    fn aob_ignores_leading_and_trailing_whitespace() {
+        let p = parse_aob("  AA BB  ").unwrap();
+        assert_eq!(p.len(), 2);
     }
 
     #[test]
@@ -717,6 +867,39 @@ mod tests {
     fn aob_rejects_single_stray_hex_digit() {
         let err = parse_aob("AA B CC").unwrap_err();
         assert_eq!(err.kind, PatternParseErrorKind::InvalidHexToken);
+    }
+
+    #[test]
+    #[ignore = "manual perf comparison (Stage 5.4 §L) — run with `cargo test --release -- --ignored parser_overhead`"]
+    fn parser_overhead_spaced_vs_continuous_is_comparable() {
+        // Stage 5.4 §L: matching-engine throughput cannot differ between
+        // spaced and continuous AOB syntax, because both compile to the
+        // identical `Vec<PatternByte>` (proven structurally by the
+        // `as_slice()` equality assertions in the tests above) and are
+        // executed by the exact same `Pattern::matches_at`/`scan_pattern`
+        // code — there is no separate runtime path to regress. This test
+        // measures the one thing that *can* legitimately differ: one-time
+        // parse overhead of `parse_aob` itself, which is negligible either
+        // way relative to a real memory scan.
+        let spaced = "48 8B 05 11 22 33 44 89 90 91 92 93 94 95 96 97";
+        let continuous = "488B0511223344899091929394959697";
+        let iterations = 200_000;
+
+        let start = std::time::Instant::now();
+        for _ in 0..iterations {
+            std::hint::black_box(parse_aob(spaced).unwrap());
+        }
+        let spaced_elapsed = start.elapsed();
+
+        let start = std::time::Instant::now();
+        for _ in 0..iterations {
+            std::hint::black_box(parse_aob(continuous).unwrap());
+        }
+        let continuous_elapsed = start.elapsed();
+
+        println!(
+            "parse_aob x{iterations}: spaced={spaced_elapsed:?} continuous={continuous_elapsed:?}"
+        );
     }
 
     #[test]

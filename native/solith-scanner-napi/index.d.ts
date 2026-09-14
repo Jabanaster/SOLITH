@@ -192,6 +192,13 @@ export declare class ScanProgressHandle {
  */
 export declare function debugEchoU64(value: bigint): bigint
 
+export interface JsAobValidation {
+  valid: boolean
+  byteLength?: number
+  errorKind?: string
+  errorMessage?: string
+}
+
 export interface JsChunkReadResult {
   chunkBase: bigint
   requestedSize: bigint
@@ -325,3 +332,12 @@ export interface JsSkippedRange {
   size: bigint
   reason: string
 }
+
+/**
+ * Parses `pattern` per `solith_scanner_core::pattern::parse_aob`'s grammar
+ * and reports the outcome without performing any scan. Never throws — a
+ * malformed pattern is reported as `{ valid: false, errorKind, errorMessage }`
+ * rather than a rejected promise, since this is a pure classification query,
+ * not a scan request.
+ */
+export declare function validateAobPattern(pattern: string): JsAobValidation

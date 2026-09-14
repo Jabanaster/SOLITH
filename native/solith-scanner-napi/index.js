@@ -704,3 +704,4 @@ module.exports.NativeScanTarget = nativeBinding.NativeScanTarget
 module.exports.ScanCancellationHandle = nativeBinding.ScanCancellationHandle
 module.exports.ScanProgressHandle = nativeBinding.ScanProgressHandle
 module.exports.debugEchoU64 = nativeBinding.debugEchoU64
+module.exports.validateAobPattern = nativeBinding.validateAobPattern

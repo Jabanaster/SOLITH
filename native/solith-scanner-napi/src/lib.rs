@@ -86,6 +86,45 @@ pub fn debug_echo_u64(value: BigInt) -> Result<BigInt> {
 }
 
 // ---------------------------------------------------------------------------
+// AOB grammar validation (Stage 5.4 §H) — a pure, scan-free wrapper around
+// `parse_aob` so real corpus-wide grammar-coverage classification (doc 56)
+// can call the exact, real, compiled Rust parser directly instead of
+// re-implementing its grammar rules a second time in TypeScript, which
+// would risk classification drift from the actual matcher.
+// ---------------------------------------------------------------------------
+
+#[napi(object)]
+pub struct JsAobValidation {
+    pub valid: bool,
+    pub byte_length: Option<u32>,
+    pub error_kind: Option<String>,
+    pub error_message: Option<String>,
+}
+
+/// Parses `pattern` per `solith_scanner_core::pattern::parse_aob`'s grammar
+/// and reports the outcome without performing any scan. Never throws — a
+/// malformed pattern is reported as `{ valid: false, errorKind, errorMessage }`
+/// rather than a rejected promise, since this is a pure classification query,
+/// not a scan request.
+#[napi]
+pub fn validate_aob_pattern(pattern: String) -> JsAobValidation {
+    match parse_aob(&pattern) {
+        Ok(compiled) => JsAobValidation {
+            valid: true,
+            byte_length: Some(compiled.len() as u32),
+            error_kind: None,
+            error_message: None,
+        },
+        Err(e) => JsAobValidation {
+            valid: false,
+            byte_length: None,
+            error_kind: Some(e.kind.to_string()),
+            error_message: Some(e.message),
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Cancellation (mission §15).
 // ---------------------------------------------------------------------------
 
