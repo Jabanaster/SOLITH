@@ -1,0 +1,35 @@
+# Phase 1 / Stage 1 — Cheat Engine Capability Gap Matrix
+
+Cheat Engine (CE) is used here strictly as a **compatibility/reference benchmark** for practical scanner capability categories a working trainer platform needs — not as an architecture to copy. Where SOLITH's design diverges from CE, the divergence is called out explicitly as an intentional UX differentiator, not an oversight.
+
+| Category | CURRENT SOLITH | PHASE 1 TARGET | CE REFERENCE | SOLITH DIFFERENTIATOR |
+|---|---|---|---|---|
+| Exact scans | Present (`scanFirst`), but silently drops any region 1 MiB–64 MiB (D02) | Present, chunked, zero silent region loss | Present, chunked, effectively unbounded | Auto-matrix (see below) removes the need to pick a type before scanning |
+| Unknown initial value | Present (`scanFirstUnknown`/`scanNextFromSnapshot`), capped at 512 MiB total snapshot bytes, same 1 MiB-per-region gap as exact scans | Present, chunked, explicit budget with honest truncation reporting | Present, effectively unbounded (RAM-limited) | — |
+| Increased/decreased | Present (`ScanComparison.increased/decreased`) | Present, unchanged semantics | Present | — |
+| Changed/unchanged | Present | Present | Present | — |
+| Value ranges (between) | Present (`scanFirstRange`, `between` comparison) — the one already-repaired truth-reporting function | Present, extended to all scan modes uniformly | Present (less central to CE's UX than to SOLITH's) | SOLITH treats range/between as first-class (HUD-rounding-ambiguity design intent, `memory-scanner.ts:192-195`), not a niche option |
+| Multiple primitive types | 6 types (`byte`,`int32`,`uint32`,`float`,`double`,`int64`) — narrower than CE (no int8/int16/uint16/uint64 as first-class scan types) | Full i8–i64/u8–u64 + f32/f64 matrix, BigInt-safe throughout, no precision loss (closes D06) | Full 1/2/4/8-byte signed/unsigned + float/double | — |
+| String scans | **Absent** — only a fixed 32-byte single-address UTF-8 read exists, no scan | Present: UTF-8 and UTF-16 string scan, configurable length | Present (ASCII/UTF-16/UTF-8 aware) | — |
+| Byte-array/AOB | Present, 4 parallel implementations (doc 01 §11), unbounded-region-read + no truncation signal (D04) | Single canonical native AOB engine, chunked, wildcard + nibble-wildcard, honest truncation | Present, mature, fast (native) | Vectorscan remains specialist for high-volume compatible batch pattern jobs (CT-import scale), not the interactive path |
+| Alignment control | Type-width-only stepping (1/4/8) confirmed correct (doc 02); no explicit unaligned-scan *toggle* for narrower types (no u16/i16 today) | Default unaligned-safe; explicit fast/aligned mode as an opt-in optimization, never a silent correctness loss | Explicit alignment dropdown | — |
+| Writable/executable/read-only region filters | Writable-only for value scans (deliberate), no writability filter for pointer scan, no image/private/mapped distinction anywhere (doc 01 §4) | Explicit, queryable filter set including image/private/mapped, not just writable/not | Explicit checkboxes (writable, executable, copy-on-write, etc.) | — |
+| Fast scan modes | None — every scan is a full linear pass; no SIMD/vectorized path | Native chunked reader + (where compatible) Vectorscan-backed batch matching for AOB; explicit alignment-fast-path opt-in | "Fast Scan" (aligned-only) toggle | — |
+| Scan refinement | Present (`scanNext`, address-by-address re-read — genuinely cheap, doc 04 confirms this is not the bottleneck) | Present, unchanged strategy, extended to full type/precision matrix | Present | — |
+| Result browsing | Present via IPC to renderer, plain request/response, no pagination (doc 01 §16, checked in additional-defect pass) | Paginated/streamed result delivery for large result sets, BigInt-safe serialization throughout | Present, in-process (no IPC boundary to cross) | — |
+| Saved scans | **Absent** — no on-disk scan-result persistence anywhere (doc 01 §14) | Optional: persist a named scan session's candidate set across app restarts (not required for Phase 1 exit, evaluate cost/benefit) | Present (`.CT`-adjacent save-scan files) | — |
+| Cancellation | **Absent entirely** for the interactive scanner (doc 01 §12) | Present via cancellation token end-to-end (Rust core → napi-rs → IPC), mid-scan abort in bounded time | Present (Cancel button always responsive) | — |
+| Progress | **Absent entirely** for the interactive scanner (doc 01 §12) | Present via progress callback → IPC event stream, monotonic 0–100%, never exceeding 100% | Present (progress bar) | — |
+| Pointer integration | Present (`pointer-scanner.ts`), but depth/result-cap truncation misreported (D05) | Present, honest completeness reporting, same session/cancellation model as value scans | Present (Pointer Scanner, separate dialog) | SOLITH already unifies value-scan → pointer-scan as one guided flow (`live-memory-session.ts.pointerScan()`) rather than a separate disconnected tool — keep and strengthen this |
+| Module-relative results | Present (`PointerPathCandidate.moduleName/moduleOffset`, restart-stable by design) | Present, unchanged design intent | Present | — |
+| Large processes | Present in principle (`DEFAULT_MAX_TOTAL_BYTES=2 GiB`), but undermined by the 1 MiB region cap (D02) making "large process" support currently theoretical | Proven: real AAA-scale processes (multi-GB committed memory) scan completely and quickly, measured not assumed | Present, mature | — |
+| Scan persistence (session survives detach/reattach) | **Absent** — all scan state is in-memory, cleared on detach (doc 01 §14) | Not required for Phase 1 exit; evaluate for a later phase alongside "saved scans" above | Absent in CE too (scans are per-session) | Parity, not a gap |
+| Usability | Auto-matrix (`scanFirstAutoMatrix`) already removes CE's "pick one type + one mode" friction — a genuine, already-shipping differentiator | Preserve and extend the auto-matrix UX once results are honest/complete | Requires picking type + scan mode explicitly per scan | **This is SOLITH's real product bet**: fewer manual decisions, more automatic breadth, as long as the underlying results are trustworthy — which is exactly what Phase 1 exists to make true |
+
+## Explicit non-goals (do not copy CE architecture blindly, per mission 1.6)
+
+- CE's scan-type dropdown-first UX is **not** the target interaction model — SOLITH's auto-matrix approach is the intended differentiator and should be preserved, not abandoned in favor of CE parity for its own sake.
+- CE's on-disk `.CT` table format is a distinct, already-solved problem in this codebase (the CT-import/parsing pipeline, `src/core/runtime/*`) — Phase 1 does not need to reproduce a CE-compatible save format for the live scanner.
+- No superiority claim ("SOLITH exceeds CE") is made anywhere in this document. Every "target" cell above is a design goal to be verified against doc 04's baseline and Phase 1's exit gate (doc 10) with measured evidence — per the mission's explicit instruction not to claim superiority without it.
+
+**CE gap matrix complete: YES.**
