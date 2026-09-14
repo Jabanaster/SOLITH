@@ -274,6 +274,12 @@ impl ScanSession {
         self.chunk_config
     }
 
+    /// The native resource bounds `UNKNOWN_INITIAL` was created with —
+    /// part of the session-snapshot metadata surface (Stage 6 §6.9).
+    pub fn resource_limits(&self) -> SessionResourceLimits {
+        self.resource_limits
+    }
+
     pub fn generation(&self) -> u64 {
         self.generation
     }

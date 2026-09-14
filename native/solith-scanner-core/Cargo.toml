@@ -31,6 +31,12 @@ name = "bench_pattern"
 path = "src/bin/bench_pattern.rs"
 
 [dependencies]
+# Session-snapshot persistence (Stage 6 §6.9-6.12) is the only place this
+# crate needs structured, versioned (de)serialization; serde/serde_json are
+# battle-tested rather than hand-rolling a parser for untrusted on-disk
+# input (Stage 6 §6.24's "corruption rejection" requirement).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [target.'cfg(windows)'.dependencies]
 # Same windows-sys major version already frozen/proven in this repo by
