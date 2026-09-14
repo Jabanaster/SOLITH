@@ -89,3 +89,5 @@ No drift. Fresh-worktree reproducibility is not re-required (mission: "Fresh-wor
 | Production scanner not switched | Met — no production source touched |
 
 **Overall: NOT_COMPLETE.** The single unmet item (full-corpus analysis) is, per the mission's own §5.1-J wording ("No corpus substitution is sufficient for certification"), sufficient by itself to withhold CERTIFIED status regardless of every other item passing.
+
+**Stage 5.3 update:** the full corpus was subsequently recovered (doc 47/48) and `xx`/`x` wildcard support implemented (doc 50) with real corpus-backed necessity now proven for nibble wildcards too. The 120,245-vs-111,467 count reconciliation remains open after real investigation (doc 49), and grammar coverage is now a precise 96.95% against a corrected legitimate-syntax denominator (doc 52), not 100%. See doc 53 for Stage 5's final certification determination.

@@ -83,6 +83,10 @@ A long tail of low-count tokens (`==`, `'-X'`, literal English words like "Could
 
 4,416 distinct normalized patterns found among the subset carrying full pattern metadata in the shard-based provenance-verified sample (doc 47); at full-corpus scale (this doc's complete run) 14,015 distinct normalized signatures exist among 111,467 total, i.e. the corpus is dominated by duplicate copies of the same underlying signatures across the archive's redundant merged mirrors, not by 111,467 independently-authored patterns.
 
+## Stage 5.3 update — superseded numbers
+
+This doc's 93.5%/104,246 grammar-support figures and 6,565 "malformedOther" count are **superseded** by doc 52: after implementing `xx`/`x` wildcard support (doc 50) and correctly separating true noise from real-but-unimplemented continuous-hex CE syntax (doc 51), the corrected figures are **96.95% coverage** (106,433 supported of 109,782 legitimate-syntax signatures) and **only 1,685 truly malformed** (not 6,565 — the rest are real CE syntax, doc 51/52). The corpus reconciliation gap (120,245 vs 111,467) is separately investigated in doc 49 and remains open.
+
 ## Grammar-certification checklist (mission §5.1-J, re-evaluated with this evidence)
 
 | Requirement | Status |

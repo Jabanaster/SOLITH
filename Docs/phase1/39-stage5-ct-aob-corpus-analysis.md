@@ -45,6 +45,8 @@ This single real signature already exercises: exact bytes (`48`, `8B`, `89`, `45
 
 Full-byte wildcards (both spellings) and exact bytes are unambiguously required — directly evidenced by the real, certified corpus's own ingest pipeline and its real test samples. Nibble wildcards have **no evidence of necessity** from this repository's own audited data, but were implemented anyway (doc 38) because the marginal engineering cost is near-zero given `PatternByte`'s existing mask/value design — an honest "implemented without evidence of current need, for compatibility" status, not an overclaim of corpus support.
 
+**Stage 5.3 update:** nibble-wildcard necessity is now evidenced, not merely a contingency (doc 48: 426 real occurrences). A third full-wildcard spelling, `xx`/`x` (case-insensitive), was also found (16,392 real occurrences, doc 48) and is now implemented (doc 50). Real, official Cheat Engine documentation (doc 51) additionally reveals continuous/unspaced hex notation and `x`/`*`-as-nibble-wildcard as further legitimate CE syntax, not yet implemented pending separate authorization.
+
 ## Stage 5.1 — exhaustive corpus-recovery search (repeat, read-only)
 
 Stage 5.1's mission required a second, exhaustive attempt to recover the real 120,245-signature corpus before accepting this scope limit as final. The following locations were searched, read-only, with no CT scripts executed and no corpus data mutated:
