@@ -277,6 +277,131 @@ test('pattern: nibble wildcard AOB matches regardless of the wildcarded nibble',
   });
 });
 
+test('pattern: validateAobPattern classifies real corpus-of-record syntax families without scanning', () => {
+  // Stage 5.4 §H's corpus reanalysis calls this exact export against every
+  // one of the 111,467 corpus-of-record signatures (doc 56) — proving it
+  // here against the real compiled addon, not a re-implementation.
+  const valid = [
+    '48 8B 05 11 22 33 44 89',
+    '48 8B 05 ?? 22 33 44 89',
+    '48 8B 05 xx 22 33 44 89',
+    'A? 00 ?3',
+    '488B051122334489',
+    '488B05??22334489',
+    'A?00?3',
+    '5x 48 8D 6x 24 E0',
+    '005x8xxxxxE0',
+  ];
+  for (const pattern of valid) {
+    const result = addon.validateAobPattern(pattern);
+    assert.equal(result.valid, true, `expected ${pattern} to be valid`);
+    assert.ok(result.byteLength > 0);
+    assert.equal(result.errorKind, undefined);
+  }
+
+  const malformed = [
+    ['', 'empty_pattern'],
+    ['AA GG CC', 'invalid_hex_token'],
+    ['AA ??? CC', 'malformed_wildcard'],
+    ['AAB', 'odd_length_token'],
+  ];
+  for (const [pattern, expectedKind] of malformed) {
+    const result = addon.validateAobPattern(pattern);
+    assert.equal(result.valid, false, `expected ${pattern} to be invalid`);
+    assert.equal(result.errorKind, expectedKind);
+  }
+});
+
+test('pattern: continuous (unspaced) exact-byte AOB matches real memory identically to spaced form', async () => {
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const region = patternRegion(fields, target.enumerateRegions());
+    const cancellation = new addon.ScanCancellationHandle();
+    const progress = new addon.ScanProgressHandle();
+    const outcome = await target.scanAob(
+      region,
+      '488B051122334489',
+      1024n * 1024n,
+      null,
+      null,
+      cancellation,
+      progress,
+    );
+    const expected = region.baseAddress + BigInt(fields.AOB_EXACT_OFFSET);
+    assert.ok(outcome.matches.some((m) => m.address === expected));
+  });
+});
+
+test('pattern: continuous full-byte wildcard AOB matches real memory regardless of the wildcarded byte', async () => {
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const region = patternRegion(fields, target.enumerateRegions());
+    const expected = region.baseAddress + BigInt(fields.AOB_WILDCARD_OFFSET);
+    for (const query of ['488B05??22334489', '488B05xx22334489', '488B05XX22334489']) {
+      const cancellation = new addon.ScanCancellationHandle();
+      const progress = new addon.ScanProgressHandle();
+      const outcome = await target.scanAob(region, query, 1024n * 1024n, null, null, cancellation, progress);
+      assert.ok(outcome.matches.some((m) => m.address === expected), `query ${query} did not match`);
+    }
+  });
+});
+
+test('pattern: continuous nibble wildcard AOB matches real memory regardless of the wildcarded nibble', async () => {
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const region = patternRegion(fields, target.enumerateRegions());
+    const cancellation = new addon.ScanCancellationHandle();
+    const progress = new addon.ScanProgressHandle();
+    const outcome = await target.scanAob(region, 'A?00?3', 1024n * 1024n, null, null, cancellation, progress);
+    const expected = region.baseAddress + BigInt(fields.AOB_NIBBLE_OFFSET);
+    assert.ok(outcome.matches.some((m) => m.address === expected));
+  });
+});
+
+test('pattern: malformed continuous (odd-length) AOB is rejected with a stable error', async () => {
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const region = patternRegion(fields, target.enumerateRegions());
+    const cancellation = new addon.ScanCancellationHandle();
+    const progress = new addon.ScanProgressHandle();
+    await assert.rejects(
+      async () => target.scanAob(region, '488B0511223344 89A', 1024n * 1024n, null, null, cancellation, progress),
+      /odd_length_token/,
+    );
+  });
+});
+
+test('pattern: continuous and spaced AOB queries produce canonically equivalent matches', async () => {
+  await withFixture(async (child, fields) => {
+    const target = addon.NativeScanTarget.attach(child.pid);
+    const region = patternRegion(fields, target.enumerateRegions());
+    const cancellation = new addon.ScanCancellationHandle();
+    const progress = new addon.ScanProgressHandle();
+    const spacedOutcome = await target.scanAob(
+      region,
+      '48 8B 05 11 22 33 44 89',
+      1024n * 1024n,
+      null,
+      null,
+      cancellation,
+      progress,
+    );
+    const continuousOutcome = await target.scanAob(
+      region,
+      '488B051122334489',
+      1024n * 1024n,
+      null,
+      null,
+      new addon.ScanCancellationHandle(),
+      new addon.ScanProgressHandle(),
+    );
+    assert.deepEqual(
+      spacedOutcome.matches.map((m) => m.address),
+      continuousOutcome.matches.map((m) => m.address),
+    );
+  });
+});
+
 test('pattern: cross-chunk-boundary patterns are found exactly once (byte, string, wildcard AOB)', async () => {
   await withFixture(async (child, fields) => {
     const target = addon.NativeScanTarget.attach(child.pid);

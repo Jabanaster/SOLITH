@@ -382,6 +382,66 @@ fn nibble_wildcard_aob_matches_regardless_of_wildcarded_nibble() {
 }
 
 #[test]
+fn continuous_hex_aob_matches_real_memory_and_normalizes_identically_to_spaced() {
+    // Stage 5.4 §D/§E/§G/§I: continuous (unspaced) Cheat Engine AOB syntax
+    // must match real process memory identically to its spaced equivalent,
+    // reusing the exact same real planted bytes the existing spaced tests
+    // above already prove against.
+    let fixture = Fixture::spawn();
+    let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
+    let region = pattern_region(&fixture);
+
+    // Continuous exact bytes — real planted [48 8B 05 11 22 33 44 89].
+    let exact_addr = region.base_address + fixture.dec_u64("AOB_EXACT_OFFSET");
+    let spaced_exact = parse_aob("48 8B 05 11 22 33 44 89").unwrap();
+    let continuous_exact = parse_aob("488B051122334489").unwrap();
+    assert_eq!(spaced_exact.as_slice(), continuous_exact.as_slice());
+
+    // Continuous full-byte wildcard — real planted [48 8B 05 FF 22 33 44 89].
+    let wildcard_addr = region.base_address + fixture.dec_u64("AOB_WILDCARD_OFFSET");
+    let spaced_wildcard = parse_aob("48 8B 05 ?? 22 33 44 89").unwrap();
+    let continuous_wildcard = parse_aob("488B05??22334489").unwrap();
+    assert_eq!(spaced_wildcard.as_slice(), continuous_wildcard.as_slice());
+    let continuous_xx_wildcard = parse_aob("488B05xx22334489").unwrap();
+    assert_eq!(
+        spaced_wildcard.as_slice(),
+        continuous_xx_wildcard.as_slice()
+    );
+
+    // Continuous nibble wildcard — real planted [A7 00 B3].
+    let nibble_addr = region.base_address + fixture.dec_u64("AOB_NIBBLE_OFFSET");
+    let spaced_nibble = parse_aob("A? 00 ?3").unwrap();
+    let continuous_nibble = parse_aob("A?00?3").unwrap();
+    assert_eq!(spaced_nibble.as_slice(), continuous_nibble.as_slice());
+
+    for (pattern_str, expected_addr) in [
+        ("488B051122334489", exact_addr),
+        ("488B05??22334489", wildcard_addr),
+        ("488B05xx22334489", wildcard_addr),
+        ("A?00?3", nibble_addr),
+    ] {
+        let pattern = parse_aob(pattern_str).unwrap();
+        let options = PatternScanOptions::default_for(&pattern, 1024 * 1024);
+        let cancellation = CancellationToken::new();
+        let result = scan_pattern(
+            &handle,
+            std::slice::from_ref(&region),
+            &readable_any_policy(),
+            &pattern,
+            PatternKind::Aob,
+            &options,
+            &cancellation,
+            None,
+        )
+        .expect("scan failed");
+        assert!(
+            result.matches.iter().any(|m| m.address == expected_addr),
+            "continuous pattern {pattern_str:?} did not match at the expected real address"
+        );
+    }
+}
+
+#[test]
 fn near_miss_bytes_do_not_produce_a_false_positive() {
     let fixture = Fixture::spawn();
     let handle = ProcessHandle::open_read_only(fixture.pid()).expect("attach failed");
