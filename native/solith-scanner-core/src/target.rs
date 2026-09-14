@@ -11,11 +11,11 @@
 use crate::error::{ErrorKind, ScannerError, ScannerResult};
 
 #[cfg(windows)]
-use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, STILL_ACTIVE};
+use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, FILETIME, HANDLE, STILL_ACTIVE};
 #[cfg(windows)]
 use windows_sys::Win32::System::Threading::{
-    GetExitCodeProcess, IsWow64Process, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE,
+    GetExitCodeProcess, GetProcessTimes, IsWow64Process, OpenProcess,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE,
 };
 
 /// Pointer width of the target process, independent of the host OS's own
@@ -188,6 +188,42 @@ impl ProcessHandle {
             // packaging target.)
             Ok(TargetArchitecture::X64)
         }
+    }
+
+    /// Captures the target's process creation time as a raw 64-bit
+    /// `FILETIME` value via `GetProcessTimes` — the strongest reliable
+    /// per-process identity value this crate can obtain (Stage 4 mission
+    /// §4.2), used alongside the PID to build a `ProcessIdentity` at scan
+    /// session creation. `GetProcessTimes` is queried on this handle's own
+    /// held `HANDLE`, which Windows keeps bound to the exact kernel process
+    /// object it was opened against for the handle's entire lifetime — a
+    /// PID being reused by an unrelated process the instant the original
+    /// exits can never cause this same handle to silently start reading the
+    /// new process's memory (see `session.rs`'s module doc for the full
+    /// stale-target argument this fact underpins).
+    pub fn process_creation_time_filetime(&self) -> ScannerResult<u64> {
+        let mut creation: FILETIME = unsafe { std::mem::zeroed() };
+        let mut exit: FILETIME = unsafe { std::mem::zeroed() };
+        let mut kernel: FILETIME = unsafe { std::mem::zeroed() };
+        let mut user: FILETIME = unsafe { std::mem::zeroed() };
+        let ok = unsafe {
+            GetProcessTimes(
+                self.raw,
+                &mut creation as *mut FILETIME,
+                &mut exit as *mut FILETIME,
+                &mut kernel as *mut FILETIME,
+                &mut user as *mut FILETIME,
+            )
+        };
+        if ok == 0 {
+            let code = unsafe { GetLastError() };
+            return Err(ScannerError::with_os_code(
+                ErrorKind::AccessFailure,
+                "GetProcessTimes failed",
+                code,
+            ));
+        }
+        Ok(((creation.dwHighDateTime as u64) << 32) | creation.dwLowDateTime as u64)
     }
 
     pub fn describe(

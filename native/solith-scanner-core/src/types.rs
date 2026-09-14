@@ -204,6 +204,124 @@ impl PrimitiveValue {
             _ => false,
         }
     }
+
+    /// `true` for a NaN-payload float; always `false` for integer types.
+    /// Used by Stage 4's refinement engine to reject NaN `BETWEEN` bounds
+    /// up front (mission §4.8: "NaN bounds invalid") rather than let them
+    /// silently produce a range comparison that can never be satisfied.
+    pub fn is_nan(&self) -> bool {
+        match self {
+            PrimitiveValue::F32(v) => v.is_nan(),
+            PrimitiveValue::F64(v) => v.is_nan(),
+            _ => false,
+        }
+    }
+
+    /// Ordering comparison for Stage 4's INCREASED/DECREASED/BETWEEN
+    /// refinement modes (mission §4.6/§4.8). Integers compare via their
+    /// own signed/unsigned Rust semantics (respecting signedness exactly —
+    /// no bit-pattern comparison across signed/unsigned). Floats use
+    /// `partial_cmp`, which returns `None` whenever either operand is NaN —
+    /// so a NaN candidate is explicitly neither "increased," "decreased,"
+    /// nor "in range" relative to anything, including another NaN (the same
+    /// explicit-NaN-handling discipline as `eq_exact`, mission §4.6's
+    /// "NaN behavior must be explicit" requirement). Mismatched types also
+    /// return `None`; `scan_exact`/session code always compares like-typed
+    /// values by construction, same discipline as `eq_exact`.
+    pub fn compare_ordered(&self, other: &PrimitiveValue) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (PrimitiveValue::I8(a), PrimitiveValue::I8(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::U8(a), PrimitiveValue::U8(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::I16(a), PrimitiveValue::I16(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::U16(a), PrimitiveValue::U16(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::I32(a), PrimitiveValue::I32(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::U32(a), PrimitiveValue::U32(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::I64(a), PrimitiveValue::I64(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::U64(a), PrimitiveValue::U64(b)) => Some(a.cmp(b)),
+            (PrimitiveValue::F32(a), PrimitiveValue::F32(b)) => a.partial_cmp(b),
+            (PrimitiveValue::F64(a), PrimitiveValue::F64(b)) => a.partial_cmp(b),
+            _ => None,
+        }
+    }
+
+    /// Checked `self + delta` for Stage 4's `INCREASED_BY` mode (mission
+    /// §4.7). Integer types use Rust's own `checked_add`: an overflow
+    /// returns `None` rather than wrapping, so a candidate whose exact
+    /// "increase by delta" target would overflow its type is correctly
+    /// treated as a non-match rather than silently compared against a
+    /// wrapped value (the mission's explicit "prefer checked numeric
+    /// semantics... must not produce undefined/wrapped behavior" rule).
+    /// Float types have no overflow concept at this magnitude range and
+    /// always return `Some` (ordinary IEEE addition — a delta or operand
+    /// that is NaN/Infinity propagates through exactly as IEEE-754
+    /// specifies, and the resulting comparison in `eq_exact` already
+    /// handles NaN explicitly). Mismatched types return `None`.
+    pub fn checked_increase_by(&self, delta: &PrimitiveValue) -> Option<PrimitiveValue> {
+        match (self, delta) {
+            (PrimitiveValue::I8(a), PrimitiveValue::I8(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::I8)
+            }
+            (PrimitiveValue::U8(a), PrimitiveValue::U8(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::U8)
+            }
+            (PrimitiveValue::I16(a), PrimitiveValue::I16(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::I16)
+            }
+            (PrimitiveValue::U16(a), PrimitiveValue::U16(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::U16)
+            }
+            (PrimitiveValue::I32(a), PrimitiveValue::I32(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::I32)
+            }
+            (PrimitiveValue::U32(a), PrimitiveValue::U32(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::U32)
+            }
+            (PrimitiveValue::I64(a), PrimitiveValue::I64(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::I64)
+            }
+            (PrimitiveValue::U64(a), PrimitiveValue::U64(d)) => {
+                a.checked_add(*d).map(PrimitiveValue::U64)
+            }
+            (PrimitiveValue::F32(a), PrimitiveValue::F32(d)) => Some(PrimitiveValue::F32(a + d)),
+            (PrimitiveValue::F64(a), PrimitiveValue::F64(d)) => Some(PrimitiveValue::F64(a + d)),
+            _ => None,
+        }
+    }
+
+    /// Checked `self - delta` for Stage 4's `DECREASED_BY` mode — same
+    /// checked-arithmetic and NaN-propagation discipline as
+    /// `checked_increase_by`, using `checked_sub`/ordinary IEEE subtraction.
+    pub fn checked_decrease_by(&self, delta: &PrimitiveValue) -> Option<PrimitiveValue> {
+        match (self, delta) {
+            (PrimitiveValue::I8(a), PrimitiveValue::I8(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::I8)
+            }
+            (PrimitiveValue::U8(a), PrimitiveValue::U8(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::U8)
+            }
+            (PrimitiveValue::I16(a), PrimitiveValue::I16(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::I16)
+            }
+            (PrimitiveValue::U16(a), PrimitiveValue::U16(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::U16)
+            }
+            (PrimitiveValue::I32(a), PrimitiveValue::I32(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::I32)
+            }
+            (PrimitiveValue::U32(a), PrimitiveValue::U32(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::U32)
+            }
+            (PrimitiveValue::I64(a), PrimitiveValue::I64(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::I64)
+            }
+            (PrimitiveValue::U64(a), PrimitiveValue::U64(d)) => {
+                a.checked_sub(*d).map(PrimitiveValue::U64)
+            }
+            (PrimitiveValue::F32(a), PrimitiveValue::F32(d)) => Some(PrimitiveValue::F32(a - d)),
+            (PrimitiveValue::F64(a), PrimitiveValue::F64(d)) => Some(PrimitiveValue::F64(a - d)),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

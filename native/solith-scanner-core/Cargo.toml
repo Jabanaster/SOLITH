@@ -22,6 +22,10 @@ path = "src/bin/bench_reader.rs"
 name = "bench_exact_scan"
 path = "src/bin/bench_exact_scan.rs"
 
+[[bin]]
+name = "bench_session"
+path = "src/bin/bench_session.rs"
+
 [dependencies]
 
 [target.'cfg(windows)'.dependencies]
@@ -39,3 +43,10 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [dev-dependencies]
+
+[target.'cfg(windows)'.dev-dependencies]
+# Same crate/version as the main dependency above — tests/session_integration.rs
+# needs direct access to GetProcessHandleCount/GetCurrentProcess to prove
+# Stage 4's session-cleanup handle-leak check (mission §4.15), which is not
+# part of this crate's own public API surface.
+windows-sys = { version = "0.61", features = ["Win32_System_Threading"] }

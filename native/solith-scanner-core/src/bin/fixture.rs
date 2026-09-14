@@ -5,15 +5,24 @@
 //! scanner fixtures.").
 //!
 //! Behavior: allocates known memory layouts, prints their addresses to
-//! stdout as `KEY=VALUE` lines terminated by a `READY` line, then blocks
-//! reading a command from stdin:
+//! stdout as `KEY=VALUE` lines terminated by a `READY` line, then loops
+//! reading commands from stdin (mission §4.13: "the parent/test can command
+//! value mutations"):
 //!
 //! - `exit` -> clean, orderly exit (Process-exit test E's "graceful" leg)
 //! - `die` -> immediate `std::process::exit`, no cleanup (Process-exit
 //!   test E's "abrupt exit" leg)
-//! - anything else / EOF / no input within the timeout -> exits after a
-//!   bounded wait, so a test that forgets to signal it can never hang CI
-//!   forever.
+//! - `write <decimal_offset> <hex_le_bytes>` -> overwrites that many bytes
+//!   at that offset within `REFINE_REGION` (Stage 4's dedicated mutable
+//!   region, kept separate from Stage 3's `TYPES_REGION` so refinement
+//!   tests can freely mutate without disturbing Stage 3's fixed sentinels),
+//!   then prints `WROTE <decimal_offset>` so the caller can synchronize
+//!   before triggering a re-read/refine.
+//! - anything else -> `UNKNOWN_CMD` is printed and the loop continues.
+//! - EOF, or no input for 30s -> exits after a bounded wait, so a test that
+//!   forgets to signal it can never hang CI forever. The 30s bound resets on
+//!   every successfully received line, so a long but active mutation
+//!   sequence is never artificially cut short.
 //!
 //! Not production code — this binary is never packaged with the app; it
 //! exists solely under `cargo test`.
@@ -91,6 +100,15 @@ const BOUNDARY_U32_OFFSET: usize = 2 * 1_048_576 - 2; // straddles the 2×1MiB b
 const BOUNDARY_U32_VALUE: u32 = 0xCAFEF00D;
 const BOUNDARY_U64_OFFSET: usize = 3 * 1_048_576 - 4; // straddles the 3×1MiB boundary
 const BOUNDARY_U64_VALUE: u64 = 0x0123_4567_89AB_CDEF;
+
+// ── Stage 4 (mission §4.13): a dedicated mutable region, separate from
+// TYPES_REGION above, that the parent test process can rewrite at runtime
+// via the `write <offset> <hex_le_bytes>` stdin command. Real scan-session
+// refinement tests plant an initial value, run UNKNOWN_INITIAL, issue a
+// `write` command to mutate it, then re-scan — a real target-process write,
+// not a Rust-array simulation (mission's explicit "do not certify only from
+// pure Rust arrays" instruction).
+const REFINE_REGION_SIZE: usize = 64 * 1024;
 
 #[cfg(windows)]
 fn main() {
@@ -211,6 +229,26 @@ fn main() {
             .copy_from_slice(&BOUNDARY_U64_VALUE.to_le_bytes());
     }
 
+    let refine_region = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            REFINE_REGION_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(
+        !refine_region.is_null(),
+        "VirtualAlloc(refine_region) failed"
+    );
+    let refine_base = refine_region as usize;
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(refine_region as *mut u8, REFINE_REGION_SIZE);
+        for (i, b) in slice.iter_mut().enumerate() {
+            *b = ((i as u32).wrapping_mul(0x2545F491) >> 16) as u8;
+        }
+    }
+
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
     writeln!(out, "PID={pid}").unwrap();
@@ -261,33 +299,116 @@ fn main() {
     writeln!(out, "BOUNDARY_U32_VALUE={BOUNDARY_U32_VALUE}").unwrap();
     writeln!(out, "BOUNDARY_U64_OFFSET={BOUNDARY_U64_OFFSET}").unwrap();
     writeln!(out, "BOUNDARY_U64_VALUE={BOUNDARY_U64_VALUE}").unwrap();
+    writeln!(out, "REFINE_REGION_BASE=0x{refine_base:x}").unwrap();
+    writeln!(out, "REFINE_REGION_SIZE={REFINE_REGION_SIZE}").unwrap();
     writeln!(out, "READY").unwrap();
     out.flush().unwrap();
-    drop(out);
 
-    // Bounded wait for a command, so an interrupted/forgotten test can never
-    // hang the fixture (and therefore CI) forever.
-    let (tx, rx) = std::sync::mpsc::channel();
+    // A dedicated thread feeds every stdin line into a channel; the main
+    // loop applies a bounded (30s, reset per line) wait on each `recv` so an
+    // interrupted/forgotten test can never hang the fixture (and therefore
+    // CI) forever, while still supporting an arbitrarily long sequence of
+    // mutation commands from an active test.
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
         let mut line = String::new();
-        if stdin.lock().read_line(&mut line).is_ok() {
-            let _ = tx.send(line.trim().to_string());
+        loop {
+            line.clear();
+            match stdin.lock().read_line(&mut line) {
+                Ok(0) => break, // EOF
+                Ok(_) => {
+                    if tx.send(line.trim().to_string()).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
         }
     });
 
-    match rx.recv_timeout(Duration::from_secs(30)) {
-        Ok(cmd) if cmd == "die" => {
-            // Abrupt, no-cleanup exit — simulates a real crash/kill for the
-            // process-exit-during-scan test.
-            std::process::exit(0xDEAD);
-        }
-        _ => {
-            // "exit", timeout, or EOF: fall through to an orderly return,
-            // which drops the VirtualAlloc'd regions with the process and
-            // exits 0.
+    let refine_slice =
+        unsafe { std::slice::from_raw_parts_mut(refine_region as *mut u8, REFINE_REGION_SIZE) };
+
+    loop {
+        match rx.recv_timeout(Duration::from_secs(30)) {
+            Ok(cmd) if cmd == "die" => {
+                // Abrupt, no-cleanup exit — simulates a real crash/kill for
+                // the process-exit-during-scan/refine test.
+                std::process::exit(0xDEAD);
+            }
+            Ok(cmd) if cmd == "exit" => break,
+            Ok(cmd) => {
+                if let Some(rest) = cmd.strip_prefix("write ") {
+                    apply_write_command(refine_slice, rest, &mut out);
+                } else {
+                    writeln!(out, "UNKNOWN_CMD {cmd}").unwrap();
+                    out.flush().unwrap();
+                }
+            }
+            Err(_) => break, // 30s of silence, or EOF: bounded-hang-safe exit.
         }
     }
+    // Falling through drops the VirtualAlloc'd regions with the process and
+    // exits 0 — the orderly path for both "exit" and the bounded timeout.
+}
+
+/// Parses `"<decimal_offset> <hex_le_bytes>"` and writes the decoded bytes
+/// into `region` at that offset, bounds-checked. Prints `WROTE <offset>` on
+/// success or `WRITE_ERROR <reason>` on any malformed input/out-of-bounds
+/// request — never panics on attacker/typo-grade input, since a real test
+/// harness bug here must be diagnosable, not a fixture crash indistinguishable
+/// from a real target-process crash.
+#[cfg(windows)]
+fn apply_write_command(region: &mut [u8], rest: &str, out: &mut impl Write) {
+    let mut parts = rest.trim().splitn(2, ' ');
+    let offset_str = parts.next().unwrap_or("");
+    let hex_str = parts.next().unwrap_or("");
+
+    let offset: usize = match offset_str.parse() {
+        Ok(v) => v,
+        Err(_) => {
+            writeln!(out, "WRITE_ERROR bad_offset").unwrap();
+            out.flush().unwrap();
+            return;
+        }
+    };
+
+    if hex_str.is_empty() || !hex_str.len().is_multiple_of(2) {
+        writeln!(out, "WRITE_ERROR bad_hex_length").unwrap();
+        out.flush().unwrap();
+        return;
+    }
+
+    let mut bytes = Vec::with_capacity(hex_str.len() / 2);
+    let mut ok = true;
+    for i in (0..hex_str.len()).step_by(2) {
+        match u8::from_str_radix(&hex_str[i..i + 2], 16) {
+            Ok(b) => bytes.push(b),
+            Err(_) => {
+                ok = false;
+                break;
+            }
+        }
+    }
+    if !ok {
+        writeln!(out, "WRITE_ERROR bad_hex_digit").unwrap();
+        out.flush().unwrap();
+        return;
+    }
+
+    if offset
+        .checked_add(bytes.len())
+        .is_none_or(|end| end > region.len())
+    {
+        writeln!(out, "WRITE_ERROR out_of_bounds").unwrap();
+        out.flush().unwrap();
+        return;
+    }
+
+    region[offset..offset + bytes.len()].copy_from_slice(&bytes);
+    writeln!(out, "WROTE {offset}").unwrap();
+    out.flush().unwrap();
 }
 
 #[cfg(not(windows))]

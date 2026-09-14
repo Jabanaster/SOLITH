@@ -17,6 +17,7 @@ pub mod exact_scan;
 pub mod policy;
 pub mod reader;
 pub mod region;
+pub mod session;
 pub mod target;
 pub mod types;
 
@@ -31,5 +32,9 @@ pub use reader::{
     read_regions_chunked_with_progress, ChunkReadResult, ChunkReadStatus, ReadBudget,
 };
 pub use region::{enumerate_regions, CommitState, Region, RegionEnumerationResult, RegionKind};
+pub use session::{
+    CandidateStore, GenerationRecord, ProcessIdentity, RefineMode, RefineOutcome, ScanSession,
+    SessionResourceLimits,
+};
 pub use target::{HandleStatus, ProcessHandle, TargetArchitecture, TargetDescriptor};
 pub use types::{PrimitiveType, PrimitiveValue};
