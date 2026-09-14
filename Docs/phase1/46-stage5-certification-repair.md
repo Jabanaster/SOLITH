@@ -23,7 +23,7 @@ Per mission §5.1-D: since the corpus remains genuinely unavailable after this s
 
 ## 5.1-E — grammar correction assessment
 
-No new evidence of a legitimate, unsupported AOB syntax family was found during this repair (the search above targeted the missing *data*, not new *syntax* claims, and no new syntax evidence surfaced as a byproduct of it). Doc 39's structural finding is strengthened this stage (see its new "Stronger structural finding on nibble wildcards" section): because `normalizeAobPattern` — the exact, unmodified function that performed the certified ingest — has no nibble-wildcard branch, it is structurally impossible for any of the 120,245 certified signatures to contain a valid nibble-wildcard token; any such token would have been rejected by that same ingest.
+No new evidence of a legitimate, unsupported AOB syntax family was found during this repair (the search above targeted the missing *data*, not new *syntax* claims, and no new syntax evidence surfaced as a byproduct of it). Doc 39's finding: because `normalizeAobPattern` — the exact, unmodified function that performed the certified ingest — has no nibble-wildcard branch, no nibble-wildcard token could have survived that ingest as a *supported, compiled* entry within the certified 120,245 count. **Update (Stage 5.2, docs 47/48): the raw corpus was subsequently recovered.** It contains 426 real nibble-wildcard signatures (no longer "UNKNOWN"), every one confirmed rejected as invalid by the same unmodified ingest function — and it also reveals two further real, evidenced, currently-unsupported syntax families (`xx`/`x` alternate wildcard notation, 16,392 occurrences; continuous/unspaced hex notation) not previously known. See doc 48 for full detail; none of this was implemented in either repair, per each mission's own scope limits.
 
 **PARSER CHANGES REQUIRED: NO.** Per the mission's own instruction ("If no corrections are needed: do not touch production/native source"), no source in `native/solith-scanner-core`, `native/solith-scanner-napi`, or any production TypeScript was modified this repair.
 
@@ -67,7 +67,7 @@ No drift. Fresh-worktree reproducibility is not re-required (mission: "Fresh-wor
 
 ## 5.1-I — evidence updated
 
-- `Docs/phase1/39-stage5-ct-aob-corpus-analysis.md` — added "Stage 5.1 — exhaustive corpus-recovery search" and "Stronger structural finding on nibble wildcards" sections.
+- `Docs/phase1/39-stage5-ct-aob-corpus-analysis.md` — added "Stage 5.1 — exhaustive corpus-recovery search" and "Structural finding on nibble wildcards" sections (the latter corrected in Stage 5.2 — see doc 47).
 - `Docs/phase1/44-stage5-defect-status.md` — corrected the 1 MiB product-defect row and its summary-table entry from "N/A" to `PRODUCT_DEFECT_NOT_YET_CLOSED`, with the exact production call chain cited.
 - `Docs/phase1/45-stage5-reproducibility.md` — not updated; no implementation change occurred this repair, so its fresh-worktree record from Stage 5 remains accurate as-is.
 - This document (`46-stage5-certification-repair.md`) — new.
@@ -78,7 +78,7 @@ No drift. Fresh-worktree reproducibility is not re-required (mission: "Fresh-wor
 |---|---|
 | Full 120,245-signature corpus analyzed, or authoritative count changed with evidence | **NOT MET** — corpus confirmed genuinely unavailable after exhaustive second search |
 | Legitimate required syntax coverage established | Met for the syntax vocabulary provable from real in-repo evidence (exact bytes, `??`/`*` full wildcards); not provable at full-corpus percentage granularity |
-| Unsupported legitimate syntax = 0, or explicitly scoped with owner-approved reason | Nibble wildcards: structurally proven absent from the certified corpus (5.1-E); no other unsupported legitimate syntax evidenced |
+| Unsupported legitimate syntax = 0, or explicitly scoped with owner-approved reason | Nibble wildcards: proven unable to survive certified ingest as supported entries; raw-corpus prevalence UNKNOWN (corrected Stage 5.2, see doc 47); no other unsupported legitimate syntax evidenced |
 | Malformed corpus entries separated from unsupported valid syntax | Met for available evidence (doc 39's `Invalid AOB token` mechanism) |
 | Old production AOB path accurately documented | Met (5.1-G, this doc) |
 | AOB native-path defect status truthful | Met (unchanged from Stage 5, already correct) |
