@@ -26,6 +26,10 @@ path = "src/bin/bench_exact_scan.rs"
 name = "bench_session"
 path = "src/bin/bench_session.rs"
 
+[[bin]]
+name = "bench_pattern"
+path = "src/bin/bench_pattern.rs"
+
 [dependencies]
 
 [target.'cfg(windows)'.dependencies]
