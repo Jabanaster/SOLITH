@@ -46,6 +46,10 @@ Every gate item is met. Stage 6's ten primary goals are each satisfied with real
 - Extended the real-process fixture with four new OS-level region-mutation commands and 28 new integration tests across two new test files plus additions to two existing ones (region mutation, stress, concurrency, cancellation-preserves-partial-results).
 - Added napi-level misuse hardening tests (double-close, use-after-detach, invalid input, best-effort forced-GC) and 5 new/updated napi tests for session persistence and authoritative-absence.
 
+## Stage 6.1 correction
+
+Doc 68's shipping-product defect table originally omitted the Alignment (D03), int64 (D06), and Truth-reporting rows — an incomplete accounting, corrected in doc 71 after re-verifying every row directly against live shipping code (`memory-scanner.ts`, `native-memory-driver.ts`). All four are confirmed still live and unchanged since the Audit 2 baseline; all remain `PRODUCT_DEFECT_NOT_YET_CLOSED`. This correction does not change the CERTIFIED verdict above — it is a defect-accounting completeness fix, not a discovery of new native-path defect or scope creep into production code.
+
 ## What remains open (out of Stage 6's scope, tracked separately)
 
 1. Production migration of the native scanner into the shipping product — unrelated to Stage 6's own scope, tracked since Stage 5's original defect-status doc (44); this is Stage 7's stated objective.

@@ -34,12 +34,12 @@
 
 ## §6.11 — persistence versioning
 
-Every persisted field the mission's checklist names is present: `schemaVersion` (locked at `1`, `SNAPSHOT_SCHEMA_VERSION`), `scannerCoreVersion` (`env!("CARGO_PKG_VERSION")`), `endianness`, `architecture` (`std::env::consts::ARCH`), `primitiveType`, `processPid`+`processCreationTimeFiletime` (process identity), `takenAtUnixMillis` (timestamp), and a `checksum` (FNV-1a 64-bit, computed over every other field's canonical JSON serialization — a non-cryptographic integrity check appropriate for detecting accidental disk/transit corruption of a local file, not for defeating a deliberate adversary).
+Every persisted field the mission's checklist names is present: `schemaVersion` (locked at `1`, `SNAPSHOT_SCHEMA_VERSION`), `scannerCoreVersion` (`env!("CARGO_PKG_VERSION")`), `endianness`, `architecture` (`std::env::consts::ARCH`), `primitiveType`, `processPid`+`processCreationTimeFiletime` (process identity), `takenAtUnixMillis` (timestamp), and a `checksum` (FNV-1a 64-bit, computed over every other field's canonical JSON serialization — a **non-cryptographic corruption-detection checksum**, appropriate for catching accidental disk/transit corruption or a manual hand-edit of a local file. It provides no authentication, tamper protection, or security-signing property: a deliberate adversary able to modify the file could trivially recompute a matching checksum over their modified content. If a security/authenticity guarantee is ever required for this format, it must use a cryptographic mechanism — an HMAC or digital signature — not this checksum, which is not designed or intended for that purpose).
 
 **Rejection is clean and total, never a partial/best-effort parse:**
 
 - Schema version mismatch (older or newer than the one this build supports) → `ErrorKind::UnsupportedSnapshotVersion`, rejected before any further validation.
-- Checksum mismatch (tampered or corrupted content) → `ErrorKind::CorruptSnapshot`.
+- Checksum mismatch (accidentally corrupted or manually/hand-edited content) → `ErrorKind::CorruptSnapshot`.
 - Malformed JSON → `ErrorKind::CorruptSnapshot`.
 - Unrecognized `primitiveType`/`alignment` label (a corrupted or hand-edited value that parses as valid JSON but isn't a real enum spelling) → `ErrorKind::CorruptSnapshot`.
 

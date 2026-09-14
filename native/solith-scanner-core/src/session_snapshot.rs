@@ -107,9 +107,12 @@ pub struct SessionSnapshotPayload {
     pub taken_at_unix_millis: u64,
 }
 
-/// A persistable, versioned, integrity-checked snapshot of a `ScanSession`'s
-/// metadata (Stage 6 §6.9). See the module doc for what is deliberately
-/// excluded (live handle, candidate addresses/values).
+/// A persistable, versioned, checksum-verified snapshot of a `ScanSession`'s
+/// metadata (Stage 6 §6.9). "Checksum-verified" here means the non-
+/// cryptographic corruption-detection check `fnv1a64` performs — see that
+/// function's doc for the exact scope (accidental disk/transit corruption,
+/// not a security or authenticity property). See the module doc for what
+/// is deliberately excluded (live handle, candidate addresses/values).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SessionSnapshot {
     #[serde(flatten)]
