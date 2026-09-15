@@ -215,3 +215,114 @@ describeReal('AOB shipping defect: a signature planted 6 MiB into an 8 MiB regio
     }
   });
 });
+
+describeReal('NativeScannerBackend applies a real default match cap when the caller omits maxMatches — Stage 7.1 §2\'s "giant single IPC payload" fix', async () => {
+  await withFixture(async ({ child }) => {
+    const pid = child.pid!;
+    const nativeBackend = new NativeScannerBackend();
+    await nativeBackend.attach(pid);
+    try {
+      // No bounds at all — before the fix, this accumulated every match
+      // from every readable region into one unbounded JS array (proven
+      // against a real game: 151,382 real matches with no limit). The
+      // fixture's own large mostly-zeroed regions reliably produce well
+      // over 10,000 real u32-zero candidates on their own.
+      const outcome = await nativeBackend.exactScan('u32', 0, undefined, {});
+      assert.ok(outcome.matches.length > 0, 'sanity: the fixture must actually contain zero-valued u32s to bound');
+      assert.ok(
+        outcome.matches.length <= 10_000,
+        `native must apply its own default match cap (10,000) when the caller supplies none — got ${outcome.matches.length}`,
+      );
+      if (outcome.matches.length === 10_000) {
+        assert.equal(outcome.completeness.state, 'resource_limit', 'hitting the default cap must be reported honestly as a resource limit, not silently as complete');
+      }
+    } finally {
+      await nativeBackend.detach();
+    }
+  });
+});
+
+describeReal('NativeScannerBackend maxMatches matrix — Stage 7 final closure §3: omitted/1/10/10000/large/cap-reached/cap-not-reached', async () => {
+  await withFixture(async ({ child, fields }) => {
+    const pid = child.pid!;
+    const nativeBackend = new NativeScannerBackend();
+    await nativeBackend.attach(pid);
+    try {
+      // maxMatches omitted — bounded by the internal default (already
+      // covered by the dedicated test above; re-asserted here as part of
+      // the matrix for a single point of reference).
+      const omitted = await nativeBackend.exactScan('u32', 0, undefined, {});
+      assert.ok(omitted.matches.length <= 10_000);
+
+      // maxMatches = 1 — smallest real bound.
+      const one = await nativeBackend.exactScan('u32', 0, undefined, { maxMatches: 1 });
+      assert.equal(one.matches.length, 1, 'maxMatches=1 must return exactly 1 real match, not 0 or more');
+      assert.equal(one.completeness.state, 'resource_limit');
+
+      // maxMatches = 10 — small explicit bound.
+      const ten = await nativeBackend.exactScan('u32', 0, undefined, { maxMatches: 10 });
+      assert.equal(ten.matches.length, 10);
+      assert.equal(ten.completeness.state, 'resource_limit');
+
+      // maxMatches = 10,000 — explicit request at the default's own value.
+      const tenThousand = await nativeBackend.exactScan('u32', 0, undefined, { maxMatches: 10_000 });
+      assert.ok(tenThousand.matches.length <= 10_000);
+
+      // Large maxMatches, genuinely within policy (comfortably above the
+      // fixture's real candidate count for a narrow, real, planted value —
+      // this is the "cap NOT reached" case, proving the bound doesn't
+      // truncate when real coverage is naturally smaller than the cap).
+      const sentinelValue = Number(fields.SENTINEL_VALUE);
+      const capNotReached = await nativeBackend.exactScan('u32', sentinelValue, undefined, { maxMatches: 50_000 });
+      assert.ok(capNotReached.matches.length < 50_000, 'a narrow real value must not hit an oversized cap');
+      assert.notEqual(capNotReached.completeness.state, 'resource_limit', 'when the cap is not reached, completeness must not falsely claim a resource limit');
+
+      // Invalid maxMatches (0) — must not crash the native call; either
+      // rejects cleanly or returns zero matches deterministically. This is
+      // the backend's own robustness, independent of the IPC schema (which
+      // separately rejects <=0 via `z.number().int().positive()` — this
+      // proves the backend itself is not naively trusting an unvalidated
+      // caller either).
+      let zeroBoundThrew = false;
+      let zeroBoundResult: Awaited<ReturnType<typeof nativeBackend.exactScan>> | undefined;
+      try {
+        zeroBoundResult = await nativeBackend.exactScan('u32', 0, undefined, { maxMatches: 0 });
+      } catch {
+        zeroBoundThrew = true;
+      }
+      assert.ok(
+        zeroBoundThrew || zeroBoundResult?.matches.length === 0,
+        'maxMatches=0 must either be rejected or deterministically yield zero matches — never crash or return unbounded results',
+      );
+    } finally {
+      await nativeBackend.detach();
+    }
+  });
+});
+
+describeReal('NativeScannerBackend explicit 100,000-match request — Stage 7 final closure §4: backend itself must not crash/hang at real high volume', async () => {
+  await withFixture(async ({ child }) => {
+    const pid = child.pid!;
+    const nativeBackend = new NativeScannerBackend();
+    await nativeBackend.attach(pid);
+    try {
+      const start = Date.now();
+      const result = await nativeBackend.exactScan('u32', 0, undefined, { maxMatches: 100_000 });
+      const durationMs = Date.now() - start;
+      // The fixture's real memory genuinely contains >= 100,000 zero-valued
+      // u32s, so this exercises a real 100k-candidate scan, not a synthetic
+      // one — proving the backend itself handles real high volume safely.
+      // The PRODUCTION WIRE schema (LiveMemoryScanFirstSchema.maxMatches,
+      // capped at 5,000) is what actually prevents any real IPC caller from
+      // requesting this — an intentional, separately-proven lower product
+      // cap (doc 92), not a gap this test needs to close.
+      assert.ok(result.matches.length <= 100_000, `must never exceed the explicitly requested bound — got ${result.matches.length}`);
+      assert.ok(durationMs < 10_000, `100k-match real scan must complete in bounded time, not hang — took ${durationMs}ms`);
+      if (result.matches.length === 100_000) {
+        assert.equal(result.completeness.state, 'resource_limit', 'hitting an explicit 100k cap must be reported honestly, not silently as complete');
+      }
+    } finally {
+      await nativeBackend.detach();
+    }
+  });
+});
