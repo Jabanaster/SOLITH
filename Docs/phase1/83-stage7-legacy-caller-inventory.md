@@ -42,3 +42,9 @@ Called directly (bypassing `memory-scanner.ts`) by: `aob-resolver.ts`, `signatur
 All callers (`live-memory-session.ts`, `src/core/live-memory/research/pointer-candidate-analysis.ts`) are **POINTER_SPECIFIC** — explicitly and correctly out of Stage 7's scope per mission §7.14. D05 remains open, untouched.
 
 **Zero unknown callers**: every caller of every function in the three named legacy modules was traced to a known file above; none is unaccounted for.
+
+## Stage 7.1 §7.1-P — recheck after production IPC integration
+
+Re-ran the same grep-based inventory after Stage 7.1's IPC/session changes (the int64-fidelity fix to `scanExactViaBackend`, the new `targetValueBigint` wire field). Result: **identical set of callers, no new unknowns, no reclassification needed.**
+
+One additional finding from this recheck: `LiveMemorySession.scanFirst` (the plain method at `live-memory-session.ts:676`, wrapping `scanFirstRegions` — distinct from `memory-scanner.ts`'s own `scanFirst` function and from `scanExactViaBackend`) now has **zero remaining callers anywhere in the repository**. Since Stage 7 routed `live-memory-scan-first`'s IPC handler to `scanExactViaBackend` instead, nothing calls `session.scanFirst` directly any more. This is a genuine dead-code finding, not previously called out in doc 84's retirement table (which only covered the underlying `memory-scanner.ts`/`aob-resolver.ts` functions, not this now-orphaned session-level wrapper). Not deleted this pass — flagged as a `DELETE_AFTER_PARITY`-equivalent candidate for whoever executes retirement, same gating as doc 84's other entries (verify no external consumer before removal).
