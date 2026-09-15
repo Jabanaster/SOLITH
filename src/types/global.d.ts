@@ -827,6 +827,51 @@ interface Window {
       mode?: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
       error?: string;
     }>;
+    /**
+     * Stage 7.2/7.3 §2/§3/§12 — cancellable production scan contract.
+     * `liveMemoryScanFirstStart`/`liveMemoryScanAobStart` return an
+     * `operationId` immediately (before the scan finishes), so
+     * `liveMemoryScanCancel` can reference an operation that is genuinely
+     * still in flight; `liveMemoryScanPoll` returns its terminal state once
+     * available. `targetValueBigint`/`valueBigint` are decimal STRINGS, never
+     * a plain `number`, so a future int64/u64 consumer of this declared type
+     * cannot be handed a value that has already lost precision.
+     */
+    liveMemoryScanFirstStart: (payload: {
+      dataType: 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64';
+      targetValue: number;
+      targetValueBigint?: string;
+      maxRegionBytes?: number;
+      maxTotalBytes?: number;
+      maxMatches?: number;
+    }) => Promise<{ success: boolean; operationId?: string; error?: string }>;
+    liveMemoryScanAobStart: (payload: { signature: string; moduleName?: string }) => Promise<{
+      success: boolean;
+      operationId?: string;
+      error?: string;
+    }>;
+    liveMemoryScanCancel: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      found?: boolean;
+      alreadyTerminal?: boolean;
+      error?: string;
+    }>;
+    liveMemoryScanPoll: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      status?: 'pending' | 'complete' | 'cancelled' | 'error' | 'not_found';
+      kind?: 'exact' | 'aob';
+      result?: {
+        backend?: 'legacy' | 'native';
+        isAuthoritativeAbsence?: boolean;
+        matches?: Array<{ address: string; value: number; valueBigint?: string }>;
+        regionsScanned?: number;
+        bytesScanned?: number;
+        truncated?: boolean;
+        found?: boolean;
+        address?: string;
+      };
+      error?: string;
+    }>;
     /** Phase 9 — typed reinterpret at one address (read-only). */
     researchView: (payload: { address: string; types: string[] }) => Promise<{
       success: boolean;

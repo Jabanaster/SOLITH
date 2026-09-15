@@ -31,6 +31,9 @@ import {
   LiveMemoryPointerScanSchema,
   LiveMemoryScanAobSchema,
   LiveMemoryScannerRoutingModeSchema,
+  LiveMemoryScanFirstStartSchema,
+  LiveMemoryScanAobStartSchema,
+  LiveMemoryScanOperationIdSchema,
   ResearchViewSchema,
   ResearchHexSchema,
   ResearchPointerAnalyzeSchema,
@@ -1048,6 +1051,81 @@ export function registerLiveMemoryIpc(): void {
     return { success: true, mode: session.getScannerRoutingMode() };
   });
 
+  // Stage 7.2/7.3 §2/§3/§12 — production scan cancellation. Unlike
+  // `live-memory-scan-first`/`live-memory-scan-aob`, whose handler promise
+  // does not resolve until the whole scan finishes, these `-start` channels
+  // return an `operationId` immediately (the scan runs in the background),
+  // so the renderer has something real to reference in a
+  // `live-memory-scan-cancel` call fired WHILE the scan is still in flight —
+  // the exact model mission §2 requires: start -> operationId -> cancel(id)
+  // -> native cancellation token -> truthful terminal state.
+  ipcMain.handle('live-memory-scan-first-start', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanFirstStartSchema.parse(payload);
+      const exactTargetValueBigint =
+        parsed.targetValueBigint !== undefined ? BigInt(parsed.targetValueBigint) : undefined;
+      const operationId = session.startExactScanOperation(
+        parsed.dataType,
+        parsed.targetValue,
+        { maxRegionBytes: parsed.maxRegionBytes, maxTotalBytes: parsed.maxTotalBytes, maxMatches: parsed.maxMatches },
+        exactTargetValueBigint,
+      );
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_first_start_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-aob-start', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanAobStartSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const operationId = session.startAobScanOperation(parsed.signature, parsed.moduleName);
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_aob_start_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-cancel', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.cancelScanOperation(parsed.operationId);
+      return { success: true, found: outcome.found, alreadyTerminal: outcome.alreadyTerminal };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_cancel_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-poll', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.getScanOperationStatus(parsed.operationId);
+      if (!outcome) return { success: true, status: 'not_found' as const };
+      return {
+        success: true,
+        status: outcome.status,
+        kind: outcome.kind,
+        result: outcome.result ? serializeScanOperationResult(outcome.kind, outcome.result) : undefined,
+        error: outcome.error,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_poll_failed') };
+    }
+  });
+
   // ── Phase 9 research tools (read-only) ─────────────────────────────────────
 
   ipcMain.handle('research:view', async (event, payload: unknown) => {
@@ -1772,6 +1850,39 @@ function serializeScanResult(result: { matches: ScanMatch[]; regionsScanned: num
     bytesScanned: result.bytesScanned,
     truncated: result.truncated,
   };
+}
+
+/**
+ * Stage 7.2/7.3 §2/§12 — serializes a polled scan-operation result for the
+ * wire, matching the exact shapes `live-memory-scan-first`/`live-memory-scan-aob`
+ * already send (BigInt values as decimal strings, never raw BigInt, never a
+ * lossy Number narrowing).
+ */
+function serializeScanOperationResult(kind: 'exact' | 'aob', result: unknown) {
+  if (kind === 'exact') {
+    const exact = result as {
+      backend: 'legacy' | 'native';
+      isAuthoritativeAbsence: boolean;
+      matches: Array<ScanMatch & { valueBigint?: bigint }>;
+      regionsScanned: number;
+      bytesScanned: number;
+      truncated: boolean;
+    };
+    return {
+      ...serializeScanResult(exact),
+      backend: exact.backend,
+      isAuthoritativeAbsence: exact.isAuthoritativeAbsence,
+      matches: exact.matches.map((m) => ({
+        address: m.address.toString(),
+        value: m.value,
+        ...(m.valueBigint !== undefined ? { valueBigint: m.valueBigint.toString() } : {}),
+      })),
+    };
+  }
+  const aob = result as { address: string | null; backend: 'legacy' | 'native'; isAuthoritativeAbsence: boolean };
+  return aob.address
+    ? { found: true, address: aob.address, backend: aob.backend, isAuthoritativeAbsence: aob.isAuthoritativeAbsence }
+    : { found: false, backend: aob.backend, isAuthoritativeAbsence: aob.isAuthoritativeAbsence };
 }
 
 function serializeAutoMatrixResult(result: {

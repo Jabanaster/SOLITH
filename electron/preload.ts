@@ -404,6 +404,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryScannerRoutingModeGet: () => ipcRenderer.invoke('live-memory-scanner-routing-mode-get'),
   liveMemoryScannerRoutingModeSet: (payload: { mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE' }) =>
     ipcRenderer.invoke('live-memory-scanner-routing-mode-set', payload),
+  // Stage 7.2/7.3 §2/§3/§12 — cancellable production scan contract. Start
+  // returns an `operationId` before the scan finishes; cancel/poll reference
+  // it. This is the real preload transport for mid-flight cancellation —
+  // not a UI-only flag.
+  liveMemoryScanFirstStart: (payload: {
+    dataType: 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64';
+    targetValue: number;
+    targetValueBigint?: string;
+    maxRegionBytes?: number;
+    maxTotalBytes?: number;
+    maxMatches?: number;
+  }) => ipcRenderer.invoke('live-memory-scan-first-start', payload),
+  liveMemoryScanAobStart: (payload: { signature: string; moduleName?: string }) =>
+    ipcRenderer.invoke('live-memory-scan-aob-start', payload),
+  liveMemoryScanCancel: (payload: { operationId: string }) => ipcRenderer.invoke('live-memory-scan-cancel', payload),
+  liveMemoryScanPoll: (payload: { operationId: string }) => ipcRenderer.invoke('live-memory-scan-poll', payload),
 
   // Phase 9 — read-only address/data research tools
   researchView: (payload: { address: string; types: string[] }) =>

@@ -187,7 +187,13 @@ export class ScannerBackendRouter {
     private readonly native: ScannerBackend,
     options: ScannerBackendRouterOptions = {},
   ) {
-    this.mode = options.mode ?? 'LEGACY';
+    // Stage 7.3 §2 (owner-authorized production migration): the canonical
+    // production default is NATIVE. LEGACY remains fully selectable for
+    // explicit rollback (mission §7.3-10) but is no longer the router's own
+    // fallback when no mode is specified — a fresh session that never calls
+    // `setScannerRoutingMode` now reaches `NativeScannerBackend` by default,
+    // with no environment variable or config flag required.
+    this.mode = options.mode ?? 'NATIVE';
     this.allowFallback = options.allowFallbackToLegacyOnNativeFailure ?? false;
   }
 
@@ -269,7 +275,12 @@ export class ScannerBackendRouter {
     let nativeError: string | undefined;
     try {
       await this.ensureNativeAttached(pid);
-      const nativeResult = await this.native.exactScan(primitiveType, valueNumber, valueBigint, bounds);
+      // Stage 7.2 §9: forward `control` to the shadow native call too — a
+      // cancellation fired during SHADOW_COMPARE must reach both backends,
+      // not just the authoritative legacy one, or the shadow native scan
+      // would keep running indefinitely after the caller believes the
+      // whole operation was cancelled.
+      const nativeResult = await this.native.exactScan(primitiveType, valueNumber, valueBigint, bounds, control);
       shadowDifferences = classifyExactScanDifference(legacyResult, nativeResult, primitiveType);
     } catch (err) {
       nativeError = err instanceof ScannerBackendError ? err.message : String(err);
@@ -324,7 +335,8 @@ export class ScannerBackendRouter {
     let nativeError: string | undefined;
     try {
       await this.ensureNativeAttached(pid);
-      const nativeResult = await this.native.aobScan(pattern, moduleName, bounds);
+      // Stage 7.2 §9: same fix as the exact-scan shadow path above.
+      const nativeResult = await this.native.aobScan(pattern, moduleName, bounds, control);
       shadowDifferences = classifyAobDifference(legacyResult, nativeResult);
     } catch (err) {
       nativeError = err instanceof ScannerBackendError ? err.message : String(err);

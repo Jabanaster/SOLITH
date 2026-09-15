@@ -567,6 +567,32 @@ export const LiveMemoryScannerRoutingModeSchema = z.object({
   mode: z.enum(['LEGACY', 'NATIVE', 'SHADOW_COMPARE']),
 });
 
+/**
+ * Stage 7.2/7.3 §2/§12 — cancellable scan start. Same fields as
+ * `LiveMemoryScanFirstSchema`; kept as a distinct schema (rather than a
+ * shared reference) so the two request shapes can diverge independently if
+ * a future stage needs to.
+ */
+export const LiveMemoryScanFirstStartSchema = z.object({
+  dataType: LIVE_VALUE_TYPE,
+  targetValue: z.number().finite(),
+  targetValueBigint: z.string().regex(/^-?\d{1,20}$/).optional(),
+  maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
+  maxTotalBytes: z.number().int().positive().max(4 * 1024 * 1024 * 1024).optional(),
+  maxMatches: z.number().int().positive().max(5000).optional(),
+});
+
+/** Stage 7.2/7.3 §2/§12 — cancellable AOB scan start. */
+export const LiveMemoryScanAobStartSchema = z.object({
+  signature: z.string().min(3).max(512),
+  moduleName: z.string().min(1).max(260).optional(),
+});
+
+/** Stage 7.2/7.3 §2/§12 — references an operation started by either scan-start channel. */
+export const LiveMemoryScanOperationIdSchema = z.object({
+  operationId: z.string().uuid(),
+});
+
 /** Phase 9 — read-only research view (typed reinterpret at one address). */
 export const ResearchViewSchema = z.object({
   address: LIVE_ADDRESS_STRING,

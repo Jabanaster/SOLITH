@@ -147,7 +147,11 @@ describeReal('full production IPC path: attach, routing-mode control, exact/unal
     // 7.1-D: mode control through the real diagnostic/control IPC channel.
     const getDefault = await mock.__invoke('live-memory-scanner-routing-mode-get', event, undefined);
     assert.equal(getDefault.success, true);
-    assert.equal(getDefault.mode, 'LEGACY', 'a fresh session must default to LEGACY (mission §7.1-N)');
+    // Stage 7.3 §2 (owner-authorized production migration): the shipping
+    // default flipped from LEGACY to NATIVE. This assertion is updated to
+    // match the new intended default, not relaxed — a regression back to
+    // LEGACY (or to any other unintended default) must still fail this test.
+    assert.equal(getDefault.mode, 'NATIVE', 'a fresh session must default to NATIVE (mission Stage 7.3 §2)');
 
     const setShadow = await mock.__invoke('live-memory-scanner-routing-mode-set', event, { mode: 'SHADOW_COMPARE' });
     assert.equal(setShadow.success, true);

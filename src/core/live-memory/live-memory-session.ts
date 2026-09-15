@@ -18,7 +18,13 @@ import { scanAobInProcess } from './aob-resolver.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
 import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
-import { liveValueTypeToCanonical, type CanonicalScanBounds, type ScannerRoutingMode } from './scanner-backend.js';
+import {
+  liveValueTypeToCanonical,
+  ScannerBackendError,
+  type CanonicalScanBounds,
+  type ScanControl,
+  type ScannerRoutingMode,
+} from './scanner-backend.js';
 import {
   fingerprintBlocksAttach,
   verifyDefinitionFingerprint,
@@ -195,6 +201,38 @@ export function byteWidthForType(dataType: LiveValueType): number {
   }
 }
 
+/**
+ * Stage 7.2/7.3 production cancellation (mission §2/§12). A scan started via
+ * `startExactScanOperation`/`startAobScanOperation` is tracked here from the
+ * moment its `operationId` is handed back to the caller (synchronously,
+ * before the scan itself has run at all) until its terminal state is
+ * observed. `status` transitions exactly once, `pending` -> one of
+ * `complete`/`cancelled`/`error` — there is no path back to `pending`.
+ */
+export type ScanOperationStatus = 'pending' | 'complete' | 'cancelled' | 'error';
+
+export interface ScanOperationEntry {
+  readonly kind: 'exact' | 'aob';
+  readonly controller: AbortController;
+  status: ScanOperationStatus;
+  result?: unknown;
+  error?: string;
+}
+
+export interface ScanOperationCancelResult {
+  /** False only for an operation ID this session has never seen (mission's "cancel unknown operation ID"). */
+  found: boolean;
+  /** True if the operation had already reached a terminal state before this cancel request arrived. */
+  alreadyTerminal: boolean;
+}
+
+export interface ScanOperationStatusResult {
+  status: ScanOperationStatus;
+  kind: 'exact' | 'aob';
+  result?: unknown;
+  error?: string;
+}
+
 export function compareRollbackValue(dataType: LiveValueType, current: number, expected: number): RollbackValueComparison {
   switch (dataType) {
     case 'float':
@@ -281,7 +319,25 @@ export class LiveMemorySession {
    * Torn down on `detach()` alongside every other per-attach session state.
    */
   private backendRouter: ScannerBackendRouter | null = null;
-  private scannerRoutingMode: ScannerRoutingMode = 'LEGACY';
+  /**
+   * Stage 7.3 §2 (owner-authorized production migration): the shipping
+   * default is NATIVE. A freshly attached session reaches
+   * `NativeScannerBackend` for exact/AOB scans with no override, no
+   * environment variable, and no config flag required. LEGACY remains fully
+   * selectable via `setScannerRoutingMode('LEGACY')` for explicit rollback.
+   */
+  private scannerRoutingMode: ScannerRoutingMode = 'NATIVE';
+  /**
+   * Stage 7.2/7.3 production cancellation registry (mission §2/§12) — one
+   * entry per in-flight or completed-but-not-yet-cleared scan operation
+   * started via `startExactScanOperation`/`startAobScanOperation`. Real
+   * cancellation: `controller.abort()` sets `control.signal.aborted`, which
+   * `NativeScannerBackend` observes between region reads (wired to a real
+   * `ScanCancellationHandle`) and `LegacyScannerBackend` observes only as a
+   * pre-flight check (documented asymmetry, not hidden). Cleared on
+   * `detach()` alongside every other per-attach session state.
+   */
+  private readonly scanOperations = new Map<string, ScanOperationEntry>();
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -724,6 +780,7 @@ export class LiveMemorySession {
     targetValue: number,
     bounds?: ScanBounds,
     exactTargetValueBigint?: bigint,
+    control?: ScanControl,
   ): Promise<{
     backend: 'legacy' | 'native';
     isAuthoritativeAbsence: boolean;
@@ -762,6 +819,7 @@ export class LiveMemorySession {
       valueBigint === undefined ? targetValue : undefined,
       valueBigint,
       canonicalBounds,
+      control,
     );
     return {
       backend: outcome.backend,
@@ -789,15 +847,99 @@ export class LiveMemorySession {
   async scanAobViaBackend(
     signature: string,
     moduleName?: string,
+    control?: ScanControl,
   ): Promise<{ address: string | null; backend: 'legacy' | 'native'; isAuthoritativeAbsence: boolean }> {
     if (!this.target) throw new Error('No process attached.');
     const router = this.getOrCreateBackendRouter();
-    const outcome = await router.routedAobScan(this.target.pid, signature, moduleName, {});
+    const outcome = await router.routedAobScan(this.target.pid, signature, moduleName, {}, control);
     return {
       address: outcome.matches.length > 0 ? `0x${outcome.matches[0].address.toString(16)}` : null,
       backend: outcome.backend,
       isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
     };
+  }
+
+  /**
+   * Stage 7.2/7.3 production cancellation (mission §2/§3/§12). Starts an
+   * exact-value scan asynchronously and returns its `operationId`
+   * synchronously, before the scan itself has done any work — this is the
+   * one property that makes real mid-flight cancellation possible: the
+   * caller has an ID to cancel *while the scan is still running*, unlike
+   * `scanExactViaBackend`, whose promise does not resolve until the scan is
+   * already finished. `cancelScanOperation(operationId)` aborts the real
+   * `AbortController` behind this operation, which `NativeScannerBackend`
+   * observes between region reads via a genuine `ScanCancellationHandle` —
+   * not a UI-only flag and not a discarded response.
+   */
+  startExactScanOperation(
+    dataType: LiveValueType,
+    targetValue: number,
+    bounds?: ScanBounds,
+    exactTargetValueBigint?: bigint,
+  ): string {
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'exact', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+    void this.scanExactViaBackend(dataType, targetValue, bounds, exactTargetValueBigint, { signal: controller.signal })
+      .then((result) => {
+        entry.status = result.truncated && controller.signal.aborted ? 'cancelled' : 'complete';
+        entry.result = result;
+      })
+      .catch((err) => {
+        entry.status = err instanceof ScannerBackendError && err.kind === 'cancelled' ? 'cancelled' : 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /** Stage 7.2/7.3 production cancellation — AOB variant of `startExactScanOperation`. */
+  startAobScanOperation(signature: string, moduleName?: string): string {
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'aob', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+    void this.scanAobViaBackend(signature, moduleName, { signal: controller.signal })
+      .then((result) => {
+        entry.status = controller.signal.aborted ? 'cancelled' : 'complete';
+        entry.result = result;
+      })
+      .catch((err) => {
+        entry.status = err instanceof ScannerBackendError && err.kind === 'cancelled' ? 'cancelled' : 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /**
+   * Requests cancellation of a previously started scan operation (mission
+   * §2's required contract: "cancellation request references that ID").
+   * Idempotent — a duplicate cancel on the same operation, or a cancel
+   * arriving after the operation already reached a terminal state (complete,
+   * already cancelled, or errored), is always safe and never throws;
+   * `AbortController.abort()` itself is a documented no-op on an
+   * already-aborted controller. Cancelling an operation ID this session has
+   * never seen returns `found: false` rather than throwing, so a stale or
+   * mistyped ID from the renderer cannot crash the main process.
+   */
+  cancelScanOperation(operationId: string): ScanOperationCancelResult {
+    const entry = this.scanOperations.get(operationId);
+    if (!entry) return { found: false, alreadyTerminal: false };
+    const alreadyTerminal = entry.status !== 'pending';
+    if (!alreadyTerminal) entry.controller.abort();
+    return { found: true, alreadyTerminal };
+  }
+
+  /**
+   * Polls a scan operation's current status (mission §2's "caller receives
+   * Cancelled completeness/state"). Returns `null` only for an operation ID
+   * this session has never seen — a legitimate, still-`pending` operation
+   * returns its entry with `status: 'pending'` and no `result` yet.
+   */
+  getScanOperationStatus(operationId: string): ScanOperationStatusResult | null {
+    const entry = this.scanOperations.get(operationId);
+    if (!entry) return null;
+    return { status: entry.status, kind: entry.kind, result: entry.result, error: entry.error };
   }
 
   /**
@@ -1451,5 +1593,14 @@ export class LiveMemorySession {
     this.addressCache.clear();
     this.lastFingerprint = null;
     this.catalogGameId = null;
+    // Stage 7.2/7.3 cancellation registry: abort anything still pending
+    // (mission's "cancel after process exit" / detach-while-scanning
+    // safety) so a stray `.then`/`.catch` never fires after this session's
+    // other per-attach state has already been torn down, then drop every
+    // entry — a detached session has no operations left to poll or cancel.
+    for (const entry of this.scanOperations.values()) {
+      if (entry.status === 'pending') entry.controller.abort();
+    }
+    this.scanOperations.clear();
   }
 }

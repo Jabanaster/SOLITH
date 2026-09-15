@@ -6,7 +6,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ScannerBackendRouter } from '../../src/core/live-memory/scanner-backend-router.js';
-import { ScannerBackendError, type ScannerBackend, type CanonicalExactScanOutcome } from '../../src/core/live-memory/scanner-backend.js';
+import {
+  ScannerBackendError,
+  type ScannerBackend,
+  type CanonicalExactScanOutcome,
+  type ScanControl,
+} from '../../src/core/live-memory/scanner-backend.js';
 
 function outcome(overrides: Partial<CanonicalExactScanOutcome> = {}): CanonicalExactScanOutcome {
   return {
@@ -23,6 +28,10 @@ class StubBackend implements ScannerBackend {
   attachCalls: number[] = [];
   detachCalls = 0;
   exactScanImpl: (() => Promise<CanonicalExactScanOutcome>) | null = null;
+  aobScanImpl: (() => ReturnType<ScannerBackend['aobScan']>) | null = null;
+  /** Stage 7.2 §9 — records the `control` this backend was actually called with, so a test can prove cancellation was (or was not) forwarded. */
+  lastExactScanControl: ScanControl | undefined;
+  lastAobScanControl: ScanControl | undefined;
 
   constructor(public readonly kind: 'legacy' | 'native') {}
 
@@ -33,14 +42,86 @@ class StubBackend implements ScannerBackend {
   async detach(): Promise<void> {
     this.detachCalls += 1;
   }
-  async exactScan(): Promise<CanonicalExactScanOutcome> {
+  async exactScan(
+    _primitiveType: unknown,
+    _valueNumber: unknown,
+    _valueBigint: unknown,
+    _bounds: unknown,
+    control?: ScanControl,
+  ): Promise<CanonicalExactScanOutcome> {
+    this.lastExactScanControl = control;
     if (!this.exactScanImpl) throw new Error('exactScanImpl not set');
     return this.exactScanImpl();
   }
-  async aobScan(): ReturnType<ScannerBackend['aobScan']> {
-    throw new Error('not used in these tests');
+  async aobScan(
+    _pattern: unknown,
+    _moduleName: unknown,
+    _bounds: unknown,
+    control?: ScanControl,
+  ): ReturnType<ScannerBackend['aobScan']> {
+    this.lastAobScanControl = control;
+    if (!this.aobScanImpl) throw new Error('aobScanImpl not set');
+    return this.aobScanImpl();
   }
 }
+
+test('a router constructed with no explicit mode defaults to NATIVE (Stage 7.3 §2 — owner-authorized production migration)', async () => {
+  const legacy = new StubBackend('legacy');
+  legacy.exactScanImpl = async () => outcome({ backend: 'legacy' });
+  const native = new StubBackend('native');
+  native.exactScanImpl = async () => outcome({ backend: 'native' });
+  const router = new ScannerBackendRouter(legacy, native);
+
+  assert.equal(router.getMode(), 'NATIVE', 'no mode specified must mean NATIVE, not LEGACY — no config/env trick required');
+  const result = await router.routedExactScan(1, 'i32', 1, undefined, {});
+  assert.equal(result.backend, 'native');
+});
+
+test('SHADOW_COMPARE forwards the cancellation control to the shadow native exact-scan call too (mission §7.2-9)', async () => {
+  const legacy = new StubBackend('legacy');
+  legacy.exactScanImpl = async () => outcome({ backend: 'legacy' });
+  const native = new StubBackend('native');
+  native.exactScanImpl = async () => outcome({ backend: 'native' });
+  const router = new ScannerBackendRouter(legacy, native, { mode: 'SHADOW_COMPARE' });
+  const controller = new AbortController();
+  controller.abort();
+
+  await router.routedExactScan(1, 'i32', 1, undefined, {}, { signal: controller.signal });
+
+  assert.ok(native.lastExactScanControl, 'the shadow native exact-scan call must receive a control object, not be silently called without one');
+  assert.equal(
+    native.lastExactScanControl?.signal?.aborted,
+    true,
+    'an aborted signal on the authoritative legacy call must reach the shadow native call unchanged — a cancellation cannot leave the shadow backend running indefinitely',
+  );
+});
+
+test('SHADOW_COMPARE forwards the cancellation control to the shadow native AOB-scan call too (mission §7.2-9)', async () => {
+  const legacy = new StubBackend('legacy');
+  legacy.aobScanImpl = async () => ({
+    backend: 'legacy',
+    matches: [],
+    completeness: { state: 'complete' },
+    isAuthoritativeAbsence: true,
+    metrics: { regionsConsidered: 0, regionsRead: 0, regionsSkipped: 0, bytesRequested: 0n, bytesRead: 0n, elapsedMillis: 0n },
+  });
+  const native = new StubBackend('native');
+  native.aobScanImpl = async () => ({
+    backend: 'native',
+    matches: [],
+    completeness: { state: 'complete' },
+    isAuthoritativeAbsence: true,
+    metrics: { regionsConsidered: 0, regionsRead: 0, regionsSkipped: 0, bytesRequested: 0n, bytesRead: 0n, elapsedMillis: 0n },
+  });
+  const router = new ScannerBackendRouter(legacy, native, { mode: 'SHADOW_COMPARE' });
+  const controller = new AbortController();
+  controller.abort();
+
+  await router.routedAobScan(1, 'DE AD', undefined, {}, { signal: controller.signal });
+
+  assert.ok(native.lastAobScanControl, 'the shadow native AOB-scan call must receive a control object');
+  assert.equal(native.lastAobScanControl?.signal?.aborted, true);
+});
 
 test('LEGACY mode never touches the native backend at all', async () => {
   const legacy = new StubBackend('legacy');
