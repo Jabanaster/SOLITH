@@ -32,7 +32,7 @@ jobs:
       # early, before `npm ci`, since the fmt/clippy checks below need only
       # the Rust toolchain, not the Node dependency graph.
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           components: rustfmt, clippy
 

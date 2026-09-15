@@ -29,12 +29,17 @@ if (process.platform !== 'win32') {
 // own devDependency, isolated from the root workspace per Stage 2's
 // design) available for the build step below.
 console.log('[Solith Scanner NAPI] npm install (isolated napi package)...');
+// shell:true is required on Windows because CreateProcess cannot launch npm.cmd
+// directly (shell:false throws ENOENT); all args here are hardcoded literals,
+// none derived from user input, so there is no injection surface.
+// nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true
 const npmInstall = spawnSync('npm', ['install'], { cwd: napiCrateDir, stdio: 'inherit', shell: true });
 if (npmInstall.status !== 0) {
   process.exit(npmInstall.status ?? 1);
 }
 
 console.log('[Solith Scanner NAPI] napi build --release...');
+// nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true
 const napiBuild = spawnSync('npm', ['run', 'build'], { cwd: napiCrateDir, stdio: 'inherit', shell: true });
 if (napiBuild.status !== 0) {
   process.exit(napiBuild.status ?? 1);
