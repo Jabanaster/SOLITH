@@ -17,7 +17,12 @@
 //!   region, kept separate from Stage 3's `TYPES_REGION` so refinement
 //!   tests can freely mutate without disturbing Stage 3's fixed sentinels),
 //!   then prints `WROTE <decimal_offset>` so the caller can synchronize
-//!   before triggering a re-read/refine.
+//!   before triggering a re-read/refine. The hex-decode buffer is scrubbed
+//!   before it drops, so a planted pattern exists exactly once in this
+//!   process and an AOB scan's first match is genuinely the planted one.
+//! - `writefar <decimal_offset> <hex_le_bytes>` -> identical, but targets
+//!   `PATTERN_REGION` (8 MiB) instead of `REFINE_REGION` (64 KiB), so a test
+//!   can plant a signature beyond the legacy 1 MiB read ceiling.
 //! - anything else -> `UNKNOWN_CMD` is printed and the loop continues.
 //! - EOF, or no input for 30s -> exits after a bounded wait, so a test that
 //!   forgets to signal it can never hang CI forever. The 30s bound resets on
@@ -553,6 +558,15 @@ fn main() {
 
     let refine_slice =
         unsafe { std::slice::from_raw_parts_mut(refine_region as *mut u8, REFINE_REGION_SIZE) };
+    // Stage 7.5 - the same mutable view over PATTERN_REGION, so a test can
+    // plant a long, genuinely distinctive signature *past* the legacy 1 MiB
+    // readBuffer ceiling. REFINE_REGION is only 64 KiB, which is entirely
+    // legacy-reachable and therefore cannot demonstrate the cap at all; the
+    // fixture's own pre-planted FAR_MARKER_PATTERN is only 5 bytes, which is
+    // too short to be unique under drift tolerance (a 5-byte pattern with a
+    // one-substitution budget matches coincidentally in a real process).
+    let pattern_slice =
+        unsafe { std::slice::from_raw_parts_mut(pattern_region as *mut u8, PATTERN_REGION_SIZE) };
 
     loop {
         match rx.recv_timeout(Duration::from_secs(30)) {
@@ -565,6 +579,8 @@ fn main() {
             Ok(cmd) => {
                 if let Some(rest) = cmd.strip_prefix("write ") {
                     apply_write_command(refine_slice, rest, &mut out);
+                } else if let Some(rest) = cmd.strip_prefix("writefar ") {
+                    apply_write_command(pattern_slice, rest, &mut out);
                 } else if let Some(rest) = cmd.strip_prefix("protect_mutation ") {
                     apply_protect_mutation_command(mutation_region, rest, &mut out);
                 } else if cmd == "decommit_mutation" {
@@ -639,6 +655,22 @@ fn apply_write_command(region: &mut [u8], rest: &str, out: &mut impl Write) {
     }
 
     region[offset..offset + bytes.len()].copy_from_slice(&bytes);
+
+    // Stage 7.5 - scrub the decode buffer before it drops.
+    //
+    // This `bytes` Vec is a second, heap-resident copy of exactly the byte
+    // sequence the caller just planted, and it sits at a LOWER address than
+    // the VirtualAlloc'd regions above. Any AOB scan over this process uses
+    // first-match-in-ascending-address-order semantics, so without this scrub
+    // a scanner legitimately returns the heap copy rather than the planted
+    // one - and a test asserting "the planted address" fails through no fault
+    // of the scanner. Leaving the bytes behind after the Vec drops is just as
+    // bad: freed heap memory is still committed, still readable, and still
+    // matches. Zero it while it is still owned, and keep the write from being
+    // optimized away.
+    bytes.fill(0);
+    std::hint::black_box(&bytes);
+
     writeln!(out, "WROTE {offset}").unwrap();
     out.flush().unwrap();
 }
