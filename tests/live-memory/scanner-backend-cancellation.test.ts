@@ -58,6 +58,14 @@ interface FixtureHandle {
 
 function spawnFixture(): Promise<FixtureHandle> {
   const child = spawn(FIXTURE_PATH, [], { stdio: ['pipe', 'pipe', 'inherit'] });
+  // Case H deliberately kills `child` mid-test, before the outer cleanup's
+  // own `stdin.write('exit\n')` attempt — that write's EPIPE is delivered
+  // asynchronously via an 'error' event, which a synchronous try/catch
+  // around the write cannot catch, and previously surfaced as an uncaught
+  // exception after the test had already completed. Real, expected,
+  // harmless once the process is already gone — swallowed here, once, for
+  // the life of this child.
+  child.stdin.on('error', () => {});
   return new Promise((resolve, reject) => {
     let buffered = '';
     const fields: Record<string, string> = {};

@@ -153,7 +153,7 @@ describe('signature-engine', () => {
     assert.equal(hit!.shiftBytes, 16);
   });
 
-  test('module-scoped resolution fails closed when module is absent', () => {
+  test('module-scoped resolution fails closed when module is absent', async () => {
     const driver = new FakeMemoryDriver();
     const regionBase = 0x420000n;
     const region = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
@@ -161,12 +161,12 @@ describe('signature-engine', () => {
     const handle = driver.openProcess(1);
 
     assert.equal(
-      resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Missing.exe' }),
+      await resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Missing.exe' }),
       null,
     );
   });
 
-  test('module-scoped resolution does not match bytes outside module bounds', () => {
+  test('module-scoped resolution does not match bytes outside module bounds', async () => {
     const driver = new FakeMemoryDriver();
     const moduleBase = 0x430004n;
     driver.addModule('Demo.exe', moduleBase, 4);
@@ -177,12 +177,12 @@ describe('signature-engine', () => {
     const handle = driver.openProcess(1);
 
     assert.equal(
-      resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' }),
+      await resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' }),
       null,
     );
   });
 
-  test('resolveSignature returns exact when available', () => {
+  test('resolveSignature returns exact when available', async () => {
     const driver = new FakeMemoryDriver();
     const moduleBase = 0x500000n;
     driver.addModule('Demo.exe', moduleBase, 0x1000);
@@ -193,9 +193,60 @@ describe('signature-engine', () => {
     region.writeUInt8(0xef, 7);
     driver.addRegion(moduleBase, region);
     const handle = driver.openProcess(1);
-    const match = resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' });
+    const match = await resolveSignature(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' });
     assert.ok(match);
     assert.equal(match!.mode, 'exact');
     assert.equal(match!.distance, 0);
+  });
+
+  test('resolveSignature routes the exact sub-path through a bound resolver when supplied', async () => {
+    // Stage 7.4 §7 — with a resolver bound, the exact sub-path never calls
+    // `scanExactSignature`/`driver.readBuffer` at all; the resolver's
+    // result is used directly. A driver with no matching bytes anywhere
+    // proves this: `scanExactSignature` would find nothing, but the bound
+    // resolver "finds" an address anyway, and that's what comes back.
+    const driver = new FakeMemoryDriver();
+    driver.addModule('Demo.exe', 0x600000n, 0x1000);
+    const handle = driver.openProcess(1);
+    let calledWith: { signature: string; moduleName: string | undefined } | undefined;
+    const resolver = async (signature: string, moduleName: string | undefined) => {
+      calledWith = { signature, moduleName };
+      return { address: 0x600040n, isAuthoritativeAbsence: false };
+    };
+
+    const match = await resolveSignature(
+      driver,
+      handle,
+      'DE AD BE EF',
+      { moduleName: 'Demo.exe' },
+      resolver,
+    );
+    assert.ok(match);
+    assert.equal(match!.mode, 'exact');
+    assert.equal(match!.address, 0x600040n);
+    assert.deepEqual(calledWith, { signature: 'DE AD BE EF', moduleName: 'Demo.exe' });
+  });
+
+  test('resolveSignature falls back to fuzzy when the bound resolver reports no exact match', async () => {
+    const driver = new FakeMemoryDriver();
+    const moduleBase = 0x610000n;
+    driver.addModule('Demo.exe', moduleBase, 0x1000);
+    const region = Buffer.alloc(32, 0);
+    // Drifted by one byte (8B -> 8C) so only fuzzy matching finds it.
+    region.set([0x48, 0x8c, 0x05, 0xaa, 0xbb, 0xcc, 0xdd], 4);
+    driver.addRegion(moduleBase, region);
+    const handle = driver.openProcess(1);
+    const resolver = async () => ({ address: null, isAuthoritativeAbsence: true });
+
+    const match = await resolveSignature(
+      driver,
+      handle,
+      '48 8B 05 ? ? ? ?',
+      { moduleName: 'Demo.exe', maxDistance: 1, maxEdits: 0 },
+      resolver,
+    );
+    assert.ok(match);
+    assert.equal(match!.mode, 'fuzzy');
+    assert.equal(match!.address, moduleBase + 4n);
   });
 });
