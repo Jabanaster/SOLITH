@@ -59,6 +59,14 @@ export interface SerializedResolvedFeature {
   resolution: ResolvedFeatureAddress['resolution'];
   signatureDistance?: number;
   error?: string;
+  /** Stage 7.5 - which backend served the drift-tolerant sub-path, when it ran. */
+  fuzzyBackend?: 'legacy' | 'native';
+  /**
+   * Stage 7.5 - canonical completeness of the signature search, when one ran.
+   * Additive only: existing consumers that ignore it are unaffected, but a
+   * consumer that wants to know whether a miss was authoritative can now ask.
+   */
+  signatureCoverage?: string;
 }
 
 export interface ZeroInputPrepareResult {
@@ -82,6 +90,8 @@ function serializeFeature(f: ResolvedFeatureAddress): SerializedResolvedFeature 
     resolution: f.resolution,
     signatureDistance: f.signatureDistance,
     error: f.error,
+    fuzzyBackend: f.fuzzyBackend,
+    signatureCoverage: f.signatureCoverage,
   };
 }
 
@@ -196,6 +206,7 @@ export async function prepareZeroInputSession(
     input.fuzzyOptions,
     normalizeFeatureHints(input.featureHints),
     session.createAobResolver(),
+    session.createFuzzyAobResolver(),
   );
 
   for (const f of resolved) {

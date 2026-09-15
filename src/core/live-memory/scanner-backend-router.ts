@@ -15,16 +15,38 @@
 import {
   ScannerBackendError,
   type CanonicalExactScanOutcome,
+  type CanonicalMemoryRegion,
   type CanonicalMetrics,
   type CanonicalPatternScanOutcome,
   type CanonicalPrimitiveType,
+  type CanonicalRegionReadOutcome,
   type CanonicalScanBounds,
+  type CanonicalTargetModule,
   type ParityDifferenceClassification,
   type ScanControl,
   type ScannerBackend,
   type ScannerBackendKind,
   type ScannerRoutingMode,
 } from './scanner-backend.js';
+
+/**
+ * The read-only half of `ScannerBackend`, handed to a resolver that needs
+ * target memory but is not itself a scan primitive (Stage 7.5 - the fuzzy /
+ * drift-tolerant signature path). Deliberately narrower than the full
+ * backend: a resolver given one of these can enumerate and read, and cannot
+ * reach `exactScan`/`aobScan`/`attach`/`detach` at all, so the routing
+ * decision stays the router's to make.
+ */
+export interface ScannerMemorySource {
+  readonly kind: ScannerBackendKind;
+  enumerateRegions(): Promise<CanonicalMemoryRegion[]>;
+  enumerateModules(): Promise<CanonicalTargetModule[]>;
+  readRegion(
+    region: CanonicalMemoryRegion,
+    bounds: CanonicalScanBounds,
+    control?: ScanControl,
+  ): Promise<CanonicalRegionReadOutcome>;
+}
 
 export interface ParityDifference {
   field: string;
@@ -35,7 +57,7 @@ export interface ParityDifference {
 }
 
 export interface RoutedOperationDiagnostics {
-  operation: 'exactScan' | 'aobScan';
+  operation: 'exactScan' | 'aobScan' | 'fuzzyAobScan';
   requestedMode: ScannerRoutingMode;
   effectiveBackend: ScannerBackendKind;
   fellBackToLegacy: boolean;
@@ -233,6 +255,77 @@ export class ScannerBackendRouter {
     this.lastOperation = diag;
     this.operationCount += 1;
     if (diag.fellBackToLegacy) this.fallbackCount += 1;
+  }
+
+  /**
+   * Stage 7.5 - routes an operation that needs raw target memory rather than
+   * a whole-operation scan result. `run` receives a `ScannerMemorySource`
+   * (enumerate + read only) and performs the higher-level resolution itself;
+   * this router still owns which backend that source is, whether a native
+   * failure may fall back, and how a SHADOW_COMPARE disagreement is
+   * classified. That split is the point: the drift-tolerant matcher stays a
+   * pure function over buffers in `signature-engine.ts`, and nothing about
+   * backend selection leaks into it.
+   *
+   * Routing discipline is identical to `routedExactScan`/`routedAobScan` -
+   * the effective backend is always the requested one, recorded in
+   * diagnostics, and a NATIVE failure throws rather than silently degrading
+   * to legacy unless the canary-only `allowFallback` escape hatch is set.
+   */
+  async routedMemorySourceOperation<T>(
+    pid: number,
+    operation: 'fuzzyAobScan',
+    run: (source: ScannerMemorySource) => Promise<T>,
+    classify?: (legacyResult: T, nativeResult: T) => ParityDifference[],
+  ): Promise<{ result: T; backend: ScannerBackendKind }> {
+    const timestamp = new Date().toISOString();
+
+    if (this.mode === 'LEGACY') {
+      const result = await run(this.legacy);
+      this.record({ operation, requestedMode: 'LEGACY', effectiveBackend: 'legacy', fellBackToLegacy: false, timestamp });
+      return { result, backend: 'legacy' };
+    }
+
+    if (this.mode === 'NATIVE') {
+      try {
+        await this.ensureNativeAttached(pid);
+        const result = await run(this.native);
+        this.record({ operation, requestedMode: 'NATIVE', effectiveBackend: 'native', fellBackToLegacy: false, timestamp });
+        return { result, backend: 'native' };
+      } catch (err) {
+        const message = err instanceof ScannerBackendError ? err.message : String(err);
+        if (!this.allowFallback) {
+          this.record({ operation, requestedMode: 'NATIVE', effectiveBackend: 'native', fellBackToLegacy: false, nativeError: message, timestamp });
+          throw err;
+        }
+        const result = await run(this.legacy);
+        this.record({ operation, requestedMode: 'NATIVE', effectiveBackend: 'legacy', fellBackToLegacy: true, nativeError: message, timestamp });
+        return { result, backend: 'legacy' };
+      }
+    }
+
+    // SHADOW_COMPARE - legacy stays authoritative (mission 7.6); native runs
+    // alongside purely so the difference can be classified.
+    const legacyResult = await run(this.legacy);
+    let shadowDifferences: ParityDifference[] | undefined;
+    let nativeError: string | undefined;
+    try {
+      await this.ensureNativeAttached(pid);
+      const nativeResult = await run(this.native);
+      shadowDifferences = classify ? classify(legacyResult, nativeResult) : undefined;
+    } catch (err) {
+      nativeError = err instanceof ScannerBackendError ? err.message : String(err);
+    }
+    this.record({
+      operation,
+      requestedMode: 'SHADOW_COMPARE',
+      effectiveBackend: 'legacy',
+      fellBackToLegacy: false,
+      nativeError,
+      shadowDifferences,
+      timestamp,
+    });
+    return { result: legacyResult, backend: 'legacy' };
   }
 
   async routedExactScan(

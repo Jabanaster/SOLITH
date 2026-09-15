@@ -31,10 +31,14 @@ import {
   liveValueTypeToCanonical,
   ScannerBackendError,
   type CanonicalExactScanOutcome,
+  type CanonicalMemoryRegion,
   type CanonicalPatternScanOutcome,
   type CanonicalPrimitiveType,
+  type CanonicalRegionReadOutcome,
+  type CanonicalRegionSlice,
   type CanonicalScanBounds,
   type CanonicalSkippedRange,
+  type CanonicalTargetModule,
   type ScanControl,
   type ScannerBackend,
 } from './scanner-backend.js';
@@ -54,6 +58,13 @@ interface NativeScanTargetInstance {
   detach(): void;
   isAttached(): boolean;
   enumerateRegions(): NativeRegion[];
+  readRegionChunked(
+    region: NativeRegion,
+    chunkSizeBytes: bigint,
+    overlapBytes: bigint,
+    cancellation: unknown,
+    progress: unknown,
+  ): Promise<NativeReadRegionOutcome>;
   scanExact(
     region: NativeRegion,
     primitiveType: string,
@@ -114,6 +125,22 @@ interface NativeExactOutcome {
   metrics: NativeProgress;
   completeness: NativeCompleteness;
   isAuthoritativeAbsence: boolean;
+}
+
+/** One chunk of a `readRegionChunked` result (mirrors `JsChunkReadResult`). */
+interface NativeChunkReadResult {
+  chunkBase: bigint;
+  requestedSize: bigint;
+  /** "success" | "partial_read" | "access_denied" | "target_exited" | "invalid_address" | "os_error" | "resource_limit" | "cancelled". */
+  status: string;
+  bytesReadIfPartial?: bigint;
+  data: Buffer;
+}
+
+interface NativeReadRegionOutcome {
+  chunks: NativeChunkReadResult[];
+  metrics: NativeProgress;
+  completeness: NativeCompleteness;
 }
 
 interface NativePatternOutcome {
@@ -225,9 +252,33 @@ const DEFAULT_OVERLAP_BYTES = 7n;
 // just the ones that happen to pass an explicit bound.
 const DEFAULT_MAX_MATCHES = 10_000;
 
+/**
+ * Supplies the target's loaded modules to the native backend. Stage 7.5 - the
+ * native addon exposes region enumeration and chunked region reads, but no
+ * module enumeration at all (see `native/solith-scanner-napi/index.d.ts`:
+ * `NativeScanTarget` has `enumerateRegions`, with no module equivalent).
+ * Module identity is target metadata, not scan/read data, and carries none of
+ * the defects this migration closes - so rather than let a module-scoped
+ * fuzzy request silently widen to the whole address space under NATIVE (a
+ * genuine false-positive hazard for a drift-tolerant matcher, unlike for
+ * exact AOB), `LiveMemorySession` injects the same OS module list both
+ * backends already see. Real module enumeration inside the native core is
+ * forward-assigned to Stage 8; until then this is an explicit, disclosed
+ * shared-metadata seam, not a hidden legacy scan path.
+ */
+export type TargetModuleProvider = () => CanonicalTargetModule[];
+
 export class NativeScannerBackend implements ScannerBackend {
   readonly kind = 'native' as const;
   private target: NativeScanTargetInstance | null = null;
+  /**
+   * Native regions from the most recent `enumerateRegions()`, keyed by base
+   * address, so `readRegion` can hand the addon back the exact `JsRegion` it
+   * produced - protection flags and all - instead of a lossy reconstruction.
+   */
+  private readonly nativeRegionsByBase = new Map<string, NativeRegion>();
+
+  constructor(private readonly moduleProvider?: TargetModuleProvider) {}
 
   async attach(pid: number): Promise<void> {
     const addon = loadNativeScannerAddon();
@@ -242,6 +293,7 @@ export class NativeScannerBackend implements ScannerBackend {
   async detach(): Promise<void> {
     this.target?.detach();
     this.target = null;
+    this.nativeRegionsByBase.clear();
   }
 
   private wireCancellation(control: ScanControl | undefined): {
@@ -260,6 +312,183 @@ export class NativeScannerBackend implements ScannerBackend {
       progress,
       cleanup: () => control?.signal?.removeEventListener('abort', onAbort),
     };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async enumerateRegions(): Promise<CanonicalMemoryRegion[]> {
+    if (!this.target) {
+      throw new ScannerBackendError('attach_failed', 'Native backend is not attached.');
+    }
+    const native = this.target.enumerateRegions();
+    this.nativeRegionsByBase.clear();
+    const canonical: CanonicalMemoryRegion[] = [];
+    for (const r of native) {
+      this.nativeRegionsByBase.set(r.baseAddress.toString(), r);
+      canonical.push({
+        baseAddress: r.baseAddress,
+        size: r.size,
+        isReadable: r.isReadable && !r.isGuard && !r.isNoaccess,
+        isWritable: r.isWritable,
+        isExecutable: r.isExecutable,
+      });
+    }
+    return canonical;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async enumerateModules(): Promise<CanonicalTargetModule[]> {
+    if (!this.moduleProvider) {
+      throw new ScannerBackendError(
+        'unsupported_operation',
+        'Native backend has no module provider bound - the native scanner core does not enumerate ' +
+          'modules itself (forward-assigned to Stage 8). A module-scoped request must not silently ' +
+          'widen to the whole address space, so this fails closed rather than returning an empty list.',
+      );
+    }
+    return this.moduleProvider();
+  }
+
+  async readRegion(
+    region: CanonicalMemoryRegion,
+    bounds: CanonicalScanBounds,
+    control?: ScanControl,
+  ): Promise<CanonicalRegionReadOutcome> {
+    if (!this.target) {
+      throw new ScannerBackendError('attach_failed', 'Native backend is not attached.');
+    }
+
+    if (bounds.maxRegionBytes !== undefined && region.size > BigInt(bounds.maxRegionBytes)) {
+      // Refused on purpose, and said out loud: an over-budget region is a
+      // region this read did NOT cover, so it is reported as a skipped range
+      // rather than as a clean, empty, authoritative read.
+      return {
+        backend: 'native',
+        slices: [],
+        completeness: {
+          state: 'complete_with_skipped_regions',
+          skipped: [{ baseAddress: region.baseAddress, size: region.size, reason: 'max_region_bytes' }],
+        },
+        metrics: {
+          regionsConsidered: 1,
+          regionsRead: 0,
+          regionsSkipped: 1,
+          bytesRequested: 0n,
+          bytesRead: 0n,
+          elapsedMillis: 0n,
+        },
+      };
+    }
+
+    const nativeRegion: NativeRegion = this.nativeRegionsByBase.get(region.baseAddress.toString()) ?? {
+      baseAddress: region.baseAddress,
+      size: region.size,
+      allocationBase: region.baseAddress,
+      commitState: 'commit',
+      kind: 'private',
+      isReadable: region.isReadable,
+      isWritable: region.isWritable,
+      isExecutable: region.isExecutable,
+      isGuard: false,
+      isNoaccess: false,
+      rawProtect: 0,
+      rawType: 0,
+    };
+
+    const { cancellation, progress, cleanup } = this.wireCancellation(control);
+    try {
+      const outcome = await this.target.readRegionChunked(
+        nativeRegion,
+        DEFAULT_CHUNK_SIZE_BYTES,
+        DEFAULT_OVERLAP_BYTES,
+        cancellation,
+        progress,
+      );
+
+      const slices: CanonicalRegionSlice[] = [];
+      const skipped: CanonicalSkippedRange[] = [];
+      let runBase: bigint | null = null;
+      let runParts: Buffer[] = [];
+      let runEnd = 0n;
+
+      const flushRun = (): void => {
+        if (runBase !== null && runParts.length > 0) {
+          slices.push({ baseAddress: runBase, data: Buffer.concat(runParts) });
+        }
+        runBase = null;
+        runParts = [];
+        runEnd = 0n;
+      };
+
+      const appendChunk = (chunkBase: bigint, data: Buffer): void => {
+        if (runBase === null) {
+          runBase = chunkBase;
+          runParts = [data];
+          runEnd = chunkBase + BigInt(data.length);
+          return;
+        }
+        if (chunkBase > runEnd) {
+          // A genuine hole between two successful chunks - never stitch over it.
+          flushRun();
+          runBase = chunkBase;
+          runParts = [data];
+          runEnd = chunkBase + BigInt(data.length);
+          return;
+        }
+        // Chunks are requested with `DEFAULT_OVERLAP_BYTES` of deliberate
+        // overlap so a pattern straddling a chunk boundary is still matchable;
+        // drop the already-held prefix so the reassembled slice stays a true
+        // 1:1 image of target memory rather than a duplicated one.
+        const alreadyHeld = Number(runEnd - chunkBase);
+        if (alreadyHeld < data.length) {
+          runParts.push(data.subarray(alreadyHeld));
+          runEnd = chunkBase + BigInt(data.length);
+        }
+      };
+
+      for (const chunk of outcome.chunks) {
+        const data = chunk.data;
+        if (chunk.status === 'success' && data && data.length > 0) {
+          appendChunk(chunk.chunkBase, data);
+          continue;
+        }
+        if (chunk.status === 'partial_read' && data && data.length > 0) {
+          appendChunk(chunk.chunkBase, data);
+          // The unread tail of a partial chunk is a real gap: close the run
+          // and record exactly how much was not covered.
+          flushRun();
+          const unread = chunk.requestedSize - BigInt(data.length);
+          if (unread > 0n) {
+            skipped.push({
+              baseAddress: chunk.chunkBase + BigInt(data.length),
+              size: unread,
+              reason: 'partial_read',
+            });
+          }
+          continue;
+        }
+        flushRun();
+        skipped.push({ baseAddress: chunk.chunkBase, size: chunk.requestedSize, reason: chunk.status });
+      }
+      flushRun();
+
+      let completeness = toNativeCompleteness(outcome.completeness);
+      if (skipped.length > 0) {
+        if (completeness.state === 'complete') {
+          completeness = { state: 'complete_with_skipped_regions', skipped };
+        } else if (completeness.state === 'complete_with_skipped_regions') {
+          completeness = {
+            state: 'complete_with_skipped_regions',
+            skipped: [...completeness.skipped, ...skipped],
+          };
+        }
+      }
+
+      const metrics = toCanonicalMetrics(outcome.metrics);
+      control?.onProgress?.(metrics);
+      return { backend: 'native', slices, completeness, metrics };
+    } finally {
+      cleanup();
+    }
   }
 
   async exactScan(

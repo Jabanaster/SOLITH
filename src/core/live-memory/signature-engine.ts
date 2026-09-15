@@ -14,6 +14,14 @@ import {
   type AobScanOptions,
 } from './aob-resolver.js';
 import type { AobResolverFn } from './feature-resolver.js';
+import type {
+  CanonicalCompleteness,
+  CanonicalScanBounds,
+  CanonicalSkippedRange,
+  ScanControl,
+  ScannerBackendKind,
+} from './scanner-backend.js';
+import type { ParityDifference, ScannerMemorySource } from './scanner-backend-router.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
 
 export interface FuzzyScanOptions extends AobScanOptions {
@@ -347,30 +355,293 @@ export function scanFuzzySignature(
 }
 
 /**
+ * The result of a drift-tolerant signature resolution performed over the
+ * canonical scanner backend contract (Stage 7.5).
+ *
+ * `completeness` is the whole point of this shape. The legacy fuzzy path
+ * returned a bare `SignatureMatch | null`, so an uncovered region and a
+ * genuinely absent pattern produced the identical answer - `null` - with no
+ * way for any caller to tell them apart. That is D03, and on the fuzzy path
+ * it was not a theoretical risk: `native-memory-driver.ts`'s `readBuffer`
+ * throws for any region over 1 MiB (D01), and `scanFuzzySignature`'s
+ * `catch { continue; }` swallowed every one of those throws, so on a real
+ * game target the overwhelming majority of the address space was skipped in
+ * silence and reported as "not found".
+ */
+export interface FuzzySignatureOutcome {
+  backend: ScannerBackendKind;
+  match: SignatureMatch | null;
+  completeness: CanonicalCompleteness;
+  /** True iff there is no match AND the search actually covered everything it claimed to. */
+  isAuthoritativeAbsence: boolean;
+}
+
+/**
+ * A drift-tolerant signature lookup bound to a real backend (native by
+ * default, legacy only under explicit rollback) - the fuzzy counterpart to
+ * `feature-resolver.ts`'s `AobResolverFn`.
+ * `LiveMemorySession.createFuzzyAobResolver()` is the production
+ * implementation, always dispatching through `ScannerBackendRouter`.
+ */
+export type FuzzyAobResolverFn = (
+  signature: string,
+  options: FuzzyScanOptions,
+) => Promise<FuzzySignatureOutcome>;
+
+/** Intersects one canonical region with the module spans, in canonical (BigInt) units. */
+function canonicalRegionSpans(
+  region: { baseAddress: bigint; size: bigint },
+  modules: Array<{ baseAddress: bigint; size: bigint }>,
+): Array<{ baseAddress: bigint; size: bigint }> {
+  if (modules.length === 0) {
+    return [{ baseAddress: region.baseAddress, size: region.size }];
+  }
+  const regionEnd = region.baseAddress + region.size;
+  const spans: Array<{ baseAddress: bigint; size: bigint }> = [];
+  for (const module of modules) {
+    const moduleEnd = module.baseAddress + module.size;
+    const start = region.baseAddress > module.baseAddress ? region.baseAddress : module.baseAddress;
+    const end = regionEnd < moduleEnd ? regionEnd : moduleEnd;
+    if (start >= end) continue;
+    spans.push({ baseAddress: start, size: end - start });
+  }
+  return spans;
+}
+
+/**
+ * Clips the hint window against one concrete slice of read bytes, returning
+ * buffer-relative candidate-start bounds (or null when the window misses the
+ * slice entirely).
+ */
+function clipSliceWindow(
+  sliceBase: bigint,
+  sliceLength: number,
+  options: FuzzyScanOptions,
+): { start: number; end: number } | null {
+  if (options.hintAddress == null) return { start: 0, end: sliceLength };
+  const maxShift = Math.max(0, Math.floor(options.maxShiftBytes ?? 512));
+  const hint = options.hintAddress;
+  const sliceEnd = sliceBase + BigInt(sliceLength);
+  const windowStart = hint - BigInt(maxShift);
+  // Exclusive candidate-start bound; +1 includes exactly hint + maxShift.
+  const windowEnd = hint + BigInt(maxShift) + 1n;
+  const clipStart = windowStart > sliceBase ? windowStart : sliceBase;
+  const clipEnd = windowEnd < sliceEnd ? windowEnd : sliceEnd;
+  if (clipStart >= clipEnd) return null;
+  return { start: Number(clipStart - sliceBase), end: Number(clipEnd - sliceBase) };
+}
+
+/**
+ * Drift-tolerant AOB resolution performed entirely over the canonical
+ * scanner backend contract (Stage 7.5 - SHARED_BACKEND_RESOLVER).
+ *
+ * This is the whole architectural claim of the fuzzy migration, made
+ * concrete: the drift algorithm itself (`findBestDriftAobInBuffer` and the
+ * Hamming/bounded-Levenshtein kernels above it) is a *pure function over a
+ * Buffer* - it performs no memory access of any kind and therefore is not,
+ * and never was, a scan primitive. The only primitives the fuzzy path
+ * genuinely needs are region enumeration, module enumeration, and a region
+ * read, and the certified native scanner already provides all three
+ * (`NativeScanTarget.enumerateRegions` / `readRegionChunked`). So migrating
+ * fuzzy required no new native capability at all - only routing the reads it
+ * was already doing through the seam every other production scan already
+ * uses. Nothing is ported to Rust that does not belong there.
+ *
+ * Two behaviors are preserved exactly from the legacy implementation because
+ * changing them would be a correctness regression, not an improvement:
+ * module-scoped requests still fail closed when the module is absent, and
+ * hint windows still clip the searched range. Module scoping in particular
+ * matters far more here than it does for exact AOB: a drift-tolerant matcher
+ * turned loose on an entire address space with a substitution budget will
+ * find something, and it will be wrong.
+ */
+export async function scanFuzzySignatureViaSource(
+  source: ScannerMemorySource,
+  signature: string,
+  options: FuzzyScanOptions = {},
+  bounds: CanonicalScanBounds = {},
+  control?: ScanControl,
+): Promise<Omit<FuzzySignatureOutcome, 'backend'>> {
+  const maxDistance = options.maxDistance ?? 2;
+  const maxEdits = options.maxEdits ?? 1;
+  const pattern = parseAobSignature(signature);
+  const minimumSpan = BigInt(Math.max(1, pattern.bytes.length - maxEdits));
+
+  let modules: Array<{ baseAddress: bigint; size: bigint }> = [];
+  if (options.moduleName) {
+    const wanted = options.moduleName.toLowerCase();
+    const all = await source.enumerateModules();
+    modules = all.filter((m) => m.name.toLowerCase() === wanted);
+    if (modules.length === 0) {
+      // Fail closed, exactly as the legacy path did - and authoritatively:
+      // the module genuinely is not loaded, which is a complete answer, not
+      // an uncovered one.
+      return { match: null, completeness: { state: 'complete' }, isAuthoritativeAbsence: true };
+    }
+  }
+
+  const regions = (await source.enumerateRegions()).filter((r) => r.isReadable && r.size > 0n);
+
+  const skipped: CanonicalSkippedRange[] = [];
+  let terminal: CanonicalCompleteness | null = null;
+  let best: SignatureMatch | null = null;
+
+  // Pure: returns whichever of `current` and the new hit is the better match.
+  // Deliberately not a closure that assigns `best` directly - TypeScript's
+  // control-flow analysis cannot see through that, and the resulting
+  // never-narrowing hid the early-exit check below behind a false positive.
+  const betterOf = (
+    current: SignatureMatch | null,
+    sliceBase: bigint,
+    hit: DriftHit,
+  ): SignatureMatch => {
+    const address = sliceBase + BigInt(hit.offset);
+    const candidate: SignatureMatch = {
+      address,
+      mode: hit.distance === 0 && hit.driftKind === 'hamming' ? 'exact' : 'fuzzy',
+      distance: hit.distance,
+      driftKind: hit.driftKind,
+      shiftBytes: options.hintAddress != null ? Number(address - options.hintAddress) : undefined,
+    };
+    if (!current) return candidate;
+    if (candidate.distance < current.distance) return candidate;
+    if (
+      candidate.distance === current.distance &&
+      candidate.driftKind === 'hamming' &&
+      current.driftKind === 'edit'
+    ) {
+      return candidate;
+    }
+    return current;
+  };
+
+  outer: for (const region of regions) {
+    for (const span of canonicalRegionSpans(region, modules)) {
+      if (span.size < minimumSpan) continue;
+      if (control?.signal?.aborted) {
+        terminal = { state: 'cancelled', atByte: 0n };
+        break outer;
+      }
+
+      const read = await source.readRegion(
+        { ...region, baseAddress: span.baseAddress, size: span.size },
+        bounds,
+        control,
+      );
+
+      switch (read.completeness.state) {
+        case 'complete':
+          break;
+        case 'complete_with_skipped_regions':
+          skipped.push(...read.completeness.skipped);
+          break;
+        default:
+          // cancelled / process_exited / resource_limit / failed are terminal
+          // for the whole resolution - there is no honest way to keep going
+          // and still call the eventual absence authoritative.
+          terminal = read.completeness;
+          break outer;
+      }
+
+      for (const slice of read.slices) {
+        if (slice.data.length < Number(minimumSpan)) continue;
+        const window = clipSliceWindow(slice.baseAddress, slice.data.length, options);
+        if (!window) continue;
+        const hit = findBestDriftAobInBuffer(slice.data, pattern, {
+          maxDistance,
+          maxEdits,
+          searchStart: window.start,
+          searchEnd: window.end,
+        });
+        if (!hit) continue;
+        best = betterOf(best, slice.baseAddress, hit);
+        if (best.distance === 0 && best.driftKind === 'hamming') break outer;
+      }
+    }
+  }
+
+  const completeness: CanonicalCompleteness =
+    terminal ?? (skipped.length > 0 ? { state: 'complete_with_skipped_regions', skipped } : { state: 'complete' });
+
+  return {
+    match: best,
+    completeness,
+    isAuthoritativeAbsence: best === null && completeness.state === 'complete',
+  };
+}
+
+/**
+ * Classifies a SHADOW_COMPARE disagreement between the legacy-sourced and
+ * native-sourced fuzzy resolutions (mission 7.7's rule, applied to the fuzzy
+ * path). The one difference this stage expects to see constantly on a real
+ * target is legacy finding nothing while native finds a real match, because
+ * legacy could not read any region over 1 MiB - that is D01/D03 showing
+ * itself, and it is attributed to the named, understood cause rather than
+ * blamed on native. Anything else is reported as needing an owner decision;
+ * this never invents a justification for a difference it cannot explain.
+ */
+export function classifyFuzzySignatureDifference(
+  legacy: Pick<FuzzySignatureOutcome, 'match' | 'completeness'>,
+  native: Pick<FuzzySignatureOutcome, 'match' | 'completeness'>,
+): ParityDifference[] {
+  const legacyAddress = legacy.match?.address ?? null;
+  const nativeAddress = native.match?.address ?? null;
+  if (legacyAddress === nativeAddress && legacy.match?.distance === native.match?.distance) return [];
+
+  const legacyIncomplete = legacy.completeness.state !== 'complete';
+  if (legacyAddress === null && nativeAddress !== null && legacyIncomplete) {
+    return [
+      {
+        field: 'match',
+        legacyValue: { found: false, completeness: legacy.completeness.state },
+        nativeValue: { found: true, address: nativeAddress.toString(), distance: native.match?.distance },
+        classification: 'EXPECTED_NATIVE_CORRECTION',
+        note:
+          'Legacy fuzzy resolution could not cover the region containing the match - every region over ' +
+          '1 MiB fails outright in native-memory-driver.ts readBuffer (D01) - and reported no match; the ' +
+          'native-sourced resolution read the region in chunks and found a real one.',
+      },
+    ];
+  }
+
+  return [
+    {
+      field: 'match',
+      legacyValue: legacyAddress !== null ? legacyAddress.toString() : null,
+      nativeValue: nativeAddress !== null ? nativeAddress.toString() : null,
+      classification: 'SEMANTIC_DIFFERENCE_REQUIRING_OWNER_DECISION',
+      note: 'Fuzzy match result differs for a reason this classifier does not recognize as a known, expected cause.',
+    },
+  ];
+}
+
+/**
  * Prefer exact match; fall back to fuzzy Hamming + edit drift within policy.
  *
- * Stage 7.4 §7 — the exact-match sub-path (`scanExactSignature`) is exactly
- * the operation `aob-resolver.ts`'s `scanAobInProcess` already migrated for
- * `feature-resolver.ts` and `hook-engine.ts`: a plain, first-match, no-drift
- * pattern search. When `exactAobResolver` is bound (the real production
- * path, via `LiveMemorySession.createAobResolver()`), that sub-path is
- * routed through the backend contract instead of calling `scanExactSignature`
- * directly — this is what "no direct legacy read-loop fallback in normal
- * NATIVE mode" means for this function.
+ * Stage 7.5 - BOTH sub-paths are now backend-routed. The exact sub-path goes
+ * through `exactAobResolver` (Stage 7.4); the fuzzy/drift sub-path goes
+ * through `fuzzyAobResolver` (this stage). `LiveMemorySession` binds both, so
+ * in the real production call graph neither sub-path touches `MemoryDriver`.
  *
- * The fuzzy path (`scanFuzzySignature` — Hamming/edit-distance drift
- * tolerance with hint windows) has NO native equivalent at all: the native
- * pattern engine (`native/solith-scanner-core/src/pattern.rs`) only ever
- * compiles a mask/value AOB grammar and matches it exactly (see its own doc
- * comment) — there is no notion of "match within N substitutions/edits" in
- * that engine. Migrating fuzzy matching would mean designing and building a
- * wholly new native capability, not routing an existing operation to an
- * existing one; mission §7's own required-test list (exact signature,
- * wildcards, continuous CE syntax, multiple matches, no-match complete/
- * incomplete, >1 MiB, cancel, process exit) never names fuzzy/Hamming/edit
- * matching, which is consistent with this boundary. Fuzzy resolution
- * therefore stays legacy-only — a real, disclosed, permanent capability gap
- * relative to the native engine, not an unmigrated shortcut.
+ * The direct `scanExactSignature`/`scanFuzzySignature` calls below survive
+ * only as the unbound fallback for a caller that genuinely has no session or
+ * router to bind to - a unit test driving this function against a
+ * `FakeMemoryDriver`. They are not a production shortcut, and they are not
+ * reachable from the shipping IPC path, which always binds both resolvers.
+ *
+ * On why the fuzzy migration needed no new Rust, correcting what this comment
+ * previously claimed: Stage 7.4 recorded that fuzzy matching had "no native
+ * equivalent at all" and must therefore remain legacy-only. The underlying
+ * observation was accurate - the native pattern engine
+ * (`native/solith-scanner-core/src/pattern.rs`) compiles a mask/value AOB
+ * grammar and matches it exactly, with no notion of a substitution or edit
+ * budget - but it drew the boundary in the wrong place. Drift tolerance is
+ * not a scan primitive; it is a pure computation over bytes that a scan
+ * primitive returns (`findBestDriftAobInBuffer` takes a `Buffer` and performs
+ * no memory access whatsoever). The primitives fuzzy actually needs - region
+ * enumeration and a chunked, completeness-reporting region read - already
+ * exist natively and are already certified. See
+ * `scanFuzzySignatureViaSource`.
  */
 export async function resolveSignature(
   driver: MemoryDriver,
@@ -378,14 +649,66 @@ export async function resolveSignature(
   signature: string,
   options: FuzzyScanOptions = {},
   exactAobResolver?: AobResolverFn,
+  fuzzyAobResolver?: FuzzyAobResolverFn,
 ): Promise<SignatureMatch | null> {
+  const outcome = await resolveSignatureWithCoverage(
+    driver,
+    handle,
+    signature,
+    options,
+    exactAobResolver,
+    fuzzyAobResolver,
+  );
+  return outcome.match;
+}
+
+/**
+ * `resolveSignature`, plus the coverage truth behind a `null` result.
+ *
+ * `completeness` is `null` only on the unbound legacy fallback path, where
+ * there genuinely is no coverage signal to report - legacy's own fuzzy scan
+ * never had one. That `null` means "unknown", and `isAuthoritativeAbsence` is
+ * correspondingly `false`: an unbound miss is never promoted to a confident
+ * not-found.
+ */
+export async function resolveSignatureWithCoverage(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  signature: string,
+  options: FuzzyScanOptions = {},
+  exactAobResolver?: AobResolverFn,
+  fuzzyAobResolver?: FuzzyAobResolverFn,
+): Promise<{
+  match: SignatureMatch | null;
+  completeness: CanonicalCompleteness | null;
+  isAuthoritativeAbsence: boolean;
+  fuzzyBackend: ScannerBackendKind | null;
+}> {
   if (options.hintAddress == null) {
     const exact = exactAobResolver
       ? await resolveExactSignatureViaBackend(exactAobResolver, signature, options.moduleName)
       : scanExactSignature(driver, handle, signature, options);
-    if (exact) return exact;
+    if (exact) {
+      return { match: exact, completeness: { state: 'complete' }, isAuthoritativeAbsence: false, fuzzyBackend: null };
+    }
   }
-  return scanFuzzySignature(driver, handle, signature, options);
+
+  if (fuzzyAobResolver) {
+    const outcome = await fuzzyAobResolver(signature, options);
+    return {
+      match: outcome.match,
+      completeness: outcome.completeness,
+      isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
+      fuzzyBackend: outcome.backend,
+    };
+  }
+
+  return {
+    match: scanFuzzySignature(driver, handle, signature, options),
+    completeness: null,
+    isAuthoritativeAbsence: false,
+    fuzzyBackend: null,
+  };
 }
 
 /** Wraps a bound `AobResolverFn` in `scanExactSignature`'s own `SignatureMatch` result shape. */

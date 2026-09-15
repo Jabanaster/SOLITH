@@ -34,6 +34,13 @@ import {
 import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
 import { resolveMemoryFeatureAddress, SessionAddressCache, type AobResolverFn } from './feature-resolver.js';
 import {
+  classifyFuzzySignatureDifference,
+  scanFuzzySignatureViaSource,
+  type FuzzyAobResolverFn,
+  type FuzzyScanOptions,
+  type FuzzySignatureOutcome,
+} from './signature-engine.js';
+import {
   registerActiveFreeze,
   unregisterActiveFreeze,
   unregisterAllFreezesForOwner,
@@ -739,7 +746,21 @@ export class LiveMemorySession {
     if (!this.handle) throw new Error('No process attached.');
     if (!this.backendRouter) {
       const legacyBackend = new LegacyScannerBackend(this.driver, this.handle);
-      const nativeBackend = new NativeScannerBackend();
+      // Stage 7.5 - the native scanner core has no module enumeration of its
+      // own (forward-assigned to Stage 8), so both backends are given the same
+      // OS module list here. This keeps module-scoped resolution fail-closed
+      // and identical across backends instead of letting a NATIVE-mode fuzzy
+      // request silently widen to the entire address space, which for a
+      // drift-tolerant matcher is a false-positive hazard, not a convenience.
+      // See NativeScannerBackend's TargetModuleProvider doc.
+      const handle = this.handle;
+      const nativeBackend = new NativeScannerBackend(() =>
+        this.driver.getModules(handle).map((m) => ({
+          name: m.name,
+          baseAddress: m.baseAddress,
+          size: BigInt(m.size),
+        })),
+      );
       this.backendRouter = new ScannerBackendRouter(legacyBackend, nativeBackend, {
         mode: this.scannerRoutingMode,
       });
@@ -863,6 +884,50 @@ export class LiveMemorySession {
       backend: outcome.backend,
       isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
     };
+  }
+
+  /**
+   * Stage 7.5 - drift-tolerant (fuzzy) AOB resolution, routed through the
+   * same backend contract every other production scan already uses. This is
+   * the migration seam for D14 (fuzzy AOB legacy-only) and, on this path, for
+   * D01/D03: under NATIVE the reads are chunked and completeness-reporting,
+   * so a region over 1 MiB is actually searched instead of being silently
+   * dropped and reported as "not found".
+   *
+   * The drift algorithm itself is not routed anywhere - it stays a pure
+   * function over buffers in `signature-engine.ts`. Only the reads move.
+   */
+  async scanFuzzyAobViaBackend(
+    signature: string,
+    options: FuzzyScanOptions = {},
+    control?: ScanControl,
+  ): Promise<FuzzySignatureOutcome> {
+    if (!this.target) throw new Error('No process attached.');
+    const router = this.getOrCreateBackendRouter();
+    // The type argument is pinned rather than inferred: `classifyFuzzySignatureDifference`
+    // accepts a `Pick<FuzzySignatureOutcome, 'match' | 'completeness'>`, which is
+    // narrower than what `run` returns, and letting both call sites drive inference
+    // silently drops `isAuthoritativeAbsence` from the result type.
+    const { result, backend } = await router.routedMemorySourceOperation<Omit<FuzzySignatureOutcome, 'backend'>>(
+      this.target.pid,
+      'fuzzyAobScan',
+      (source) => scanFuzzySignatureViaSource(source, signature, options, {}, control),
+      classifyFuzzySignatureDifference,
+    );
+    return { backend, ...result };
+  }
+
+  /**
+   * Stage 7.5 - the fuzzy counterpart to `createAobResolver()`. Bound by
+   * every production call site that resolves definition features
+   * (`process-watcher.ts`'s `resolveDefinitionFeatures`, reached from
+   * `zero-input-prepare.ts` and the `live-memory-zero-input-prepare` IPC
+   * handler), so the shipping fuzzy path no longer calls `MemoryDriver`
+   * directly at all.
+   */
+  createFuzzyAobResolver(): FuzzyAobResolverFn {
+    return (signature: string, options: FuzzyScanOptions) =>
+      this.scanFuzzyAobViaBackend(signature, options);
   }
 
   /**

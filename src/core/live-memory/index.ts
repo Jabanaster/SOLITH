@@ -50,10 +50,18 @@ export {
   findBestFuzzyAobInBuffer,
   scanExactSignature,
   scanFuzzySignature,
+  scanFuzzySignatureViaSource,
+  classifyFuzzySignatureDifference,
   resolveSignature,
+  resolveSignatureWithCoverage,
   resolveSignatureInBuffer,
 } from './signature-engine.js';
-export type { FuzzyScanOptions, SignatureMatch } from './signature-engine.js';
+export type {
+  FuzzyAobResolverFn,
+  FuzzyScanOptions,
+  FuzzySignatureOutcome,
+  SignatureMatch,
+} from './signature-engine.js';
 export { MemoryAuditLog } from './audit-log.js';
 export type { MemoryAuditEntry, MemoryAuditOp, MemoryAuditLogOptions } from './audit-log.js';
 export { MemoryManager } from './memory-manager.js';

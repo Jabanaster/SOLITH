@@ -160,6 +160,60 @@ export interface ScanControl {
 }
 
 /**
+ * A single committed region of the target's address space, canonicalized
+ * (Stage 7.5 §3). `size` is BigInt — this contract never down-converts an
+ * address or a size, matching the discipline every other canonical type here
+ * already follows.
+ */
+export interface CanonicalMemoryRegion {
+  baseAddress: bigint;
+  size: bigint;
+  isReadable: boolean;
+  isWritable: boolean;
+  isExecutable: boolean;
+}
+
+/**
+ * A loaded module in the target process. Stage 7.5 §3 — module identity is
+ * target *metadata*, not scan/read data: it carries none of the defects
+ * (D01's 1 MiB `readBuffer` ceiling, D03's silent skip-on-throw) that this
+ * contract exists to close, and obtaining it reads no target memory. It is
+ * on the contract anyway for two concrete reasons: a resolver layered on
+ * this seam (`signature-engine.ts`'s fuzzy path) then needs no `MemoryDriver`
+ * import at all, and module-scoped resolution keeps identical fail-closed
+ * semantics across backends instead of silently widening its search when a
+ * backend cannot name modules — which for a drift-tolerant matcher would
+ * not be a narrowing convenience lost, but a false-positive hazard gained.
+ */
+export interface CanonicalTargetModule {
+  name: string;
+  baseAddress: bigint;
+  size: bigint;
+}
+
+/**
+ * One contiguous run of bytes actually read from the target. A region read
+ * yields one slice per gap-free run: a chunk that could not be read (access
+ * denied, target exited, partial read) ends the current run and is recorded
+ * in the outcome's `completeness` as a skipped range rather than being
+ * silently stitched over. This is the structural property that makes a
+ * resolver built on this seam incapable of reproducing D03 — a pattern that
+ * would have straddled an unreadable gap is reported as *not covered*, never
+ * as *not present*.
+ */
+export interface CanonicalRegionSlice {
+  baseAddress: bigint;
+  data: Buffer;
+}
+
+export interface CanonicalRegionReadOutcome {
+  backend: ScannerBackendKind;
+  slices: CanonicalRegionSlice[];
+  completeness: CanonicalCompleteness;
+  metrics: CanonicalMetrics;
+}
+
+/**
  * A single production scanner backend. Both `LegacyScannerBackend` and
  * `NativeScannerBackend` implement this. Every method is async — the native
  * backend's operations are inherently async (napi worker-thread pool), and
@@ -178,6 +232,26 @@ export interface ScannerBackend {
   attach(pid: number): Promise<void>;
   /** Releases this backend's resources for the current target, if any were acquired. Idempotent. */
   detach(): Promise<void>;
+  /**
+   * Enumerates the target's committed regions (Stage 7.5 §3). Native reads
+   * them from its own independent attach; legacy reuses the session's
+   * existing `MemoryDriver` handle.
+   */
+  enumerateRegions(): Promise<CanonicalMemoryRegion[]>;
+  /** Enumerates the target's loaded modules — see `CanonicalTargetModule`. */
+  enumerateModules(): Promise<CanonicalTargetModule[]>;
+  /**
+   * Reads `region`, honestly reporting whatever it could not cover. An
+   * unreadable sub-range is never a thrown error and never a silent gap: it
+   * ends the current slice and lands in `completeness`. This method throws
+   * `ScannerBackendError` only when the operation as a whole cannot proceed
+   * (not attached, target gone, cancelled before any work began).
+   */
+  readRegion(
+    region: CanonicalMemoryRegion,
+    bounds: CanonicalScanBounds,
+    control?: ScanControl,
+  ): Promise<CanonicalRegionReadOutcome>;
   exactScan(
     primitiveType: CanonicalPrimitiveType,
     valueNumber: number | undefined,

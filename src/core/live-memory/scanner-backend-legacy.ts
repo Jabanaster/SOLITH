@@ -17,9 +17,12 @@ import {
   liveValueTypeToCanonical,
   ScannerBackendError,
   type CanonicalExactScanOutcome,
+  type CanonicalMemoryRegion,
   type CanonicalPatternScanOutcome,
   type CanonicalPrimitiveType,
+  type CanonicalRegionReadOutcome,
   type CanonicalScanBounds,
+  type CanonicalTargetModule,
   type ScanControl,
   type ScannerBackend,
 } from './scanner-backend.js';
@@ -72,6 +75,139 @@ export class LegacyScannerBackend implements ScannerBackend {
   async detach(): Promise<void> {
     // No-op by design: the shared legacy handle's lifecycle is owned by
     // `LiveMemorySession`, not by this adapter.
+  }
+
+  /**
+   * Stage 7.5 - legacy's own region model (`MemoryRegion` in `types.ts`) is
+   * narrower than the native one: it carries only `writable`, with no
+   * readable/executable protection bits at all. `isReadable` is therefore
+   * reported as `true` for every enumerated region, which is legacy's real,
+   * existing assumption (`aob-resolver.ts` and `memory-scanner.ts` both just
+   * attempt the read and treat a throw as "skip"), not a claim this adapter
+   * is inventing. The consequence - that legacy discovers unreadability only
+   * by failing - is exactly what `readRegion` below reports honestly.
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async enumerateRegions(): Promise<CanonicalMemoryRegion[]> {
+    if (!this.driver || !this.handle) {
+      throw new ScannerBackendError('attach_failed', 'Legacy backend is not attached.');
+    }
+    return this.driver.getRegions(this.handle).map((r) => ({
+      baseAddress: r.baseAddress,
+      size: BigInt(r.size),
+      isReadable: true,
+      isWritable: r.writable,
+      isExecutable: false,
+    }));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async enumerateModules(): Promise<CanonicalTargetModule[]> {
+    if (!this.driver || !this.handle) {
+      throw new ScannerBackendError('attach_failed', 'Legacy backend is not attached.');
+    }
+    return this.driver.getModules(this.handle).map((m) => ({
+      name: m.name,
+      baseAddress: m.baseAddress,
+      size: BigInt(m.size),
+    }));
+  }
+
+  /**
+   * Stage 7.5 - a pure adapter over `MemoryDriver.readBuffer`, deliberately
+   * preserving every legacy limitation rather than repairing it here. The
+   * single most important one: `native-memory-driver.ts`'s `readBuffer`
+   * **throws** for any `size > 1048576`, so under LEGACY every region larger
+   * than 1 MiB yields zero bytes. That is D01, and it must stay true on this
+   * path or explicit LEGACY rollback would no longer be a faithful rollback,
+   * and SHADOW_COMPARE would have nothing real to compare.
+   *
+   * What this adapter DOES change is the silence. Legacy's own callers
+   * (`aob-resolver.ts`'s and `signature-engine.ts`'s `catch { continue; }`)
+   * swallowed that throw and let an uncovered region masquerade as a covered
+   * one with no match - D03, a false "not found" that no caller could
+   * distinguish from a true absence. Here the same failure is surfaced as a
+   * `complete_with_skipped_regions` range carrying the real reason, so a
+   * resolver built on this contract can refuse to call the result
+   * authoritative. The defect stays; the lie does not.
+   */
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async readRegion(
+    region: CanonicalMemoryRegion,
+    bounds: CanonicalScanBounds,
+    control?: ScanControl,
+  ): Promise<CanonicalRegionReadOutcome> {
+    checkNotAborted(control);
+    if (!this.driver || !this.handle) {
+      throw new ScannerBackendError('attach_failed', 'Legacy backend is not attached.');
+    }
+
+    const skippedOutcome = (reason: string): CanonicalRegionReadOutcome => {
+      const metrics = {
+        regionsConsidered: 1,
+        regionsRead: 0,
+        regionsSkipped: 1,
+        bytesRequested: region.size,
+        bytesRead: 0n,
+        elapsedMillis: 0n,
+      };
+      control?.onProgress?.(metrics);
+      return {
+        backend: 'legacy',
+        slices: [],
+        completeness: {
+          state: 'complete_with_skipped_regions',
+          skipped: [{ baseAddress: region.baseAddress, size: region.size, reason }],
+        },
+        metrics,
+      };
+    };
+
+    if (bounds.maxRegionBytes !== undefined && region.size > BigInt(bounds.maxRegionBytes)) {
+      return skippedOutcome('max_region_bytes');
+    }
+    if (region.size <= 0n || region.size > BigInt(Number.MAX_SAFE_INTEGER)) {
+      return skippedOutcome('legacy_region_size_unrepresentable');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = this.driver.readBuffer(this.handle, region.baseAddress, Number(region.size));
+    } catch (err) {
+      return skippedOutcome(`legacy_read_failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    const metrics = {
+      regionsConsidered: 1,
+      regionsRead: 1,
+      regionsSkipped: 0,
+      bytesRequested: region.size,
+      bytesRead: BigInt(buffer.length),
+      elapsedMillis: 0n,
+    };
+    control?.onProgress?.(metrics);
+
+    // A short read is a partial read: say so rather than treating the missing
+    // tail as scanned-and-empty.
+    const shortfall = region.size - BigInt(buffer.length);
+    return {
+      backend: 'legacy',
+      slices: buffer.length > 0 ? [{ baseAddress: region.baseAddress, data: buffer }] : [],
+      completeness:
+        shortfall > 0n
+          ? {
+              state: 'complete_with_skipped_regions',
+              skipped: [
+                {
+                  baseAddress: region.baseAddress + BigInt(buffer.length),
+                  size: shortfall,
+                  reason: 'legacy_short_read',
+                },
+              ],
+            }
+          : { state: 'complete' },
+      metrics,
+    };
   }
 
   async exactScan(
