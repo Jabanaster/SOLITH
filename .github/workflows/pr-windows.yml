@@ -27,6 +27,23 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # Stage 7.2/7.3 §14/§18 — the native Rust scanner had NO fmt/clippy/test
+      # gate anywhere in CI before this (doc 101's disclosed gap). Installed
+      # early, before `npm ci`, since the fmt/clippy checks below need only
+      # the Rust toolchain, not the Node dependency graph.
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust fmt check (native/solith-scanner-core)
+        working-directory: native/solith-scanner-core
+        run: cargo fmt --check
+
+      - name: Rust clippy (native/solith-scanner-core)
+        working-directory: native/solith-scanner-core
+        run: cargo clippy --release -- -D warnings
+
       - name: Verify Node policy
         run: node scripts/check-node.mjs
 
@@ -52,6 +69,25 @@ jobs:
       # boundaries-only result when no host has been built.
       - name: Orphan and boundary check
         run: npm run orphan-check
+
+      - name: Rust test (release profile — matches the canonical build)
+        working-directory: native/solith-scanner-core
+        run: cargo test --release
+
+      # Stage 7 final closure §fresh-worktree finding (doc 100): the napi JS
+      # test suite looks for the fixture binary under target/debug, which
+      # `cargo test --release` above does not produce — a separate debug
+      # build is required. This is not duplicate work: `cargo build` (no
+      # --release) is fast once `cargo test --release` has already
+      # populated the shared target/ dependency cache.
+      - name: Rust debug build (napi test fixture dependency)
+        working-directory: native/solith-scanner-core
+        run: cargo build
+
+      - name: napi tests (--expose-gc)
+        working-directory: native/solith-scanner-napi
+        shell: bash
+        run: node --expose-gc --test test/*.test.js
 
       - name: Run standard test suite
         run: npm test
