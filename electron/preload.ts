@@ -131,6 +131,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryScanFirst: (payload: {
     dataType: string;
     targetValue: number;
+    // Stage 7.1 §3/§4 — exact int64 wire value (decimal string; a `number`
+    // alone cannot carry a value beyond Number.MAX_SAFE_INTEGER without
+    // loss). Ignored for any dataType other than 'int64'. See
+    // LiveMemoryScanFirstSchema and LiveMemorySession.scanExactViaBackend.
+    targetValueBigint?: string;
     maxRegionBytes?: number;
     maxTotalBytes?: number;
     maxMatches?: number;

@@ -492,11 +492,21 @@ export function registerLiveMemoryIpc(): void {
       // Stage 7 §7.10-§7.12 — routed through the backend contract (LEGACY
       // by default, byte-for-byte equivalent to the pre-Stage-7 `scanFirst`
       // call it replaces; see LegacyScannerBackend's doc comment).
-      const result = await session.scanExactViaBackend(parsed.dataType, parsed.targetValue, {
-        maxRegionBytes: parsed.maxRegionBytes,
-        maxTotalBytes: parsed.maxTotalBytes,
-        maxMatches: parsed.maxMatches,
-      });
+      // Stage 7.1 §7.1-C — when the caller supplies the exact int64 wire
+      // value, pass it through untouched instead of letting the session
+      // reconstruct it from the already-lossy `targetValue` number.
+      const exactTargetValueBigint =
+        parsed.targetValueBigint !== undefined ? BigInt(parsed.targetValueBigint) : undefined;
+      const result = await session.scanExactViaBackend(
+        parsed.dataType,
+        parsed.targetValue,
+        {
+          maxRegionBytes: parsed.maxRegionBytes,
+          maxTotalBytes: parsed.maxTotalBytes,
+          maxMatches: parsed.maxMatches,
+        },
+        exactTargetValueBigint,
+      );
       return {
         success: true,
         result: {

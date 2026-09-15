@@ -723,6 +723,7 @@ export class LiveMemorySession {
     dataType: LiveValueType,
     targetValue: number,
     bounds?: ScanBounds,
+    exactTargetValueBigint?: bigint,
   ): Promise<{
     backend: 'legacy' | 'native';
     isAuthoritativeAbsence: boolean;
@@ -739,7 +740,22 @@ export class LiveMemorySession {
       maxTotalBytes: bounds?.maxTotalBytes,
       maxMatches: bounds?.maxMatches,
     };
-    const valueBigint = dataType === 'int64' ? BigInt(Math.trunc(targetValue)) : undefined;
+    // Stage 7.1 §7.1-C fix: `targetValue` is a `number` and has already lost
+    // precision beyond Number.MAX_SAFE_INTEGER by the time it reaches this
+    // method — deriving the int64 search value from it via `BigInt(Math.trunc(...))`
+    // (the pre-Stage-7.1 behavior, still the fallback below for callers that
+    // don't have an exact value) can never round-trip a real int64 beyond
+    // 2^53 correctly. `exactTargetValueBigint` is the real fix: callers that
+    // hold the true BigInt (the IPC handler, once the wire format carries
+    // one — see LiveMemoryScanFirstSchema.targetValueBigint) pass it directly,
+    // so precision is preserved end to end instead of round-tripped through
+    // a lossy Number.
+    const valueBigint =
+      exactTargetValueBigint !== undefined
+        ? exactTargetValueBigint
+        : dataType === 'int64'
+          ? BigInt(Math.trunc(targetValue))
+          : undefined;
     const outcome = await router.routedExactScan(
       this.target.pid,
       primitiveType,

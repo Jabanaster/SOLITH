@@ -189,6 +189,17 @@ function toCanonicalMetrics(m: NativeProgress) {
 /** Default chunk/overlap sizes — same values the Stage 1-6 native test suite already certified. */
 const DEFAULT_CHUNK_SIZE_BYTES = 64n * 1024n;
 const DEFAULT_OVERLAP_BYTES = 7n;
+// Stage 7.1 §2 — real, confirmed defect: unlike `memory-scanner.ts`'s
+// `scanFirst` (which has always applied its own `DEFAULT_MAX_MATCHES =
+// 10_000` whenever a caller omits `bounds.maxMatches`), this backend had NO
+// default at all — `exactScan` accumulated every match from every region
+// into one in-memory array with no bound unless the caller explicitly
+// supplied `maxMatches`. Proven real via a live NATIVE-mode scan against a
+// real game (Godlike Burger, u32 value 100): 151,382 real matches
+// accumulated in one JS array with no limit. Matching legacy's own existing
+// safe default here closes that gap for every caller of this backend, not
+// just the ones that happen to pass an explicit bound.
+const DEFAULT_MAX_MATCHES = 10_000;
 
 export class NativeScannerBackend implements ScannerBackend {
   readonly kind = 'native' as const;
@@ -242,6 +253,10 @@ export class NativeScannerBackend implements ScannerBackend {
       .filter((r) => r.isReadable && !r.isGuard && !r.isNoaccess)
       .filter((r) => bounds.maxRegionBytes === undefined || r.size <= BigInt(bounds.maxRegionBytes));
 
+    // Stage 7.1 §2 fix — always apply a real bound, whether or not the
+    // caller supplied one (see DEFAULT_MAX_MATCHES's doc comment above).
+    const effectiveMaxMatches = bounds.maxMatches ?? DEFAULT_MAX_MATCHES;
+
     const { cancellation, progress, cleanup } = this.wireCancellation(control);
     try {
       const matches: CanonicalExactScanOutcome['matches'] = [];
@@ -267,7 +282,7 @@ export class NativeScannerBackend implements ScannerBackend {
           'bytewise',
           DEFAULT_CHUNK_SIZE_BYTES,
           DEFAULT_OVERLAP_BYTES,
-          bounds.maxMatches !== undefined ? BigInt(bounds.maxMatches - matches.length) : undefined,
+          BigInt(effectiveMaxMatches - matches.length),
           cancellation,
           progress,
         );
@@ -288,7 +303,7 @@ export class NativeScannerBackend implements ScannerBackend {
           worstCompleteness = outcome.completeness;
           if (outcome.completeness.state === 'cancelled' || outcome.completeness.state === 'process_exited') break;
         }
-        if (bounds.maxMatches !== undefined && matches.length >= bounds.maxMatches) {
+        if (matches.length >= effectiveMaxMatches) {
           worstCompleteness = { state: 'resource_limit', atByte: totalBytesSoFar };
           break;
         }

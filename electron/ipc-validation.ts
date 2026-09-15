@@ -367,6 +367,13 @@ export const LiveMemoryRollbackSchema = z.object({
 export const LiveMemoryScanFirstSchema = z.object({
   dataType: LIVE_VALUE_TYPE,
   targetValue: z.number().finite(),
+  // Stage 7.1 §7.1-C — `targetValue` alone cannot carry an exact int64 value
+  // beyond Number.MAX_SAFE_INTEGER (a `number` has already lost precision by
+  // the time it's on the wire). This optional decimal-string sibling lets a
+  // dataType: 'int64' caller supply the real value exactly; `targetValue`
+  // stays required for every other type and as a best-effort display value
+  // even when this is present. Ignored for any dataType other than 'int64'.
+  targetValueBigint: z.string().regex(/^-?\d{1,20}$/).optional(),
   maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
   // 4 GiB ceiling — real-machine testing showed the 2 GiB production default is itself
   // sometimes insufficient (Stardew Valley alone used ~957 MiB), so the client-overridable

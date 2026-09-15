@@ -138,12 +138,29 @@ interface Window {
     liveMemoryScanFirst: (payload: {
       dataType: string;
       targetValue: number;
+      // Stage 7.1 §3/§4 — exact int64 wire value (decimal string). A
+      // `number` alone cannot carry a value beyond
+      // Number.MAX_SAFE_INTEGER without loss. Ignored for any dataType
+      // other than 'int64'.
+      targetValueBigint?: string;
       maxRegionBytes?: number;
       maxTotalBytes?: number;
       maxMatches?: number;
     }) => Promise<{
       success: boolean;
-      result?: { matches: { address: string; value: number }[]; regionsScanned: number; bytesScanned: number; truncated: boolean };
+      result?: {
+        matches: { address: string; value: number; valueBigint?: string }[];
+        regionsScanned: number;
+        bytesScanned: number;
+        truncated: boolean;
+        // Stage 7 — which backend actually served this scan (LEGACY/NATIVE
+        // routing is real and observable, not compile-time-only) and
+        // whether an empty match set is authoritative (legacy's AOB/scan
+        // paths never had a real "definitely not present" signal; see
+        // ScannerBackend's doc comments).
+        backend?: 'legacy' | 'native';
+        isAuthoritativeAbsence?: boolean;
+      };
       error?: string;
     }>;
     liveMemoryScanFirstAutoMatrix: (payload: {
@@ -781,6 +798,33 @@ interface Window {
       success: boolean;
       found?: boolean;
       address?: string;
+      backend?: 'legacy' | 'native';
+      isAuthoritativeAbsence?: boolean;
+      error?: string;
+    }>;
+    /**
+     * Stage 7 §7.5 — explicit, observable scanner backend routing control.
+     * Was missing from this renderer-facing type declaration since Stage 7
+     * added the underlying IPC channels/preload methods — renderer code
+     * had no type-safe way to call them until this fix (Stage 7 final
+     * closure §8: "runtime-observable... testable... not compile-time-only"
+     * requires the renderer contract to actually expose this).
+     */
+    liveMemoryScannerRoutingModeGet: () => Promise<{
+      success: boolean;
+      mode?: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
+      diagnostics?: {
+        mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
+        allowFallbackToLegacyOnNativeFailure: boolean;
+        operationCount: number;
+        fallbackCount: number;
+        lastOperation?: unknown;
+      };
+      error?: string;
+    }>;
+    liveMemoryScannerRoutingModeSet: (payload: { mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE' }) => Promise<{
+      success: boolean;
+      mode?: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
       error?: string;
     }>;
     /** Phase 9 — typed reinterpret at one address (read-only). */
