@@ -15,6 +15,10 @@ import type { AutoFirstScanMatrixResult, AutoFirstScanQuery, ScanResult, TypedSc
 import { resolvePointerPath } from './pointer-resolver.js';
 import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
 import { scanAobInProcess } from './aob-resolver.js';
+import { LegacyScannerBackend } from './scanner-backend-legacy.js';
+import { NativeScannerBackend } from './scanner-backend-native.js';
+import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
+import { liveValueTypeToCanonical, type CanonicalScanBounds, type ScannerRoutingMode } from './scanner-backend.js';
 import {
   fingerprintBlocksAttach,
   verifyDefinitionFingerprint,
@@ -270,6 +274,14 @@ export class LiveMemorySession {
   private readonly addressCache = new SessionAddressCache();
   private lastFingerprint: FingerprintVerifyResult | null = null;
   private catalogGameId: string | null = null;
+  /**
+   * Stage 7 §7.5 backend routing. Created lazily on first backend-routed
+   * scan call (not eagerly in `attach()`) since it only needs `this.handle`,
+   * which `attach()` already guarantees by the time any scan method runs.
+   * Torn down on `detach()` alongside every other per-attach session state.
+   */
+  private backendRouter: ScannerBackendRouter | null = null;
+  private scannerRoutingMode: ScannerRoutingMode = 'LEGACY';
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -664,6 +676,112 @@ export class LiveMemorySession {
   scanFirst(dataType: LiveValueType, targetValue: number, bounds?: ScanBounds): ScanResult {
     if (!this.handle) throw new Error('No process attached.');
     return scanFirstRegions(this.driver, this.handle, dataType, targetValue, bounds);
+  }
+
+  private getOrCreateBackendRouter(): ScannerBackendRouter {
+    if (!this.handle) throw new Error('No process attached.');
+    if (!this.backendRouter) {
+      const legacyBackend = new LegacyScannerBackend(this.driver, this.handle);
+      const nativeBackend = new NativeScannerBackend();
+      this.backendRouter = new ScannerBackendRouter(legacyBackend, nativeBackend, {
+        mode: this.scannerRoutingMode,
+      });
+    }
+    return this.backendRouter;
+  }
+
+  /**
+   * Backend-routed current mode (mission §7.5) — observable in diagnostics,
+   * switchable without recreating the session or rebuilding (mission
+   * §7.16's rollback-without-rebuild requirement).
+   */
+  getScannerRoutingMode(): ScannerRoutingMode {
+    return this.scannerRoutingMode;
+  }
+
+  setScannerRoutingMode(mode: ScannerRoutingMode): void {
+    this.scannerRoutingMode = mode;
+    this.backendRouter?.setMode(mode);
+  }
+
+  getScannerBackendDiagnostics(): ScannerBackendDiagnosticsSnapshot | null {
+    return this.backendRouter?.diagnostics() ?? null;
+  }
+
+  /**
+   * Exact-value scan, routed through the Stage 7 backend contract (mission
+   * §7.3/§7.10-§7.12) — the migration seam for the 1 MiB, alignment, and
+   * int64 shipping defects. `dataType`/`targetValue`/`bounds` and the
+   * `matches`/`regionsScanned`/`bytesScanned`/`truncated` shape of the
+   * returned object are unchanged from `scanFirst`'s own contract so this
+   * is a drop-in replacement at the IPC boundary; `backend`,
+   * `isAuthoritativeAbsence`, and (for `int64` only) each match's
+   * `valueBigint` are new, additive fields — nothing existing is removed
+   * or down-converted.
+   */
+  async scanExactViaBackend(
+    dataType: LiveValueType,
+    targetValue: number,
+    bounds?: ScanBounds,
+  ): Promise<{
+    backend: 'legacy' | 'native';
+    isAuthoritativeAbsence: boolean;
+    matches: Array<ScanMatch & { valueBigint?: bigint }>;
+    regionsScanned: number;
+    bytesScanned: number;
+    truncated: boolean;
+  }> {
+    if (!this.target) throw new Error('No process attached.');
+    const router = this.getOrCreateBackendRouter();
+    const primitiveType = liveValueTypeToCanonical(dataType);
+    const canonicalBounds: CanonicalScanBounds = {
+      maxRegionBytes: bounds?.maxRegionBytes,
+      maxTotalBytes: bounds?.maxTotalBytes,
+      maxMatches: bounds?.maxMatches,
+    };
+    const valueBigint = dataType === 'int64' ? BigInt(Math.trunc(targetValue)) : undefined;
+    const outcome = await router.routedExactScan(
+      this.target.pid,
+      primitiveType,
+      valueBigint === undefined ? targetValue : undefined,
+      valueBigint,
+      canonicalBounds,
+    );
+    return {
+      backend: outcome.backend,
+      isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
+      matches: outcome.matches.map((m) => ({
+        address: m.address,
+        value: m.valueNumber ?? (m.valueBigint !== undefined ? Number(m.valueBigint) : 0),
+        ...(m.valueBigint !== undefined ? { valueBigint: m.valueBigint } : {}),
+      })),
+      regionsScanned: outcome.metrics.regionsRead,
+      bytesScanned: Number(outcome.metrics.bytesRead),
+      truncated: outcome.completeness.state !== 'complete',
+    };
+  }
+
+  /**
+   * AOB scan, routed through the Stage 7 backend contract (mission
+   * §7.3/§7.13) — the migration seam for the AOB shipping defect. Return
+   * shape is additive over `scanAobSignature`'s `{ address }` — adds
+   * `backend` and `isAuthoritativeAbsence` (legacy AOB never had a real
+   * authoritative-not-found signal at all; see
+   * `LegacyScannerBackend.aobScan`'s doc for why it is always `false` for
+   * legacy).
+   */
+  async scanAobViaBackend(
+    signature: string,
+    moduleName?: string,
+  ): Promise<{ address: string | null; backend: 'legacy' | 'native'; isAuthoritativeAbsence: boolean }> {
+    if (!this.target) throw new Error('No process attached.');
+    const router = this.getOrCreateBackendRouter();
+    const outcome = await router.routedAobScan(this.target.pid, signature, moduleName, {});
+    return {
+      address: outcome.matches.length > 0 ? `0x${outcome.matches[0].address.toString(16)}` : null,
+      backend: outcome.backend,
+      isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
+    };
   }
 
   /**
@@ -1300,6 +1418,13 @@ export class LiveMemorySession {
     if (this.handle) {
       this.driver.closeProcess(this.handle);
     }
+    // Fire-and-forget: NativeScannerBackend.detach()'s real work
+    // (`target.detach()`) is synchronous and runs before the first
+    // `await` point inside the async function body, so this releases the
+    // native handle immediately despite not being awaited here — `detach()`
+    // itself must stay synchronous to match its existing callers.
+    void this.backendRouter?.detachNative();
+    this.backendRouter = null;
     this.handle = null;
     this.target = null;
     this.pendingProposals.clear();

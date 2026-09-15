@@ -555,6 +555,11 @@ export const LiveMemoryScanAobSchema = z.object({
   moduleName: z.string().min(1).max(260).optional(),
 });
 
+/** Stage 7 §7.5 — explicit scanner backend routing mode control. */
+export const LiveMemoryScannerRoutingModeSchema = z.object({
+  mode: z.enum(['LEGACY', 'NATIVE', 'SHADOW_COMPARE']),
+});
+
 /** Phase 9 — read-only research view (typed reinterpret at one address). */
 export const ResearchViewSchema = z.object({
   address: LIVE_ADDRESS_STRING,

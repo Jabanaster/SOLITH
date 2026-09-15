@@ -30,6 +30,7 @@ import {
   LiveMemoryResolveDefinitionFeatureSchema,
   LiveMemoryPointerScanSchema,
   LiveMemoryScanAobSchema,
+  LiveMemoryScannerRoutingModeSchema,
   ResearchViewSchema,
   ResearchHexSchema,
   ResearchPointerAnalyzeSchema,
@@ -488,12 +489,27 @@ export function registerLiveMemoryIpc(): void {
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanFirstSchema.parse(payload);
-      const result = session.scanFirst(parsed.dataType, parsed.targetValue, {
+      // Stage 7 §7.10-§7.12 — routed through the backend contract (LEGACY
+      // by default, byte-for-byte equivalent to the pre-Stage-7 `scanFirst`
+      // call it replaces; see LegacyScannerBackend's doc comment).
+      const result = await session.scanExactViaBackend(parsed.dataType, parsed.targetValue, {
         maxRegionBytes: parsed.maxRegionBytes,
         maxTotalBytes: parsed.maxTotalBytes,
         maxMatches: parsed.maxMatches,
       });
-      return { success: true, result: serializeScanResult(result) };
+      return {
+        success: true,
+        result: {
+          ...serializeScanResult(result),
+          backend: result.backend,
+          isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+          matches: result.matches.map((m) => ({
+            address: m.address.toString(),
+            value: m.value,
+            ...(m.valueBigint !== undefined ? { valueBigint: m.valueBigint.toString() } : {}),
+          })),
+        },
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_first_failed') };
     }
@@ -985,12 +1001,41 @@ export function registerLiveMemoryIpc(): void {
       const parsed = LiveMemoryScanAobSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
-      const result = session.scanAobSignature(parsed.signature, parsed.moduleName);
-      if (!result) return { success: true, found: false };
-      return { success: true, found: true, address: result.address };
+      // Stage 7 §7.13 — routed through the backend contract (LEGACY by
+      // default; see `live-memory-scanner-routing-mode` to switch).
+      const result = await session.scanAobViaBackend(parsed.signature, parsed.moduleName);
+      if (!result.address) {
+        return { success: true, found: false, backend: result.backend, isAuthoritativeAbsence: result.isAuthoritativeAbsence };
+      }
+      return {
+        success: true,
+        found: true,
+        address: result.address,
+        backend: result.backend,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'aob_scan_failed') };
     }
+  });
+
+  // Stage 7 §7.5 — observable, explicit backend-routing control. Additive:
+  // no existing channel's shape changes. Never silently applied to an
+  // in-flight scan — takes effect on the next routed call.
+  ipcMain.handle('live-memory-scanner-routing-mode-get', (event) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    const session = requireSession(event);
+    return { success: true, mode: session.getScannerRoutingMode(), diagnostics: session.getScannerBackendDiagnostics() };
+  });
+
+  ipcMain.handle('live-memory-scanner-routing-mode-set', (event, payload: unknown) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    const session = requireSession(event);
+    const parsed = LiveMemoryScannerRoutingModeSchema.parse(payload);
+    session.setScannerRoutingMode(parsed.mode);
+    return { success: true, mode: session.getScannerRoutingMode() };
   });
 
   // ── Phase 9 research tools (read-only) ─────────────────────────────────────

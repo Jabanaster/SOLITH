@@ -396,6 +396,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
+  liveMemoryScannerRoutingModeGet: () => ipcRenderer.invoke('live-memory-scanner-routing-mode-get'),
+  liveMemoryScannerRoutingModeSet: (payload: { mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE' }) =>
+    ipcRenderer.invoke('live-memory-scanner-routing-mode-set', payload),
 
   // Phase 9 — read-only address/data research tools
   researchView: (payload: { address: string; types: string[] }) =>
