@@ -22,6 +22,7 @@ import {
   liveValueTypeToCanonical,
   ScannerBackendError,
   type CanonicalScanBounds,
+  type RoutedWireValueType,
   type ScanControl,
   type ScannerRoutingMode,
 } from './scanner-backend.js';
@@ -31,7 +32,7 @@ import {
   type FingerprintVerifyResult,
 } from '../definitions/fingerprint-verify.js';
 import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
-import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
+import { resolveMemoryFeatureAddress, SessionAddressCache, type AobResolverFn } from './feature-resolver.js';
 import {
   registerActiveFreeze,
   unregisterActiveFreeze,
@@ -776,7 +777,7 @@ export class LiveMemorySession {
    * or down-converted.
    */
   async scanExactViaBackend(
-    dataType: LiveValueType,
+    dataType: RoutedWireValueType,
     targetValue: number,
     bounds?: ScanBounds,
     exactTargetValueBigint?: bigint,
@@ -806,11 +807,16 @@ export class LiveMemorySession {
     // hold the true BigInt (the IPC handler, once the wire format carries
     // one — see LiveMemoryScanFirstSchema.targetValueBigint) pass it directly,
     // so precision is preserved end to end instead of round-tripped through
-    // a lossy Number.
+    // a lossy Number. Stage 7.4 §2 generalizes the gate from `dataType ===
+    // 'int64'` to "the canonical type is one of the two 64-bit widths" —
+    // gating on the already-resolved `primitiveType` rather than the raw
+    // wire spelling means this works identically whether the caller used
+    // the legacy name ('int64') or a canonical short name ('i64'/'u64').
+    const isSixtyFourBit = primitiveType === 'i64' || primitiveType === 'u64';
     const valueBigint =
       exactTargetValueBigint !== undefined
         ? exactTargetValueBigint
-        : dataType === 'int64'
+        : isSixtyFourBit
           ? BigInt(Math.trunc(targetValue))
           : undefined;
     const outcome = await router.routedExactScan(
@@ -860,6 +866,29 @@ export class LiveMemorySession {
   }
 
   /**
+   * Stage 7.4 §5-§8 — a bound AOB resolver for production call sites that
+   * live outside this session's own methods (`feature-resolver.ts`'s
+   * `resolveMemoryFeatureAddress`, `signature-engine.ts`'s exact-match sub-path,
+   * consumed via `process-watcher.ts`'s `resolveDefinitionFeatures`). Always
+   * routes through `scanAobViaBackend`/the router — the same NATIVE-by-default,
+   * LEGACY-only-on-explicit-rollback dispatch every other routed operation
+   * gets. This is what makes "no direct legacy read-loop fallback in normal
+   * NATIVE mode" (mission §7's own words) true for these callers: they never
+   * call `scanAobInProcess` themselves anymore when bound to a real session,
+   * so there is no code path left that could silently prefer legacy while
+   * NATIVE is the active mode.
+   */
+  createAobResolver(): AobResolverFn {
+    return async (signature: string, moduleName: string | undefined) => {
+      const result = await this.scanAobViaBackend(signature, moduleName);
+      return {
+        address: result.address !== null ? BigInt(result.address) : null,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+      };
+    };
+  }
+
+  /**
    * Stage 7.2/7.3 production cancellation (mission §2/§3/§12). Starts an
    * exact-value scan asynchronously and returns its `operationId`
    * synchronously, before the scan itself has done any work — this is the
@@ -872,7 +901,7 @@ export class LiveMemorySession {
    * not a UI-only flag and not a discarded response.
    */
   startExactScanOperation(
-    dataType: LiveValueType,
+    dataType: RoutedWireValueType,
     targetValue: number,
     bounds?: ScanBounds,
     exactTargetValueBigint?: bigint,
@@ -1077,9 +1106,9 @@ export class LiveMemorySession {
    * Resolves a schema.v1 memory feature to a concrete address. Uses the per-session
    * AOB/pointer cache so freeze loops do not re-scan on every tick.
    */
-  resolveMemoryFeature(feature: MemoryFeatureV1): LiveMemoryAddress {
+  async resolveMemoryFeature(feature: MemoryFeatureV1): Promise<LiveMemoryAddress> {
     if (!this.handle) throw new Error('No process attached.');
-    return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache);
+    return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache, this.createAobResolver());
   }
 
   /** Expose session address cache for Zero-Input bulk resolve. */

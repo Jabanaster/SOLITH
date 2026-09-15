@@ -13,6 +13,7 @@ import {
   type AobPattern,
   type AobScanOptions,
 } from './aob-resolver.js';
+import type { AobResolverFn } from './feature-resolver.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
 
 export interface FuzzyScanOptions extends AobScanOptions {
@@ -347,18 +348,55 @@ export function scanFuzzySignature(
 
 /**
  * Prefer exact match; fall back to fuzzy Hamming + edit drift within policy.
+ *
+ * Stage 7.4 §7 — the exact-match sub-path (`scanExactSignature`) is exactly
+ * the operation `aob-resolver.ts`'s `scanAobInProcess` already migrated for
+ * `feature-resolver.ts` and `hook-engine.ts`: a plain, first-match, no-drift
+ * pattern search. When `exactAobResolver` is bound (the real production
+ * path, via `LiveMemorySession.createAobResolver()`), that sub-path is
+ * routed through the backend contract instead of calling `scanExactSignature`
+ * directly — this is what "no direct legacy read-loop fallback in normal
+ * NATIVE mode" means for this function.
+ *
+ * The fuzzy path (`scanFuzzySignature` — Hamming/edit-distance drift
+ * tolerance with hint windows) has NO native equivalent at all: the native
+ * pattern engine (`native/solith-scanner-core/src/pattern.rs`) only ever
+ * compiles a mask/value AOB grammar and matches it exactly (see its own doc
+ * comment) — there is no notion of "match within N substitutions/edits" in
+ * that engine. Migrating fuzzy matching would mean designing and building a
+ * wholly new native capability, not routing an existing operation to an
+ * existing one; mission §7's own required-test list (exact signature,
+ * wildcards, continuous CE syntax, multiple matches, no-match complete/
+ * incomplete, >1 MiB, cancel, process exit) never names fuzzy/Hamming/edit
+ * matching, which is consistent with this boundary. Fuzzy resolution
+ * therefore stays legacy-only — a real, disclosed, permanent capability gap
+ * relative to the native engine, not an unmigrated shortcut.
  */
-export function resolveSignature(
+export async function resolveSignature(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   signature: string,
   options: FuzzyScanOptions = {},
-): SignatureMatch | null {
+  exactAobResolver?: AobResolverFn,
+): Promise<SignatureMatch | null> {
   if (options.hintAddress == null) {
-    const exact = scanExactSignature(driver, handle, signature, options);
+    const exact = exactAobResolver
+      ? await resolveExactSignatureViaBackend(exactAobResolver, signature, options.moduleName)
+      : scanExactSignature(driver, handle, signature, options);
     if (exact) return exact;
   }
   return scanFuzzySignature(driver, handle, signature, options);
+}
+
+/** Wraps a bound `AobResolverFn` in `scanExactSignature`'s own `SignatureMatch` result shape. */
+async function resolveExactSignatureViaBackend(
+  resolver: AobResolverFn,
+  signature: string,
+  moduleName: string | undefined,
+): Promise<SignatureMatch | null> {
+  const { address } = await resolver(signature, moduleName);
+  if (address === null) return null;
+  return { address, mode: 'exact', distance: 0, driftKind: 'hamming' };
 }
 
 /** Buffer helper used by tests — exact first, then drift-tolerant fuzzy. */

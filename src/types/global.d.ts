@@ -838,7 +838,11 @@ interface Window {
      * cannot be handed a value that has already lost precision.
      */
     liveMemoryScanFirstStart: (payload: {
-      dataType: 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64';
+      // Stage 7.4 §1 — legacy names plus the 10 canonical short names
+      // (the only way to reach i8/i16/u16/u64).
+      dataType:
+        | 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64'
+        | 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32' | 'i64' | 'u64' | 'f32' | 'f64';
       targetValue: number;
       targetValueBigint?: string;
       maxRegionBytes?: number;

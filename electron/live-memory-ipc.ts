@@ -928,7 +928,7 @@ export function registerLiveMemoryIpc(): void {
       if (!resolved.control) return { success: false, error: 'unknown_control' };
 
       const address = resolved.feature
-        ? session.resolveMemoryFeature(resolved.feature)
+        ? await session.resolveMemoryFeature(resolved.feature)
         : session.resolveControl(resolved.control);
       const currentValue = session.readValue(address);
       return {
@@ -962,7 +962,7 @@ export function registerLiveMemoryIpc(): void {
       const feature = definition.memoryFeatures?.find((f) => f.id === parsed.featureId);
       if (!feature) return { success: false, error: 'unknown_feature' };
 
-      const address = session.resolveMemoryFeature(feature);
+      const address = await session.resolveMemoryFeature(feature);
       const currentValue = session.readValue(address);
       return {
         success: true,
@@ -1336,12 +1336,36 @@ export function registerLiveMemoryIpc(): void {
       const access = session.getMemoryAccess();
       if (!access) return { success: false, error: 'not_attached' };
 
-      const { installHookFromProposal } = await import('../src/core/in-process-script/hook-engine.js');
+      const { getHookProposal, installHookFromProposal } = await import('../src/core/in-process-script/hook-engine.js');
+      const proposal = getHookProposal(parsed.proposalId);
+      if (!proposal) return { success: false, error: 'unknown_hook_proposal' };
+      const { plan } = proposal;
+      if (!plan.executablePlan || plan.status !== 'ready' || !plan.presetId) {
+        return { success: false, error: 'hook_plan_not_executable' };
+      }
+
+      // Stage 7.4 §8 — the hook-site AOB lookup is routed through the
+      // production backend contract (native by default, legacy only under
+      // explicit rollback) instead of hook-engine.ts calling
+      // `scanAobInProcess` directly. `isAuthoritativeAbsence` distinguishes
+      // a genuinely absent signature from an incomplete scan (mission's
+      // "incomplete zero-match MUST NOT become authoritative not-found")
+      // so the two cases get distinct, structured error codes rather than
+      // being collapsed into one ambiguous failure.
+      const aobResult = await session.scanAobViaBackend(plan.aobSignature, plan.moduleName);
+      if (!aobResult.address) {
+        return {
+          success: false,
+          error: aobResult.isAuthoritativeAbsence ? 'aob_signature_not_found' : 'aob_signature_scan_incomplete',
+        };
+      }
+
       const manifest = installHookFromProposal({
         sessionKey: String(event.sender.id),
         proposalId: parsed.proposalId,
         driver: access.driver,
         handle: access.handle,
+        hookSite: BigInt(aobResult.address),
       });
       return { success: true, manifest, guard };
     } catch (error) {

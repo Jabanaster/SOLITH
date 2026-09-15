@@ -295,6 +295,20 @@ export const TrainerHostRollbackSchema = z.object({
 // ── Live Memory Trainer IPC Schemas (V2, feature-flagged, see PROJECT_SPEC.md Section 3.1) ──
 
 const LIVE_VALUE_TYPE = z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']);
+// Stage 7.4 §1 — the routed exact-scan schemas (the two behind
+// `scanExactViaBackend`: `LiveMemoryScanFirstSchema`/`LiveMemoryScanFirstStartSchema`)
+// additionally accept the 10 canonical short type names, which is the only
+// way a caller can request the 4 widths the legacy vocabulary has no name
+// for at all (i8, i16, u16, u64). Every other schema below (read/write/
+// scan-next/auto-matrix/research) stays on the original 6-value `LIVE_VALUE_TYPE`
+// — those are legacy-only surfaces (`MemoryDriver`'s own `LiveValueType`
+// union), out of this stage's scope, and widening them would let a request
+// pass validation only to fail deeper inside code that never claimed to
+// support these widths.
+const LIVE_VALUE_TYPE_ROUTED = z.enum([
+  'int32', 'uint32', 'float', 'double', 'int64', 'byte',
+  'i8', 'u8', 'i16', 'u16', 'i32', 'u32', 'i64', 'u64', 'f32', 'f64',
+]);
 // Decimal or 0x-prefixed hex string — parsed with BigInt() in the main process.
 const LIVE_ADDRESS_STRING = z.string().min(1).max(20).regex(/^(0x[0-9a-fA-F]+|\d+)$/, 'Address must be decimal or 0x-hex');
 const UNKNOWN_SCAN_KEY = z.string().min(1).max(128);
@@ -365,14 +379,16 @@ export const LiveMemoryRollbackSchema = z.object({
 // (even a trusted-by-default one) should not be able to request a scan large
 // enough to hang the main process.
 export const LiveMemoryScanFirstSchema = z.object({
-  dataType: LIVE_VALUE_TYPE,
+  dataType: LIVE_VALUE_TYPE_ROUTED,
   targetValue: z.number().finite(),
   // Stage 7.1 §7.1-C — `targetValue` alone cannot carry an exact int64 value
   // beyond Number.MAX_SAFE_INTEGER (a `number` has already lost precision by
   // the time it's on the wire). This optional decimal-string sibling lets a
-  // dataType: 'int64' caller supply the real value exactly; `targetValue`
-  // stays required for every other type and as a best-effort display value
-  // even when this is present. Ignored for any dataType other than 'int64'.
+  // dataType: 'int64'/'i64'/'u64' caller supply the real value exactly;
+  // `targetValue` stays required for every other type and as a best-effort
+  // display value even when this is present. Ignored for any 32-bit-or-narrower
+  // dataType (Stage 7.4 §2 generalizes this from "int64 only" to "any 64-bit
+  // canonical type", since u64 has exactly the same precision problem).
   targetValueBigint: z.string().regex(/^-?\d{1,20}$/).optional(),
   maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
   // 4 GiB ceiling — real-machine testing showed the 2 GiB production default is itself
@@ -574,7 +590,7 @@ export const LiveMemoryScannerRoutingModeSchema = z.object({
  * a future stage needs to.
  */
 export const LiveMemoryScanFirstStartSchema = z.object({
-  dataType: LIVE_VALUE_TYPE,
+  dataType: LIVE_VALUE_TYPE_ROUTED,
   targetValue: z.number().finite(),
   targetValueBigint: z.string().regex(/^-?\d{1,20}$/).optional(),
   maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),

@@ -193,7 +193,21 @@ export interface ScannerBackend {
   ): Promise<CanonicalPatternScanOutcome>;
 }
 
-/** Maps the legacy `LiveValueType` union onto the canonical 10-type native primitive set. */
+/**
+ * Maps every wire-level value-type spelling onto the canonical 10-type
+ * native primitive set. Stage 7.4 §1 — the wire now carries two vocabularies
+ * for the same canonical set: the original 6 legacy `LiveValueType` names
+ * (kept unchanged so every existing caller/test/preload consumer keeps
+ * working byte-for-byte) plus the 10 canonical short names themselves,
+ * self-mapped, which is how a routed caller reaches the 4 widths the legacy
+ * vocabulary never had a name for at all (i8, i16, u16, u64). This is
+ * additive only — no existing wire spelling changes meaning, and nothing is
+ * removed. `LegacyScannerBackend`'s own `CANONICAL_TO_LIVE_VALUE_TYPE` table
+ * is the other half of this contract: it still maps i8/i16/u16/u64 to
+ * `undefined` and throws a structured `unsupported_operation` error, because
+ * legacy genuinely cannot serve those widths — this table only says the wire
+ * (and NATIVE) can name them, not that every backend can.
+ */
 export const LIVE_VALUE_TYPE_TO_CANONICAL: Record<string, CanonicalPrimitiveType> = {
   byte: 'u8',
   int32: 'i32',
@@ -201,7 +215,28 @@ export const LIVE_VALUE_TYPE_TO_CANONICAL: Record<string, CanonicalPrimitiveType
   float: 'f32',
   double: 'f64',
   int64: 'i64',
+  i8: 'i8',
+  u8: 'u8',
+  i16: 'i16',
+  u16: 'u16',
+  i32: 'i32',
+  u32: 'u32',
+  i64: 'i64',
+  u64: 'u64',
+  f32: 'f32',
+  f64: 'f64',
 };
+
+/**
+ * Every wire spelling a routed exact-value scan schema accepts — the 6
+ * original legacy names plus the 10 canonical short names (2 overlap:
+ * 'int32'/'i32' and so on are distinct wire strings that both resolve to the
+ * same canonical type, not duplicates). Used to type `dataType` params on
+ * the routed session methods (`scanExactViaBackend`, `startExactScanOperation`)
+ * so TypeScript accepts both vocabularies at every call site, not just the
+ * legacy one.
+ */
+export type RoutedWireValueType = keyof typeof LIVE_VALUE_TYPE_TO_CANONICAL;
 
 export function liveValueTypeToCanonical(dataType: string): CanonicalPrimitiveType {
   const mapped = LIVE_VALUE_TYPE_TO_CANONICAL[dataType];

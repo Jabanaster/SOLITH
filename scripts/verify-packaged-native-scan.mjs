@@ -153,6 +153,51 @@ try {
   } else {
     console.log('PASS');
   }
+
+  // ── Stage 7.4 §17 — packaged u16 unaligned, u64 exact, AOB smoke ────────
+  const typesBase = BigInt(fields.TYPES_REGION_BASE);
+  const typesRegion = regions.find((r) => typesBase >= r.baseAddress && typesBase < r.baseAddress + r.size);
+  if (!typesRegion) throw new Error('could not find TYPES_REGION among enumerated regions');
+
+  const u16Offset = Number(fields.BOUNDARY_U16_OFFSET);
+  const u16Value = Number(fields.BOUNDARY_U16_VALUE);
+  const u16Result = await target.scanExact(typesRegion, 'u16', u16Value, undefined, 'bytewise', 65536n, 7n, undefined, cancellation, progress);
+  const u16ExpectedAddress = typesBase + BigInt(u16Offset);
+  const u16Found = u16Result.matches.some((m) => BigInt(m.address) === u16ExpectedAddress);
+  console.log('── Packaged u16 unaligned smoke ──');
+  console.log('U16 UNALIGNED FOUND VIA PACKAGED ADDON:', u16Found);
+  if (!u16Found) {
+    console.error('FAIL: packaged addon did not find the unaligned u16 boundary value.');
+    exitCode = 1;
+  }
+
+  const u64Value = BigInt(fields.U64_HUGE_VALUE);
+  const u64Offset = Number(fields.U64_HUGE_OFFSET);
+  const u64Result = await target.scanExact(typesRegion, 'u64', undefined, u64Value, 'bytewise', 65536n, 7n, undefined, cancellation, progress);
+  const u64ExpectedAddress = typesBase + BigInt(u64Offset);
+  const u64Match = u64Result.matches.find((m) => BigInt(m.address) === u64ExpectedAddress);
+  console.log('── Packaged u64 exact smoke ──');
+  console.log('U64 MAX FOUND VIA PACKAGED ADDON:', Boolean(u64Match), u64Match ? `valueBigint=${u64Match.valueBigint}` : '');
+  if (!u64Match || u64Match.valueBigint?.toString() !== u64Value.toString()) {
+    console.error('FAIL: packaged addon did not find the exact u64::MAX value.');
+    exitCode = 1;
+  }
+
+  const patternBase = BigInt(fields.PATTERN_REGION_BASE);
+  const patternRegion = regions.find((r) => patternBase >= r.baseAddress && patternBase < r.baseAddress + r.size);
+  if (!patternRegion) throw new Error('could not find PATTERN_REGION among enumerated regions');
+  const aobOffset = Number(fields.AOB_EXACT_OFFSET);
+  const aobResult = await target.scanAob(patternRegion, '48 8B 05 11 22 33 44 89', 65536n, undefined, true, cancellation, progress);
+  const aobExpectedAddress = patternBase + BigInt(aobOffset);
+  const aobFound = aobResult.matches.some((m) => BigInt(m.address) === aobExpectedAddress);
+  console.log('── Packaged AOB smoke (feature-resolver/hook-engine migrated shape) ──');
+  console.log('AOB PATTERN FOUND VIA PACKAGED ADDON:', aobFound);
+  if (!aobFound) {
+    console.error('FAIL: packaged addon did not find the real AOB pattern.');
+    exitCode = 1;
+  }
+
+  if (exitCode === 0) console.log('PASS: u16/u64/AOB packaged smoke');
 } catch (err) {
   console.error('FAIL:', err);
   exitCode = 1;

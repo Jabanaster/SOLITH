@@ -19,6 +19,7 @@ import {
   parseHexOffset,
   resolveMemoryFeatureAddress,
   SessionAddressCache,
+  type AobResolverFn,
 } from './feature-resolver.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
 
@@ -176,8 +177,14 @@ function applyPointerChain(
 /**
  * Resolve all memory features for Zero-Input apply.
  * Order per feature: session cache → exact/fuzzy AOB → static pointer path.
+ *
+ * Stage 7.4 §5-§7 — `exactAobResolver`, when supplied, routes both the
+ * exact-AOB sub-path of `resolveSignature` and `resolveMemoryFeatureAddress`'s
+ * own AOB step through the real backend contract (native by default). The
+ * fuzzy/drift-tolerant path inside `resolveSignature` always stays legacy —
+ * see that function's own doc comment for why (no native equivalent exists).
  */
-export function resolveDefinitionFeatures(
+export async function resolveDefinitionFeatures(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   features: MemoryFeatureV1[],
@@ -185,7 +192,8 @@ export function resolveDefinitionFeatures(
   fuzzyOptions: FuzzyScanOptions = {},
   /** Prior match addresses per featureId — used as SignatureEngine hint windows. */
   featureHints?: Map<string, bigint>,
-): ResolvedFeatureAddress[] {
+  exactAobResolver?: AobResolverFn,
+): Promise<ResolvedFeatureAddress[]> {
   const results: ResolvedFeatureAddress[] = [];
 
   for (const feature of features) {
@@ -209,7 +217,7 @@ export function resolveDefinitionFeatures(
     try {
       if (resolution.signature) {
         const hintAddress = featureHints?.get(feature.id);
-        const match: SignatureMatch | null = resolveSignature(
+        const match: SignatureMatch | null = await resolveSignature(
           driver,
           handle,
           resolution.signature,
@@ -218,6 +226,7 @@ export function resolveDefinitionFeatures(
             ...fuzzyOptions,
             ...(hintAddress != null ? { hintAddress } : {}),
           },
+          exactAobResolver,
         );
         if (match) {
           const baseOffset = parseHexOffset(resolution.baseOffset);
@@ -237,7 +246,7 @@ export function resolveDefinitionFeatures(
       }
 
       // Exact/fuzzy AOB missed (or no signature) — fall back to static pointer path.
-      const liveAddr = resolveMemoryFeatureAddress(driver, handle, feature, cache);
+      const liveAddr = await resolveMemoryFeatureAddress(driver, handle, feature, cache, exactAobResolver);
       results.push({ featureId: feature.id, address: liveAddr.address, resolution: 'pointer' });
     } catch (err) {
       results.push({

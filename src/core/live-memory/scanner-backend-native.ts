@@ -125,6 +125,23 @@ interface NativePatternOutcome {
 
 let cachedAddon: NativeScannerAddon | null = null;
 
+/**
+ * Stage 7.4 §14 — distinguishes "the module specifier could not be found at
+ * all" (`err.code === 'MODULE_NOT_FOUND'`, Node's own standard code for a
+ * genuinely absent/unresolvable module — e.g. `npm install` was never run)
+ * from "the module was found but failed to load" (any other error — e.g. a
+ * corrupted `.node` binary, napi-rs's own generated loader throwing
+ * "Cannot find native binding" after every platform candidate it tried
+ * failed). Real, structured evidence for this split is in
+ * `scanner-backend-failure-injection-real.test.ts`. Before this pass every
+ * `require('solith-scanner-napi')` failure under plain Node (no
+ * `process.resourcesPath`) collapsed into `native_addon_missing` regardless
+ * of which of these two genuinely different problems actually occurred.
+ */
+function isModuleNotFoundError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'code' in err && (err as { code?: unknown }).code === 'MODULE_NOT_FOUND';
+}
+
 function loadNativeScannerAddon(): NativeScannerAddon {
   if (cachedAddon) return cachedAddon;
   try {
@@ -144,11 +161,18 @@ function loadNativeScannerAddon(): NativeScannerAddon {
         );
       }
     }
+    if (isModuleNotFoundError(err)) {
+      throw new ScannerBackendError(
+        'native_addon_missing',
+        `Native scanner addon ("solith-scanner-napi") is not installed/built for this Node/Electron ` +
+          `ABI. Run "npm install" at the project root, then "npm run build --prefix native/solith-scanner-napi". ` +
+          `Underlying error: ${String(err)}`,
+      );
+    }
     throw new ScannerBackendError(
-      'native_addon_missing',
-      `Native scanner addon ("solith-scanner-napi") is not installed/built for this Node/Electron ` +
-        `ABI. Run "npm install" at the project root, then "npm run build --prefix native/solith-scanner-napi". ` +
-        `Underlying error: ${String(err)}`,
+      'native_addon_load_failed',
+      `Native scanner addon ("solith-scanner-napi") was found but failed to load — the installed ` +
+        `binary may be corrupted or built for the wrong platform/ABI. Underlying error: ${String(err)}`,
     );
   }
 }

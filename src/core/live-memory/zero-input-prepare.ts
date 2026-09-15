@@ -188,13 +188,14 @@ export async function prepareZeroInputSession(
 
   const access = session.getMemoryAccessOrThrow();
   const features = plan.definition.memoryFeatures ?? [];
-  const resolved = resolveDefinitionFeatures(
+  const resolved = await resolveDefinitionFeatures(
     access.driver,
     access.handle,
     features,
     session.getAddressCache(),
     input.fuzzyOptions,
     normalizeFeatureHints(input.featureHints),
+    session.createAobResolver(),
   );
 
   for (const f of resolved) {

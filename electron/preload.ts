@@ -409,7 +409,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // it. This is the real preload transport for mid-flight cancellation —
   // not a UI-only flag.
   liveMemoryScanFirstStart: (payload: {
-    dataType: 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64';
+    // Stage 7.4 §1 — the 6 legacy names plus the 10 canonical short names
+    // (i8/u8/i16/u16/i32/u32/i64/u64/f32/f64), which is the only way to
+    // reach i8/i16/u16/u64.
+    dataType:
+      | 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64'
+      | 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32' | 'i64' | 'u64' | 'f32' | 'f64';
     targetValue: number;
     targetValueBigint?: string;
     maxRegionBytes?: number;
