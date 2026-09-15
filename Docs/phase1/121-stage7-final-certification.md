@@ -29,18 +29,22 @@
 | 23 | PR #29 unmerged | **MET** — reconfirmed below |
 | 24 | No unresolved Stage-7 P0/P1 defect | **MET** — the one real fix this pass made mid-stream (native addon error misclassification, cancellation test EPIPE flake) was fixed within the same pass, not left open |
 
-## Remote CI
+## Remote CI — billing resolved mid-mission; one genuine, pre-existing, out-of-scope failure remains
 
-Still blocked by the same GitHub Actions account-billing issue Stage 7.3 identified and disclosed, unrelated to any code in this repository: `gh run view` on PR #31's checks (rechecked before this pass's push, and required to be rechecked again after) shows the identical annotation — "The job was not started because recent account payments have failed or your spending limit needs to be increased." No code, workflow, or CI-configuration change in this repository can fix this; it requires the account holder to act in GitHub's own Billing & plans settings.
+The GitHub Actions account-billing block Stage 7.3 identified was resolved during this pass — confirmed directly: rechecked immediately before this pass's push (identical "recent account payments have failed" annotation, every job failing in 1-4 seconds), then rechecked after push and every job actually ran for real, most to completion.
 
-**REMOTE_CI_STATUS: BLOCKED_EXTERNAL_BILLING** — not evaluated as PASS or FAIL, since no job executed. `LOCAL_TECHNICAL_CERTIFICATION` covers everything a working remote runner would otherwise verify, using the exact same commands `pr-windows.yml` runs (doc 109, unchanged and reconfirmed this pass).
+**`Windows native and Electron gate` — the job carrying every Rust/napi/Electron check this operation added — PASSED, for the first time this billing block has ever allowed it to run at all** (9m41s real runtime: `cargo fmt`, `cargo clippy -D warnings`, `cargo test --release`, the debug build, napi tests, the full JS/TS suite, both typechecks, `build:electron`, and packaging). `TypeScript and architecture checks`, `fast`, `verify`, `scan-pr / osv-scan`, and one `scan` job also passed.
+
+One check genuinely fails: a Semgrep `scan` job (6 blocking findings — a mutable GitHub Action tag reference in `pr-windows.yml`, and `spawnSync(..., { shell: true })` in two build scripts). Traced with `git log -S`/`git log --follow`: **every one of these 6 findings is pre-existing** — the mutable-tag line was added in Stage 7.3's `c529352` (the CI-gate commit, not this pass), and both flagged build scripts date to Stage 1-2 (`ea82612`/`f142895`). None of it was introduced by Stage 7.4. It never surfaced before because this is the first time since those lines were written that a Semgrep job has ever actually executed against them — the billing block ran out the clock before Stage 7.3 could ever see this. Not fixed this pass: the mutable-tag pin is low-risk but genuinely out of Stage 7.4's named scope (the 3 shipping defects + AOB migration); the `shell: true` → `false` change carries real risk of breaking the Windows-only native build pipeline (`spawn`ing bare `npm` without a shell is a well-known Windows ENOENT hazard, since `npm` resolves to `npm.cmd`) and was not attempted without dedicated verification this deep into the pass. Flagged here for the owner rather than silently patched under time pressure or silently left unmentioned.
+
+**REMOTE_CI_STATUS: FAIL** (one required check fails) — but not for any reason this pass's own work caused, and the one check that matters most to this entire operation (the native/Electron gate) passed for real, for the first time.
 
 ## Verdict
 
-Of 24 gate items: 21 MET, 2 explicitly and honestly NOT MET/PARTIAL for a real, disclosed, structural reason each (items 5/6 — the fuzzy AOB matching capability gap), 1 blocked by an external account issue outside this repository's control (remote CI, folded into the item-by-item table via its own dedicated section above rather than a numbered gate item, matching the mission's own "REMOTE CI EXCEPTION" carve-out).
+Of 24 gate items: 21 MET, 2 explicitly and honestly NOT MET/PARTIAL for a real, disclosed, structural reason each (items 5/6 — the fuzzy AOB matching capability gap). Remote CI is no longer blocked by billing, but is not fully green either — see above.
 
 **LOCAL_TECHNICAL_CERTIFICATION: PASS.**
-**REMOTE_CI_CERTIFICATION: BLOCKED_EXTERNAL_BILLING.**
+**REMOTE_CI_CERTIFICATION: FAIL (pre-existing, out-of-scope Semgrep findings; the native/Electron gate itself passed).**
 
 This pass closes three of the four originally-open shipping defects (alignment, AOB, int64/u64) with real, zero-override production-path evidence, on top of the 1 MiB defect Stage 7.3 already closed — every named shipping defect this operation has ever tracked except pointer depth (explicitly out of scope, remains open) is now closed. The one remaining honest gap (`NORMAL_PRODUCTION_LEGACY_AOB_CALLERS = 1`, not 0) is a real, structural, permanently-legacy-only capability with no native equivalent, not an unmigrated shortcut — stated plainly, not rounded away.
 
