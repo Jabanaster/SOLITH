@@ -66,6 +66,7 @@
     "test:pointer-map-ui-packaged": "playwright test tests/pointer-map-ui-packaged.e2e.test.ts --config playwright.e2e.config.ts",
     "test:pointer-map-ui-cancellation": "playwright test tests/pointer-map-ui-cancellation.e2e.test.ts --config playwright.e2e.config.ts",
     "test:pointer-map-ui-cancellation-packaged": "playwright test tests/pointer-map-ui-cancellation-packaged.e2e.test.ts --config playwright.e2e.config.ts",
+    "test:pointer-map-ui-stability": "playwright test tests/pointer-map-ui-stability.e2e.test.ts --config playwright.e2e.config.ts",
     "test:packaged-smoke": "playwright test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts",
     "pretest:milestone-e": "npm run build",
     "test:milestone-e": "playwright test tests/milestone-e-acceptance.test.ts --config playwright.e2e.config.ts",
