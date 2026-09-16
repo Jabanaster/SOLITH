@@ -56,6 +56,48 @@ describe('pointer_maps store', () => {
     assert.deepEqual(result, { ok: false, error: 'not_found' });
   });
 
+  test('P2-4: a real schemaVersion=1 row (saved before pointer stability existed) migrates forward, not rejected', async () => {
+    const db = (await import('../../src/core/database/index.ts')).default;
+    // Deliberately the exact P2-2 shape — no `stability` field anywhere,
+    // matching what a real pre-P2-4 save actually wrote to disk.
+    const v1Map = {
+      id: 'legacy-v1-map',
+      name: 'Legacy P2-2 Map',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      nodes: [
+        {
+          id: 'legacy-node-1',
+          label: 'Legacy candidate',
+          path: { moduleName: 'game.exe', moduleOffset: 0x2000, offsets: [16] },
+          depth: 1,
+          status: 'resolved',
+          lastResolvedAddress: '0xdeadbeef',
+          lastResolvedAt: '2026-01-01T00:00:00.000Z',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          targetAddress: '0xdeadbeef',
+          scanId: 'legacy-scan',
+        },
+      ],
+    };
+    db.prepare(
+      `INSERT INTO pointer_maps (mapId, name, schemaVersion, gameId, executableIdentity, architecture, data, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(v1Map.id, v1Map.name, 1, null, null, null, JSON.stringify(v1Map), v1Map.createdAt, v1Map.updatedAt);
+
+    const result = loadPointerMap(v1Map.id);
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.map.nodes.length, 1);
+    // Migration backfills a real, empty stability state — never fabricates
+    // restart history that never happened, and never leaves it undefined
+    // where downstream code would need its own null-check to be correct.
+    assert.deepEqual(result.map.nodes[0].stability, { baseline: null, observations: [] });
+    // The existing P2-2 stale-on-load guarantee still holds for migrated data too.
+    assert.equal(result.map.nodes[0].status, 'unresolved');
+    assert.equal(result.map.nodes[0].lastResolvedAddress, null);
+  });
+
   test('loadPointerMap rejects an unsupported future schema version', async () => {
     const db = (await import('../../src/core/database/index.ts')).default;
     const map = createEmptyPointerMap('Future Schema');
