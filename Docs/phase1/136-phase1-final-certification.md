@@ -1,5 +1,8 @@
 # Phase 1 — Final Certification
 
+> **Supersession notice (Phase 1 final closure).** This document’s verdict — PHASE 1: NOT_COMPLETE — was correct at `2618286` and is **superseded by doc 143**. All three blocking items it names (D05, ROADMAP D01, the real-game coverage percentage) are closed by docs 138, 137 and 139.
+
+
 Assessed at `97e51b5` (code-final). This is a **phase-level** verdict and is deliberately not the same as Stage 7.5's stage-level verdict in doc 130.
 
 ## Gate

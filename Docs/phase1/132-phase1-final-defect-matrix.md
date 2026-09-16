@@ -1,5 +1,8 @@
 # Phase 1 — Final Defect Matrix
 
+> **Supersession notice (Phase 1 final closure).** Superseded as the current defect matrix by **doc 140**. Accurate as of `2618286`; the single open row (D05) is closed by doc 138, and five further defects found afterwards (D17-D21) are recorded in doc 140.
+
+
 One authoritative table. Every Phase 1-scoped scanner defect, its native-path status, its **shipping-product** status, and the test / document / commit that certifies each.
 
 ## Two numbering schemes — read this first

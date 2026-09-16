@@ -1,5 +1,8 @@
 # Phase 1 — Legacy and Preserved-Work Disposition
 
+> **Supersession notice (Phase 1 final closure).** Legacy-caller classifications and preserved-branch dispositions here remain current. The *forward assignments* are not: FA-1 (D05 pointer depth) and FA-8 (real-game coverage) are closed by docs 138 and 139 rather than carried forward. See doc 140 for the current residual list.
+
+
 ## Part 1 — Preserved branches
 
 No branch is deleted. Each is given an explicit disposition so no preserved work is left unaccounted.

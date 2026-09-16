@@ -1,5 +1,8 @@
 # Phase 1 / Stage 7 — Final Certification Gate
 
+> **Supersession notice (Phase 1 final closure).** This document’s Stage 7 verdict stands: Stage 7.5 is CERTIFIED. Two of its *current-status* statements have since changed — gate item 19 (“Pointer depth remains OPEN”) and the “Scope boundaries” note that pointer depth is untouched. D05 is closed by doc 138. Nothing else here is altered; see doc 143 for the current Phase 1 status.
+
+
 Candidate: `97e51b57517c513b19afa89b4e2f084013e3c0fb` (code-final; documentation commits follow).
 
 ## Gate

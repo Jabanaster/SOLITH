@@ -1,5 +1,8 @@
 # Phase 1 — ROADMAP Requirement Reconciliation
 
+> **Supersession notice (Phase 1 final closure).** Superseded as the current reconciliation by **doc 141**, which recomputes the accounting as 23/23 met. Its finding that Stardew Valley is not installed was incorrect — see doc 139. Preserved unmodified as the record of what was measured at `2618286`.
+
+
 `ROADMAP.md` is **not modified** by this work. This document compares completed work against `ROADMAP.md`'s Phase 1 section (lines 257-287) and its defect register, so every requirement is accounted for.
 
 Legend: `IMPLEMENTED` / `TESTED` / `CERTIFIED` / `OPEN` / `FORWARD-ASSIGNED`.

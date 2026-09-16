@@ -1,5 +1,8 @@
 # Phase 1 — Authoritative Status Index
 
+> **Supersession notice (Phase 1 final closure).** This index was authoritative as of `2618286`. Its rows for D01, D05 and the real-game coverage requirement are superseded by docs 137, 138 and 139; the current authoritative index is **doc 143**. Every other row remains accurate.
+
+
 **This document is the current-status index for Phase 1.** Where an older document's *current-status* claim disagrees with a row below, this index is authoritative. No historical report has been rewritten; each remains valid as a record of what was true when it was written.
 
 Established at `703feaf` (Stage 7.5 candidate). Working tree of record: `G:\ACTIVE_PROJECTS\solith-phase0-convergence`, branch `feature/solith-phase1-scanner-reconstruction`.
