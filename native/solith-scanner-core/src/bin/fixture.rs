@@ -233,6 +233,16 @@ const POINTER_TARGET_VALUE: u32 = 0x5A5A_1234;
 const POINTER_CYCLE_OFFSET: usize = 32;
 static POINTER_ROOT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+// -- Phase 2 P2-2 (mission §15): a second, wholly independent module-rooted
+// pointer chain in the same real process, so a real multi-target
+// scanTargetsIntoMap([A, B]) run has two genuine, unrelated targets to
+// resolve rather than two views of the same one. Deliberately depth-1
+// (POINTER_ROOT_B -> NODE_B1 -> value) rather than mirroring Target A's
+// depth-3/cycle shape — the point of Target B is independence, not
+// duplicating coverage §11/§13 already have.
+const POINTER_B_TARGET_VALUE: u32 = 0xB0B0_5678;
+static POINTER_ROOT_B: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 #[cfg(windows)]
 fn main() {
     let pid = std::process::id();
@@ -361,6 +371,26 @@ fn main() {
         );
     }
     POINTER_ROOT.store(pointer_nodes[0] as u64, std::sync::atomic::Ordering::SeqCst);
+
+    // -- P2-2 Target B: independent single-node chain.
+    let pointer_node_b = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            POINTER_NODE_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(!pointer_node_b.is_null(), "VirtualAlloc(pointer_node_b) failed");
+    unsafe {
+        std::ptr::write_bytes(pointer_node_b as *mut u8, 0, POINTER_NODE_SIZE);
+        std::ptr::write_unaligned(
+            (pointer_node_b as usize + POINTER_TARGET_OFFSET) as *mut u32,
+            POINTER_B_TARGET_VALUE,
+        );
+    }
+    POINTER_ROOT_B.store(pointer_node_b as u64, std::sync::atomic::Ordering::SeqCst);
+    let pointer_root_b_addr = &POINTER_ROOT_B as *const _ as usize;
     let pointer_root_addr = &POINTER_ROOT as *const _ as usize;
     unsafe {
         let slice =
@@ -603,6 +633,9 @@ fn main() {
     writeln!(out, "POINTER_TARGET_OFFSET={POINTER_TARGET_OFFSET}").unwrap();
     writeln!(out, "POINTER_TARGET_VALUE=0x{POINTER_TARGET_VALUE:x}").unwrap();
     writeln!(out, "POINTER_CYCLE_OFFSET={POINTER_CYCLE_OFFSET}").unwrap();
+    writeln!(out, "POINTER_ROOT_B_ADDRESS=0x{pointer_root_b_addr:x}").unwrap();
+    writeln!(out, "POINTER_NODE_B1_BASE=0x{:x}", pointer_node_b as usize).unwrap();
+    writeln!(out, "POINTER_B_TARGET_VALUE=0x{POINTER_B_TARGET_VALUE:x}").unwrap();
     writeln!(out, "MUTATION_REGION_BASE=0x{mutation_base:x}").unwrap();
     writeln!(out, "MUTATION_REGION_SIZE={MUTATION_REGION_SIZE}").unwrap();
     writeln!(out, "MUTATION_MARKER_OFFSET={MUTATION_MARKER_OFFSET}").unwrap();
