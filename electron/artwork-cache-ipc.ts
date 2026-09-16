@@ -2,9 +2,10 @@ import { app, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import { validateIpcSender } from './sender-validation.js';
 import { ArtworkCacheRefreshSchema } from './ipc-validation.js';
-import { searchCatalog } from '../src/core/trainer-catalog/store.js';
+import { getCatalogEntry, searchCatalog } from '../src/core/trainer-catalog/store.js';
 import { steamCdnImages, type TrainerCatalogEntry } from '../src/core/trainer-catalog/types.js';
 import { POPULAR_TRAINER_LIMIT } from '../src/core/trainer-catalog/popular-ranking.js';
+import { filterEligibleForTrainerLibrary } from '../src/core/trainer-catalog/eligibility-classification.js';
 import type { ArtworkFetchJob, ArtworkKind } from '../src/core/artwork-cache/types.js';
 import { fetchArtworkJob } from '../src/core/artwork-cache/fetch-executor.js';
 import {
@@ -51,11 +52,18 @@ function candidateUrlsForEntry(entry: TrainerCatalogEntry): Partial<Record<Artwo
  * guessing at "installed"/"favorite" signals this process cannot cheaply see.
  */
 function buildCandidateJobs(catalogGameIds: string[] | undefined): ArtworkFetchJob[] {
-  const priority = catalogGameIds && catalogGameIds.length > 0 ? 'visible' : 'popular';
-  const result = searchCatalog('', POPULAR_TRAINER_LIMIT, 0, {});
-  const scoped = catalogGameIds && catalogGameIds.length > 0
-    ? result.entries.filter((entry) => catalogGameIds.includes(entry.catalogGameId))
-    : result.entries;
+  const hasExplicitIds = Boolean(catalogGameIds && catalogGameIds.length > 0);
+  const priority = hasExplicitIds ? 'visible' : 'popular';
+  // Explicit ids (cards actually visible on screen) are looked up directly —
+  // filtering them out of a capped Popular-projection window (D07 defect
+  // class) would silently drop artwork for any visible card whose catalog
+  // entry does not fall in the first POPULAR_TRAINER_LIMIT rows. Only the
+  // no-explicit-ids fallback intentionally uses the bounded Popular scope.
+  const scoped = hasExplicitIds
+    ? filterEligibleForTrainerLibrary(
+        catalogGameIds!.map((id) => getCatalogEntry(id)).filter((entry): entry is TrainerCatalogEntry => entry != null),
+      )
+    : searchCatalog('', POPULAR_TRAINER_LIMIT, 0, {}).entries;
 
   const jobs: ArtworkFetchJob[] = [];
   for (const entry of scoped) {

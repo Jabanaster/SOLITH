@@ -68,6 +68,7 @@ export { MemoryManager } from './memory-manager.js';
 export type { SafeWriteResult, MemoryManagerSnapshotListener } from './memory-manager.js';
 export {
   matchCatalogProcess,
+  matchAllCatalogProcesses,
   buildZeroInputAttachPlan,
   resolveDefinitionFeatures,
 } from './process-watcher.js';

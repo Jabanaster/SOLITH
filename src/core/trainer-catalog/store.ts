@@ -572,6 +572,45 @@ export function searchCatalog(
   };
 }
 
+/**
+ * Full, unbounded catalog fetch for identity-matching callers (install
+ * discovery, live-process detection) that must consider every row, never a
+ * fixed-size page. Distinct from searchCatalog(), which is a paginated
+ * user-facing browse/search query and rightly bounded by a page `limit`.
+ * A page-size ceiling here previously caused D07 (Phase 3): games whose
+ * catalog entry sorted past a hardcoded window could never be identity-matched
+ * regardless of how long they ran or were installed. This runs one unfiltered
+ * query with no LIMIT/OFFSET clause at all — not a larger fixed constant.
+ */
+export function getFullCatalogForMatching(filters: CatalogSearchFilters = {}): TrainerCatalogEntry[] {
+  const { whereSql, params } = buildCatalogSearchWhere('', filters);
+  const rows = db
+    .prepare(`SELECT * FROM trainer_catalog_games ${whereSql}`)
+    .all(...params) as Record<string, unknown>[];
+  return filterEligibleForTrainerLibrary(rows.map(rowToEntry));
+}
+
+/**
+ * Full catalog id/name/executables index for process-watch matching.
+ * Deliberately skips artwork/verification/search columns — this runs on every
+ * poll tick against the whole catalog (thousands of rows), not a paged
+ * fixed-size search window, so the fetched columns stay minimal.
+ */
+export function listCatalogExecutableIndex(): Array<{
+  catalogGameId: string;
+  displayName: string;
+  executables: string[];
+}> {
+  const rows = db
+    .prepare('SELECT catalogGameId, displayName, executablesJson FROM trainer_catalog_games')
+    .all() as Array<{ catalogGameId: string; displayName: string; executablesJson: string | null }>;
+  return rows.map((row) => ({
+    catalogGameId: row.catalogGameId,
+    displayName: decodeHtmlEntities(row.displayName),
+    executables: JSON.parse(row.executablesJson || '[]') as string[],
+  }));
+}
+
 export function getCatalogEntry(catalogGameId: string): TrainerCatalogEntry | null {
   const row = db.prepare(
     `SELECT trainer_catalog_games.*,

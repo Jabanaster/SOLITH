@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { searchCatalog } from '../trainer-catalog/store.js';
+import { getFullCatalogForMatching } from '../trainer-catalog/store.js';
 import { setSetting } from '../settings/index.js';
 import { scanEpicInstalls } from './epic.js';
 import { scanGogInstalls } from './gog.js';
@@ -268,7 +268,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     });
     return false;
   });
-  const catalog = searchCatalog('', 5000, 0).entries;
+  const catalog = getFullCatalogForMatching();
   const matched = deduplicateConcreteInstalls(matchInstalledToCatalog(raw, catalog, scannedAt));
   const classificationReasons = new Map<string, string>();
   const addable = matched.filter((record) => {
@@ -347,7 +347,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
 
 export function commitInstallDiscoveryRecords(records: InstallDiscoveryCommitSelection[]): { added: number; skipped: number; rejected: number } {
   const committedAt = new Date().toISOString();
-  const catalog = searchCatalog('', 5000, 0).entries;
+  const catalog = getFullCatalogForMatching();
   const validRaw: RawInstalledGame[] = [];
 
   for (const record of records) {
