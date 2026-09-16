@@ -290,6 +290,40 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 
 ### PHASE 2 — Advanced Memory Engineering & Adaptive Scan Intelligence
 
+**Phase 2 — Advanced Memory Engineering — status summary.** Presentational index only (2026-09-16) — added for at-a-glance navigation; changes no requirement, status, count, or evidence below. The detailed P2-1 through P2-17 execution/certification checkpoints below remain authoritative; this groups them, it does not replace them.
+
+- Current workstream: **P2-A — Pointer Engineering & Stability**
+- Current checkpoint: **P2-4 — Pointer Stability / Real-Game Restart Validation**
+- Completed checkpoints: P2-1, P2-2, P2-3
+- Phase 2 overall: **NOT_COMPLETE**
+- Requirements: **28 total** (see "Phase 2 requirement count" note below)
+
+**Phase 2 workstreams** (navigation/grouping only — every P2-x stage listed here is the same authoritative execution checkpoint defined throughout the rest of this section; grouping them does not change their requirements, evidence, or certification status):
+
+- **P2-A — Pointer Engineering & Stability** — IN PROGRESS
+  - P2-1 Pointer-map data model — COMPLETE AS FOUNDATION
+  - P2-2 Pointer-map live orchestration — COMPLETE
+  - P2-3 Pointer-chain visualization — CERTIFIED COMPLETE
+  - P2-4 Pointer stability / real-game restart validation — NEXT / NOT STARTED
+- **P2-B — Memory Understanding** — NOT STARTED
+  - P2-5 Structure discovery engine
+  - P2-6 Typed memory-view expansion
+  - P2-7 Value/type inference
+- **P2-C — Memory Interaction & Control** — NOT STARTED
+  - P2-8 Memory map + watchlists
+  - P2-9 Freeze/write/revert + address-validation/hotkey verification
+- **P2-D — Adaptive Analysis & Acceleration** — NOT STARTED
+  - P2-10 Adaptive Scan Planner
+  - P2-11 Zydis integration
+  - P2-12 Vectorscan integration
+- **P2-E — Instrumentation & External Tooling** — NOT STARTED
+  - P2-13 DynamoRIO integration
+  - P2-14 Dear ImGui developer diagnostics overlay
+  - P2-15 Symbol/module awareness + Ghidra external adapter (ReClass.NET's Repository/Technology Adoption reference-adoption role — see below — lives in this workstream; its completion criterion is unchanged)
+- **P2-F — Resilience & Final Certification** — NOT STARTED
+  - P2-16 Resilient/version-aware rediscovery
+  - P2-17 Full Phase 2 certification
+
 **Objective.** Turn SOLITH from a basic scanner into a serious memory-engineering platform, with an adaptive scan planner so ordinary players do not need Cheat Engine-level internals knowledge.
 
 **Why This Phase Exists.** Pointer scanning, structure discovery, and an adaptive planner are all currently absent or shallow; Audit 2 confirms the adaptive planner does not exist anywhere in the codebase, on any branch.
