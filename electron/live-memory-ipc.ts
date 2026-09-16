@@ -651,10 +651,19 @@ export function registerLiveMemoryIpc(): void {
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryReadManySchema.parse(payload);
-      const results = session.readMany(parsed.addresses.map((a) => ({ address: BigInt(a.address), dataType: a.dataType })));
+      const outcome = session.readManyWithCoverage(
+        parsed.addresses.map((a) => ({ address: BigInt(a.address), dataType: a.dataType })),
+      );
+      // `values` keeps its exact shape. `requested` and `unreadable` are
+      // additive: omission alone is ambiguous to a polling caller, which
+      // cannot tell "this candidate was freed" from "this candidate was never
+      // asked for", so the Watch Live panel needs the count to distinguish a
+      // genuinely dead candidate list from a transient read failure.
       return {
         success: true,
-        values: results.map((r) => ({ address: r.address.toString(), value: r.value, dataType: r.dataType })),
+        values: outcome.values.map((r) => ({ address: r.address.toString(), value: r.value, dataType: r.dataType })),
+        requested: outcome.requested,
+        unreadable: outcome.unreadable.map((r) => ({ address: r.address.toString(), dataType: r.dataType })),
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'read_many_failed') };
