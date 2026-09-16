@@ -63,7 +63,7 @@ That check earned its place immediately. **The first run reported Stardew Valley
 
 ## §17 — The 3+2-game coverage report
 
-Measured at `8cb2ad9`, backend NATIVE by default, read-only.
+Measured at `8cb2ad9` (all five titles) and re-confirmed for the two curated titles at the code-final SHA `30436d0`, backend NATIVE by default, read-only.
 
 | Game | EXE | Arch | Curated | Eligible regions | Eligible bytes | Read bytes | Skipped bytes | Coverage % | Completeness | Duration | Backend |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -74,6 +74,19 @@ Measured at `8cb2ad9`, backend NATIVE by default, read-only.
 | Aegis Defenders | `AegisDefenders.exe` | x64 | no | 1258 | 521 224 192 (497.1 MiB) | 232.4 MiB | 264.7 MiB | **46.75 %** | CompleteWithSkippedRegions(484) | 0.7 s | native |
 
 Coverage-truth violations: **0 of 5**. All five processes closed and verified closed.
+
+### Run-to-run variance, stated rather than smoothed
+
+These percentages are **not** fixed constants, and presenting them as though they were would be its own small dishonesty. A game's committed heap differs between launches — different save state, different shader cache warmth, different allocator luck — so both the numerator and the denominator move. Re-measuring the two curated titles at the code-final SHA `30436d0`:
+
+| Title | At `8cb2ad9` | At `30436d0` | Eligible bytes moved |
+|---|---|---|---|
+| Stardew Valley | 68.22 % | **68.32 %** | 1172.5 → 1184.7 MiB |
+| DREDGE | 63.84 % | **73.51 %** | 782.6 → 1012.1 MiB |
+
+Stardew is stable to a tenth of a percent across runs. DREDGE moved nearly ten points, because its eligible footprint grew by 230 MiB between launches — the *proportion* the selection policy excludes stayed close to constant while the absolute size changed.
+
+The honest reading is therefore "roughly two thirds to three quarters of a real game's eligible memory, on these titles, on this machine", not a certified constant. Both runs pass the §16 truth check, which is the property that actually matters: whatever the number is on a given launch, the completeness signal agrees with it.
 
 ### Against Audit 2
 

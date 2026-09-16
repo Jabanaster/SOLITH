@@ -42,7 +42,7 @@ Documents 01–144 are contiguous, with no gaps and no duplicate numbers.
 | 13 | **D05 pointer depth fully closed** | **MET** | doc 138 |
 | 14 | **pointer truncation truthful** | **MET** | doc 138 §10 — eight terminal states |
 | 15 | **pointer depth semantics verified in a real process** | **MET** | doc 138 §13 — 8/8, module-rooted chain, 3 consecutive |
-| 16 | **real-game coverage requirement satisfied** | **MET** | doc 139 — Stardew 68.22 %, DREDGE 63.84 % |
+| 16 | **real-game coverage requirement satisfied** | **MET** | doc 139 — Stardew 68.32 %, DREDGE 73.51 % at the code-final SHA; run-to-run variance recorded |
 | 17 | all Phase 1 defects reconciled | **MET** | doc 140 — 20 closed, 1 provably N/A, 0 open, 0 unknown |
 | 18 | stale current doc statuses = 0 | **MET** | §19 above |
 | 19 | direct production legacy AOB callers = 0 | **MET** | doc 126; `scanAobSignature` routed in `e5648d3` |
@@ -51,9 +51,9 @@ Documents 01–144 are contiguous, with no gaps and no duplicate numbers.
 | 22 | LEGACY rollback works | **MET** | doc 124 — real-process rollback and toggle-back, no rebuild |
 | 23 | SHADOW_COMPARE works | **MET** | docs 124, 125 |
 | 24 | packaged native addon works | **MET** | doc 142 — both packaged proofs |
-| 25 | fresh worktree passes | **MET** | doc 142 |
-| 26 | remote CI passes | **MET** | doc 142 |
-| 27 | Semgrep passes | **MET (remote)** | doc 142 — see the honest note there about the local run |
+| 25 | fresh worktree passes | **MET** | doc 142 — 18/18 at the code-final SHA `30436d0` |
+| 26 | remote CI passes | **MET** | doc 142 — 7/7 required checks at `30436d0` |
+| 27 | Semgrep passes | **MET (remote; local run unavailable)** | doc 142 — remote `semgrep.yml` passes at the code-final SHA; the local pre-check could not run because PyPI is unreachable from this machine, and that is recorded as missing rather than reported as passed |
 | 28 | npm audit 0 | **MET** | 0 vulnerabilities |
 | 29 | roadmap requirements 100 % accounted and met | **MET** | doc 141 — 23/23 accounted, 23/23 met |
 | 30 | unresolved Phase-1 P0 = 0 | **MET** | doc 140 |
@@ -62,7 +62,7 @@ Documents 01–144 are contiguous, with no gaps and no duplicate numbers.
 | 33 | shipping tree untouched | **MET** | `G:\ACTIVE_PROJECTS\SOLITH` at `9fdc6e7`, same branch, same 4 untracked files |
 | 34 | PR #31 OPEN / not merged | **MET** | OPEN |
 | 35 | PR #29 OPEN / not merged | **MET** | OPEN |
-| 36 | local == remote | **MET** | doc 142 |
+| 36 | local == remote | **MET** | both `30436d0` |
 | 37 | worktree clean | **MET** | doc 142 |
 
 ## Verdict
