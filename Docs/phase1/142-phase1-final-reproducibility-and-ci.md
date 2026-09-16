@@ -106,12 +106,28 @@ This is the third instance of the same class in Phase 1 (doc 128's u8 wire-type 
 
 It is worth noting that `PR Windows` was an intermittently-failing gate for most of this branch's history (doc 129: four failures in six runs, including the Stage 7.5 entry commit). It has now passed at `97e51b5`, `2e5cfa8`, `c63d349` and `30436d0` — four consecutive green runs since the EPIPE teardown repair.
 
+## Certification of the documentation SHA
+
+The commits after `30436d0` change only `Docs/phase1/**` — verified with `git diff --stat 30436d0..HEAD -- . ':(exclude)Docs'`, which returns empty. At the documentation SHA **`b4a5a7c`**, all 7 required checks are green:
+
+| Check | `b4a5a7c` | Duration |
+|---|---|---|
+| PR Windows | **pass** | 8m41s |
+| CI Fast | **pass** | 8m22s |
+| Semgrep | **pass** | 30s |
+| PR Static | **pass** | 15s |
+| Gitleaks | **pass** | 11s |
+| OSV-Scanner | **pass** | 34s |
+| Vendored memoryjs integrity | **pass** | 10s |
+
+So the required checks pass at both the code-final SHA (`30436d0`) and the documentation SHA. This is the one place a self-reference is unavoidable — a document cannot contain its own commit's CI result — so the recursion is terminated here deliberately, following doc 130's precedent: the amendment that fills this table is documentation-only, and its own result is stated in the commit message rather than chased into another round.
+
 ## Local ≡ remote
 
 ```
-local  HEAD : 30436d0ea8c45bf9b680b44a626240ece9a8c881
-remote HEAD : 30436d0ea8c45bf9b680b44a626240ece9a8c881
-worktree    : clean
+code-final  : 30436d0ea8c45bf9b680b44a626240ece9a8c881   (7/7 remote checks)
+docs SHA    : b4a5a7c829f1cd207fa23cdaebead7dde50a8be7   (7/7 remote checks)
+local == remote, worktree clean
 ```
 
 Pushed normally, non-force. No history was rewritten and no prior Phase 1 commit was squashed.
