@@ -12,9 +12,14 @@ import {
   nodeStatusBadge,
   pointerMapDtoNodeChainSteps,
   sortPointerMapNodes,
+  stabilityStatusBadge,
+  summarizeStabilityObservations,
   type PointerMapNodeSort,
   type PointerMapNodeStatus,
 } from '../live-memory/pointer-map-ui.js';
+
+const GROUND_TRUTH_KINDS = ['u32', 'u64'] as const;
+type GroundTruthKind = (typeof GROUND_TRUTH_KINDS)[number];
 
 export interface PointerMapPanelProps {
   attached: boolean;
@@ -67,6 +72,13 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
   const [filterModule, setFilterModule] = useState<string>('all');
   const [sortBy, setSortBy] = useState<PointerMapNodeSort>('order');
   const [exportDataType, setExportDataType] = useState<(typeof EXPORT_DATA_TYPES)[number]>('int32');
+  // P2-4 — restart-stability validation form (mission §16's "Validate After
+  // Restart" workflow: user supplies what the resolved address SHOULD hold,
+  // since only the user knows what a given candidate is supposed to mean).
+  const [groundTruthKind, setGroundTruthKind] = useState<GroundTruthKind>('u32');
+  const [groundTruthExpected, setGroundTruthExpected] = useState('');
+  const [groundTruthDescription, setGroundTruthDescription] = useState('');
+  const [showStabilityHistory, setShowStabilityHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   // P2-3.1 §5/§6 — real cancellation state. `scanOperationId` is the live
@@ -299,6 +311,40 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
         setMessage(`Resolved: ${result.resolvedCount ?? 0} succeeded, ${result.failedCount ?? 0} failed.`);
       } else {
         setMessage(`Resolve failed: ${result?.error ?? 'unknown error'}`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * P2-4 — mission §16's "Validate After Restart" workflow: re-resolves the
+   * selected candidate against the currently attached (possibly restarted)
+   * process AND independently verifies the resolved address holds the
+   * user-declared expected value — never trusts "resolved" alone as proof
+   * of correctness (see pointer-stability.ts).
+   */
+  const handleValidateAfterRestart = async (nodeId: string) => {
+    if (!api || !selectedMapId) return;
+    if (!groundTruthExpected.trim() || !groundTruthDescription.trim()) {
+      setMessage('Enter both an expected value and a description before validating.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const groundTruth =
+        groundTruthKind === 'u32'
+          ? { kind: 'u32' as const, expected: Number(groundTruthExpected), description: groundTruthDescription }
+          : { kind: 'u64' as const, expected: groundTruthExpected.trim(), description: groundTruthDescription };
+      const result = await api.pointerMapValidateNode({ mapId: selectedMapId, nodeId, groundTruth });
+      if (result?.success && result.observation) {
+        await loadMaps();
+        const badge = stabilityStatusBadge(result.observation.status);
+        setMessage(
+          `Restart validation: ${badge.label}${result.observation.failureReason ? ` — ${result.observation.failureReason}` : ''}`,
+        );
+      } else {
+        setMessage(`Validation failed: ${result?.error ?? 'unknown error'}`);
       }
     } finally {
       setBusy(false);
@@ -678,6 +724,75 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
                 </select>
                 <button className="btn-primary" onClick={() => handleExportNode(selectedNode)}>Export to Trainer YAML</button>
               </div>
+
+              {(() => {
+                const stability = selectedNode.stability;
+                const summary = summarizeStabilityObservations(stability.observations);
+                const last = stability.observations[stability.observations.length - 1] ?? null;
+                return (
+                  <div className={styles.row} aria-label="Restart stability">
+                    <h4>Restart Stability</h4>
+                    <dl>
+                      <dt>Current state</dt>
+                      <dd><Badge {...stabilityStatusBadge(last?.status ?? null)} /></dd>
+                      <dt>Attempts</dt><dd>{summary.attempts}</dd>
+                      <dt>Correct</dt><dd>{summary.correct}</dd>
+                      <dt>Broken</dt><dd>{summary.broken}</dd>
+                      <dt>False positive</dt><dd>{summary.falsePositive}</dd>
+                      <dt>Stability rate</dt>
+                      <dd>{summary.attempts > 0 ? `${summary.correct}/${summary.attempts} (${Math.round(summary.stabilityRate * 100)}%)` : 'not yet validated'}</dd>
+                      <dt>Last restart result</dt>
+                      <dd>{last ? `${stabilityStatusBadge(last.status).label} at ${last.observedAt}` : 'never'}</dd>
+                      <dt>Last resolved address</dt>
+                      <dd>{last?.resolvedAddress ?? '(not resolved)'}</dd>
+                    </dl>
+
+                    <div className={styles.row}>
+                      <label htmlFor="pm-ground-truth-kind">Ground truth type</label>
+                      <select id="pm-ground-truth-kind" value={groundTruthKind} onChange={(e) => setGroundTruthKind(e.target.value as GroundTruthKind)} disabled={busy || !attached}>
+                        {GROUND_TRUTH_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                      </select>
+                      <label htmlFor="pm-ground-truth-expected">Expected value</label>
+                      <input
+                        id="pm-ground-truth-expected"
+                        type="text"
+                        value={groundTruthExpected}
+                        onChange={(e) => setGroundTruthExpected(e.target.value)}
+                        placeholder={groundTruthKind === 'u32' ? 'e.g. 100' : 'e.g. 18446744073709551615'}
+                        disabled={busy || !attached}
+                      />
+                      <label htmlFor="pm-ground-truth-description">Description</label>
+                      <input
+                        id="pm-ground-truth-description"
+                        type="text"
+                        value={groundTruthDescription}
+                        onChange={(e) => setGroundTruthDescription(e.target.value)}
+                        placeholder="e.g. starting gold = 100"
+                        disabled={busy || !attached}
+                      />
+                      <button className="btn-primary" onClick={() => void handleValidateAfterRestart(selectedNode.id)} disabled={busy || !attached}>
+                        Validate After Restart
+                      </button>
+                    </div>
+
+                    {stability.observations.length > 0 && (
+                      <button className="btn-secondary" onClick={() => setShowStabilityHistory((v) => !v)}>
+                        {showStabilityHistory ? 'Hide' : 'Show'} restart history ({stability.observations.length})
+                      </button>
+                    )}
+                    {showStabilityHistory && (
+                      <ul aria-label="Restart stability history">
+                        {stability.observations.map((obs, i) => (
+                          <li key={i}>
+                            #{obs.launchNumber} — <Badge {...stabilityStatusBadge(obs.status)} /> — {obs.resolvedAddress ?? 'n/a'} — {obs.observedAt}
+                            {obs.failureReason ? ` — ${obs.failureReason}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </>

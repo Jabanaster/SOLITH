@@ -59,6 +59,57 @@ export function completenessBadge(completeness: PointerMapCompletenessDto): Badg
   return COMPLETENESS_BADGE[completeness.state];
 }
 
+const STABILITY_STATUS_BADGE: Record<StabilityStatusDto, BadgeView> = {
+  stable_exact: { label: 'Stable (exact)', variant: 'safe' },
+  stable_relocated: { label: 'Stable (relocated)', variant: 'safe' },
+  target_moved_chain_valid: { label: 'Stable (heap moved)', variant: 'safe' },
+  chain_broken: { label: 'Chain Broken', variant: 'risky' },
+  module_missing: { label: 'Module Missing', variant: 'risky' },
+  read_failed: { label: 'Read Failed', variant: 'risky' },
+  process_exited: { label: 'Process Exited', variant: 'blocked' },
+  false_positive: { label: 'False Positive', variant: 'blocked' },
+};
+
+/** A node with no observations yet is truthfully "not checked", never a silent green — mission §2's stale_unresolved. */
+export function stabilityStatusBadge(status: StabilityStatusDto | null): BadgeView {
+  if (!status) return { label: 'Not Yet Validated', variant: 'caution' };
+  return STABILITY_STATUS_BADGE[status];
+}
+
+export interface StabilitySummaryView {
+  attempts: number;
+  correct: number;
+  broken: number;
+  falsePositive: number;
+  stabilityRate: number;
+}
+
+const CORRECT_STABILITY_STATUSES: ReadonlySet<StabilityStatusDto> = new Set([
+  'stable_exact',
+  'stable_relocated',
+  'target_moved_chain_valid',
+]);
+const BROKEN_STABILITY_STATUSES: ReadonlySet<StabilityStatusDto> = new Set([
+  'chain_broken',
+  'module_missing',
+  'read_failed',
+  'process_exited',
+]);
+
+/** Raw counts + rate, denominator always alongside it — never a fabricated-precision label (mission §10). */
+export function summarizeStabilityObservations(observations: StabilityObservationDto[]): StabilitySummaryView {
+  const attempts = observations.length;
+  let correct = 0;
+  let broken = 0;
+  let falsePositive = 0;
+  for (const obs of observations) {
+    if (CORRECT_STABILITY_STATUSES.has(obs.status)) correct += 1;
+    else if (BROKEN_STABILITY_STATUSES.has(obs.status)) broken += 1;
+    else if (obs.status === 'false_positive') falsePositive += 1;
+  }
+  return { attempts, correct, broken, falsePositive, stabilityRate: attempts > 0 ? correct / attempts : 0 };
+}
+
 /** "resource_limit" -> "Resource limit". Used for termination reasons, which are free-form strings on the wire. */
 export function humanizeSnakeCase(value: string): string {
   if (!value) return value;

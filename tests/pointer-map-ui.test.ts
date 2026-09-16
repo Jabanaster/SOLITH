@@ -10,6 +10,8 @@ import {
   nodeStatusBadge,
   pointerMapDtoNodeChainSteps,
   sortPointerMapNodes,
+  stabilityStatusBadge,
+  summarizeStabilityObservations,
 } from '../src/app/live-memory/pointer-map-ui.ts';
 
 function node(overrides: Partial<PointerMapNodeDto> = {}): PointerMapNodeDto {
@@ -24,6 +26,20 @@ function node(overrides: Partial<PointerMapNodeDto> = {}): PointerMapNodeDto {
     createdAt: '2026-09-16T00:00:00.000Z',
     targetAddress: '0xdeadbeef',
     scanId: 'pms-1',
+    stability: { baseline: null, observations: [] },
+    ...overrides,
+  };
+}
+
+function observation(overrides: Partial<StabilityObservationDto> = {}): StabilityObservationDto {
+  return {
+    launchNumber: 1,
+    pid: 100,
+    moduleBase: '0x400000',
+    resolvedAddress: '0x10000010',
+    status: 'stable_exact',
+    failureReason: null,
+    observedAt: '2026-09-16T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -206,4 +222,56 @@ describe('large-map UX — grouping/filtering/sorting stay correct at the P2-2 m
       for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i].depth >= sorted[i - 1].depth);
     });
   }
+});
+
+describe('stabilityStatusBadge — never a silent green (P2-4)', () => {
+  test('null status (never validated) is a caution badge, not stable and not hidden', () => {
+    const badge = stabilityStatusBadge(null);
+    assert.equal(badge.variant, 'caution');
+    assert.match(badge.label, /not.*valid/i);
+  });
+
+  test('every correct status is a safe badge with a distinct label', () => {
+    const exact = stabilityStatusBadge('stable_exact');
+    const relocated = stabilityStatusBadge('stable_relocated');
+    const moved = stabilityStatusBadge('target_moved_chain_valid');
+    assert.equal(exact.variant, 'safe');
+    assert.equal(relocated.variant, 'safe');
+    assert.equal(moved.variant, 'safe');
+    assert.notEqual(exact.label, relocated.label);
+    assert.notEqual(relocated.label, moved.label);
+  });
+
+  test('every broken status is never a safe badge', () => {
+    for (const status of ['chain_broken', 'module_missing', 'read_failed', 'process_exited'] as const) {
+      assert.notEqual(stabilityStatusBadge(status).variant, 'safe');
+    }
+  });
+
+  test('false_positive is never a safe badge — readable does not mean correct', () => {
+    assert.notEqual(stabilityStatusBadge('false_positive').variant, 'safe');
+  });
+});
+
+describe('summarizeStabilityObservations — raw counts + rate, denominator never hidden (mission §10)', () => {
+  test('empty observations never divides by zero', () => {
+    const summary = summarizeStabilityObservations([]);
+    assert.equal(summary.attempts, 0);
+    assert.equal(summary.stabilityRate, 0);
+  });
+
+  test('mixed observations produce correct raw counts and rate', () => {
+    const observations = [
+      observation({ status: 'stable_exact' }),
+      observation({ status: 'stable_relocated' }),
+      observation({ status: 'chain_broken' }),
+      observation({ status: 'false_positive' }),
+    ];
+    const summary = summarizeStabilityObservations(observations);
+    assert.equal(summary.attempts, 4);
+    assert.equal(summary.correct, 2);
+    assert.equal(summary.broken, 1);
+    assert.equal(summary.falsePositive, 1);
+    assert.equal(summary.stabilityRate, 0.5);
+  });
 });
