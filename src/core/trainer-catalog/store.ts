@@ -187,10 +187,16 @@ function mergeSources(
 
 /**
  * Resolves one artwork field (steamAppId/coverUrl/headerUrl/iconUrl) against
- * whatever is already stored. Null/undefined incoming values never erase an
- * existing value. A non-empty incoming value fills an empty field. A
- * non-empty incoming value only replaces an existing non-empty value when
- * its source's artwork precedence is at least as high as the precedence
+ * whatever is already stored, for ordinary (non-explicit-clear) upserts.
+ * Null/undefined incoming values never erase an existing value — this is
+ * what protects curated artwork from being wiped by an incremental sync
+ * writer that simply doesn't know that field. A caller that genuinely wants
+ * to clear a field (a direct user edit) bypasses this via
+ * `UpsertCatalogEntryOptions.explicitClearFields`, not by relying on this
+ * function to treat `undefined` as intent to clear. A non-empty incoming
+ * value fills an empty field. A non-empty incoming value only replaces an
+ * existing non-empty value when its source's artwork precedence is at least
+ * as high as the precedence
  * that already produced the stored value.
  */
 function resolveArtworkField<T>(
@@ -204,25 +210,39 @@ function resolveArtworkField<T>(
   return incomingPrecedence >= existingPrecedence ? incomingValue : existingValue;
 }
 
-export function upsertCatalogEntry(entry: TrainerCatalogEntry): void {
+export type ExplicitClearableArtworkField = 'steamAppId' | 'headerUrl' | 'coverUrl' | 'iconUrl';
+
+export interface UpsertCatalogEntryOptions {
+  /**
+   * Artwork fields to clear exactly as given (bypassing the precedence
+   * protection below) when `entry` carries `undefined` for them. Use this
+   * only for a direct, human-driven edit that intends to remove an image —
+   * never for incremental sync/import writers, which must be able to omit a
+   * field without risking an existing higher-precedence value being wiped.
+   */
+  explicitClearFields?: ExplicitClearableArtworkField[];
+}
+
+export function upsertCatalogEntry(entry: TrainerCatalogEntry, options: UpsertCatalogEntryOptions = {}): void {
   const existingEntry = getCatalogEntry(entry.catalogGameId);
+  const explicitClear = new Set(options.explicitClearFields ?? []);
 
   const mergedSources = existingEntry ? mergeSources(existingEntry.sources, entry.sources) : entry.sources;
   const existingPrecedence = existingEntry ? maxArtworkPrecedence(existingEntry.sources) : 0;
   const incomingPrecedence = maxArtworkPrecedence(entry.sources);
 
-  const steamAppId = existingEntry
-    ? resolveArtworkField(existingEntry.steamAppId, entry.steamAppId, existingPrecedence, incomingPrecedence)
-    : entry.steamAppId;
-  const headerUrl = existingEntry
-    ? resolveArtworkField(existingEntry.headerUrl, entry.headerUrl, existingPrecedence, incomingPrecedence)
-    : entry.headerUrl;
-  const coverUrl = existingEntry
-    ? resolveArtworkField(existingEntry.coverUrl, entry.coverUrl, existingPrecedence, incomingPrecedence)
-    : entry.coverUrl;
-  const iconUrl = existingEntry
-    ? resolveArtworkField(existingEntry.iconUrl, entry.iconUrl, existingPrecedence, incomingPrecedence)
-    : entry.iconUrl;
+  const steamAppId = !existingEntry || explicitClear.has('steamAppId')
+    ? entry.steamAppId
+    : resolveArtworkField(existingEntry.steamAppId, entry.steamAppId, existingPrecedence, incomingPrecedence);
+  const headerUrl = !existingEntry || explicitClear.has('headerUrl')
+    ? entry.headerUrl
+    : resolveArtworkField(existingEntry.headerUrl, entry.headerUrl, existingPrecedence, incomingPrecedence);
+  const coverUrl = !existingEntry || explicitClear.has('coverUrl')
+    ? entry.coverUrl
+    : resolveArtworkField(existingEntry.coverUrl, entry.coverUrl, existingPrecedence, incomingPrecedence);
+  const iconUrl = !existingEntry || explicitClear.has('iconUrl')
+    ? entry.iconUrl
+    : resolveArtworkField(existingEntry.iconUrl, entry.iconUrl, existingPrecedence, incomingPrecedence);
 
   const searchableText = entry.searchableText || buildSearchableText(entry);
   const hasModPackValue = entry.hasModPack ? 1 : 0;
