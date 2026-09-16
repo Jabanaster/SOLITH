@@ -226,6 +226,59 @@ function toNativeCompleteness(c: NativeCompleteness): CanonicalExactScanOutcome[
   }
 }
 
+/**
+ * Accumulates the per-region completeness outcomes of a multi-region scan into
+ * one truthful answer.
+ *
+ * This backend scans one region per native call, so each call returns its own
+ * completeness. The previous code kept only the most recent non-complete
+ * outcome (`worstCompleteness = outcome.completeness`), which silently threw
+ * away every earlier region's skipped ranges. Measuring real-game coverage is
+ * what exposed it: a Stardew Valley scan left 375 MiB of eligible memory
+ * unread across many policy-excluded regions and reported exactly ONE skipped
+ * range of 53 KiB, because only the last one survived.
+ *
+ * The rules, in order of severity:
+ *
+ * - A terminal stop (cancelled / process_exited / resource_limit / failed)
+ *   outranks everything: the scan stopped, and the first such stop is the one
+ *   that ended it.
+ * - Otherwise every skipped range from every region is kept, so
+ *   `complete_with_skipped_regions` lists all of them rather than the last.
+ * - `complete` only survives if no region reported anything else.
+ */
+class CompletenessAccumulator {
+  private readonly skipped: CanonicalSkippedRange[] = [];
+  private terminal: CanonicalExactScanOutcome['completeness'] | null = null;
+
+  /** True once a terminal stop has been recorded; the caller should stop scanning. */
+  get stopped(): boolean {
+    return this.terminal !== null;
+  }
+
+  add(outcome: NativeCompleteness): void {
+    const canonical = toNativeCompleteness(outcome);
+    if (canonical.state === 'complete') return;
+    if (canonical.state === 'complete_with_skipped_regions') {
+      for (const range of canonical.skipped) this.skipped.push(range);
+      return;
+    }
+    // First terminal stop wins — it is the one that actually ended the scan.
+    this.terminal ??= canonical;
+  }
+
+  /** Records a stop this backend decided on itself (a bound, not a native outcome). */
+  stop(completeness: CanonicalExactScanOutcome['completeness']): void {
+    this.terminal ??= completeness;
+  }
+
+  result(): CanonicalExactScanOutcome['completeness'] {
+    if (this.terminal !== null) return this.terminal;
+    if (this.skipped.length > 0) return { state: 'complete_with_skipped_regions', skipped: [...this.skipped] };
+    return { state: 'complete' };
+  }
+}
+
 function toCanonicalMetrics(m: NativeProgress) {
   return {
     regionsConsidered: m.regionsConsidered,
@@ -518,13 +571,13 @@ export class NativeScannerBackend implements ScannerBackend {
       let regionsSkipped = 0;
       let bytesRequested = 0n;
       let bytesRead = 0n;
-      let worstCompleteness: NativeCompleteness = { state: 'complete' };
+      const completenessOf = new CompletenessAccumulator();
       let totalBytesSoFar = 0n;
 
       for (const region of regions) {
         regionsConsidered += 1;
         if (bounds.maxTotalBytes !== undefined && totalBytesSoFar >= BigInt(bounds.maxTotalBytes)) {
-          worstCompleteness = { state: 'resource_limit', atByte: totalBytesSoFar };
+          completenessOf.stop({ state: 'resource_limit', atByte: totalBytesSoFar });
           break;
         }
         const outcome = await this.target.scanExact(
@@ -539,7 +592,13 @@ export class NativeScannerBackend implements ScannerBackend {
           cancellation,
           progress,
         );
-        regionsRead += 1;
+        // Taken from the native metrics rather than incremented blindly: this
+        // backend scans one region per call, and the native core may exclude
+        // that region by policy, in which case it was iterated but never read.
+        // Counting it as read is what made a scan that skipped 375 MiB report
+        // `regionsSkipped: 0`.
+        regionsRead += outcome.metrics.regionsRead;
+        regionsSkipped += outcome.metrics.regionsSkipped;
         bytesRequested += outcome.metrics.bytesRequested;
         bytesRead += outcome.metrics.bytesRead;
         totalBytesSoFar += outcome.metrics.bytesRead;
@@ -552,17 +611,14 @@ export class NativeScannerBackend implements ScannerBackend {
           })),
         );
         control?.onProgress?.(toCanonicalMetrics(outcome.metrics));
-        if (outcome.completeness.state !== 'complete') {
-          worstCompleteness = outcome.completeness;
-          if (outcome.completeness.state === 'cancelled' || outcome.completeness.state === 'process_exited') break;
-        }
+        completenessOf.add(outcome.completeness);
+        if (outcome.completeness.state === 'cancelled' || outcome.completeness.state === 'process_exited') break;
         if (matches.length >= effectiveMaxMatches) {
-          worstCompleteness = { state: 'resource_limit', atByte: totalBytesSoFar };
+          completenessOf.stop({ state: 'resource_limit', atByte: totalBytesSoFar });
           break;
         }
       }
-      regionsSkipped = regionsConsidered - regionsRead;
-      const completeness = toNativeCompleteness(worstCompleteness);
+      const completeness = completenessOf.result();
       return {
         backend: 'native',
         matches,
@@ -597,9 +653,10 @@ export class NativeScannerBackend implements ScannerBackend {
       const matches: CanonicalPatternScanOutcome['matches'] = [];
       let regionsConsidered = 0;
       let regionsRead = 0;
+      let regionsSkipped = 0;
       let bytesRequested = 0n;
       let bytesRead = 0n;
-      let worstCompleteness: NativeCompleteness = { state: 'complete' };
+      const completenessOf = new CompletenessAccumulator();
 
       for (const region of regions) {
         regionsConsidered += 1;
@@ -612,19 +669,18 @@ export class NativeScannerBackend implements ScannerBackend {
           cancellation,
           progress,
         );
-        regionsRead += 1;
+        regionsRead += outcome.metrics.regionsRead;
+        regionsSkipped += outcome.metrics.regionsSkipped;
         bytesRequested += outcome.metrics.bytesRequested;
         bytesRead += outcome.metrics.bytesRead;
         matches.push(...outcome.matches);
         control?.onProgress?.(toCanonicalMetrics(outcome.metrics));
-        if (outcome.completeness.state !== 'complete') {
-          worstCompleteness = outcome.completeness;
-          if (outcome.completeness.state === 'cancelled' || outcome.completeness.state === 'process_exited') break;
-        }
+        completenessOf.add(outcome.completeness);
+        if (outcome.completeness.state === 'cancelled' || outcome.completeness.state === 'process_exited') break;
         if (matches.length > 0) break; // firstMatchOnly semantics, matching legacy's scanAobInProcess contract
         if (bounds.maxMatches !== undefined && matches.length >= bounds.maxMatches) break;
       }
-      const completeness = toNativeCompleteness(worstCompleteness);
+      const completeness = completenessOf.result();
       return {
         backend: 'native',
         matches,
@@ -633,7 +689,7 @@ export class NativeScannerBackend implements ScannerBackend {
         metrics: {
           regionsConsidered,
           regionsRead,
-          regionsSkipped: regionsConsidered - regionsRead,
+          regionsSkipped,
           bytesRequested,
           bytesRead,
           elapsedMillis: 0n,

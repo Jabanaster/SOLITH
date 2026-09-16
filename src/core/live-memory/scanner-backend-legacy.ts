@@ -311,19 +311,19 @@ export class LegacyScannerBackend implements ScannerBackend {
     if (!this.driver || !this.handle) {
       throw new ScannerBackendError('attach_failed', 'Legacy backend is not attached.');
     }
-    // Legacy AOB (`aob-resolver.ts`) tracks no completeness/skipped-region
-    // signal at all — every region read failure is a silent `continue`
-    // (this is the AOB truth-reporting defect this stage tracks, D01/D04).
-    // Reporting `complete` here for a "not found" result would be
-    // dishonest, so a legacy AOB miss is always reported as
-    // `complete_with_skipped_regions` with an empty (unknown) skip list
-    // rather than a false authoritative-absence claim.
-    const match = scanAobInProcess(this.driver, this.handle, pattern, { moduleName });
-    const matches = match !== null ? [{ address: match, length: 0 }] : [];
+    // Legacy AOB (`aob-resolver.ts`) now reports which eligible regions it
+    // could not read, so this adapter passes the real completeness through
+    // instead of the blanket "complete_with_skipped_regions, skip list
+    // unknown" it had to assume while the legacy scan swallowed every read
+    // failure. A legacy miss over fully-read regions is now allowed to be a
+    // genuine authoritative absence; a miss with any unreadable region is
+    // still never one.
+    const outcome = scanAobInProcess(this.driver, this.handle, pattern, { moduleName });
+    const matches = outcome.address !== null ? [{ address: outcome.address, length: 0 }] : [];
     const metrics = {
-      regionsConsidered: 0,
-      regionsRead: 0,
-      regionsSkipped: 0,
+      regionsConsidered: outcome.regionsConsidered,
+      regionsRead: outcome.regionsRead,
+      regionsSkipped: outcome.skippedRegions.length,
       bytesRequested: 0n,
       bytesRead: 0n,
       elapsedMillis: 0n,
@@ -332,8 +332,8 @@ export class LegacyScannerBackend implements ScannerBackend {
     return {
       backend: 'legacy',
       matches,
-      completeness: { state: 'complete_with_skipped_regions', skipped: [] },
-      isAuthoritativeAbsence: false,
+      completeness: outcome.completeness,
+      isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
       metrics,
     };
   }

@@ -48,6 +48,7 @@ import {
   InProcessRegisterInjectorHelperSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
+import type { CanonicalCompleteness, CanonicalSkippedRange } from '../src/core/live-memory/scanner-backend.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
@@ -567,8 +568,20 @@ export function registerLiveMemoryIpc(): void {
       const session = requireSession(event);
       const parsed = LiveMemoryScanNextSchema.parse(payload);
       const previous: ScanMatch[] = parsed.previous.map((m) => ({ address: BigInt(m.address), value: m.value }));
-      const matches = session.scanNext(parsed.dataType, parsed.comparison, previous);
-      return { success: true, matches: serializeMatches(matches) };
+      const result = session.scanNext(parsed.dataType, parsed.comparison, previous);
+      // `matches` is unchanged for existing renderer code; the coverage fields
+      // are additive, and are what let the UI distinguish "narrowed to zero
+      // because nothing matched" from "narrowed to zero because candidates
+      // could not be re-read" (D01 final closure).
+      return {
+        success: true,
+        matches: serializeMatches(result.matches),
+        candidatesConsidered: result.candidatesConsidered,
+        candidatesUnreadable: result.candidatesUnreadable,
+        truncated: result.truncated,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+        completeness: serializeCompleteness(result.completeness),
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_next_failed') };
     }
@@ -586,7 +599,14 @@ export function registerLiveMemoryIpc(): void {
         maxRegionBytes: parsed.maxRegionBytes,
         maxTotalBytes: parsed.maxTotalBytes,
       });
-      return { success: true, ...result };
+      return {
+        success: true,
+        regionsScanned: result.regionsScanned,
+        bytesScanned: result.bytesScanned,
+        truncated: result.truncated,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+        completeness: serializeCompleteness(result.completeness),
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_first_unknown_failed') };
     }
@@ -613,6 +633,8 @@ export function registerLiveMemoryIpc(): void {
           regionsScanned: result.regionsScanned,
           bytesScanned: result.bytesScanned,
           truncated: result.truncated,
+          isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+          completeness: serializeCompleteness(result.completeness),
         },
       };
     } catch (error) {
@@ -997,8 +1019,15 @@ export function registerLiveMemoryIpc(): void {
             depth: c.depth,
           })),
           truncated: scanResult.truncated,
+          requestedDepth: scanResult.requestedDepth,
           levelsSearched: scanResult.levelsSearched,
+          deepestLevelCompleted: scanResult.deepestLevelCompleted,
           scansPerformed: scanResult.scansPerformed,
+          candidatesExplored: scanResult.candidatesExplored,
+          candidatesDropped: scanResult.candidatesDropped,
+          termination: scanResult.termination,
+          isAuthoritativeAbsence: scanResult.isAuthoritativeAbsence,
+          completeness: serializeCompleteness(scanResult.completeness),
         },
       };
     } catch (error) {
@@ -1205,8 +1234,13 @@ export function registerLiveMemoryIpc(): void {
       return {
         success: true,
         report,
+        requestedDepth: scanResult.requestedDepth,
         levelsSearched: scanResult.levelsSearched,
+        deepestLevelCompleted: scanResult.deepestLevelCompleted,
         scansPerformed: scanResult.scansPerformed,
+        termination: scanResult.termination,
+        isAuthoritativeAbsence: scanResult.isAuthoritativeAbsence,
+        completeness: serializeCompleteness(scanResult.completeness),
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'research_pointer_analyze_failed') };
@@ -1919,8 +1953,18 @@ function serializeAutoMatrixResult(result: {
     truncated: boolean;
     skipped?: boolean;
     reason?: string;
+    completeness: CanonicalCompleteness;
+    isAuthoritativeAbsence: boolean;
+    skippedRegions: CanonicalSkippedRange[];
   }>;
-  unknown?: { regionsScanned: number; bytesScanned: number; truncated: boolean };
+  unknown?: {
+    regionsScanned: number;
+    bytesScanned: number;
+    truncated: boolean;
+    completeness: CanonicalCompleteness;
+    isAuthoritativeAbsence: boolean;
+    skippedRegions: CanonicalSkippedRange[];
+  };
   totals: {
     buckets: number;
     matches: number;
@@ -1938,8 +1982,47 @@ function serializeAutoMatrixResult(result: {
     buckets: result.buckets.map((bucket) => ({
       ...bucket,
       matches: serializeTypedMatches(bucket.matches),
+      completeness: serializeCompleteness(bucket.completeness),
+      skippedRegions: serializeSkippedRegions(bucket.skippedRegions),
     })),
+    ...(result.unknown
+      ? {
+          unknown: {
+            ...result.unknown,
+            completeness: serializeCompleteness(result.unknown.completeness),
+            skippedRegions: serializeSkippedRegions(result.unknown.skippedRegions),
+          },
+        }
+      : {}),
   };
+}
+
+/**
+ * BigInt-safe wire form of the canonical completeness states. Addresses and
+ * byte offsets cross the IPC boundary as decimal strings, never as a Number —
+ * the same rule every other BigInt in this file follows.
+ */
+function serializeCompleteness(completeness: CanonicalCompleteness) {
+  switch (completeness.state) {
+    case 'complete':
+      return { state: completeness.state };
+    case 'complete_with_skipped_regions':
+      return { state: completeness.state, skipped: serializeSkippedRegions(completeness.skipped) };
+    case 'cancelled':
+    case 'process_exited':
+    case 'resource_limit':
+      return { state: completeness.state, atByte: completeness.atByte.toString() };
+    case 'failed':
+      return { state: completeness.state, reason: completeness.reason };
+  }
+}
+
+function serializeSkippedRegions(skipped: CanonicalSkippedRange[]) {
+  return skipped.map((range) => ({
+    baseAddress: range.baseAddress.toString(),
+    size: range.size.toString(),
+    reason: range.reason,
+  }));
 }
 
 function serializeFreezeStatus(status: {

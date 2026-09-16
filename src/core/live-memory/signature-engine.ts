@@ -253,20 +253,70 @@ function clipSearchWindow(
   };
 }
 
+/**
+ * The truthful result of a legacy in-process signature scan.
+ *
+ * `match === null` means "not found in the spans that were actually read".
+ * That is only equivalent to "not present" when every eligible span WAS read,
+ * which is why these scans report the spans they had to skip instead of
+ * swallowing the read failure — the same rule `memory-scanner.ts` and
+ * `aob-resolver.ts` follow, using the same canonical completeness vocabulary.
+ */
+export interface SignatureScanOutcome {
+  match: SignatureMatch | null;
+  skippedRegions: CanonicalSkippedRange[];
+  completeness: CanonicalCompleteness;
+  isAuthoritativeAbsence: boolean;
+}
+
+function signatureOutcome(
+  match: SignatureMatch | null,
+  skippedRegions: CanonicalSkippedRange[],
+): SignatureScanOutcome {
+  const completeness: CanonicalCompleteness =
+    skippedRegions.length > 0
+      ? { state: 'complete_with_skipped_regions', skipped: [...skippedRegions] }
+      : { state: 'complete' };
+  return {
+    match,
+    skippedRegions: [...skippedRegions],
+    completeness,
+    isAuthoritativeAbsence: match === null && completeness.state === 'complete',
+  };
+}
+
+function spanReadFailure(baseAddress: bigint, size: number, err: unknown): CanonicalSkippedRange {
+  return {
+    baseAddress,
+    size: BigInt(size),
+    reason: `span_read_failed: ${err instanceof Error ? err.message : String(err)}`,
+  };
+}
+
 /** Exact AOB scan (delegates to aob-resolver). */
 export function scanExactSignature(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   signature: string,
   options: AobScanOptions = {},
-): SignatureMatch | null {
+): SignatureScanOutcome {
   const pattern = parseAobSignature(signature);
+  const skippedRegions: CanonicalSkippedRange[] = [];
   const modules = options.moduleName
     ? driver.getModules(handle).filter(
       (module) => module.name.toLowerCase() === options.moduleName!.toLowerCase(),
     )
     : [];
-  if (options.moduleName && modules.length === 0) return null;
+  // A module-scoped scan whose module is absent searched nothing at all, so it
+  // fails closed rather than reporting an authoritative absence.
+  if (options.moduleName && modules.length === 0) {
+    return {
+      match: null,
+      skippedRegions: [],
+      completeness: { state: 'failed', reason: `module_not_found: ${options.moduleName}` },
+      isAuthoritativeAbsence: false,
+    };
+  }
 
   for (const region of driver.getRegions(handle)) {
     for (const span of regionScanSpans(region, modules)) {
@@ -275,19 +325,23 @@ export function scanExactSignature(
         const buffer = driver.readBuffer(handle, span.baseAddress, span.size);
         const offset = findAobInBuffer(buffer, pattern);
         if (offset >= 0) {
-          return {
-            address: span.baseAddress + BigInt(offset),
-            mode: 'exact',
-            distance: 0,
-            driftKind: 'hamming',
-          };
+          return signatureOutcome(
+            {
+              address: span.baseAddress + BigInt(offset),
+              mode: 'exact',
+              distance: 0,
+              driftKind: 'hamming',
+            },
+            skippedRegions,
+          );
         }
-      } catch {
+      } catch (err) {
+        skippedRegions.push(spanReadFailure(span.baseAddress, span.size, err));
         continue;
       }
     }
   }
-  return null;
+  return signatureOutcome(null, skippedRegions);
 }
 
 /**
@@ -298,16 +352,24 @@ export function scanFuzzySignature(
   handle: LiveProcessHandle,
   signature: string,
   options: FuzzyScanOptions = {},
-): SignatureMatch | null {
+): SignatureScanOutcome {
   const maxDistance = options.maxDistance ?? 2;
   const maxEdits = options.maxEdits ?? 1;
   const pattern = parseAobSignature(signature);
   const regions = driver.getRegions(handle);
+  const skippedRegions: CanonicalSkippedRange[] = [];
   const modules = options.moduleName
     ? driver.getModules(handle).filter((m) => m.name.toLowerCase() === options.moduleName!.toLowerCase())
     : [];
   // Module-scoped definitions must fail closed when the requested module is absent.
-  if (options.moduleName && modules.length === 0) return null;
+  if (options.moduleName && modules.length === 0) {
+    return {
+      match: null,
+      skippedRegions: [],
+      completeness: { state: 'failed', reason: `module_not_found: ${options.moduleName}` },
+      isAuthoritativeAbsence: false,
+    };
+  }
 
   let best: SignatureMatch | null = null;
 
@@ -343,15 +405,18 @@ export function scanFuzzySignature(
             best.driftKind === 'edit')
         ) {
           best = candidate;
-          if (best.distance === 0 && best.driftKind === 'hamming') return best;
+          if (best.distance === 0 && best.driftKind === 'hamming') {
+            return signatureOutcome(best, skippedRegions);
+          }
         }
-      } catch {
+      } catch (err) {
+        skippedRegions.push(spanReadFailure(span.baseAddress, span.size, err));
         continue;
       }
     }
   }
 
-  return best;
+  return signatureOutcome(best, skippedRegions);
 }
 
 /**
@@ -687,7 +752,7 @@ export async function resolveSignatureWithCoverage(
   if (options.hintAddress == null) {
     const exact = exactAobResolver
       ? await resolveExactSignatureViaBackend(exactAobResolver, signature, options.moduleName)
-      : scanExactSignature(driver, handle, signature, options);
+      : scanExactSignature(driver, handle, signature, options).match;
     if (exact) {
       return { match: exact, completeness: { state: 'complete' }, isAuthoritativeAbsence: false, fuzzyBackend: null };
     }
@@ -703,10 +768,15 @@ export async function resolveSignatureWithCoverage(
     };
   }
 
+  // Unbound fallback. It no longer has to report `completeness: null`
+  // ("unknown"): the legacy fuzzy scan now tracks the spans it could not read,
+  // so the real completeness — and, when coverage was genuinely complete, a
+  // real authoritative absence — can be passed through.
+  const legacy = scanFuzzySignature(driver, handle, signature, options);
   return {
-    match: scanFuzzySignature(driver, handle, signature, options),
-    completeness: null,
-    isAuthoritativeAbsence: false,
+    match: legacy.match,
+    completeness: legacy.completeness,
+    isAuthoritativeAbsence: legacy.isAuthoritativeAbsence,
     fuzzyBackend: null,
   };
 }

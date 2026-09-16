@@ -130,7 +130,7 @@ export async function resolveMemoryFeatureAddress(
     // in isolation against a `FakeMemoryDriver`).
     const match = aobResolver
       ? (await aobResolver(resolution.signature, resolution.moduleName)).address
-      : scanAobInProcess(driver, handle, resolution.signature, { moduleName: resolution.moduleName });
+      : scanAobInProcess(driver, handle, resolution.signature, { moduleName: resolution.moduleName }).address;
 
     if (match !== null) {
       const anchor = match + BigInt(parseHexOffset(resolution.baseOffset));

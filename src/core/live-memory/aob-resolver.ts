@@ -1,3 +1,4 @@
+import type { CanonicalCompleteness, CanonicalSkippedRange } from './scanner-backend.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
 
 export interface AobPattern {
@@ -65,6 +66,30 @@ function regionOverlapsModule(
 }
 
 /**
+ * The truthful result of a legacy in-process AOB scan.
+ *
+ * `address === null` on its own has never been enough information: it means
+ * "not found in the regions that were actually read", which is only the same
+ * thing as "not present in this process" when every eligible region WAS read.
+ * Before this was reported, `scanAobInProcess` returned a bare `bigint | null`
+ * and swallowed every region read failure, so a signature sitting in a region
+ * that exceeded memoryjs's 1 MiB `readBuffer` ceiling came back
+ * indistinguishable from a signature that genuinely was not there — the
+ * false-not-found half of D03/D04.
+ */
+export interface AobScanOutcome {
+  address: bigint | null;
+  /** Eligible regions that could not be read, and why. */
+  skippedRegions: CanonicalSkippedRange[];
+  /** Canonical completeness, same vocabulary as the scanner-backend contract. */
+  completeness: CanonicalCompleteness;
+  /** True iff nothing was found AND every eligible region was actually read. */
+  isAuthoritativeAbsence: boolean;
+  regionsConsidered: number;
+  regionsRead: number;
+}
+
+/**
  * Scan committed process regions for an AOB pattern.
  * When `moduleName` is set, only regions overlapping that module are searched.
  */
@@ -73,31 +98,59 @@ export function scanAobInProcess(
   handle: LiveProcessHandle,
   signature: string,
   options: AobScanOptions = {},
-): bigint | null {
+): AobScanOutcome {
   const pattern = parseAobSignature(signature);
   const regions = driver.getRegions(handle);
   const modules = options.moduleName
     ? driver.getModules(handle).filter((m) => m.name.toLowerCase() === options.moduleName!.toLowerCase())
     : [];
 
+  const skippedRegions: CanonicalSkippedRange[] = [];
+  let regionsConsidered = 0;
+  let regionsRead = 0;
+
+  const outcome = (address: bigint | null): AobScanOutcome => {
+    const completeness: CanonicalCompleteness =
+      skippedRegions.length > 0
+        ? { state: 'complete_with_skipped_regions', skipped: [...skippedRegions] }
+        : { state: 'complete' };
+    return {
+      address,
+      skippedRegions: [...skippedRegions],
+      completeness,
+      isAuthoritativeAbsence: address === null && completeness.state === 'complete',
+      regionsConsidered,
+      regionsRead,
+    };
+  };
+
   for (const region of regions) {
     if (modules.length > 0) {
       const overlaps = modules.some((m) =>
         regionOverlapsModule(region.baseAddress, region.size, m.baseAddress, m.size),
       );
+      // A region outside the requested module is not eligible, so passing over
+      // it is not a coverage gap — unlike a read failure below.
       if (!overlaps) continue;
     }
+    regionsConsidered += 1;
 
     try {
       const buffer = driver.readBuffer(handle, region.baseAddress, region.size);
+      regionsRead += 1;
       const offset = findAobInBuffer(buffer, pattern);
       if (offset >= 0) {
-        return region.baseAddress + BigInt(offset);
+        return outcome(region.baseAddress + BigInt(offset));
       }
-    } catch {
+    } catch (err) {
+      skippedRegions.push({
+        baseAddress: region.baseAddress,
+        size: BigInt(region.size),
+        reason: `region_read_failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
       continue;
     }
   }
 
-  return null;
+  return outcome(null);
 }

@@ -11,19 +11,29 @@ import {
   scanFirstUnknown as scanFirstUnknownSnapshot,
   scanNextFromSnapshotMultiType,
 } from './memory-scanner.js';
-import type { AutoFirstScanMatrixResult, AutoFirstScanQuery, ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
+import type {
+  AutoFirstScanMatrixResult,
+  AutoFirstScanQuery,
+  NextScanResult,
+  ScanCoverage,
+  ScanResult,
+  TypedScanResult,
+  UnknownScanSnapshot,
+} from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
 import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
-import { scanAobInProcess } from './aob-resolver.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
 import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
 import {
   liveValueTypeToCanonical,
   ScannerBackendError,
+  type CanonicalCompleteness,
+  type CanonicalMetrics,
   type CanonicalScanBounds,
   type RoutedWireValueType,
   type ScanControl,
+  type ScannerBackendKind,
   type ScannerRoutingMode,
 } from './scanner-backend.js';
 import {
@@ -810,6 +820,17 @@ export class LiveMemorySession {
     regionsScanned: number;
     bytesScanned: number;
     truncated: boolean;
+    /**
+     * The full canonical metrics the backend produced. `regionsScanned` and
+     * `bytesScanned` above are the two fields the IPC wire format has always
+     * carried; this exposes the rest — `regionsConsidered`, `regionsSkipped`
+     * and `bytesRequested` — which is what makes an honest coverage
+     * percentage (bytesRead / bytesRequested) computable by a caller rather
+     * than only by the backend itself.
+     */
+    metrics: CanonicalMetrics;
+    /** Structured completeness, of which `truncated` is the boolean summary. */
+    completeness: CanonicalCompleteness;
   }> {
     if (!this.target) throw new Error('No process attached.');
     const router = this.getOrCreateBackendRouter();
@@ -859,6 +880,8 @@ export class LiveMemorySession {
       regionsScanned: outcome.metrics.regionsRead,
       bytesScanned: Number(outcome.metrics.bytesRead),
       truncated: outcome.completeness.state !== 'complete',
+      metrics: outcome.metrics,
+      completeness: outcome.completeness,
     };
   }
 
@@ -1062,14 +1085,22 @@ export class LiveMemorySession {
               regionsScanned: unknown.regionsScanned,
               bytesScanned: unknown.bytesScanned,
               truncated: unknown.truncated,
+              skippedRegions: unknown.skippedRegions,
+              completeness: unknown.completeness,
+              isAuthoritativeAbsence: unknown.isAuthoritativeAbsence,
             },
           }
         : {}),
     };
   }
 
-  /** Next scan: read-only narrowing of a prior candidate set. */
-  scanNext(dataType: LiveValueType, comparison: ScanComparison, previous: ScanMatch[]): ScanMatch[] {
+  /**
+   * Next scan: read-only narrowing of a prior candidate set. Returns the
+   * survivors plus truthful coverage — candidates that could not be re-read
+   * are reported, not silently conflated with candidates that failed the
+   * comparison (D01 final closure).
+   */
+  scanNext(dataType: LiveValueType, comparison: ScanComparison, previous: ScanMatch[]): NextScanResult {
     if (!this.handle) throw new Error('No process attached.');
     return scanNextMatches(this.driver, this.handle, dataType, comparison, previous);
   }
@@ -1088,7 +1119,10 @@ export class LiveMemorySession {
    * and Stamina together). A single unkeyed snapshot field would let a
    * second scanFirstUnknown silently clobber the first one's baseline.
    */
-  scanFirstUnknown(key: string, bounds?: ScanBounds): { regionsScanned: number; bytesScanned: number; truncated: boolean } {
+  scanFirstUnknown(
+    key: string,
+    bounds?: ScanBounds,
+  ): { regionsScanned: number; bytesScanned: number; truncated: boolean } & ScanCoverage {
     if (!this.handle) throw new Error('No process attached.');
     const snapshot = scanFirstUnknownSnapshot(this.driver, this.handle, bounds);
     this.unknownSnapshots.set(key, snapshot);
@@ -1096,6 +1130,9 @@ export class LiveMemorySession {
       regionsScanned: snapshot.regionsScanned,
       bytesScanned: snapshot.bytesScanned,
       truncated: snapshot.truncated,
+      skippedRegions: snapshot.skippedRegions,
+      completeness: snapshot.completeness,
+      isAuthoritativeAbsence: snapshot.isAuthoritativeAbsence,
     };
   }
 
@@ -1135,17 +1172,34 @@ export class LiveMemorySession {
    * steady-state reasoning as scanNext.
    */
   readMany(addresses: { address: bigint; dataType: LiveValueType }[]): { address: bigint; value: number; dataType: LiveValueType }[] {
+    return this.readManyWithCoverage(addresses).values;
+  }
+
+  /**
+   * Same bulk read as {@link readMany}, but reports which addresses could not
+   * be read instead of only omitting them. Omission alone is ambiguous to a
+   * polling caller — an address missing from the result could equally mean
+   * "freed" or "never asked for" — so the Watch Live panel needs the count to
+   * distinguish a genuinely dead candidate list from a transient read failure.
+   */
+  readManyWithCoverage(addresses: { address: bigint; dataType: LiveValueType }[]): {
+    values: { address: bigint; value: number; dataType: LiveValueType }[];
+    requested: number;
+    unreadable: { address: bigint; dataType: LiveValueType }[];
+  } {
     if (!this.handle) throw new Error('No process attached.');
     const results: { address: bigint; value: number; dataType: LiveValueType }[] = [];
+    const unreadable: { address: bigint; dataType: LiveValueType }[] = [];
     for (const target of addresses) {
       try {
         const value = this.driver.readMemory(this.handle, target.address, target.dataType);
         results.push({ address: target.address, value, dataType: target.dataType });
       } catch {
+        unreadable.push({ address: target.address, dataType: target.dataType });
         continue;
       }
     }
-    return results;
+    return { values: results, requested: addresses.length, unreadable };
   }
 
   /**
@@ -1192,12 +1246,28 @@ export class LiveMemorySession {
     return scanForPointerPath(this.driver, this.handle, targetAddress, bounds);
   }
 
-  /** Read-only AOB scan in the attached process (Script Research Analyzer). */
-  scanAobSignature(signature: string, moduleName?: string): { address: string } | null {
+  /**
+   * Read-only AOB scan in the attached process (Script Research Analyzer).
+   *
+   * Phase 1 final closure: this was the last direct `scanAobInProcess` call
+   * left on a normal production path. It bypassed the backend router
+   * entirely — so this endpoint ran the legacy read loop even with NATIVE as
+   * the active backend, and returned a bare `null` that could not distinguish
+   * "the signature is not in this process" from "regions were unreadable, so
+   * we did not look everywhere". Both are fixed by routing it like every
+   * other production scanner operation.
+   */
+  async scanAobSignature(
+    signature: string,
+    moduleName?: string,
+  ): Promise<{ address: string | null; isAuthoritativeAbsence: boolean; backend: ScannerBackendKind }> {
     if (!this.handle) throw new Error('No process attached.');
-    const match = scanAobInProcess(this.driver, this.handle, signature, { moduleName });
-    if (match == null) return null;
-    return { address: `0x${match.toString(16)}` };
+    const result = await this.scanAobViaBackend(signature, moduleName);
+    return {
+      address: result.address !== null ? `0x${BigInt(result.address).toString(16)}` : null,
+      isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+      backend: result.backend,
+    };
   }
 
   /** Captures the current value and stages a proposed write. Does not write anything yet. */

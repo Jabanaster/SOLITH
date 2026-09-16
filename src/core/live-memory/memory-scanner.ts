@@ -1,3 +1,4 @@
+import type { CanonicalCompleteness, CanonicalSkippedRange } from './scanner-backend.js';
 import type {
   LiveProcessHandle,
   LiveValueType,
@@ -24,17 +25,218 @@ const DEFAULT_MAX_MATCHES = 10_000; // keeps the result set usable; a real narro
 // title's full space should pass an explicit larger maxTotalBytes and accept the added memory cost).
 const DEFAULT_UNKNOWN_MAX_TOTAL_BYTES = 512 * 1024 * 1024;
 
-export interface ScanResult {
+/**
+ * The one truth rule every scan in this module obeys (D01 final closure §2).
+ *
+ * An eligible region that could not be examined means the result is NOT
+ * complete coverage of what was asked for — no matter which function was
+ * called, and no matter whether any matches were found. Before this was
+ * centralized, six sibling functions each answered that question differently
+ * (`scanFirst`, `scanNext`, `scanFirstUnknown`, `scanNextFromSnapshot`,
+ * `scanNextFromSnapshotMultiType`, `scanFirstByComparison` all did a bare
+ * `catch { continue; }`), so an unreadable region produced a result that
+ * claimed `truncated: false` and a zero-match result that read as an
+ * authoritative "this value is not in the process".
+ *
+ * Rather than invent a parallel truth model, this reuses the canonical
+ * `CanonicalCompleteness` states the scanner-backend contract already
+ * defines, so a legacy scan result and a backend scan outcome answer
+ * "was this complete?" in exactly the same vocabulary.
+ */
+export interface ScanCoverage {
+  /**
+   * Eligible regions that were skipped because they could not be read.
+   * Empty when every eligible region was examined.
+   */
+  skippedRegions: CanonicalSkippedRange[];
+  /** Canonical completeness — the same states the scanner-backend contract uses. */
+  completeness: CanonicalCompleteness;
+  /**
+   * True iff the match set is empty AND coverage was genuinely complete.
+   * A zero-match result with incomplete coverage is "not found here, so far",
+   * never "not present".
+   */
+  isAuthoritativeAbsence: boolean;
+}
+
+export interface ScanResult extends ScanCoverage {
   matches: ScanMatch[];
   regionsScanned: number;
   bytesScanned: number;
   /**
    * True if the results do not represent complete coverage of the requested
-   * scan — the scan stopped early due to maxTotalBytes or maxMatches, or (in
-   * scanFirstRange) a region could not be read and was skipped. Never claim
+   * scan — the scan stopped early due to maxTotalBytes or maxMatches, or an
+   * eligible region could not be read and was skipped. Never claim
    * completeness when part of the requested range was not actually scanned.
+   *
+   * Kept as the single boolean summary for existing callers; `completeness`
+   * carries the structured reason and `skippedRegions` the specific ranges.
    */
   truncated: boolean;
+}
+
+/**
+ * A short, non-sensitive reason string for a region read that failed. Keeps the
+ * driver's own message (which names the real cause — a protection change, a
+ * freed mapping, memoryjs's 1 MiB `readBuffer` ceiling) instead of flattening
+ * every failure into one opaque label.
+ */
+function readFailureReason(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return `region_read_failed: ${message}`;
+}
+
+/**
+ * Distinguishes "this process is gone" from "this one region could not be
+ * read". Matched on the driver's own message text because `MemoryDriver` does
+ * not carry typed error kinds; both the native driver and memoryjs surface
+ * process exit as one of these.
+ *
+ * The distinction matters for truthfulness: a single unreadable region leaves
+ * a scan complete-with-gaps and worth continuing, whereas a process that
+ * exited mid-scan invalidates every remaining region, so continuing would
+ * quietly manufacture "not found" answers about a process that no longer
+ * exists.
+ */
+export function isProcessGoneError(err: unknown): boolean {
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes('process_exited') ||
+    message.includes('process exited') ||
+    message.includes('process is not running') ||
+    message.includes('invalid handle') ||
+    message.includes('no such process')
+  );
+}
+
+/**
+ * Accumulates the coverage facts of one scan so every function in this module
+ * reports them identically. Two distinct events are tracked, because
+ * conflating them is what made the old `truncated` flag ambiguous:
+ *
+ * - `recordSkippedRegion` — an eligible region could not be examined. Coverage
+ *   is no longer complete, but the scan should carry on to later regions.
+ * - `recordStop` — the scan stopped before covering the requested space
+ *   (byte budget, match cap, resource limit). The caller must break out.
+ */
+/**
+ * Selects the regions a value scan is allowed to examine, and records the ones
+ * excluded purely for exceeding `maxRegionBytes`.
+ *
+ * Those are eligible, writable regions the caller DID ask about; the bound is
+ * a cost control, not a statement that they hold nothing. Filtering them out
+ * silently is the same truth loss as a swallowed read failure — it just
+ * happened one line earlier, before the `try`, which is why the original D01
+ * audit did not catch it.
+ *
+ * A non-writable region is genuinely out of scope for a value scan (the whole
+ * point is to find something writable), so excluding those is not a gap.
+ */
+function selectScannableRegions(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  maxRegionBytes: number,
+  coverage: ScanCoverageTracker,
+): ReturnType<MemoryDriver['getRegions']> {
+  const eligible: ReturnType<MemoryDriver['getRegions']> = [];
+  for (const region of driver.getRegions(handle)) {
+    if (!region.writable || region.size <= 0) continue;
+    if (region.size > maxRegionBytes) {
+      coverage.recordSkippedRegion(
+        region.baseAddress,
+        region.size,
+        `region_exceeds_max_region_bytes: ${region.size} > ${maxRegionBytes}`,
+      );
+      continue;
+    }
+    eligible.push(region);
+  }
+  return eligible;
+}
+
+class ScanCoverageTracker {
+  private readonly skippedRanges: CanonicalSkippedRange[] = [];
+  private stop: CanonicalCompleteness | null = null;
+
+  recordSkippedRegion(baseAddress: bigint, size: number | bigint, reason: string): void {
+    this.skippedRanges.push({ baseAddress, size: BigInt(size), reason });
+  }
+
+  recordStop(completeness: CanonicalCompleteness): void {
+    // First stop wins — it is the one that actually ended the scan.
+    this.stop ??= completeness;
+  }
+
+  recordResourceLimit(atByte: number | bigint): void {
+    this.recordStop({ state: 'resource_limit', atByte: BigInt(atByte) });
+  }
+
+  recordProcessExited(atByte: number | bigint): void {
+    this.recordStop({ state: 'process_exited', atByte: BigInt(atByte) });
+  }
+
+  recordCancelled(atByte: number | bigint): void {
+    this.recordStop({ state: 'cancelled', atByte: BigInt(atByte) });
+  }
+
+  /**
+   * Records a failed region read, promoting it to a terminal `process_exited`
+   * stop when the driver says the process is gone. Returns true when the
+   * caller must stop iterating.
+   */
+  recordReadFailure(baseAddress: bigint, size: number | bigint, bytesSoFar: number | bigint, err: unknown): boolean {
+    if (isProcessGoneError(err)) {
+      this.recordProcessExited(bytesSoFar);
+      return true;
+    }
+    this.recordSkippedRegion(baseAddress, size, readFailureReason(err));
+    return false;
+  }
+
+  /**
+   * Folds an upstream result's coverage into this one. A scan derived from an
+   * incomplete snapshot can never be more complete than the snapshot it was
+   * derived from — which `scanNextFromSnapshot` and
+   * `scanNextFromSnapshotMultiType` previously got wrong by reporting only
+   * their own `truncated` and discarding the snapshot's.
+   */
+  inherit(upstream: ScanCoverage): void {
+    for (const range of upstream.skippedRegions) this.skippedRanges.push(range);
+    if (upstream.completeness.state !== 'complete' && upstream.completeness.state !== 'complete_with_skipped_regions') {
+      this.recordStop(upstream.completeness);
+    }
+  }
+
+  /** True once the scan stopped early; the caller must stop iterating regions. */
+  get stoppedEarly(): boolean {
+    return this.stop !== null;
+  }
+
+  get truncated(): boolean {
+    return this.stop !== null || this.skippedRanges.length > 0;
+  }
+
+  /**
+   * Coverage for a result that makes no presence/absence claim at all (an
+   * unknown-value baseline snapshot captures bytes; it does not search for
+   * anything), so `isAuthoritativeAbsence` is always false.
+   */
+  coverageWithoutAbsenceClaim(): ScanCoverage {
+    return { ...this.coverage(0), isAuthoritativeAbsence: false };
+  }
+
+  coverage(matchCount: number): ScanCoverage {
+    const completeness: CanonicalCompleteness =
+      this.stop ??
+      (this.skippedRanges.length > 0
+        ? { state: 'complete_with_skipped_regions', skipped: [...this.skippedRanges] }
+        : { state: 'complete' });
+    return {
+      skippedRegions: [...this.skippedRanges],
+      completeness,
+      isAuthoritativeAbsence: matchCount === 0 && completeness.state === 'complete',
+    };
+  }
 }
 
 interface RegionSnapshot {
@@ -50,7 +252,7 @@ interface RegionSnapshot {
  * enumerate-every-value first scan would (that would be hundreds of millions
  * of objects for a 512 MiB+ region set).
  */
-export interface UnknownScanSnapshot {
+export interface UnknownScanSnapshot extends ScanCoverage {
   regions: RegionSnapshot[];
   regionsScanned: number;
   bytesScanned: number;
@@ -142,26 +344,32 @@ export function scanFirst(
   const needle = encodeValue(dataType, targetValue);
   const step = needle.length;
 
-  const regions = driver
-    .getRegions(handle)
-    .filter((r) => r.writable && r.size > 0 && r.size <= maxRegionBytes);
+  const coverage = new ScanCoverageTracker();
+  const regions = selectScannableRegions(driver, handle, maxRegionBytes, coverage);
 
   const matches: ScanMatch[] = [];
   let bytesScanned = 0;
   let regionsScanned = 0;
-  let truncated = false;
 
   for (const region of regions) {
+    if (bounds?.signal?.aborted) {
+      coverage.recordCancelled(bytesScanned);
+      break;
+    }
     if (bytesScanned + region.size > maxTotalBytes) {
-      truncated = true;
+      coverage.recordResourceLimit(bytesScanned);
       break;
     }
 
     let buf: Buffer;
     try {
       buf = driver.readBuffer(handle, region.baseAddress, region.size);
-    } catch {
-      // Region became unreadable mid-scan (freed, protection changed) — skip it, don't abort the whole scan.
+    } catch (err) {
+      // Region became unreadable mid-scan (freed, protection changed) — skip it
+      // and keep scanning later regions, but the requested address space is no
+      // longer fully covered, so record it rather than claiming completeness.
+      // A process that exited is different: every remaining region is moot.
+      if (coverage.recordReadFailure(region.baseAddress, region.size, bytesScanned, err)) break;
       continue;
     }
 
@@ -176,17 +384,23 @@ export function scanFirst(
       if (found % step === 0) {
         matches.push({ address: region.baseAddress + BigInt(found), value: targetValue });
         if (matches.length >= maxMatches) {
-          truncated = true;
+          coverage.recordResourceLimit(bytesScanned);
           break;
         }
       }
       searchOffset = found + 1;
     }
 
-    if (truncated) break;
+    if (coverage.stoppedEarly) break;
   }
 
-  return { matches, regionsScanned, bytesScanned, truncated };
+  return {
+    matches,
+    regionsScanned,
+    bytesScanned,
+    truncated: coverage.truncated,
+    ...coverage.coverage(matches.length),
+  };
 }
 
 /**
@@ -213,29 +427,31 @@ export function scanFirstRange(
   const maxMatches = bounds?.maxMatches ?? DEFAULT_MAX_MATCHES;
   const step = valueSize(dataType);
 
-  const regions = driver
-    .getRegions(handle)
-    .filter((r) => r.writable && r.size > 0 && r.size <= maxRegionBytes);
+  const coverage = new ScanCoverageTracker();
+  const regions = selectScannableRegions(driver, handle, maxRegionBytes, coverage);
 
   const matches: ScanMatch[] = [];
   let bytesScanned = 0;
   let regionsScanned = 0;
-  let truncated = false;
 
   for (const region of regions) {
+    if (bounds?.signal?.aborted) {
+      coverage.recordCancelled(bytesScanned);
+      break;
+    }
     if (bytesScanned + region.size > maxTotalBytes) {
-      truncated = true;
+      coverage.recordResourceLimit(bytesScanned);
       break;
     }
 
     let buf: Buffer;
     try {
       buf = driver.readBuffer(handle, region.baseAddress, region.size);
-    } catch {
+    } catch (err) {
       // Region became unreadable mid-scan (freed, protection changed). Skip it and
       // keep scanning later regions, but the requested address space is no longer
-      // fully covered — truncated must reflect that rather than claim completeness.
-      truncated = true;
+      // fully covered — coverage must reflect that rather than claim completeness.
+      if (coverage.recordReadFailure(region.baseAddress, region.size, bytesScanned, err)) break;
       continue;
     }
 
@@ -247,16 +463,26 @@ export function scanFirstRange(
       if (value >= min && value <= max && Number.isFinite(value)) {
         matches.push({ address: region.baseAddress + BigInt(offset), value });
         if (matches.length >= maxMatches) {
-          truncated = true;
+          coverage.recordResourceLimit(bytesScanned);
           break;
         }
       }
     }
 
-    if (truncated) break;
+    // Only a stop (byte budget / match cap) ends the sweep. A skipped region
+    // must not: the pre-existing `if (truncated) break` here conflated the two,
+    // so a single unreadable region silently aborted the scan one region later
+    // while still reporting the regions after it as simply absent.
+    if (coverage.stoppedEarly) break;
   }
 
-  return { matches, regionsScanned, bytesScanned, truncated };
+  return {
+    matches,
+    regionsScanned,
+    bytesScanned,
+    truncated: coverage.truncated,
+    ...coverage.coverage(matches.length),
+  };
 }
 
 /**
@@ -267,22 +493,39 @@ export function scanFirstRange(
  *
  * Addresses that fail to read (freed, unmapped since the last scan) are
  * dropped rather than throwing, since that's the expected steady-state case
- * as a game's allocations change between scans.
+ * as a game's allocations change between scans — but they are reported as
+ * skipped rather than silently conflated with "this candidate did not match".
+ * Those are different facts: an unreadable candidate may still hold the value
+ * the user is hunting, so narrowing to zero survivors after one or more
+ * unreadable candidates is not an authoritative "the value is gone".
  */
+export interface NextScanResult extends ScanCoverage {
+  matches: ScanMatch[];
+  /** How many prior candidates were examined. */
+  candidatesConsidered: number;
+  /** How many prior candidates could not be re-read and were therefore not evaluated. */
+  candidatesUnreadable: number;
+  truncated: boolean;
+}
+
 export function scanNext(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   dataType: LiveValueType,
   comparison: ScanComparison,
   previous: ScanMatch[],
-): ScanMatch[] {
+): NextScanResult {
   const kept: ScanMatch[] = [];
+  const coverage = new ScanCoverageTracker();
+  let candidatesUnreadable = 0;
 
   for (const prior of previous) {
     let current: number;
     try {
       current = driver.readMemory(handle, prior.address, dataType);
-    } catch {
+    } catch (err) {
+      candidatesUnreadable += 1;
+      if (coverage.recordReadFailure(prior.address, valueSize(dataType), 0, err)) break;
       continue;
     }
 
@@ -291,7 +534,13 @@ export function scanNext(
     }
   }
 
-  return kept;
+  return {
+    matches: kept,
+    candidatesConsidered: previous.length,
+    candidatesUnreadable,
+    truncated: coverage.truncated,
+    ...coverage.coverage(kept.length),
+  };
 }
 
 // Tolerance for the delta-based comparisons (increasedBy/decreasedBy) — a computed
@@ -344,25 +593,30 @@ export function scanFirstUnknown(driver: MemoryDriver, handle: LiveProcessHandle
   const maxRegionBytes = bounds?.maxRegionBytes ?? DEFAULT_MAX_REGION_BYTES;
   const maxTotalBytes = bounds?.maxTotalBytes ?? DEFAULT_UNKNOWN_MAX_TOTAL_BYTES;
 
-  const regions = driver
-    .getRegions(handle)
-    .filter((r) => r.writable && r.size > 0 && r.size <= maxRegionBytes);
+  const coverage = new ScanCoverageTracker();
+  const regions = selectScannableRegions(driver, handle, maxRegionBytes, coverage);
 
   const snapshot: RegionSnapshot[] = [];
   let bytesScanned = 0;
   let regionsScanned = 0;
-  let truncated = false;
 
   for (const region of regions) {
+    if (bounds?.signal?.aborted) {
+      coverage.recordCancelled(bytesScanned);
+      break;
+    }
     if (bytesScanned + region.size > maxTotalBytes) {
-      truncated = true;
+      coverage.recordResourceLimit(bytesScanned);
       break;
     }
 
     let buf: Buffer;
     try {
       buf = driver.readBuffer(handle, region.baseAddress, region.size);
-    } catch {
+    } catch (err) {
+      // A region missing from the baseline is a region every later narrowing
+      // round is blind to, so the snapshot must carry that gap forward.
+      if (coverage.recordReadFailure(region.baseAddress, region.size, bytesScanned, err)) break;
       continue;
     }
 
@@ -374,7 +628,13 @@ export function scanFirstUnknown(driver: MemoryDriver, handle: LiveProcessHandle
     regionsScanned += 1;
   }
 
-  return { regions: snapshot, regionsScanned, bytesScanned, truncated };
+  return {
+    regions: snapshot,
+    regionsScanned,
+    bytesScanned,
+    truncated: coverage.truncated,
+    ...coverage.coverageWithoutAbsenceClaim(),
+  };
 }
 
 /**
@@ -400,14 +660,22 @@ export function scanNextFromSnapshot(
   const maxMatches = bounds?.maxMatches ?? DEFAULT_MAX_MATCHES;
 
   const matches: ScanMatch[] = [];
-  let truncated = false;
+  const coverage = new ScanCoverageTracker();
+  // A narrowing pass can never be more complete than the baseline it narrows.
+  coverage.inherit(snapshot);
 
   for (const region of snapshot.regions) {
+    if (bounds?.signal?.aborted) {
+      coverage.recordCancelled(snapshot.bytesScanned);
+      break;
+    }
     let current: Buffer;
     try {
       current = driver.readBuffer(handle, region.baseAddress, region.data.length);
-    } catch {
-      // Region freed/moved since the snapshot was taken — nothing left to compare here.
+    } catch (err) {
+      // Region freed/moved since the snapshot was taken — nothing left to
+      // compare here, so this slice of the baseline goes unevaluated.
+      if (coverage.recordReadFailure(region.baseAddress, region.data.length, snapshot.bytesScanned, err)) break;
       continue;
     }
 
@@ -419,19 +687,25 @@ export function scanNextFromSnapshot(
       if (matchesComparison(comparison, previousValue, currentValue)) {
         matches.push({ address: region.baseAddress + BigInt(offset), value: currentValue });
         if (matches.length >= maxMatches) {
-          truncated = true;
+          coverage.recordResourceLimit(snapshot.bytesScanned);
           break;
         }
       }
     }
 
-    if (truncated) break;
+    if (coverage.stoppedEarly) break;
   }
 
-  return { matches, regionsScanned: snapshot.regionsScanned, bytesScanned: snapshot.bytesScanned, truncated };
+  return {
+    matches,
+    regionsScanned: snapshot.regionsScanned,
+    bytesScanned: snapshot.bytesScanned,
+    truncated: coverage.truncated,
+    ...coverage.coverage(matches.length),
+  };
 }
 
-export interface TypedScanResult {
+export interface TypedScanResult extends ScanCoverage {
   matches: TypedScanMatch[];
   regionsScanned: number;
   bytesScanned: number;
@@ -459,7 +733,7 @@ export interface AutoFirstScanQuery {
   unknownBounds?: ScanBounds;
 }
 
-export interface AutoFirstScanBucket {
+export interface AutoFirstScanBucket extends ScanCoverage {
   mode: AutoFirstScanMode;
   dataType: LiveValueType;
   matches: TypedScanMatch[];
@@ -469,7 +743,7 @@ export interface AutoFirstScanBucket {
   skipped?: false;
 }
 
-export interface AutoFirstScanSkippedBucket {
+export interface AutoFirstScanSkippedBucket extends ScanCoverage {
   mode: AutoFirstScanMode;
   dataType: LiveValueType;
   matches: [];
@@ -480,7 +754,7 @@ export interface AutoFirstScanSkippedBucket {
   reason: string;
 }
 
-export interface AutoFirstUnknownScanSummary {
+export interface AutoFirstUnknownScanSummary extends ScanCoverage {
   regionsScanned: number;
   bytesScanned: number;
   truncated: boolean;
@@ -528,13 +802,22 @@ export function scanNextFromSnapshotMultiType(
 ): TypedScanResult {
   const maxMatches = bounds?.maxMatches ?? DEFAULT_MAX_MATCHES;
   const matches: TypedScanMatch[] = [];
-  let truncated = false;
+  const coverage = new ScanCoverageTracker();
+  // Same rule as scanNextFromSnapshot: inherit the baseline's own coverage.
+  coverage.inherit(snapshot);
 
   regionLoop: for (const region of snapshot.regions) {
+    if (bounds?.signal?.aborted) {
+      coverage.recordCancelled(snapshot.bytesScanned);
+      break;
+    }
     let current: Buffer;
     try {
       current = driver.readBuffer(handle, region.baseAddress, region.data.length);
-    } catch {
+    } catch (err) {
+      if (coverage.recordReadFailure(region.baseAddress, region.data.length, snapshot.bytesScanned, err)) {
+        break regionLoop;
+      }
       continue;
     }
     const len = Math.min(current.length, region.data.length);
@@ -550,7 +833,7 @@ export function scanNextFromSnapshotMultiType(
         if (matchesComparison(comparison, previousValue, currentValue)) {
           matches.push({ address: region.baseAddress + BigInt(offset), value: currentValue, dataType });
           if (matches.length >= maxMatches) {
-            truncated = true;
+            coverage.recordResourceLimit(snapshot.bytesScanned);
             break regionLoop;
           }
         }
@@ -558,7 +841,13 @@ export function scanNextFromSnapshotMultiType(
     }
   }
 
-  return { matches, regionsScanned: snapshot.regionsScanned, bytesScanned: snapshot.bytesScanned, truncated };
+  return {
+    matches,
+    regionsScanned: snapshot.regionsScanned,
+    bytesScanned: snapshot.bytesScanned,
+    truncated: coverage.truncated,
+    ...coverage.coverage(matches.length),
+  };
 }
 
 function firstScanComparisonForMode(mode: AutoFirstScanMode, query: AutoFirstScanQuery): ScanComparison | string {
@@ -592,25 +881,28 @@ function scanFirstByComparison(
   const maxMatches = bounds?.maxMatches ?? DEFAULT_MAX_MATCHES;
   const step = valueSize(dataType);
 
-  const regions = driver
-    .getRegions(handle)
-    .filter((r) => r.writable && r.size > 0 && r.size <= maxRegionBytes);
+  const coverage = new ScanCoverageTracker();
+  const regions = selectScannableRegions(driver, handle, maxRegionBytes, coverage);
 
   const matches: ScanMatch[] = [];
   let bytesScanned = 0;
   let regionsScanned = 0;
-  let truncated = false;
 
   for (const region of regions) {
+    if (bounds?.signal?.aborted) {
+      coverage.recordCancelled(bytesScanned);
+      break;
+    }
     if (bytesScanned + region.size > maxTotalBytes) {
-      truncated = true;
+      coverage.recordResourceLimit(bytesScanned);
       break;
     }
 
     let buf: Buffer;
     try {
       buf = driver.readBuffer(handle, region.baseAddress, region.size);
-    } catch {
+    } catch (err) {
+      if (coverage.recordReadFailure(region.baseAddress, region.size, bytesScanned, err)) break;
       continue;
     }
 
@@ -623,16 +915,22 @@ function scanFirstByComparison(
       if (matchesComparison(comparison, value, value)) {
         matches.push({ address: region.baseAddress + BigInt(offset), value });
         if (matches.length >= maxMatches) {
-          truncated = true;
+          coverage.recordResourceLimit(bytesScanned);
           break;
         }
       }
     }
 
-    if (truncated) break;
+    if (coverage.stoppedEarly) break;
   }
 
-  return { matches, regionsScanned, bytesScanned, truncated };
+  return {
+    matches,
+    regionsScanned,
+    bytesScanned,
+    truncated: coverage.truncated,
+    ...coverage.coverage(matches.length),
+  };
 }
 
 /**
@@ -667,6 +965,12 @@ export function scanFirstAutoMatrix(
           truncated: false,
           skipped: true,
           reason: comparison,
+          // A skipped bucket never scanned anything, so it claims no coverage
+          // at all — reporting `complete` here would let an incompatible
+          // mode/type pair read as a proven absence.
+          skippedRegions: [],
+          completeness: { state: 'failed', reason: comparison },
+          isAuthoritativeAbsence: false,
         });
         continue;
       }
@@ -679,6 +983,9 @@ export function scanFirstAutoMatrix(
         regionsScanned: result.regionsScanned,
         bytesScanned: result.bytesScanned,
         truncated: result.truncated,
+        skippedRegions: result.skippedRegions,
+        completeness: result.completeness,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
       });
     }
   }
@@ -695,6 +1002,9 @@ export function scanFirstAutoMatrix(
             regionsScanned: unknownSnapshot.regionsScanned,
             bytesScanned: unknownSnapshot.bytesScanned,
             truncated: unknownSnapshot.truncated,
+            skippedRegions: unknownSnapshot.skippedRegions,
+            completeness: unknownSnapshot.completeness,
+            isAuthoritativeAbsence: unknownSnapshot.isAuthoritativeAbsence,
             snapshot: unknownSnapshot,
           },
         }
