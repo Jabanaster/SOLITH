@@ -410,12 +410,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pointerMapScanTarget: (payload: {
     mapId: string;
     target: string;
-    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number };
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
   }) => ipcRenderer.invoke('pointer-map-scan-target', payload),
   pointerMapScanTargets: (payload: {
     mapId: string;
     targets: string[];
-    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number };
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
   }) => ipcRenderer.invoke('pointer-map-scan-targets', payload),
   pointerMapResolve: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-resolve', payload),
   pointerMapRefresh: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-refresh', payload),

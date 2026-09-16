@@ -583,6 +583,14 @@ const POINTER_MAP_SCAN_BOUNDS = z.object({
   maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
   maxResults: z.number().int().positive().max(200).optional(),
   maxTotalScans: z.number().int().positive().max(2000).optional(),
+  // Real-process discovery (P2-3 evidence) found the scanner's own
+  // conservative default (3) routinely crowds out a real module-rooted
+  // pointer path among the megabytes of incidental pointer-shaped bytes a
+  // real process holds. This bound was already accepted by the core scanner
+  // (pointer-scanner.ts's PointerScanBounds) but missing from this IPC
+  // schema, silently stripping it from any caller's request before it ever
+  // reached the scanner.
+  maxCandidatesPerLevel: z.number().int().positive().max(64).optional(),
 });
 
 export const PointerMapCreateSchema = z.object({

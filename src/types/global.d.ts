@@ -855,12 +855,12 @@ interface Window {
     pointerMapScanTarget: (payload: {
       mapId: string;
       target: string;
-      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number };
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
     }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
     pointerMapScanTargets: (payload: {
       mapId: string;
       targets: string[];
-      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number };
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
     }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
     pointerMapResolve: (payload: { mapId: string }) => Promise<{
       success: boolean;
