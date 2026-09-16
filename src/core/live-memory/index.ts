@@ -48,9 +48,12 @@ export {
   pointerMapNodeFromCandidate,
   addPointerMapNode,
   removePointerMapNode,
+  renamePointerMap,
   resolvePointerMap,
   pointerMapNodeChainSteps,
 } from './pointer-map.js';
+export { scanTargetsIntoMap, aggregatePointerMapCompleteness } from './pointer-map-orchestration.js';
+export type { PointerMapTargetOutcome, PointerMapScanTargetsResult } from './pointer-map-orchestration.js';
 export type {
   PointerMap,
   PointerMapNode,

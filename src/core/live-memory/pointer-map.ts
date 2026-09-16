@@ -1,3 +1,4 @@
+import { isProcessGoneError } from './memory-scanner.js';
 import { resolvePointerPath, type LivePointerPath } from './pointer-resolver.js';
 import type { PointerPathCandidate } from './pointer-scanner.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
@@ -17,7 +18,12 @@ import type { LiveProcessHandle, MemoryDriver } from './types.js';
  * (see watch-list-bookmarks.ts for the same shape at smaller scale).
  */
 
-export type PointerMapNodeStatus = 'unresolved' | 'resolved' | 'module_missing' | 'read_failed';
+// process_exited is distinct from read_failed on purpose — Phase 1's D-series
+// pointer work established that a dead-but-open process handle fails module
+// enumeration (getModules throws) rather than silently returning nothing, so
+// a caller can and must tell "this chain doesn't resolve" apart from "the
+// process is gone" (isProcessGoneError, shared with memory-scanner.ts).
+export type PointerMapNodeStatus = 'unresolved' | 'resolved' | 'module_missing' | 'read_failed' | 'process_exited';
 
 export interface PointerMapNode {
   id: string;
@@ -29,18 +35,46 @@ export interface PointerMapNode {
   lastResolvedAddress: string | null;
   lastResolvedAt: string | null;
   createdAt: string;
+  /**
+   * The address this node's chain was discovered for (0x-prefixed hex), or
+   * null for a manually-added node with no scan behind it. Provenance only —
+   * never re-derived automatically as current truth after a restart.
+   */
+  targetAddress: string | null;
+  /** Groups every node an orchestrated scanTargetsIntoMap call produced together, or null for a manual add. */
+  scanId: string | null;
 }
 
 export interface PointerMap {
+  id: string;
+  name: string;
   nodes: PointerMapNode[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export function createEmptyPointerMap(): PointerMap {
-  return { nodes: [] };
+export function createEmptyPointerMap(name: string): PointerMap {
+  const now = new Date().toISOString();
+  return {
+    id: `pmap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    nodes: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export interface PointerMapNodeProvenance {
+  targetAddress: string;
+  scanId: string;
 }
 
 /** Builds an unresolved node from a scan candidate, ready to add to a map. */
-export function pointerMapNodeFromCandidate(label: string, candidate: PointerPathCandidate): PointerMapNode {
+export function pointerMapNodeFromCandidate(
+  label: string,
+  candidate: PointerPathCandidate,
+  provenance: PointerMapNodeProvenance | null = null,
+): PointerMapNode {
   return {
     id: `pm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     label,
@@ -54,15 +88,21 @@ export function pointerMapNodeFromCandidate(label: string, candidate: PointerPat
     lastResolvedAddress: null,
     lastResolvedAt: null,
     createdAt: new Date().toISOString(),
+    targetAddress: provenance?.targetAddress ?? null,
+    scanId: provenance?.scanId ?? null,
   };
 }
 
 export function addPointerMapNode(map: PointerMap, node: PointerMapNode): PointerMap {
-  return { nodes: [...map.nodes, node] };
+  return { ...map, nodes: [...map.nodes, node], updatedAt: new Date().toISOString() };
 }
 
 export function removePointerMapNode(map: PointerMap, id: string): PointerMap {
-  return { nodes: map.nodes.filter((n) => n.id !== id) };
+  return { ...map, nodes: map.nodes.filter((n) => n.id !== id), updatedAt: new Date().toISOString() };
+}
+
+export function renamePointerMap(map: PointerMap, name: string): PointerMap {
+  return { ...map, name, updatedAt: new Date().toISOString() };
 }
 
 export interface PointerMapResolution {
@@ -97,13 +137,15 @@ export function resolvePointerMap(
     } catch (error) {
       failedCount += 1;
       const message = error instanceof Error ? error.message : String(error);
-      const status: PointerMapNodeStatus = message.includes('is not currently loaded')
-        ? 'module_missing'
-        : 'read_failed';
+      const status: PointerMapNodeStatus = isProcessGoneError(error)
+        ? 'process_exited'
+        : message.includes('is not currently loaded')
+          ? 'module_missing'
+          : 'read_failed';
       return { ...node, status, lastResolvedAddress: null };
     }
   });
-  return { map: { nodes }, resolvedCount, failedCount };
+  return { map: { ...map, nodes, updatedAt: new Date().toISOString() }, resolvedCount, failedCount };
 }
 
 export interface PointerChainStep {

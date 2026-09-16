@@ -12,6 +12,7 @@ import {
   pointerMapNodeChainSteps,
   pointerMapNodeFromCandidate,
   removePointerMapNode,
+  renamePointerMap,
   resolvePointerMap,
 } from '../../src/core/live-memory/pointer-map.js';
 import type { PointerPathCandidate } from '../../src/core/live-memory/pointer-scanner.js';
@@ -39,7 +40,7 @@ test('pointerMapNodeFromCandidate carries the path and depth through unresolved'
 });
 
 test('addPointerMapNode and removePointerMapNode never mutate the input map', () => {
-  const empty = createEmptyPointerMap();
+  const empty = createEmptyPointerMap('Test Map');
   const node = pointerMapNodeFromCandidate('Gold', candidate());
   const withNode = addPointerMapNode(empty, node);
 
@@ -63,7 +64,7 @@ test('resolvePointerMap resolves a real chain through a live driver', () => {
   heapRegion.writeInt32LE(1337, 16);
   driver.addRegion(heapNode, heapRegion, true);
 
-  const map = addPointerMapNode(createEmptyPointerMap(), pointerMapNodeFromCandidate('Gold', candidate()));
+  const map = addPointerMapNode(createEmptyPointerMap('Test Map'), pointerMapNodeFromCandidate('Gold', candidate()));
   const result = resolvePointerMap(driver, HANDLE, map);
 
   assert.equal(result.resolvedCount, 1);
@@ -77,7 +78,7 @@ test('resolvePointerMap reports module_missing when the module is not loaded', (
   const driver = new FakeMemoryDriver();
   driver.addModule('other.exe', MODULE_BASE, MODULE_SIZE);
 
-  const map = addPointerMapNode(createEmptyPointerMap(), pointerMapNodeFromCandidate('Gold', candidate()));
+  const map = addPointerMapNode(createEmptyPointerMap('Test Map'), pointerMapNodeFromCandidate('Gold', candidate()));
   const result = resolvePointerMap(driver, HANDLE, map);
 
   assert.equal(result.resolvedCount, 0);
@@ -97,7 +98,7 @@ test('resolvePointerMap reports read_failed when a dereference lands on unmapped
   // first readPointer call has nothing to read — a real "found the module,
   // the slot itself doesn't resolve" failure, not a missing-module one.
   const map = addPointerMapNode(
-    createEmptyPointerMap(),
+    createEmptyPointerMap('Test Map'),
     pointerMapNodeFromCandidate('Gold', candidate({ moduleOffset: 0x9000 })),
   );
   const result = resolvePointerMap(driver, HANDLE, map);
@@ -105,6 +106,36 @@ test('resolvePointerMap reports read_failed when a dereference lands on unmapped
   assert.equal(result.resolvedCount, 0);
   assert.equal(result.failedCount, 1);
   assert.equal(result.map.nodes[0].status, 'read_failed');
+});
+
+test('createEmptyPointerMap assigns a stable id and name; renamePointerMap updates name and bumps updatedAt without touching id', async () => {
+  const map = createEmptyPointerMap('Loot Table');
+  assert.equal(map.name, 'Loot Table');
+  assert.ok(map.id.length > 0);
+  assert.equal(map.createdAt, map.updatedAt);
+
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  const renamed = renamePointerMap(map, 'Loot Table v2');
+  assert.equal(renamed.id, map.id);
+  assert.equal(renamed.name, 'Loot Table v2');
+  assert.notEqual(renamed.updatedAt, map.updatedAt);
+  assert.equal(map.name, 'Loot Table', 'original map must not be mutated');
+});
+
+test('resolvePointerMap reports process_exited (not read_failed) when the process is gone', () => {
+  const driver = new FakeMemoryDriver();
+  driver.addModule('game.exe', MODULE_BASE, MODULE_SIZE);
+  // Same technique pointer-scanner-depth-truth.test.ts uses for D05 §10:
+  // monkey-patch the driver method a dead-but-open handle actually fails on.
+  driver.getModules = (() => {
+    throw new Error('the process is not running');
+  }) as typeof driver.getModules;
+
+  const map = addPointerMapNode(createEmptyPointerMap('Test Map'), pointerMapNodeFromCandidate('Gold', candidate()));
+  const result = resolvePointerMap(driver, HANDLE, map);
+
+  assert.equal(result.failedCount, 1);
+  assert.equal(result.map.nodes[0].status, 'process_exited');
 });
 
 test('resolvePointerMap resolves independent nodes independently in one map', () => {
@@ -118,7 +149,7 @@ test('resolvePointerMap resolves independent nodes independently in one map', ()
   heapRegion.writeInt32LE(1337, 16);
   driver.addRegion(heapNode, heapRegion, true);
 
-  let map = createEmptyPointerMap();
+  let map = createEmptyPointerMap('Test Map');
   map = addPointerMapNode(map, pointerMapNodeFromCandidate('Gold', candidate()));
   map = addPointerMapNode(map, pointerMapNodeFromCandidate('Broken', candidate({ moduleName: 'missing.exe' })));
 
