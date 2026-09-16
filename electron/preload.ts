@@ -431,6 +431,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pointerMapLoad: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-load', payload),
   pointerMapListSaved: () => ipcRenderer.invoke('pointer-map-list-saved'),
   pointerMapDeleteSaved: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-delete-saved', payload),
+  // P2-3.1 §5/§6 — cancellable pointer-map scan contract, same start/cancel/poll
+  // transport shape as liveMemoryScanFirstStart/liveMemoryScanCancel/liveMemoryScanPoll below.
+  pointerMapScanStart: (payload: {
+    mapId: string;
+    targets: string[];
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-start', payload),
+  pointerMapScanCancel: (payload: { operationId: string }) => ipcRenderer.invoke('pointer-map-scan-cancel', payload),
+  pointerMapScanPoll: (payload: { operationId: string }) => ipcRenderer.invoke('pointer-map-scan-poll', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
   liveMemoryScannerRoutingModeGet: () => ipcRenderer.invoke('live-memory-scanner-routing-mode-get'),

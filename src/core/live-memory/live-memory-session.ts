@@ -33,7 +33,11 @@ import {
   type PointerMapNode,
   type PointerMapResolution,
 } from './pointer-map.js';
-import { scanTargetsIntoMap, type PointerMapScanTargetsResult } from './pointer-map-orchestration.js';
+import {
+  scanTargetsIntoMap,
+  scanTargetsIntoMapCancellable,
+  type PointerMapScanTargetsResult,
+} from './pointer-map-orchestration.js';
 import {
   deleteSavedPointerMap,
   loadPointerMap,
@@ -250,7 +254,7 @@ export function byteWidthForType(dataType: LiveValueType): number {
 export type ScanOperationStatus = 'pending' | 'complete' | 'cancelled' | 'error';
 
 export interface ScanOperationEntry {
-  readonly kind: 'exact' | 'aob';
+  readonly kind: 'exact' | 'aob' | 'pointerMap';
   readonly controller: AbortController;
   status: ScanOperationStatus;
   result?: unknown;
@@ -266,7 +270,7 @@ export interface ScanOperationCancelResult {
 
 export interface ScanOperationStatusResult {
   status: ScanOperationStatus;
-  kind: 'exact' | 'aob';
+  kind: 'exact' | 'aob' | 'pointerMap';
   result?: unknown;
   error?: string;
 }
@@ -1324,6 +1328,56 @@ export class LiveMemorySession {
     const result = scanTargetsIntoMap(this.driver, this.handle, map, targets, bounds);
     this.pointerMaps.set(mapId, result.map);
     return result;
+  }
+
+  /**
+   * Real production cancellation for pointer-map scans (P2-3.1 §5/§6) — the
+   * exact same start/cancel/poll shape as `startExactScanOperation`/
+   * `cancelScanOperation`/`getScanOperationStatus` above, reusing this
+   * session's one `scanOperations` registry rather than a parallel
+   * subsystem. Returns an `operationId` synchronously, before any scanning
+   * has happened, so the caller has something to cancel *while the scan is
+   * still running* — made genuinely possible by `scanTargetsIntoMapCancellable`
+   * awaiting a real event-loop turn between BFS steps (pointer-scanner.ts's
+   * `pointerScanGenerator`), unlike the fully synchronous
+   * `scanTargetsIntoMap` this wraps for the non-cancellable path.
+   */
+  startPointerMapScanOperation(mapId: string, targets: bigint[], bounds?: PointerScanBounds): string {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const driver = this.driver;
+    const handle = this.handle;
+
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'pointerMap', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+
+    const signal = { get aborted() { return controller.signal.aborted; } };
+    void scanTargetsIntoMapCancellable(driver, handle, map, targets, { ...bounds, signal })
+      .then((result) => {
+        // The map may have been deleted (or scanned again) while this
+        // operation was in flight; only persist into a registry entry that
+        // still exists, and never resurrect a map the user removed.
+        if (this.pointerMaps.has(mapId)) this.pointerMaps.set(mapId, result.map);
+        entry.status = controller.signal.aborted ? 'cancelled' : 'complete';
+        entry.result = result;
+      })
+      .catch((err) => {
+        entry.status = 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /** Requests cancellation of a pointer-map scan operation. Same idempotent, never-throws contract as `cancelScanOperation`. */
+  cancelPointerMapScanOperation(operationId: string): ScanOperationCancelResult {
+    return this.cancelScanOperation(operationId);
+  }
+
+  /** Polls a pointer-map scan operation's current status. Same contract as `getScanOperationStatus`. */
+  getPointerMapScanOperationStatus(operationId: string): ScanOperationStatusResult | null {
+    return this.getScanOperationStatus(operationId);
   }
 
   /** Convenience wrapper for the single-target case — same orchestration, one-element target list. */

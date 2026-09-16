@@ -899,6 +899,29 @@ interface Window {
       error?: string;
     }>;
     pointerMapDeleteSaved: (payload: { mapId: string }) => Promise<{ success: boolean; error?: string }>;
+    /**
+     * P2-3.1 §5/§6 — real cancellable pointer-map scan contract, same
+     * start-returns-operationId-before-the-scan-finishes shape as
+     * `liveMemoryScanFirstStart`/`liveMemoryScanCancel`/`liveMemoryScanPoll`
+     * below, reusing the identical operation registry (not a parallel one).
+     */
+    pointerMapScanStart: (payload: {
+      mapId: string;
+      targets: string[];
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; operationId?: string; error?: string }>;
+    pointerMapScanCancel: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      found?: boolean;
+      alreadyTerminal?: boolean;
+      error?: string;
+    }>;
+    pointerMapScanPoll: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      status?: 'pending' | 'complete' | 'cancelled' | 'error' | 'not_found';
+      result?: PointerMapScanResultDto;
+      error?: string;
+    }>;
     liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) => Promise<{
       success: boolean;
       found?: boolean;

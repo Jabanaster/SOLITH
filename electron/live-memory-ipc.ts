@@ -1159,6 +1159,60 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  // P2-3.1 §5/§6 — real production cancellation for pointer-map scans, the
+  // same start->operationId->cancel(id)->truthful-terminal-state model as
+  // `live-memory-scan-first-start`/`-cancel`/`-poll` above, reusing the same
+  // session-level operation registry rather than a parallel subsystem.
+  ipcMain.handle('pointer-map-scan-start', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapScanTargetsSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const operationId = session.startPointerMapScanOperation(
+        parsed.mapId,
+        parsed.targets.map((t) => BigInt(t)),
+        parsed.bounds,
+      );
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_start_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-cancel', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.cancelPointerMapScanOperation(parsed.operationId);
+      return { success: true, found: outcome.found, alreadyTerminal: outcome.alreadyTerminal };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_cancel_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-poll', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.getPointerMapScanOperationStatus(parsed.operationId);
+      if (!outcome) return { success: true, status: 'not_found' as const };
+      return {
+        success: true,
+        status: outcome.status,
+        result: outcome.result ? serializeScanOperationResult(outcome.kind, outcome.result) : undefined,
+        error: outcome.error,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_poll_failed') };
+    }
+  });
+
   ipcMain.handle('pointer-map-resolve', async (event, payload: unknown) => {
     try {
       const senderCheck = requireTrustedSender(event);
@@ -2156,7 +2210,10 @@ function serializeScanResult(result: { matches: ScanMatch[]; regionsScanned: num
  * already send (BigInt values as decimal strings, never raw BigInt, never a
  * lossy Number narrowing).
  */
-function serializeScanOperationResult(kind: 'exact' | 'aob', result: unknown) {
+function serializeScanOperationResult(kind: 'exact' | 'aob' | 'pointerMap', result: unknown) {
+  if (kind === 'pointerMap') {
+    return serializePointerMapScanResult(result as PointerMapScanTargetsResult);
+  }
   if (kind === 'exact') {
     const exact = result as {
       backend: 'legacy' | 'native';

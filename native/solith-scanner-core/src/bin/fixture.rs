@@ -274,6 +274,40 @@ fn main() {
         println!("BENCH_REGION_SIZE={size}");
     }
 
+    // Optional second CLI arg (P2-3.1 §8 real-process cancellation proof):
+    // plant this many small, separately-VirtualAlloc'd "noise" regions. A
+    // single findPointersNear() call scans every committed region in the
+    // process once per BFS frontier item; a real large game process has
+    // thousands of small individual heap allocations (allocator arenas,
+    // per-object headers, etc.), and the resulting many-small-regions shape
+    // adds real, non-simulated wall-clock latency dominated by per-region
+    // native round-trip overhead rather than raw memory bandwidth. This lets
+    // a real-process E2E test observe (and genuinely interrupt) an in-flight
+    // scan without any timing hack in the product code being tested.
+    let noise_region_count: Option<usize> = std::env::args().nth(2).and_then(|s| s.parse().ok());
+    if let Some(count) = noise_region_count {
+        const NOISE_REGION_SIZE: usize = 64 * 1024;
+        for i in 0..count {
+            let region = unsafe {
+                VirtualAlloc(
+                    std::ptr::null(),
+                    NOISE_REGION_SIZE,
+                    MEM_COMMIT | MEM_RESERVE,
+                    PAGE_READWRITE,
+                )
+            };
+            assert!(!region.is_null(), "VirtualAlloc(noise_region) failed");
+            unsafe {
+                let slice = std::slice::from_raw_parts_mut(region as *mut u8, NOISE_REGION_SIZE);
+                for (j, b) in slice.iter_mut().enumerate() {
+                    *b = ((i as u32).wrapping_mul(2246822519).wrapping_add(j as u32) >> 16) as u8;
+                }
+            }
+        }
+        println!("NOISE_REGION_COUNT={count}");
+        println!("NOISE_REGION_SIZE={NOISE_REGION_SIZE}");
+    }
+
     let big_region = unsafe {
         VirtualAlloc(
             std::ptr::null(),

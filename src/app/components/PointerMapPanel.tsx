@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './PointerMapPanel.module.css';
 import { exportMemoryFeatureToYaml } from '../../core/definitions/export-definition.js';
 import { downloadTextFile } from '../utils/download-text-file.js';
@@ -69,6 +69,26 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
   const [exportDataType, setExportDataType] = useState<(typeof EXPORT_DATA_TYPES)[number]>('int32');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  // P2-3.1 §5/§6 — real cancellation state. `scanOperationId` is the live
+  // handle a Cancel click references; `scanActive` gates the Cancel
+  // button's enabled state independently of `busy` (busy also covers every
+  // other non-cancellable action in this panel).
+  const [scanOperationId, setScanOperationId] = useState<string | null>(null);
+  const [scanActive, setScanActive] = useState(false);
+  // Guards against setState after unmount while a poll loop is in flight,
+  // and lets the unmount cleanup below cancel any still-running backend
+  // operation rather than leaving it to finish unobserved.
+  const mountedRef = useRef(true);
+  const activeOperationIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const inFlight = activeOperationIdRef.current;
+      if (inFlight && api) void api.pointerMapScanCancel({ operationId: inFlight });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedMap = maps.find((m) => m.id === selectedMapId) ?? null;
   const selectedNode = selectedMap?.nodes.find((n) => n.id === selectedNodeId) ?? null;
@@ -167,6 +187,19 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
     }
   };
 
+  const SCAN_POLL_INTERVAL_MS = 200;
+
+  /**
+   * Real production cancellation (P2-3.1 §5/§6): starts the scan via
+   * pointerMapScanStart (returns an operationId before any scanning has
+   * happened), then polls pointerMapScanPoll until a terminal state —
+   * exactly the same start/poll transport the byte-value scanner already
+   * uses (liveMemoryScanFirstStart/liveMemoryScanPoll), reused rather than
+   * a parallel mechanism. The scan itself (scanTargetsIntoMapCancellable)
+   * genuinely runs in the background between polls, so Cancel reaches work
+   * that is actually still executing, not a value already computed and
+   * withheld from the renderer.
+   */
   const handleScan = async () => {
     if (!api || !selectedMapId) return;
     const targets = targetInput
@@ -178,27 +211,82 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
       return;
     }
     setBusy(true);
-    setMessage('');
+    setScanActive(true);
+    setMessage('Scanning…');
     try {
       const bounds = {
         maxDepth: scanMaxDepth.trim() ? Number(scanMaxDepth) : undefined,
         maxOffsetPerLevel: scanMaxOffset.trim() ? Number(scanMaxOffset) : undefined,
         maxCandidatesPerLevel: scanMaxCandidatesPerLevel.trim() ? Number(scanMaxCandidatesPerLevel) : undefined,
       };
-      const result = await api.pointerMapScanTargets({ mapId: selectedMapId, targets, bounds });
-      if (result?.success && result.result) {
-        setLastScanResult(result.result);
+      const started = await api.pointerMapScanStart({ mapId: selectedMapId, targets, bounds });
+      if (!started?.success || !started.operationId) {
+        setMessage(`Scan failed: ${started?.error ?? 'unknown error'}`);
+        setBusy(false);
+        setScanActive(false);
+        return;
+      }
+      activeOperationIdRef.current = started.operationId;
+      setScanOperationId(started.operationId);
+      await pollScanOperation(started.operationId);
+    } catch (err) {
+      if (mountedRef.current) setMessage(`Scan failed: ${err instanceof Error ? err.message : String(err)}`);
+      setBusy(false);
+      setScanActive(false);
+    }
+  };
+
+  const pollScanOperation = async (operationId: string) => {
+    for (;;) {
+      if (!api) return;
+      const status = await api.pointerMapScanPoll({ operationId });
+      if (!mountedRef.current) return; // unmount cleanup already cancelled the operation
+      if (!status?.success) {
+        setMessage(`Scan poll failed: ${status?.error ?? 'unknown error'}`);
+        break;
+      }
+      if (status.status === 'pending') {
+        await new Promise((resolve) => setTimeout(resolve, SCAN_POLL_INTERVAL_MS));
+        continue;
+      }
+      if (status.status === 'not_found') {
+        setMessage('Scan operation not found — it may have been superseded.');
+        break;
+      }
+      if (status.status === 'error') {
+        setMessage(`Scan error: ${status.error ?? 'unknown error'}`);
+        break;
+      }
+      // 'complete' or 'cancelled' — both are real terminal states.
+      if (status.result) {
+        setLastScanResult(status.result);
         await loadMaps();
-        const badge = completenessBadge(result.result.aggregateCompleteness);
+        const badge = completenessBadge(status.result.aggregateCompleteness);
+        const suffix = status.result.resourceLimited ? ' — resource limit reached' : '';
         setMessage(
-          `Scanned ${result.result.targetsScanned}/${result.result.targetsRequested} target(s) — aggregate: ${badge.label}${result.result.resourceLimited ? ' — resource limit reached' : ''}.`,
+          status.status === 'cancelled'
+            ? `Scan cancelled — ${status.result.targetsScanned}/${status.result.targetsRequested} target(s) reached, aggregate: ${badge.label}${suffix}.`
+            : `Scanned ${status.result.targetsScanned}/${status.result.targetsRequested} target(s) — aggregate: ${badge.label}${suffix}.`,
         );
       } else {
-        setMessage(`Scan failed: ${result?.error ?? 'unknown error'}`);
+        setMessage(status.status === 'cancelled' ? 'Scan cancelled before any target started.' : 'Scan finished with no result.');
       }
-    } finally {
-      setBusy(false);
+      break;
     }
+    if (mountedRef.current) {
+      setBusy(false);
+      setScanActive(false);
+      setScanOperationId(null);
+    }
+    activeOperationIdRef.current = null;
+  };
+
+  const handleCancelScan = async () => {
+    if (!api || !scanOperationId) return;
+    setMessage('Cancelling…');
+    await api.pointerMapScanCancel({ operationId: scanOperationId });
+    // The poll loop already in flight observes the resulting terminal state
+    // and updates UI/busy/scanActive itself — this call only requests it.
   };
 
   const handleResolve = async () => {
@@ -442,7 +530,15 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
             <button className="btn-primary" onClick={() => void handleScan()} disabled={busy || !attached || !targetInput.trim()}>
               Scan Into Map
             </button>
+            <button className="btn-danger" onClick={() => void handleCancelScan()} disabled={!scanActive}>
+              Cancel Scan
+            </button>
           </div>
+          {scanActive && (
+            <p className={styles.meta} role="status">
+              <Badge label="Scanning" variant="caution" /> Scan in progress — Cancel is available.
+            </p>
+          )}
           {!attached && <p className={styles.meta} role="status">Attach to a process above to scan or resolve this map.</p>}
 
           {lastScanResult && (

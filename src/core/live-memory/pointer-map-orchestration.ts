@@ -1,4 +1,9 @@
-import { scanForPointerPath, type PointerScanBounds, type PointerScanTermination } from './pointer-scanner.js';
+import {
+  scanForPointerPath,
+  scanForPointerPathCancellable,
+  type PointerScanBounds,
+  type PointerScanTermination,
+} from './pointer-scanner.js';
 import { addPointerMapNode, pointerMapNodeFromCandidate, type PointerMap } from './pointer-map.js';
 import type { CanonicalCompleteness } from './scanner-backend.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
@@ -121,6 +126,87 @@ export function scanTargetsIntoMap(
 
     const scanId = `pms-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const result = scanForPointerPath(driver, handle, target, bounds);
+
+    const remainingMapCapacity = Math.max(0, MAX_NODES_PER_MAP - workingMap.nodes.length);
+    const nodeCapacityForTarget = Math.min(MAX_NODES_PER_TARGET, remainingMapCapacity);
+    const candidatesToAdd = result.candidates.slice(0, nodeCapacityForTarget);
+    if (candidatesToAdd.length < result.candidates.length) resourceLimited = true;
+
+    candidatesToAdd.forEach((candidate, index) => {
+      const node = pointerMapNodeFromCandidate(`${targetAddress} candidate ${index + 1}`, candidate, {
+        targetAddress,
+        scanId,
+      });
+      workingMap = addPointerMapNode(workingMap, node);
+    });
+
+    perTarget.push({
+      targetAddress,
+      requestedDepth: result.requestedDepth,
+      deepestLevelCompleted: result.deepestLevelCompleted,
+      termination: result.termination,
+      completeness: result.completeness,
+      candidateCount: result.candidates.length,
+      nodesAdded: candidatesToAdd.length,
+      truncated: result.truncated,
+    });
+  }
+
+  return {
+    map: workingMap,
+    perTarget,
+    aggregateCompleteness: aggregatePointerMapCompleteness(perTarget.map((t) => t.completeness)),
+    targetsRequested,
+    targetsScanned: boundedTargets.length,
+    resourceLimited,
+  };
+}
+
+/**
+ * Real cancellable twin of `scanTargetsIntoMap` (P2-3.1 §5/§6). Identical
+ * per-target orchestration, but awaits `scanForPointerPathCancellable`
+ * instead of the synchronous `scanForPointerPath`, so a concurrently-issued
+ * `bounds.signal`-triggered cancellation can interrupt mid-target (the
+ * generator's own cancellation checkpoints), not just between targets. A
+ * target not yet reached when cancellation lands is recorded as `cancelled`
+ * with zero candidates — the same "we did not get to this one" vs "we
+ * scanned it and found nothing" distinction the synchronous path already
+ * makes (mission §12).
+ */
+export async function scanTargetsIntoMapCancellable(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  map: PointerMap,
+  targets: bigint[],
+  bounds?: PointerScanBounds,
+): Promise<PointerMapScanTargetsResult> {
+  const targetsRequested = targets.length;
+  const boundedTargets = targets.slice(0, MAX_TARGETS_PER_SCAN);
+  let resourceLimited = boundedTargets.length < targetsRequested;
+
+  let workingMap = map;
+  const perTarget: PointerMapTargetOutcome[] = [];
+
+  for (const target of boundedTargets) {
+    const targetAddress = hex(target);
+
+    if (bounds?.signal?.aborted) {
+      perTarget.push({
+        targetAddress,
+        requestedDepth: bounds?.maxDepth ?? 0,
+        deepestLevelCompleted: 0,
+        termination: 'cancelled',
+        completeness: { state: 'cancelled', atByte: 0n },
+        candidateCount: 0,
+        nodesAdded: 0,
+        truncated: true,
+      });
+      continue;
+    }
+
+    const scanId = `pms-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // eslint-disable-next-line no-await-in-loop -- targets must scan sequentially: each one's node budget depends on the running map-capacity total from every target scanned before it.
+    const result = await scanForPointerPathCancellable(driver, handle, target, bounds);
 
     const remainingMapCapacity = Math.max(0, MAX_NODES_PER_MAP - workingMap.nodes.length);
     const nodeCapacityForTarget = Math.min(MAX_NODES_PER_TARGET, remainingMapCapacity);
