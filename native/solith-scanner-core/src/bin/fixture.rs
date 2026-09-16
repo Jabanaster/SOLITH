@@ -415,7 +415,10 @@ fn main() {
             PAGE_READWRITE,
         )
     };
-    assert!(!pointer_node_b.is_null(), "VirtualAlloc(pointer_node_b) failed");
+    assert!(
+        !pointer_node_b.is_null(),
+        "VirtualAlloc(pointer_node_b) failed"
+    );
     unsafe {
         std::ptr::write_bytes(pointer_node_b as *mut u8, 0, POINTER_NODE_SIZE);
         std::ptr::write_unaligned(
