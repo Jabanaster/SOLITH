@@ -62,7 +62,7 @@ describe('ambiguous executable matching — tier 1 (displayName)', () => {
       [install({ displayName: 'Some Unrelated Title' })],
       CATALOG_AMBIGUOUS,
       new Date().toISOString(),
-      { hashExecutable: () => null, resolveExecutableHashPrefixes: () => [] },
+      { hashExecutable: () => null, resolveExecutableHashPrefixes: () => [], resolveModPackProvider: () => undefined },
     );
     assert.equal(record.catalogGameId, undefined);
   });
@@ -113,7 +113,7 @@ describe('ambiguous executable matching — tier 2 (authoritative content identi
   });
 });
 
-describe('ambiguous executable matching — tier 3 (fail closed)', () => {
+describe('ambiguous executable matching — tier 3 (provider) and final fail-closed', () => {
   test('two candidates share the fingerprint prefix: fails closed, does not guess', () => {
     const [record] = matchInstalledToCatalog(
       [install({ displayName: undefined })],
@@ -122,6 +122,7 @@ describe('ambiguous executable matching — tier 3 (fail closed)', () => {
       {
         hashExecutable: () => 'deadbeef',
         resolveExecutableHashPrefixes: () => ['dead'], // both candidates match — still ambiguous
+        resolveModPackProvider: () => undefined,
       },
     );
     assert.equal(record.catalogGameId, undefined);
@@ -133,7 +134,7 @@ describe('ambiguous executable matching — tier 3 (fail closed)', () => {
       [install({ displayName: undefined })],
       CATALOG_AMBIGUOUS,
       new Date().toISOString(),
-      { hashExecutable: () => null, resolveExecutableHashPrefixes: () => [] },
+      { hashExecutable: () => null, resolveExecutableHashPrefixes: () => [], resolveModPackProvider: () => undefined },
     );
     assert.equal(record.catalogGameId, undefined);
   });
@@ -147,7 +148,35 @@ describe('ambiguous executable matching — tier 3 (fail closed)', () => {
       [install({ displayName: 'Same Title' })],
       dupDisplayName,
       new Date().toISOString(),
-      { hashExecutable: () => null, resolveExecutableHashPrefixes: () => [] },
+      { hashExecutable: () => null, resolveExecutableHashPrefixes: () => [], resolveModPackProvider: () => undefined },
+    );
+    assert.equal(record.catalogGameId, undefined);
+  });
+
+  test('provider tier resolves when exactly one candidate\'s trainer/mod-pack was built for the installed game\'s canonical provider', () => {
+    const [record] = matchInstalledToCatalog(
+      [install({ platform: 'gog', displayName: undefined })],
+      CATALOG_AMBIGUOUS,
+      new Date().toISOString(),
+      {
+        hashExecutable: () => null,
+        resolveExecutableHashPrefixes: () => [],
+        resolveModPackProvider: (id) => (id === 'game-a' ? { canonical: 'gog', raw: 'standalone' } : { canonical: 'steam', raw: 'steam' }),
+      },
+    );
+    assert.equal(record.catalogGameId, 'game-a');
+  });
+
+  test('provider tier does not resolve when both candidates share the same provider (still ambiguous)', () => {
+    const [record] = matchInstalledToCatalog(
+      [install({ platform: 'steam', displayName: undefined })],
+      CATALOG_AMBIGUOUS,
+      new Date().toISOString(),
+      {
+        hashExecutable: () => null,
+        resolveExecutableHashPrefixes: () => [],
+        resolveModPackProvider: () => ({ canonical: 'steam', raw: 'steam' }),
+      },
     );
     assert.equal(record.catalogGameId, undefined);
   });

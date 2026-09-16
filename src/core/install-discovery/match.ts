@@ -4,6 +4,7 @@ import type { InstalledGameRecord, RawInstalledGame } from './types.js';
 import { createInstallIdentity, INSTALL_IDENTITY_VERSION } from './identity.js';
 import { getModPackForGame } from '../trainer-catalog/store.js';
 import { hashExecutableFileSHA256 } from '../live-memory/installed-exe-hash.js';
+import { normalizeInstallPlatform, normalizeModPackPlatform, sameCanonicalProvider } from './provider-identity.js';
 
 function normalizeExe(name: string): string {
   return path.basename(name).toLowerCase();
@@ -21,16 +22,28 @@ export interface MatchInstalledToCatalogOptions {
   /**
    * SHA-256 prefixes recorded against a catalog game's trainer/mod-pack
    * versions (schema.v1 `executableHashPrefixes`), used alongside
-   * `hashExecutable` for tier-3 disambiguation. Defaults to a real lookup
+   * `hashExecutable` for tier-2 disambiguation. Defaults to a real lookup
    * via getModPackForGame(); tests may inject fixtures directly.
    */
   resolveExecutableHashPrefixes?: (catalogGameId: string) => string[];
+  /**
+   * The canonical provider a catalog game's trainer/mod-pack was built
+   * against (ModPack.platform, bridged via provider-identity.ts), used for
+   * tier-3 disambiguation. Defaults to a real lookup via getModPackForGame();
+   * tests may inject fixtures directly.
+   */
+  resolveModPackProvider?: (catalogGameId: string) => ReturnType<typeof normalizeModPackPlatform> | undefined;
 }
 
 function defaultResolveExecutableHashPrefixes(catalogGameId: string): string[] {
   const pack = getModPackForGame(catalogGameId);
   if (!pack) return [];
   return pack.versions.flatMap((v) => v.executableHashPrefixes ?? []);
+}
+
+function defaultResolveModPackProvider(catalogGameId: string): ReturnType<typeof normalizeModPackPlatform> | undefined {
+  const pack = getModPackForGame(catalogGameId);
+  return pack ? normalizeModPackPlatform(pack.platform) : undefined;
 }
 
 function defaultHashExecutable(executablePath: string): string | null {
@@ -47,14 +60,19 @@ function defaultHashExecutable(executablePath: string): string | null {
  *  2. authoritative content identity: the installed executable's real
  *     SHA-256 against each remaining candidate's known trainer/mod-pack
  *     executableHashPrefixes, when exactly one candidate's prefix matches.
- *  3. otherwise FAIL CLOSED — return undefined. An unresolved ambiguous
+ *  3. provider match: the install's own platform (InstallPlatform) bridged
+ *     to the same canonical provider (provider-identity.ts) as exactly one
+ *     remaining candidate's trainer/mod-pack platform.
+ *  4. otherwise FAIL CLOSED — return undefined. An unresolved ambiguous
  *     install is surfaced as "no catalog match" (safe: no trainer can be
  *     misattached to the wrong game/edition) rather than guessed.
  */
 function resolveAmbiguousExecutableMatch(
   candidates: TrainerCatalogEntry[],
   game: RawInstalledGame,
-  options: Required<Pick<MatchInstalledToCatalogOptions, 'hashExecutable' | 'resolveExecutableHashPrefixes'>>,
+  options: Required<
+    Pick<MatchInstalledToCatalogOptions, 'hashExecutable' | 'resolveExecutableHashPrefixes' | 'resolveModPackProvider'>
+  >,
 ): TrainerCatalogEntry | undefined {
   if (game.displayName) {
     const lower = game.displayName.toLowerCase();
@@ -72,6 +90,13 @@ function resolveAmbiguousExecutableMatch(
     }
   }
 
+  const installProvider = normalizeInstallPlatform(game.platform);
+  const byProvider = candidates.filter((c) => {
+    const catalogProvider = options.resolveModPackProvider(c.catalogGameId);
+    return catalogProvider != null && sameCanonicalProvider(installProvider, catalogProvider);
+  });
+  if (byProvider.length === 1) return byProvider[0];
+
   return undefined;
 }
 
@@ -84,6 +109,7 @@ export function matchInstalledToCatalog(
   const resolvedOptions = {
     hashExecutable: options.hashExecutable ?? defaultHashExecutable,
     resolveExecutableHashPrefixes: options.resolveExecutableHashPrefixes ?? defaultResolveExecutableHashPrefixes,
+    resolveModPackProvider: options.resolveModPackProvider ?? defaultResolveModPackProvider,
   };
 
   const bySteamId = new Map<number, TrainerCatalogEntry>();
