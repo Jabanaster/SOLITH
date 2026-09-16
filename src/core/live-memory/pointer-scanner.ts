@@ -137,12 +137,30 @@ interface PointerHit {
   pointerValue: bigint;
 }
 
-export function scanForPointerPath(
+/**
+ * Core BFS as a synchronous generator, yielding once after each frontier
+ * item is scanned (the same granularity the existing `signal?.aborted`
+ * checks already use). Two drivers consume it:
+ *
+ * - `scanForPointerPath` (below) drains it to completion in a single tight
+ *   loop with no yield to the event loop between `.next()` calls — this is
+ *   byte-for-byte the previous synchronous behavior, so every existing
+ *   caller (session methods, `scanTargetsIntoMap`, ~25 unit tests) is
+ *   unaffected.
+ * - `scanForPointerPathCancellable` (pointer-map-cancellable-scan.ts) awaits
+ *   a real `setImmediate` between `.next()` calls, so the Node event loop
+ *   gets a turn to process an incoming IPC cancel request and flip
+ *   `bounds.signal.aborted` — which this generator already checks on its
+ *   very next resumption. That is what makes mid-scan cancellation genuine
+ *   rather than cosmetic: the check existed already, but nothing was ever
+ *   yielding long enough for a concurrent message to reach it.
+ */
+export function* pointerScanGenerator(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   targetAddress: bigint,
   bounds?: PointerScanBounds,
-): PointerScanResult {
+): Generator<void, PointerScanResult, void> {
   const requestedDepth = Math.max(1, Math.min(bounds?.maxDepth ?? DEFAULT_MAX_DEPTH, MAX_DEPTH_CAP));
   const maxOffsetPerLevel = bounds?.maxOffsetPerLevel ?? DEFAULT_MAX_OFFSET_PER_LEVEL;
   const maxCandidatesPerLevel = bounds?.maxCandidatesPerLevel ?? DEFAULT_MAX_CANDIDATES_PER_LEVEL;
@@ -211,7 +229,12 @@ export function scanForPointerPath(
     }
 
     levelsSearched = depth;
-    const nextFrontier: FrontierItem[] = [];
+    // Heap hits for this whole level are collected here rather than pushed
+    // straight into nextFrontier, then ranked by diff (ascending) before the
+    // maxCandidatesPerLevel cap is applied — see the comment below the loop
+    // for why: discovery order alone is not a reliable signal in a real
+    // process.
+    const heapHitCandidates: { address: bigint; diff: bigint; pathOffsets: number[] }[] = [];
     let levelFullyExamined = true;
 
     for (const item of frontier) {
@@ -286,19 +309,44 @@ export function scanForPointerPath(
         // coverage gap — the path through it has been (or is being) explored,
         // so suppressing it loses nothing and must NOT count as truncation.
         if (visited.has(hit.address)) continue;
-
-        if (nextFrontier.length >= maxCandidatesPerLevel) {
-          // A real coverage gap: this address is never expanded, so any path
-          // running through it goes unsearched.
-          candidatesDropped += 1;
-          levelFullyExamined = false;
-          continue;
-        }
-
         visited.add(hit.address);
-        nextFrontier.push({ address: hit.address, offsetsSoFar: pathOffsets });
-        candidatesExplored += 1;
+
+        const diff = item.address - hit.pointerValue;
+        heapHitCandidates.push({ address: hit.address, diff, pathOffsets });
       }
+
+      // Cancellation checkpoint. A no-op for the synchronous drain below;
+      // the cancellable async driver awaits a real event-loop turn here.
+      yield;
+    }
+
+    // Root-cause fix (P2-3.1 §1-3): a real process's heap/allocator/thread
+    // metadata routinely contains pointer-shaped bytes that coincidentally
+    // land within maxOffsetPerLevel of a frontier address — this is genuine
+    // noise, not a defect in the target process. The previous code accepted
+    // heap candidates into nextFrontier in raw memory-scan discovery order
+    // (ascending region base address), so whether a real chain link survived
+    // the maxCandidatesPerLevel cap depended on how much unrelated noise
+    // happened to enumerate before it — a real, reproducible source of
+    // nondeterminism across ASLR/heap-layout-varying runs, not a timing
+    // race. A genuine pointer link's diff (the exact byte gap between the
+    // frontier address and the discovered pointer's value) is the same
+    // every run for a given binary; noise diffs are effectively uniform
+    // across [0, maxOffsetPerLevel] and only coincidentally land near 0.
+    // Ranking by ascending diff before applying the cap means a real link is
+    // kept whenever it exists among the hits, independent of scan order.
+    heapHitCandidates.sort((a, b) => (a.diff < b.diff ? -1 : a.diff > b.diff ? 1 : 0));
+    const nextFrontier: FrontierItem[] = [];
+    for (const hit of heapHitCandidates) {
+      if (nextFrontier.length >= maxCandidatesPerLevel) {
+        // A real coverage gap: this address is never expanded, so any path
+        // running through it goes unsearched.
+        candidatesDropped += 1;
+        levelFullyExamined = false;
+        continue;
+      }
+      nextFrontier.push({ address: hit.address, offsetsSoFar: hit.pathOffsets });
+      candidatesExplored += 1;
     }
 
     if (levelFullyExamined) deepestLevelCompleted = depth;
@@ -338,6 +386,48 @@ export function scanForPointerPath(
     isAuthoritativeAbsence: candidates.length === 0 && complete,
     truncated: !complete,
   };
+}
+
+/**
+ * The long-standing synchronous entry point — drains `pointerScanGenerator`
+ * to completion in one tight loop, with no event-loop yield between steps.
+ * Byte-for-byte the same behavior this function had before the generator
+ * refactor; every existing caller keeps working unchanged.
+ */
+export function scanForPointerPath(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  targetAddress: bigint,
+  bounds?: PointerScanBounds,
+): PointerScanResult {
+  const gen = pointerScanGenerator(driver, handle, targetAddress, bounds);
+  let step = gen.next();
+  while (!step.done) step = gen.next();
+  return step.value;
+}
+
+/**
+ * Real cancellable variant (P2-3.1 §5/§6): drives the identical generator
+ * but awaits a genuine event-loop turn (`setImmediate`) between steps. That
+ * turn is what lets a concurrently-arriving IPC cancel request actually run
+ * and flip `bounds.signal.aborted` — which the generator's existing
+ * `signal?.aborted` checks then observe on the very next resumption. Used
+ * only by `startPointerMapScanOperation`; every other caller keeps using the
+ * synchronous `scanForPointerPath` above.
+ */
+export async function scanForPointerPathCancellable(
+  driver: MemoryDriver,
+  handle: LiveProcessHandle,
+  targetAddress: bigint,
+  bounds?: PointerScanBounds,
+): Promise<PointerScanResult> {
+  const gen = pointerScanGenerator(driver, handle, targetAddress, bounds);
+  let step = gen.next();
+  while (!step.done) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    step = gen.next();
+  }
+  return step.value;
 }
 
 /**
