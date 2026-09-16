@@ -2,6 +2,7 @@ import { isProcessGoneError } from './memory-scanner.js';
 import { resolvePointerPath, type LivePointerPath } from './pointer-resolver.js';
 import type { PointerPathCandidate } from './pointer-scanner.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
+import { emptyStabilityState, type NodeStabilityState } from './pointer-stability.js';
 
 /**
  * Phase 2 — the pointer-map data model (ROADMAP "pointer maps,
@@ -43,6 +44,15 @@ export interface PointerMapNode {
   targetAddress: string | null;
   /** Groups every node an orchestrated scanTargetsIntoMap call produced together, or null for a manual add. */
   scanId: string | null;
+  /**
+   * P2-4 — restart-stability evidence (mission §3). Optional in the TYPE
+   * because a map persisted before this stage (schemaVersion 1) has no such
+   * data on disk; every in-memory node this stage creates or loads always
+   * populates it (see pointer-map-store.ts's migration and
+   * pointerMapNodeFromCandidate below) — callers should treat a missing
+   * value as `emptyStabilityState()`, never as an error.
+   */
+  stability?: NodeStabilityState;
 }
 
 export interface PointerMap {
@@ -90,6 +100,7 @@ export function pointerMapNodeFromCandidate(
     createdAt: new Date().toISOString(),
     targetAddress: provenance?.targetAddress ?? null,
     scanId: provenance?.scanId ?? null,
+    stability: emptyStabilityState(),
   };
 }
 

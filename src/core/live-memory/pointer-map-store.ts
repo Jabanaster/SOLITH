@@ -1,5 +1,6 @@
 import db from '../database/index.js';
 import type { PointerMap } from './pointer-map.js';
+import { emptyStabilityState } from './pointer-stability.js';
 
 /**
  * Phase 2 P2-2 persistence for pointer maps (ROADMAP §8/§9). A saved map is
@@ -9,9 +10,18 @@ import type { PointerMap } from './pointer-map.js';
  * needs redacting before it hits disk. What DOES need enforcing on the way
  * back out is that a reloaded map is never treated as live truth until it
  * is explicitly re-resolved — see `toInactiveOnLoad` below.
+ *
+ * P2-4 (mission §13): schemaVersion 2 adds each node's `stability` field
+ * (restart-observation history). A row's schemaVersion is written as the
+ * CURRENT version on every save, but on load, any version <= the current
+ * one is migrated forward and accepted — only a version NEWER than this
+ * code understands is rejected. A schemaVersion 1 row is real P2-2 data
+ * (saved before this stage existed) and must keep loading: it becomes
+ * live nodes with `stability: emptyStabilityState()`, unresolved until
+ * validated against the current process, never silently dropped.
  */
 
-export const POINTER_MAP_SCHEMA_VERSION = 1;
+export const POINTER_MAP_SCHEMA_VERSION = 2;
 
 /** Hard ceiling on a single map's serialized size, so a corrupted or runaway map can't be persisted. */
 export const MAX_SERIALIZED_MAP_BYTES = 2 * 1024 * 1024;
@@ -88,14 +98,29 @@ export function savePointerMap(map: PointerMap, identity: PointerMapSaveIdentity
 export function loadPointerMap(mapId: string): PointerMapLoadResult {
   const row = db.prepare(`SELECT * FROM pointer_maps WHERE mapId = ?`).get(mapId) as PointerMapRow | undefined;
   if (!row) return { ok: false, error: 'not_found' };
-  if (row.schemaVersion !== POINTER_MAP_SCHEMA_VERSION) return { ok: false, error: 'unsupported_schema_version' };
+  // Only a version this code was never built to understand is rejected — a
+  // version at or below the current one is migrated forward, never refused.
+  if (row.schemaVersion > POINTER_MAP_SCHEMA_VERSION) return { ok: false, error: 'unsupported_schema_version' };
   try {
     const parsed = JSON.parse(row.data) as unknown;
     if (!isWellFormedPointerMap(parsed)) return { ok: false, error: 'corrupt' };
-    return { ok: true, map: toInactiveOnLoad(parsed) };
+    const migrated = migratePointerMapData(parsed, row.schemaVersion);
+    return { ok: true, map: toInactiveOnLoad(migrated) };
   } catch {
     return { ok: false, error: 'corrupt' };
   }
+}
+
+/**
+ * Forward-migrates a parsed map from the version it was actually saved at.
+ * Additive only — never rewrites or drops a field an older version already
+ * had a meaning for. schemaVersion 1 -> 2: every node gets a fresh
+ * `emptyStabilityState()` (no restart history exists for data saved before
+ * P2-4), never a guessed or fabricated one.
+ */
+function migratePointerMapData(map: PointerMap, fromSchemaVersion: number): PointerMap {
+  if (fromSchemaVersion >= 2) return map;
+  return { ...map, nodes: map.nodes.map((node) => ({ ...node, stability: node.stability ?? emptyStabilityState() })) };
 }
 
 export interface PointerMapSummary {
