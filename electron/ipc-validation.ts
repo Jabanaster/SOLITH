@@ -641,6 +641,28 @@ export const PointerMapSaveSchema = z.object({
   architecture: z.string().min(1).max(32).optional(),
 });
 
+/** P2-4 — the serializable ground-truth spec (StabilityGroundTruthSpec's wire shape). `u64.expected` is a decimal STRING, the same BigInt-safe-IPC rule every other value crossing this boundary follows. */
+export const POINTER_STABILITY_GROUND_TRUTH = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('u32'), expected: z.number().int().min(0).max(0xffffffff), description: z.string().min(1).max(256) }),
+  z.object({ kind: z.literal('u64'), expected: z.string().regex(/^\d{1,20}$/), description: z.string().min(1).max(256) }),
+]);
+
+export const PointerMapValidateNodeSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  nodeId: z.string().min(1).max(128),
+  groundTruth: POINTER_STABILITY_GROUND_TRUTH,
+});
+
+export const PointerMapValidateAfterRestartSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  groundTruthByNodeId: z.record(z.string().min(1).max(128), POINTER_STABILITY_GROUND_TRUTH).refine((obj) => Object.keys(obj).length <= 200),
+});
+
+export const PointerMapGetNodeStabilitySchema = z.object({
+  mapId: z.string().min(1).max(128),
+  nodeId: z.string().min(1).max(128),
+});
+
 export const LiveMemoryScanAobSchema = z.object({
   signature: z.string().min(3).max(512),
   moduleName: z.string().min(1).max(260).optional(),

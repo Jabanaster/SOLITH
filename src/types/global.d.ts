@@ -6,6 +6,45 @@ declare module 'sql.js';
 // serializePointerMapScanResult in electron/live-memory-ipc.ts. moduleOffset
 // is a "0x..." string on the wire (see PointerMapCreateSchema and friends),
 // matching liveMemoryPointerScan's existing candidate shape above.
+// P2-4 — restart-stability wire shapes, mirroring pointer-stability.ts's
+// StabilityStatus/StabilityObservation/StabilityBaseline exactly.
+type StabilityStatusDto =
+  | 'stable_exact'
+  | 'stable_relocated'
+  | 'target_moved_chain_valid'
+  | 'chain_broken'
+  | 'module_missing'
+  | 'read_failed'
+  | 'process_exited'
+  | 'false_positive';
+
+interface StabilityBaselineDto {
+  pid: number | null;
+  moduleBase: string | null;
+  resolvedAddress: string;
+  recordedAt: string;
+}
+
+interface StabilityObservationDto {
+  launchNumber: number;
+  pid: number | null;
+  moduleBase: string | null;
+  resolvedAddress: string | null;
+  status: StabilityStatusDto;
+  failureReason: string | null;
+  observedAt: string;
+}
+
+interface NodeStabilityStateDto {
+  baseline: StabilityBaselineDto | null;
+  observations: StabilityObservationDto[];
+}
+
+/** The wire shape sent TO the main process — never a closure, see pointer-stability.ts's StabilityGroundTruthSpec. */
+type StabilityGroundTruthSpecDto =
+  | { kind: 'u32'; expected: number; description: string }
+  | { kind: 'u64'; expected: string; description: string };
+
 interface PointerMapNodeDto {
   id: string;
   label: string;
@@ -17,6 +56,7 @@ interface PointerMapNodeDto {
   createdAt: string;
   targetAddress: string | null;
   scanId: string | null;
+  stability: NodeStabilityStateDto;
 }
 
 interface PointerMapDto {
@@ -884,6 +924,27 @@ interface Window {
     pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) => Promise<{
       success: boolean;
       map?: PointerMapDto;
+      error?: string;
+    }>;
+    /** P2-4 — real restart-stability validation, same start-shape convention as the rest of this pointer-map contract. */
+    pointerMapValidateNode: (payload: {
+      mapId: string;
+      nodeId: string;
+      groundTruth: StabilityGroundTruthSpecDto;
+    }) => Promise<{ success: boolean; map?: PointerMapDto; observation?: StabilityObservationDto; error?: string }>;
+    pointerMapValidateAfterRestart: (payload: {
+      mapId: string;
+      groundTruthByNodeId: Record<string, StabilityGroundTruthSpecDto>;
+    }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      observations?: StabilityObservationDto[];
+      skippedNodeIds?: string[];
+      error?: string;
+    }>;
+    pointerMapGetNodeStability: (payload: { mapId: string; nodeId: string }) => Promise<{
+      success: boolean;
+      stability?: NodeStabilityStateDto;
       error?: string;
     }>;
     pointerMapSave: (payload: {

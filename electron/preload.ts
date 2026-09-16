@@ -426,6 +426,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('pointer-map-add-node', payload),
   pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) =>
     ipcRenderer.invoke('pointer-map-remove-node', payload),
+  // P2-4 — real restart-stability validation. groundTruth is a serializable
+  // spec (u32/u64 expected value), never a closure.
+  pointerMapValidateNode: (payload: {
+    mapId: string;
+    nodeId: string;
+    groundTruth: { kind: 'u32'; expected: number; description: string } | { kind: 'u64'; expected: string; description: string };
+  }) => ipcRenderer.invoke('pointer-map-validate-node', payload),
+  pointerMapValidateAfterRestart: (payload: {
+    mapId: string;
+    groundTruthByNodeId: Record<
+      string,
+      { kind: 'u32'; expected: number; description: string } | { kind: 'u64'; expected: string; description: string }
+    >;
+  }) => ipcRenderer.invoke('pointer-map-validate-after-restart', payload),
+  pointerMapGetNodeStability: (payload: { mapId: string; nodeId: string }) =>
+    ipcRenderer.invoke('pointer-map-get-node-stability', payload),
   pointerMapSave: (payload: { mapId: string; gameId?: string; executableIdentity?: string; architecture?: string }) =>
     ipcRenderer.invoke('pointer-map-save', payload),
   pointerMapLoad: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-load', payload),

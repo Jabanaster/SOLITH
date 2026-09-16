@@ -39,6 +39,13 @@ import {
   type PointerMapScanTargetsResult,
 } from './pointer-map-orchestration.js';
 import {
+  validateNodeAfterRestart,
+  validateMapAfterRestart,
+  type NodeStabilityResult,
+  type MapStabilityResult,
+} from './pointer-stability-orchestration.js';
+import { groundTruthFromSpec, type StabilityGroundTruthSpec } from './pointer-stability.js';
+import {
   deleteSavedPointerMap,
   loadPointerMap,
   savePointerMap,
@@ -1403,6 +1410,60 @@ export class LiveMemorySession {
     const updated = removePointerMapNode(map, nodeId);
     this.pointerMaps.set(mapId, updated);
     return updated;
+  }
+
+  /**
+   * P2-4 — real restart-stability validation (mission §12/§16). Re-resolves
+   * ONE node against the currently attached process and independently
+   * verifies the destination holds the intended value (`groundTruth`) — not
+   * merely that the chain traversed without error, which is all
+   * pointerMapResolve above proves. Requires an active attach: a saved map's
+   * stale nodes cannot be "validated" against nothing.
+   */
+  pointerMapValidateNodeAfterRestart(
+    mapId: string,
+    nodeId: string,
+    groundTruth: StabilityGroundTruthSpec,
+  ): NodeStabilityResult {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = validateNodeAfterRestart(
+      this.driver,
+      this.handle,
+      map,
+      nodeId,
+      groundTruthFromSpec(groundTruth),
+      this.target?.pid ?? null,
+    );
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Same operation applied to every node in the map that has a known ground truth — nodes without one are recorded as skipped, never silently validated. */
+  pointerMapValidateAfterRestart(
+    mapId: string,
+    groundTruthByNodeId: Record<string, StabilityGroundTruthSpec>,
+  ): MapStabilityResult {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = validateMapAfterRestart(
+      this.driver,
+      this.handle,
+      map,
+      (node) => {
+        const spec = groundTruthByNodeId[node.id];
+        return spec ? groundTruthFromSpec(spec) : null;
+      },
+      this.target?.pid ?? null,
+    );
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Read-only accessor — the node's own persisted stability history, never re-derived or guessed. */
+  pointerMapGetNodeStability(mapId: string, nodeId: string): PointerMapNode['stability'] | null {
+    const map = this.requirePointerMap(mapId);
+    return map.nodes.find((n) => n.id === nodeId)?.stability ?? null;
   }
 
   /** Re-resolves every node in the map against the currently attached process. Must be called fresh after every attach. */

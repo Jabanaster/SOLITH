@@ -37,6 +37,9 @@ import {
   PointerMapAddNodeSchema,
   PointerMapRemoveNodeSchema,
   PointerMapSaveSchema,
+  PointerMapValidateNodeSchema,
+  PointerMapValidateAfterRestartSchema,
+  PointerMapGetNodeStabilitySchema,
   LiveMemoryScanAobSchema,
   LiveMemoryScannerRoutingModeSchema,
   LiveMemoryScanFirstStartSchema,
@@ -58,8 +61,10 @@ import {
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { CanonicalCompleteness, CanonicalSkippedRange } from '../src/core/live-memory/scanner-backend.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
-import type { PointerMap } from '../src/core/live-memory/pointer-map.js';
+import type { PointerMap, PointerMapNode } from '../src/core/live-memory/pointer-map.js';
 import type { PointerMapScanTargetsResult } from '../src/core/live-memory/pointer-map-orchestration.js';
+import type { NodeStabilityResult, MapStabilityResult } from '../src/core/live-memory/pointer-stability-orchestration.js';
+import type { StabilityGroundTruthSpec } from '../src/core/live-memory/pointer-stability.js';
 import { listSavedPointerMaps } from '../src/core/live-memory/pointer-map-store.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
@@ -1268,6 +1273,59 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  // P2-4 (mission §14) — real restart-stability validation. Reuses
+  // pointerMapResolve's requireSession/attach gating; ground truth is a
+  // serializable spec (never a closure), the same BigInt-safe-IPC
+  // convention as every other value crossing this boundary.
+  ipcMain.handle('pointer-map-validate-node', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapValidateNodeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapValidateNodeAfterRestart(parsed.mapId, parsed.nodeId, parsed.groundTruth as StabilityGroundTruthSpec);
+      return { success: true, map: serializePointerMap(result.map), observation: result.observation };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_validate_node_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-validate-after-restart', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapValidateAfterRestartSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapValidateAfterRestart(
+        parsed.mapId,
+        parsed.groundTruthByNodeId as Record<string, StabilityGroundTruthSpec>,
+      );
+      return {
+        success: true,
+        map: serializePointerMap(result.map),
+        observations: result.observations,
+        skippedNodeIds: result.skippedNodeIds,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_validate_after_restart_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-get-node-stability', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapGetNodeStabilitySchema.parse(payload);
+      const stability = session.pointerMapGetNodeStability(parsed.mapId, parsed.nodeId);
+      return { success: true, stability: stability ?? { baseline: null, observations: [] } };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_get_node_stability_failed') };
+    }
+  });
+
   ipcMain.handle('pointer-map-save', async (event, payload: unknown) => {
     try {
       const senderCheck = requireTrustedSender(event);
@@ -2320,7 +2378,17 @@ function serializePointerMap(map: PointerMap) {
       createdAt: node.createdAt,
       targetAddress: node.targetAddress,
       scanId: node.scanId,
+      stability: serializeNodeStability(node.stability),
     })),
+  };
+}
+
+/** P2-4 — a node's restart-stability history. Absent (pre-P2-4 in-memory data, should not occur post-migration) serializes as an explicit empty state rather than `undefined`, so the renderer never needs its own null-check. */
+function serializeNodeStability(stability: PointerMapNode['stability']) {
+  const state = stability ?? { baseline: null, observations: [] };
+  return {
+    baseline: state.baseline,
+    observations: state.observations,
   };
 }
 
