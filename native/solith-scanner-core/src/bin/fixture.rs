@@ -203,6 +203,36 @@ const FAR_MARKER_PATTERN: [u8; 5] = [0xDE, 0xAD, 0xC0, 0xDE, 0x42];
 const GUARD_HIDDEN_PATTERN_OFFSET: usize = GUARD_NOACCESS_PAGE_OFFSET + 100;
 const GUARD_HIDDEN_PATTERN: [u8; 4] = [0x5E, 0xC4, 0x37, 0x21];
 
+// -- Phase 1 final closure (D05, mission §13): a real module-rooted pointer
+// chain in a real process.
+//
+//   POINTER_ROOT (this binary's own .data, i.e. inside the module range)
+//     -> NODE1 -> NODE2 -> NODE3 -> the target value
+//
+// Each node lives in its own VirtualAlloc'd region so the reverse traversal
+// has to cross three genuine region boundaries rather than walking within one
+// buffer. The value sits at POINTER_TARGET_OFFSET inside NODE3, so a correct
+// depth-3 path is `[0, 0, POINTER_TARGET_OFFSET]`.
+//
+// `POINTER_ROOT` must live in the image, not in a VirtualAlloc region: the
+// scanner only calls a hit a stable path root when the address holding the
+// pointer falls inside a loaded module, which is the entire point of the
+// "module + offset chain" output. An atomic is used rather than `static mut`
+// so writing it needs no `unsafe` and no pointer-to-static lint exception.
+const POINTER_NODE_SIZE: usize = 4096;
+const POINTER_TARGET_OFFSET: usize = 16;
+const POINTER_TARGET_VALUE: u32 = 0x5A5A_1234;
+// A second slot in NODE1 pointing at NODE2, and a slot in NODE2 pointing back
+// at NODE1, so the live process really does contain a pointer cycle for the
+// traversal to survive (mission §11) rather than a synthetic one.
+//
+// The cycle is deliberately placed BETWEEN adjacent links rather than across
+// them: an earlier revision put it on NODE1 -> NODE3, which created a genuine
+// two-edge shortcut from the module root to the target and made the chain's
+// nominal depth-3 path no longer the shortest one.
+const POINTER_CYCLE_OFFSET: usize = 32;
+static POINTER_ROOT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 #[cfg(windows)]
 fn main() {
     let pid = std::process::id();
@@ -294,6 +324,44 @@ fn main() {
         "VirtualAlloc(mutation_region) failed"
     );
     let mutation_base = mutation_region as usize;
+
+    // -- D05 pointer chain: three separately-allocated nodes, rooted in .data.
+    let mut pointer_nodes: [usize; 3] = [0; 3];
+    for node in pointer_nodes.iter_mut() {
+        let region = unsafe {
+            VirtualAlloc(
+                std::ptr::null(),
+                POINTER_NODE_SIZE,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_READWRITE,
+            )
+        };
+        assert!(!region.is_null(), "VirtualAlloc(pointer_node) failed");
+        unsafe {
+            std::ptr::write_bytes(region as *mut u8, 0, POINTER_NODE_SIZE);
+        }
+        *node = region as usize;
+    }
+    unsafe {
+        // NODE1[0] -> NODE2, NODE2[0] -> NODE3, NODE3[+16] = the value.
+        std::ptr::write_unaligned(pointer_nodes[0] as *mut u64, pointer_nodes[1] as u64);
+        std::ptr::write_unaligned(pointer_nodes[1] as *mut u64, pointer_nodes[2] as u64);
+        std::ptr::write_unaligned(
+            (pointer_nodes[2] + POINTER_TARGET_OFFSET) as *mut u32,
+            POINTER_TARGET_VALUE,
+        );
+        // The cycle: NODE1 -> NODE2 and NODE2 -> NODE1.
+        std::ptr::write_unaligned(
+            (pointer_nodes[0] + POINTER_CYCLE_OFFSET) as *mut u64,
+            pointer_nodes[1] as u64,
+        );
+        std::ptr::write_unaligned(
+            (pointer_nodes[1] + POINTER_CYCLE_OFFSET) as *mut u64,
+            pointer_nodes[0] as u64,
+        );
+    }
+    POINTER_ROOT.store(pointer_nodes[0] as u64, std::sync::atomic::Ordering::SeqCst);
+    let pointer_root_addr = &POINTER_ROOT as *const _ as usize;
     unsafe {
         let slice =
             std::slice::from_raw_parts_mut(mutation_region as *mut u8, MUTATION_REGION_SIZE);
@@ -527,6 +595,14 @@ fn main() {
         "GUARD_HIDDEN_PATTERN_OFFSET={GUARD_HIDDEN_PATTERN_OFFSET}"
     )
     .unwrap();
+    writeln!(out, "POINTER_ROOT_ADDRESS=0x{pointer_root_addr:x}").unwrap();
+    writeln!(out, "POINTER_NODE1_BASE=0x{:x}", pointer_nodes[0]).unwrap();
+    writeln!(out, "POINTER_NODE2_BASE=0x{:x}", pointer_nodes[1]).unwrap();
+    writeln!(out, "POINTER_NODE3_BASE=0x{:x}", pointer_nodes[2]).unwrap();
+    writeln!(out, "POINTER_NODE_SIZE={POINTER_NODE_SIZE}").unwrap();
+    writeln!(out, "POINTER_TARGET_OFFSET={POINTER_TARGET_OFFSET}").unwrap();
+    writeln!(out, "POINTER_TARGET_VALUE=0x{POINTER_TARGET_VALUE:x}").unwrap();
+    writeln!(out, "POINTER_CYCLE_OFFSET={POINTER_CYCLE_OFFSET}").unwrap();
     writeln!(out, "MUTATION_REGION_BASE=0x{mutation_base:x}").unwrap();
     writeln!(out, "MUTATION_REGION_SIZE={MUTATION_REGION_SIZE}").unwrap();
     writeln!(out, "MUTATION_MARKER_OFFSET={MUTATION_MARKER_OFFSET}").unwrap();

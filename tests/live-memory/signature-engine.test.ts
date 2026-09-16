@@ -86,12 +86,13 @@ describe('signature-engine', () => {
     driver.addRegion(moduleBase, region);
 
     const handle = driver.openProcess(1);
-    const match = scanFuzzySignature(driver, handle, '48 8B 05 ? ? ? ?', {
+    const { match, completeness } = scanFuzzySignature(driver, handle, '48 8B 05 ? ? ? ?', {
       moduleName: 'Demo.exe',
       maxDistance: 1,
       maxEdits: 0,
     });
     assert.ok(match);
+    assert.equal(completeness.state, 'complete');
     assert.equal(match!.mode, 'fuzzy');
     assert.equal(match!.distance, 1);
     assert.equal(match!.driftKind, 'hamming');
@@ -117,7 +118,7 @@ describe('signature-engine', () => {
       maxShiftBytes: 16,
       maxDistance: 0,
       maxEdits: 0,
-    });
+    }).match;
     assert.equal(miss, null);
 
     const hit = scanFuzzySignature(driver, handle, 'DE AD BE EF', {
@@ -126,7 +127,7 @@ describe('signature-engine', () => {
       maxShiftBytes: 32,
       maxDistance: 0,
       maxEdits: 0,
-    });
+    }).match;
     assert.ok(hit);
     assert.equal(hit!.address, moduleBase + 200n);
     assert.equal(hit!.shiftBytes, 10);
@@ -147,10 +148,52 @@ describe('signature-engine', () => {
       maxShiftBytes: 16,
       maxDistance: 0,
       maxEdits: 0,
-    });
+    }).match;
     assert.ok(hit);
     assert.equal(hit!.address, moduleBase + 24n);
     assert.equal(hit!.shiftBytes, 16);
+  });
+
+  // D01 final closure: the legacy fuzzy scan used to swallow span read
+  // failures, so a miss caused by an unreadable span was indistinguishable
+  // from a signature that genuinely was not there.
+  test('scanFuzzySignature never claims absence when a span could not be read', () => {
+    const driver = new FakeMemoryDriver();
+    const moduleBase = 0x420000n;
+    driver.addModule('Demo.exe', moduleBase, 0x1000);
+    driver.addRegion(moduleBase, Buffer.alloc(64, 0));
+    const handle = driver.openProcess(1);
+
+    driver.readBuffer = (() => {
+      throw new Error('read failed: region exceeds the 1 MiB ceiling');
+    }) as typeof driver.readBuffer;
+
+    const outcome = scanFuzzySignature(driver, handle, 'DE AD BE EF', {
+      moduleName: 'Demo.exe',
+      maxDistance: 0,
+      maxEdits: 0,
+    });
+    assert.equal(outcome.match, null);
+    assert.equal(outcome.isAuthoritativeAbsence, false);
+    assert.equal(outcome.completeness.state, 'complete_with_skipped_regions');
+    assert.ok(outcome.skippedRegions.length > 0);
+  });
+
+  test('scanFuzzySignature reports a miss over fully-read spans as an authoritative absence', () => {
+    const driver = new FakeMemoryDriver();
+    const moduleBase = 0x430000n;
+    driver.addModule('Demo.exe', moduleBase, 0x1000);
+    driver.addRegion(moduleBase, Buffer.alloc(64, 0));
+    const handle = driver.openProcess(1);
+
+    const outcome = scanFuzzySignature(driver, handle, 'DE AD BE EF', {
+      moduleName: 'Demo.exe',
+      maxDistance: 0,
+      maxEdits: 0,
+    });
+    assert.equal(outcome.match, null);
+    assert.equal(outcome.isAuthoritativeAbsence, true);
+    assert.equal(outcome.completeness.state, 'complete');
   });
 
   test('module-scoped resolution fails closed when module is absent', async () => {

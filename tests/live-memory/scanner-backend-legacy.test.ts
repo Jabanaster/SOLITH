@@ -95,10 +95,17 @@ test('LegacyScannerBackend.aobScan produces the same address as calling scanAobI
   const outcome = await backend.aobScan('48 8B 05', undefined, {});
 
   assert.equal(outcome.matches.length, 1);
-  assert.equal(outcome.matches[0].address, direct);
+  assert.equal(outcome.matches[0].address, direct.address);
 });
 
-test('LegacyScannerBackend.aobScan never claims authoritative absence — legacy tracks no completeness signal at all (D01/D04)', async () => {
+// Updated at D01 final closure. This test previously asserted that a legacy
+// AOB miss can NEVER be an authoritative absence, because `scanAobInProcess`
+// swallowed every region read failure and so had no completeness signal to
+// report. It now has one, so the adapter passes the real answer through: a
+// miss over fully-read regions is a genuine absence, and a miss with any
+// unreadable region still is not. Both halves are asserted, because passing
+// only the first would be satisfiable by the old always-incomplete behavior.
+test('LegacyScannerBackend.aobScan reports a miss over fully-read regions as an authoritative absence (D01/D04)', async () => {
   const driver = new FakeMemoryDriver();
   const region = filledBuffer(32, 0x00);
   driver.addRegion(0x5000n, region, true);
@@ -107,8 +114,30 @@ test('LegacyScannerBackend.aobScan never claims authoritative absence — legacy
   const outcome = await backend.aobScan('DE AD BE EF', undefined, {});
 
   assert.equal(outcome.matches.length, 0);
+  assert.equal(outcome.isAuthoritativeAbsence, true);
+  assert.equal(outcome.completeness.state, 'complete');
+  assert.equal(outcome.metrics.regionsRead, 1);
+  assert.equal(outcome.metrics.regionsSkipped, 0);
+});
+
+test('LegacyScannerBackend.aobScan never claims absence when a region could not be read (D01/D04)', async () => {
+  const driver = new FakeMemoryDriver();
+  driver.addRegion(0x5000n, filledBuffer(32, 0x00), true);
+  driver.addRegion(0x6000n, filledBuffer(32, 0x00), true);
+
+  const realRead = driver.readBuffer.bind(driver);
+  driver.readBuffer = ((h: unknown, base: bigint, size: number) => {
+    if (base === 0x6000n) throw new Error('read failed: region exceeds the 1 MiB ceiling');
+    return realRead(h as never, base, size);
+  }) as typeof driver.readBuffer;
+
+  const backend = new LegacyScannerBackend(driver, HANDLE);
+  const outcome = await backend.aobScan('DE AD BE EF', undefined, {});
+
+  assert.equal(outcome.matches.length, 0);
   assert.equal(outcome.isAuthoritativeAbsence, false);
   assert.equal(outcome.completeness.state, 'complete_with_skipped_regions');
+  assert.equal(outcome.metrics.regionsSkipped, 1);
 });
 
 test('LegacyScannerBackend rejects a pre-aborted scan control before doing any work', async () => {
