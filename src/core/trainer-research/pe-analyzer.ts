@@ -1,22 +1,25 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PeSectionInfo, TrainerExeAnalysis } from './types.js';
+import type { TrainerExeAnalysis } from './types.js';
+import { resolvePeStructuralMetadata } from '../executable-identity/pe-metadata.js';
 
 const MAX_ANALYZE_BYTES = 50 * 1024 * 1024;
 const MAX_STRINGS = 400;
 const MIN_STRING_LEN = 5;
 
+// Real Microsoft PE/COFF Machine field values (winnt.h IMAGE_FILE_MACHINE_*).
+// Kept as a direct fixed-offset read (not delegated to LIEF) because the
+// node-lief binding actually available does not expose this — see
+// ../executable-identity/pe-metadata.ts's module doc for the verified gap.
+// Unlike full section-table/optional-header parsing, a 2-byte fixed-offset
+// COFF field read carries no PE32/PE32_PLUS branching risk, so hand-reading
+// it here (once LIEF has already confirmed this is a valid PE) is not the
+// same class of risk the rest of this file's LIEF migration addresses.
 const MACHINE_TYPES: Record<number, string> = {
   0x014c: 'i386',
   0x8664: 'x64',
   0xaa64: 'ARM64',
-};
-
-const SUBSYSTEM_TYPES: Record<number, string> = {
-  1: 'native',
-  2: 'windows-gui',
-  3: 'windows-cui',
 };
 
 function readU16(buf: Buffer, offset: number): number {
@@ -25,6 +28,23 @@ function readU16(buf: Buffer, offset: number): number {
 
 function readU32(buf: Buffer, offset: number): number {
   return buf.readUInt32LE(offset);
+}
+
+/** Best-effort raw COFF machine type + link timestamp. Never throws — a file LIEF parsed leniently may not have every fixed offset in range. */
+function readCoffMachineAndTimestamp(buf: Buffer): { machine: string; peTimestamp?: string } {
+  try {
+    const peOffset = readU32(buf, 0x3c);
+    const coffOffset = peOffset + 4;
+    if (coffOffset + 8 > buf.length) return { machine: 'unknown' };
+    const machineCode = readU16(buf, coffOffset);
+    const timestamp = readU32(buf, coffOffset + 4);
+    return {
+      machine: MACHINE_TYPES[machineCode] ?? `unknown(0x${machineCode.toString(16)})`,
+      peTimestamp: new Date(timestamp * 1000).toISOString(),
+    };
+  } catch {
+    return { machine: 'unknown' };
+  }
 }
 
 function extractAsciiStrings(buf: Buffer): string[] {
@@ -67,26 +87,6 @@ function scoreInterestingString(value: string): number {
   return score;
 }
 
-function parsePeSections(buf: Buffer, peOffset: number): PeSectionInfo[] {
-  const coffOffset = peOffset + 4;
-  const numberOfSections = readU16(buf, coffOffset + 2);
-  const optionalHeaderSize = readU16(buf, coffOffset + 16);
-  const sectionTableOffset = coffOffset + 20 + optionalHeaderSize;
-  const sections: PeSectionInfo[] = [];
-
-  for (let i = 0; i < numberOfSections; i += 1) {
-    const base = sectionTableOffset + i * 40;
-    if (base + 40 > buf.length) break;
-    const name = buf.subarray(base, base + 8).toString('utf8').replace(/\0/g, '').trim();
-    sections.push({
-      name: name || `section-${i}`,
-      virtualSize: readU32(buf, base + 8),
-      rawSize: readU32(buf, base + 16),
-    });
-  }
-  return sections;
-}
-
 export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
   const resolved = path.resolve(filePath);
   const warnings: string[] = [];
@@ -110,7 +110,8 @@ export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
   const sha256 = createHash('sha256').update(buf).digest('hex');
   const fileName = path.basename(resolved);
 
-  if (buf.length < 0x40 || readU16(buf, 0) !== 0x5a4d) {
+  const hasDosHeader = buf.length >= 0x40 && readU16(buf, 0) === 0x5a4d;
+  if (!hasDosHeader) {
     return {
       filePath: resolved,
       fileName,
@@ -127,15 +128,13 @@ export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
     };
   }
 
-  const peOffset = readU32(buf, 0x3c);
-  const isPe =
-    peOffset + 4 <= buf.length &&
-    buf[peOffset] === 0x50 &&
-    buf[peOffset + 1] === 0x45 &&
-    buf[peOffset + 2] === 0x00 &&
-    buf[peOffset + 3] === 0x00;
+  // LIEF (real structural parser, ../executable-identity/pe-metadata.ts) is
+  // the single authoritative source for isPe/sections/subsystem/entrypoint/
+  // imageBase — it replaces this file's former hand-rolled section-table and
+  // PE32/PE32_PLUS-optional-header offset math.
+  const structural = resolvePeStructuralMetadata(resolved);
 
-  if (!isPe) {
+  if (!structural.isPe) {
     return {
       filePath: resolved,
       fileName,
@@ -151,27 +150,7 @@ export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
     };
   }
 
-  const coffOffset = peOffset + 4;
-  const machine = MACHINE_TYPES[readU16(buf, coffOffset)] ?? `unknown(0x${readU16(buf, coffOffset).toString(16)})`;
-  const timestamp = readU32(buf, coffOffset + 4);
-  const optionalHeaderSize = readU16(buf, coffOffset + 16);
-  const optionalOffset = coffOffset + 20;
-  const magic = readU16(buf, optionalOffset);
-  const isPe32Plus = magic === 0x20b;
-
-  let imageBase: string | undefined;
-  let entryPoint: string | undefined;
-  let subsystem: string | undefined;
-
-  if (isPe32Plus && optionalOffset + 0x38 <= buf.length) {
-    entryPoint = `0x${readU32(buf, optionalOffset + 16).toString(16).toUpperCase()}`;
-    imageBase = `0x${readU64(buf, optionalOffset + 24).toString(16).toUpperCase()}`;
-    subsystem = SUBSYSTEM_TYPES[readU16(buf, optionalOffset + 0x44)] ?? `unknown(${readU16(buf, optionalOffset + 0x44)})`;
-  } else if (optionalOffset + 0x34 <= buf.length) {
-    entryPoint = `0x${readU32(buf, optionalOffset + 16).toString(16).toUpperCase()}`;
-    imageBase = `0x${readU32(buf, optionalOffset + 28).toString(16).toUpperCase()}`;
-    subsystem = SUBSYSTEM_TYPES[readU16(buf, optionalOffset + 0x44)] ?? `unknown(${readU16(buf, optionalOffset + 0x44)})`;
-  }
+  const { machine, peTimestamp } = readCoffMachineAndTimestamp(buf);
 
   const strings = extractAsciiStrings(buf)
     .sort((a, b) => scoreInterestingString(b) - scoreInterestingString(a))
@@ -189,17 +168,13 @@ export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
     sha256,
     isPe: true,
     machine,
-    peTimestamp: new Date(timestamp * 1000).toISOString(),
-    subsystem,
-    imageBase,
-    entryPoint,
-    sections: parsePeSections(buf, peOffset),
+    peTimestamp,
+    subsystem: structural.subsystem,
+    imageBase: structural.imageBase,
+    entryPoint: structural.entryPoint,
+    sections: structural.sections,
     interestingStrings: strings,
     warnings,
     analyzedAt: new Date().toISOString(),
   };
-}
-
-function readU64(buf: Buffer, offset: number): bigint {
-  return buf.readBigUInt64LE(offset);
 }

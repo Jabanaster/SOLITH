@@ -38,6 +38,21 @@ describe('trainer-research PE analyzer', () => {
     assert.equal(report.isPe, false);
     assert.equal(report.fileName, 'Palworld.Trainer-FLiNG.exe');
   });
+
+  const realExe = 'C:\\Windows\\System32\\notepad.exe';
+  it('analyzes a real PE executable end-to-end via the LIEF-backed structural parser', { skip: !fs.existsSync(realExe) ? 'requires a Windows system executable' : false }, () => {
+    const filePath = writeTempExe('RealTrainer.exe', fs.readFileSync(realExe));
+    const report = analyzeTrainerExecutable(filePath);
+    assert.equal(report.isPe, true);
+    assert.equal(report.machine, 'x64');
+    assert.equal(report.subsystem, 'windows-gui');
+    assert.match(report.entryPoint ?? '', /^0x[0-9A-F]+$/);
+    assert.match(report.imageBase ?? '', /^0x[0-9A-F]+$/);
+    assert.ok(report.sections.length > 0);
+    assert.ok(report.sections.some((s) => s.name === '.text'));
+    assert.equal(report.sha256.length, 64);
+    assert.ok(report.peTimestamp);
+  });
 });
 
 describe('trainer-research exports', () => {
