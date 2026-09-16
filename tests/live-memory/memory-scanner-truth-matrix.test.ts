@@ -279,3 +279,68 @@ test('D01 §5 — no scanner sweep file retains a consequence-free catch/continu
     );
   }
 });
+
+// A dead process does not present the way the fake driver suggests. With a
+// still-open handle, the real Windows driver's `readBuffer` and `readMemory`
+// against an exited process do NOT throw — they return garbage bytes. Only
+// `getRegions` reports it, by coming back EMPTY.
+//
+// So the case that actually matters is not "a read threw", it is "there was
+// nothing to read". A sweep over zero regions loops zero times, finds nothing,
+// and would otherwise report a complete scan and an authoritative absence: a
+// confident "this value is not in the process" about a process that no longer
+// exists. Measured against the real driver, not assumed.
+for (const sweep of SWEEPS) {
+  test(`D01 case F2 — ${sweep.name}: an empty region enumeration is never an authoritative absence`, () => {
+    const driver = new FakeMemoryDriver(); // no regions seeded at all
+
+    const result = sweep.run(driver);
+
+    assert.equal(result.matchCount, 0);
+    assert.notEqual(result.completeness.state, 'complete');
+    assert.equal(result.truncated, true);
+    assert.equal(
+      result.isAuthoritativeAbsence,
+      false,
+      'a scan that could not enumerate any memory has proven nothing',
+    );
+  });
+}
+
+test('D01 case F2 — scanAobInProcess over an empty enumeration is never an authoritative absence', async () => {
+  const { scanAobInProcess } = await import('../../src/core/live-memory/aob-resolver.js');
+  const driver = new FakeMemoryDriver();
+
+  const outcome = scanAobInProcess(driver, HANDLE, 'DE AD BE EF');
+
+  assert.equal(outcome.address, null);
+  assert.equal(outcome.isAuthoritativeAbsence, false);
+  assert.equal(outcome.completeness.state, 'failed');
+});
+
+test('D01 case F2 — legacy signature scans over an empty enumeration are never authoritative', async () => {
+  const { scanExactSignature, scanFuzzySignature } = await import('../../src/core/live-memory/signature-engine.js');
+  const driver = new FakeMemoryDriver();
+
+  for (const outcome of [
+    scanExactSignature(driver, HANDLE, 'DE AD BE EF'),
+    scanFuzzySignature(driver, HANDLE, 'DE AD BE EF', { maxDistance: 0, maxEdits: 0 }),
+  ]) {
+    assert.equal(outcome.match, null);
+    assert.equal(outcome.isAuthoritativeAbsence, false);
+    assert.equal(outcome.completeness.state, 'failed');
+  }
+});
+
+test('D05 case F2 — a pointer scan over an empty enumeration reports process_exited', async () => {
+  const { scanForPointerPath } = await import('../../src/core/live-memory/pointer-scanner.js');
+  const driver = new FakeMemoryDriver();
+  driver.addModule('game.exe', 0x400000n, 0x100000);
+
+  const result = scanForPointerPath(driver, HANDLE, 0x10000000n, { maxDepth: 2 });
+
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.termination, 'process_exited');
+  assert.equal(result.isAuthoritativeAbsence, false);
+  assert.equal(result.truncated, true);
+});

@@ -138,8 +138,24 @@ function selectScannableRegions(
   maxRegionBytes: number,
   coverage: ScanCoverageTracker,
 ): ReturnType<MemoryDriver['getRegions']> {
+  const all = driver.getRegions(handle);
+  if (all.length === 0) {
+    // A live process always has mapped regions, so an empty enumeration means
+    // we could not see the target at all — in practice, that it has exited.
+    //
+    // This is the real signature of process exit on this platform, and it is
+    // not the one you would guess: with a still-open handle, `readBuffer` and
+    // `readMemory` against a dead process do NOT throw. They return garbage
+    // bytes. Only `getRegions` reports it, by coming back empty. Without this
+    // check a scan of a dead process loops zero times, finds nothing, and
+    // reports a *complete* scan with an authoritative absence — a confident
+    // "this value is not in the process" about a process that no longer
+    // exists.
+    coverage.recordStop({ state: 'failed', reason: 'no_regions_enumerated: the target reports no mapped memory' });
+    return [];
+  }
   const eligible: ReturnType<MemoryDriver['getRegions']> = [];
-  for (const region of driver.getRegions(handle)) {
+  for (const region of all) {
     if (!region.writable || region.size <= 0) continue;
     if (region.size > maxRegionBytes) {
       coverage.recordSkippedRegion(

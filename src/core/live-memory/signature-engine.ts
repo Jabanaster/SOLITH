@@ -318,7 +318,17 @@ export function scanExactSignature(
     };
   }
 
-  for (const region of driver.getRegions(handle)) {
+  const regions = driver.getRegions(handle);
+  if (regions.length === 0) {
+    return {
+      match: null,
+      skippedRegions: [],
+      completeness: { state: 'failed', reason: 'no_regions_enumerated: the target reports no mapped memory' },
+      isAuthoritativeAbsence: false,
+    };
+  }
+
+  for (const region of regions) {
     for (const span of regionScanSpans(region, modules)) {
       if (span.size < pattern.bytes.length) continue;
       try {
@@ -367,6 +377,18 @@ export function scanFuzzySignature(
       match: null,
       skippedRegions: [],
       completeness: { state: 'failed', reason: `module_not_found: ${options.moduleName}` },
+      isAuthoritativeAbsence: false,
+    };
+  }
+
+  // Empty enumeration means the target could not be seen at all — on Windows
+  // that is how an exited process presents, since `readBuffer` against a dead
+  // process returns garbage rather than throwing.
+  if (regions.length === 0) {
+    return {
+      match: null,
+      skippedRegions: [],
+      completeness: { state: 'failed', reason: 'no_regions_enumerated: the target reports no mapped memory' },
       isAuthoritativeAbsence: false,
     };
   }

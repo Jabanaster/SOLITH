@@ -109,6 +109,21 @@ export function scanAobInProcess(
   let regionsConsidered = 0;
   let regionsRead = 0;
 
+  // An empty region enumeration means the target could not be seen at all —
+  // on Windows that is how an exited process presents, since `readBuffer`
+  // against a dead process returns garbage instead of throwing. A miss here is
+  // "we could not look", never "it is not there".
+  if (regions.length === 0) {
+    return {
+      address: null,
+      skippedRegions: [],
+      completeness: { state: 'failed', reason: 'no_regions_enumerated: the target reports no mapped memory' },
+      isAuthoritativeAbsence: false,
+      regionsConsidered: 0,
+      regionsRead: 0,
+    };
+  }
+
   const outcome = (address: bigint | null): AobScanOutcome => {
     const completeness: CanonicalCompleteness =
       skippedRegions.length > 0

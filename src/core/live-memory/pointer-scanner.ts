@@ -401,8 +401,22 @@ function findPointersNear(
   const skippedRegions: CanonicalSkippedRange[] = [];
   let regions: ReturnType<MemoryDriver['getRegions']>;
   try {
+    const all = driver.getRegions(handle);
+    if (all.length === 0) {
+      // Empty enumeration is how a dead process actually presents here —
+      // `readBuffer` against one returns garbage rather than throwing. Without
+      // this, a pointer scan of a dead process reports an exhausted frontier
+      // and an authoritative "no pointer path exists".
+      return {
+        matches: [],
+        skippedRegions: [],
+        budgetExhausted: false,
+        cancelled: false,
+        processExited: true,
+      };
+    }
     regions = [];
-    for (const region of driver.getRegions(handle)) {
+    for (const region of all) {
       if (region.size <= 0) continue;
       if (region.size > maxRegionBytes) {
         // An eligible region excluded purely for size is still a region whose
