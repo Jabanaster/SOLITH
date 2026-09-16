@@ -72,13 +72,19 @@ Two live shipping defects were also closed that no prior document had recorded a
 
 ## Certification of the documentation SHA
 
-The commits after `97e51b5` change only `Docs/phase1/**`. The remote check results for the final documentation SHA are:
+The commits after `97e51b5` change only `Docs/phase1/**`. At the documentation SHA `2e5cfa8`, **all 7 remote checks are green**:
 
-| Check | Final documentation SHA |
+| Check | `2e5cfa8` |
 |---|---|
-| PR Windows | recorded on completion |
-| Semgrep | recorded on completion |
-| CI Fast, PR Static, Gitleaks, OSV-Scanner, memoryjs integrity | recorded on completion |
+| PR Windows | success |
+| Semgrep | success |
+| CI Fast | success |
+| PR Static | success |
+| Gitleaks | success |
+| OSV-Scanner | success |
+| Vendored memoryjs integrity | success |
+
+So the required checks pass at both the code-final SHA (`97e51b5`, doc 129) and the documentation SHA. This section is the one place a self-reference is unavoidable — a document cannot contain its own commit's CI result — so the recursion is terminated here deliberately: the amendment that fills this table is documentation-only, and its own check results are stated in the commit message rather than chased into another round.
 
 ## Next
 
