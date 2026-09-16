@@ -98,6 +98,40 @@ describe('pointer_maps store', () => {
     assert.equal(result.map.nodes[0].lastResolvedAddress, null);
   });
 
+  test('P2-4: loadPointerMap rejects a corrupt stability field (mission §25) rather than crashing later code', async () => {
+    const db = (await import('../../src/core/database/index.ts')).default;
+    const corruptMap = {
+      id: 'corrupt-stability-map',
+      name: 'Corrupt Stability',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Bad stability',
+          path: { moduleName: 'game.exe', moduleOffset: 0, offsets: [16] },
+          depth: 1,
+          status: 'unresolved',
+          lastResolvedAddress: null,
+          lastResolvedAt: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          targetAddress: null,
+          scanId: null,
+          // observations must be an array — a string here is corrupt data,
+          // not a real stability state (e.g. from a hand-edited file).
+          stability: { baseline: null, observations: 'not-an-array' },
+        },
+      ],
+    };
+    db.prepare(
+      `INSERT INTO pointer_maps (mapId, name, schemaVersion, gameId, executableIdentity, architecture, data, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(corruptMap.id, corruptMap.name, 2, null, null, null, JSON.stringify(corruptMap), corruptMap.createdAt, corruptMap.updatedAt);
+
+    const result = loadPointerMap(corruptMap.id);
+    assert.deepEqual(result, { ok: false, error: 'corrupt' });
+  });
+
   test('loadPointerMap rejects an unsupported future schema version', async () => {
     const db = (await import('../../src/core/database/index.ts')).default;
     const map = createEmptyPointerMap('Future Schema');

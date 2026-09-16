@@ -167,6 +167,21 @@ function isWellFormedPointerMap(value: unknown): value is PointerMap {
     if (typeof n.path !== 'object' || n.path === null) return false;
     const path = n.path as Record<string, unknown>;
     if (typeof path.moduleName !== 'string' || typeof path.moduleOffset !== 'number') return false;
-    return Array.isArray(path.offsets) && path.offsets.every((offset) => typeof offset === 'number');
+    if (!Array.isArray(path.offsets) || !path.offsets.every((offset) => typeof offset === 'number')) return false;
+    // P2-4 (mission §25): a node's `stability` field is optional (absent on
+    // real pre-P2-4 data, backfilled by migratePointerMapData below), but if
+    // PRESENT it must have the real shape — a malformed one (corrupt disk
+    // data, a hand-edited file) is rejected here rather than silently
+    // passed through to crash later UI/summary code that assumes
+    // `observations` is an array.
+    return isWellFormedStabilityState(n.stability);
   });
+}
+
+function isWellFormedStabilityState(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  const state = value as Record<string, unknown>;
+  if (state.baseline !== null && (typeof state.baseline !== 'object' || state.baseline === null)) return false;
+  return Array.isArray(state.observations);
 }
