@@ -1,3 +1,4 @@
+import path from 'node:path';
 import db from '../database/index.js';
 import type { InstalledGameRecord } from './types.js';
 
@@ -92,6 +93,26 @@ export function getInstallPathForCatalogGame(catalogGameId: string): string | un
     `SELECT install_path AS installPath FROM installed_games WHERE catalog_game_id = ? LIMIT 1`,
   ).get(catalogGameId) as { installPath?: string } | undefined;
   return row?.installPath ? String(row.installPath) : undefined;
+}
+
+/**
+ * Resolves the on-disk executable path for a catalog game's installed copy.
+ * When `executableName` is given, matches the specific install whose
+ * executable basename matches (case-insensitive); otherwise returns the
+ * first installed copy found. Shared by every executable-hashing caller
+ * (SHA-256 definition-fingerprint compat, BLAKE3 authoritative content
+ * identity) so the lookup semantics stay in exactly one place.
+ */
+export function findInstalledExecutablePath(catalogGameId: string, executableName?: string): string | undefined {
+  const candidates = listInstalledGames().filter((game) => game.catalogGameId === catalogGameId);
+  const installed = executableName
+    ? candidates.find(
+      (game) =>
+        game.executablePath != null &&
+        path.basename(game.executablePath).toLowerCase() === executableName.toLowerCase(),
+    )
+    : candidates[0];
+  return installed?.executablePath;
 }
 
 export function countInstalledGames(): number {

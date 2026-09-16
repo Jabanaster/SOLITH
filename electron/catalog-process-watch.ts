@@ -15,6 +15,8 @@ export interface CatalogProcessDetectionPayload {
   hasDefinition: boolean;
   prepareReady: boolean;
   executableHashSHA256?: string;
+  /** Authoritative SOLITH build/version identity (ROADMAP.md Phase 3 hash architecture) — distinct from the SHA-256 definition-fingerprint hash above. */
+  executableContentHashBLAKE3?: string;
 }
 
 export interface CatalogProcessClearedPayload {
@@ -35,8 +37,15 @@ async function buildDetectionPayload(
   const { hashInstalledExecutableForCatalog } = await import(
     '../src/core/live-memory/installed-exe-hash.js'
   );
+  const { resolveInstalledExecutableContentHash } = await import(
+    '../src/core/executable-identity/catalog-content-hash.js'
+  );
   const definition = loadCatalogDefinition(detection.catalogGameId);
   const executableHashSHA256 = hashInstalledExecutableForCatalog(
+    detection.catalogGameId,
+    detection.executable,
+  );
+  const executableContentHashBLAKE3 = await resolveInstalledExecutableContentHash(
     detection.catalogGameId,
     detection.executable,
   );
@@ -66,6 +75,7 @@ async function buildDetectionPayload(
     // User must confirm offline + call prepare IPC; watch never attaches.
     prepareReady: definition != null,
     executableHashSHA256: executableHashSHA256 ?? undefined,
+    executableContentHashBLAKE3: executableContentHashBLAKE3 ?? undefined,
   };
 }
 
