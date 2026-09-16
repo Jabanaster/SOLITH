@@ -62,6 +62,8 @@
     "test:electron-e2e": "playwright test tests/electron.e2e.test.ts --config playwright.e2e.config.ts",
     "test:new1-new2-trust-boundary": "playwright test tests/new1-new2-trust-boundary.e2e.test.ts --config playwright.e2e.config.ts",
     "test:trainer-e2e": "playwright test tests/trainer.e2e.test.ts --config playwright.e2e.config.ts",
+    "test:pointer-map-ui-real-process": "playwright test tests/pointer-map-ui-real-process.e2e.test.ts --config playwright.e2e.config.ts",
+    "test:pointer-map-ui-packaged": "playwright test tests/pointer-map-ui-packaged.e2e.test.ts --config playwright.e2e.config.ts",
     "test:packaged-smoke": "playwright test tests/packaged-smoke.test.ts --config playwright.e2e.config.ts",
     "pretest:milestone-e": "npm run build",
     "test:milestone-e": "playwright test tests/milestone-e-acceptance.test.ts --config playwright.e2e.config.ts",

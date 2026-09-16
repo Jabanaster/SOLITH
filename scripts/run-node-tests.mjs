@@ -44,6 +44,8 @@ const TEST_GROUPS = {
     "tests/profiles.test.ts",
     "tests/process.test.ts",
     "tests/process-picker.test.ts",
+    "tests/virtual-catalog-grid-columns.test.ts",
+    "tests/pointer-map-ui.test.ts",
     "tests/page-walkthrough.test.tsx",
     "tests/trainer-ui.test.ts",
     "tests/pilot-intake.test.ts",
