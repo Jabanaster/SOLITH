@@ -182,16 +182,19 @@
     "yazl": "^3.3.1"
   },
   "dependencies": {
+    "blake3": "^2.1.7",
     "memoryjs": "file:vendor/memoryjs-3.5.1-patched",
+    "node-lief": "^1.3.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "solith-scanner-napi": "file:native/solith-scanner-napi",
     "sql.js": "^1.14.2",
     "tesseract.js": "^7.0.0",
     "xml2js": "^0.6.2",
+    "xxhash-wasm": "^1.1.0",
     "yaml": "^2.9.0",
     "yauzl": "^3.2.0",
-    "zod": "^4.4.3",
-    "solith-scanner-napi": "file:native/solith-scanner-napi"
+    "zod": "^4.4.3"
   },
   "overrides": {
     "esbuild": "0.28.1",
