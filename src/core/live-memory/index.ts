@@ -43,6 +43,21 @@ export { scanForPointerPath } from './pointer-scanner.js';
 export type { PointerScanBounds, PointerPathCandidate, PointerScanResult } from './pointer-scanner.js';
 export { resolvePointerPath } from './pointer-resolver.js';
 export type { LivePointerPath } from './pointer-resolver.js';
+export {
+  createEmptyPointerMap,
+  pointerMapNodeFromCandidate,
+  addPointerMapNode,
+  removePointerMapNode,
+  resolvePointerMap,
+  pointerMapNodeChainSteps,
+} from './pointer-map.js';
+export type {
+  PointerMap,
+  PointerMapNode,
+  PointerMapNodeStatus,
+  PointerMapResolution,
+  PointerChainStep,
+} from './pointer-map.js';
 export { parseAobSignature, findAobInBuffer, scanAobInProcess } from './aob-resolver.js';
 export type { AobPattern, AobScanOptions } from './aob-resolver.js';
 export {
