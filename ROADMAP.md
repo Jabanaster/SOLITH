@@ -117,6 +117,7 @@ Reproduced from `36-step-0.13.5-capability-state-matrix.md` (re-certified fresh 
 | AOB scanning | PARTIAL | Works sub-cap; fails silently above cap; two incompatible grammars | 1 |
 | Structure discovery | ABSENT | No typed memory-node/class-reconstruction UX | 2 |
 | Adaptive scan planner | ABSENT | Confirmed absent across every ref/worktree | 2 |
+| Pointer maps (model + live orchestration) | PARTIAL | P2-1/P2-2 implemented and tested (522/522 live-memory, 2033/2033 root); real spawned-process proof, not a shipped-title game; pointer-chain visualization absent; not Phase-2 certified | 2 |
 | Game identity | PARTIAL | Detection/matching real; binding gate broken for 91.7% of catalog | 3 |
 | Executable/version fingerprinting | PARTIAL | SHA-256 works; PE analysis hand-rolled, 205 lines | 3 |
 | Catalog | PARTIAL | 6,028-row catalog real and fast; pagination windows block most binding | 3 |
@@ -313,6 +314,14 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 **Exit Gate.** 100% of Phase 2 scope certified — including at least one real-game freeze/write/revert exercise (not merely unit-tested), and the adaptive planner demonstrably selecting a scan strategy without user Cheat Engine knowledge.
 
 **Prohibited Shortcut.** Do not ship the adaptive planner as a fixed decision tree dressed up as "adaptive" without a real strategy-selection mechanism. Do not certify memory write/freeze from unit tests alone.
+
+**Progress Reconciliation — 2026-09-16 (P2-1/P2-2, branch `feature/solith-phase2-pointer-engineering`, verified HEAD `c104e33fb93ee4b44323feea912b491b544dd2c7`).** This note updates status/evidence only; it does not change Mandatory Work, Repository/Technology Adoption, Exit Gate, or Prohibited Shortcut above, and does not mark any Phase 2 capability CERTIFIED.
+
+- Pointer-map data model (P2-1): real, immutable `PointerMap`/`PointerMapNode` model with truthful per-node resolution states (`resolved` / `module_missing` / `read_failed` / `process_exited`). Focus-tested, not independently phase-certified.
+- Pointer-map live orchestration (P2-2): real production service on `LiveMemorySession` — named maps, multi-target scan (`scanTargetsIntoMap`) with independent per-target grouping, truthful per-target completeness plus a worst-of aggregate reusing `CanonicalCompleteness`, between-target cancellation, resource limits (`MAX_TARGETS_PER_SCAN` / `MAX_NODES_PER_TARGET` / `MAX_NODES_PER_MAP`), process-exit and stale-target handling, schema-versioned SQLite persistence (reload forced inactive until re-resolved), a 13-endpoint IPC + preload contract with BigInt-safe address transport, and a real two-target spawned-process proof including a save/kill/respawn/load restart-stability proof. Evidence: `Docs/phase2/001` through `005`; commits `2441de5`, `8f1e885`, `ba2bd38`, `c104e33`; live-memory 522/522; root 2033/2033; renderer and electron typecheck PASS; local HEAD == remote HEAD.
+- Still ABSENT or PARTIAL and not touched by P2-1/P2-2: pointer-chain visualization, pointer stability/restart validation beyond the one fixture pair proven above, structure discovery, typed memory views, value/type inference, memory map, watchlists, freeze/write/revert real-game exercise, the known freeze/write address-validation inconsistency, the Adaptive Scan Planner, Zydis, Vectorscan, DynamoRIO, Dear ImGui overlay, symbol/module awareness, the Ghidra external adapter, resilient/version-aware rediscovery, and final Phase 2 certification.
+- Phase 2 requirement count carried in stage evidence docs: 28 (every independently mandated bullet above and in Repository/Technology Adoption counts once, including ReClass.NET's reference-adoption-only criterion — non-code completion criteria are not excluded from the count).
+- Phase 2 overall status: NOT_COMPLETE. Next authorized stage: P2-3 — pointer-chain visualization UI.
 
 ---
 
