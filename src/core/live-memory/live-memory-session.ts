@@ -21,7 +21,27 @@ import type {
   UnknownScanSnapshot,
 } from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
-import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
+import { scanForPointerPath, type PointerScanBounds, type PointerPathCandidate } from './pointer-scanner.js';
+import {
+  addPointerMapNode,
+  createEmptyPointerMap,
+  pointerMapNodeFromCandidate,
+  removePointerMapNode,
+  renamePointerMap,
+  resolvePointerMap,
+  type PointerMap,
+  type PointerMapNode,
+  type PointerMapResolution,
+} from './pointer-map.js';
+import { scanTargetsIntoMap, type PointerMapScanTargetsResult } from './pointer-map-orchestration.js';
+import {
+  deleteSavedPointerMap,
+  loadPointerMap,
+  savePointerMap,
+  listSavedPointerMaps,
+  type PointerMapSaveIdentity,
+  type PointerMapSummary,
+} from './pointer-map-store.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
 import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
@@ -356,6 +376,16 @@ export class LiveMemorySession {
    * `detach()` alongside every other per-attach session state.
    */
   private readonly scanOperations = new Map<string, ScanOperationEntry>();
+
+  /**
+   * Phase 2 P2-2 pointer maps, keyed by mapId. Holds no OS handle or PID —
+   * every map is driver-independent (see pointer-map.ts) — so it does not
+   * need clearing on detach()/re-attach the way scanOperations does; a map
+   * created against one process instance simply goes stale (all nodes
+   * unresolved) until pointerMapResolve/Refresh is called against whatever
+   * is currently attached.
+   */
+  private readonly pointerMaps = new Map<string, PointerMap>();
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -1244,6 +1274,129 @@ export class LiveMemorySession {
   pointerScan(targetAddress: bigint, bounds?: PointerScanBounds) {
     if (!this.handle) throw new Error('No process attached.');
     return scanForPointerPath(this.driver, this.handle, targetAddress, bounds);
+  }
+
+  // --- Phase 2 P2-2: pointer maps -----------------------------------------
+  //
+  // The production service seam for ROADMAP's "pointer maps" requirement.
+  // Orchestration itself (scanTargetsIntoMap, resolvePointerMap, etc.) is
+  // pure and lives in pointer-map.ts/pointer-map-orchestration.ts so it is
+  // independently testable; these methods are the thin, stateful wiring
+  // that gives IPC one authoritative place to reach it, matching how
+  // pointerScan/resolveControl above already work.
+
+  pointerMapCreate(name: string): PointerMap {
+    const map = createEmptyPointerMap(name);
+    this.pointerMaps.set(map.id, map);
+    return map;
+  }
+
+  pointerMapList(): PointerMap[] {
+    return Array.from(this.pointerMaps.values());
+  }
+
+  pointerMapGet(mapId: string): PointerMap | null {
+    return this.pointerMaps.get(mapId) ?? null;
+  }
+
+  pointerMapRename(mapId: string, name: string): PointerMap {
+    const map = this.requirePointerMap(mapId);
+    const renamed = renamePointerMap(map, name);
+    this.pointerMaps.set(mapId, renamed);
+    return renamed;
+  }
+
+  /** Removes the map from this session's live registry. Does not touch any saved copy — see pointerMapDeleteSaved. */
+  pointerMapDelete(mapId: string): boolean {
+    return this.pointerMaps.delete(mapId);
+  }
+
+  /**
+   * Scans one or more concrete target addresses into an existing map in one
+   * production operation — the actual "pointer maps" requirement (not
+   * satisfied by a single scan with maxDepth > 1). See
+   * pointer-map-orchestration.ts for per-target/aggregate completeness,
+   * cancellation and resource-limit semantics.
+   */
+  pointerMapScanTargets(mapId: string, targets: bigint[], bounds?: PointerScanBounds): PointerMapScanTargetsResult {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = scanTargetsIntoMap(this.driver, this.handle, map, targets, bounds);
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Convenience wrapper for the single-target case — same orchestration, one-element target list. */
+  pointerMapScanTarget(mapId: string, target: bigint, bounds?: PointerScanBounds): PointerMapScanTargetsResult {
+    return this.pointerMapScanTargets(mapId, [target], bounds);
+  }
+
+  /** Manually appends a caller-supplied candidate (e.g. from a one-off pointerScan call) rather than an orchestrated multi-target scan. */
+  pointerMapAddNode(
+    mapId: string,
+    label: string,
+    candidate: PointerPathCandidate,
+    provenance?: { targetAddress: string; scanId: string },
+  ): PointerMapNode {
+    const map = this.requirePointerMap(mapId);
+    const node = pointerMapNodeFromCandidate(label, candidate, provenance ?? null);
+    this.pointerMaps.set(mapId, addPointerMapNode(map, node));
+    return node;
+  }
+
+  pointerMapRemoveNode(mapId: string, nodeId: string): PointerMap {
+    const map = this.requirePointerMap(mapId);
+    const updated = removePointerMapNode(map, nodeId);
+    this.pointerMaps.set(mapId, updated);
+    return updated;
+  }
+
+  /** Re-resolves every node in the map against the currently attached process. Must be called fresh after every attach. */
+  pointerMapResolve(mapId: string): PointerMapResolution {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = resolvePointerMap(this.driver, this.handle, map);
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Same operation as pointerMapResolve, exposed under the name mission §2's required end-state list uses ("refresh/re-resolve map"). */
+  pointerMapRefresh(mapId: string): PointerMapResolution {
+    return this.pointerMapResolve(mapId);
+  }
+
+  pointerMapSave(mapId: string, identity?: PointerMapSaveIdentity): { ok: true } | { ok: false; error: 'oversized' } {
+    const map = this.requirePointerMap(mapId);
+    return savePointerMap(map, identity);
+  }
+
+  /** Loads a saved map into this session's live registry. Comes back inactive/unresolved by construction — see pointer-map-store.ts. */
+  pointerMapLoad(mapId: string): PointerMap {
+    const result = loadPointerMap(mapId);
+    if (result.ok) {
+      this.pointerMaps.set(result.map.id, result.map);
+      return result.map;
+    }
+    // tsconfig.electron.json runs non-strict, where this discriminated
+    // union does not always narrow across the branch boundary the way it
+    // does under the (strict) root tsconfig — the explicit cast keeps this
+    // correct under both rather than relying on inconsistent narrowing.
+    throw new Error(`Failed to load pointer map "${mapId}": ${(result as { ok: false; error: string }).error}`);
+  }
+
+  pointerMapListSaved(): PointerMapSummary[] {
+    return listSavedPointerMaps();
+  }
+
+  pointerMapDeleteSaved(mapId: string): void {
+    deleteSavedPointerMap(mapId);
+    this.pointerMaps.delete(mapId);
+  }
+
+  private requirePointerMap(mapId: string): PointerMap {
+    const map = this.pointerMaps.get(mapId);
+    if (!map) throw new Error(`Pointer map "${mapId}" not found.`);
+    return map;
   }
 
   /**

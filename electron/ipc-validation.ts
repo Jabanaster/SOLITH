@@ -573,6 +573,66 @@ export const LiveMemoryPointerScanSchema = z.object({
   maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
 });
 
+// Phase 2 P2-2 — pointer map IPC contract. Every address is a hex string,
+// never a bare Number, matching LiveMemoryPointerScanSchema above — the
+// values these chains resolve to can exceed Number.MAX_SAFE_INTEGER on a
+// real 64-bit process, so precision-losing JSON transport is not an option
+// (mission §11).
+const POINTER_MAP_SCAN_BOUNDS = z.object({
+  maxDepth: z.number().int().min(1).max(8).optional(),
+  maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
+  maxResults: z.number().int().positive().max(200).optional(),
+  maxTotalScans: z.number().int().positive().max(2000).optional(),
+});
+
+export const PointerMapCreateSchema = z.object({
+  name: z.string().min(1).max(128),
+});
+
+export const PointerMapIdSchema = z.object({
+  mapId: z.string().min(1).max(128),
+});
+
+export const PointerMapRenameSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  name: z.string().min(1).max(128),
+});
+
+export const PointerMapScanTargetSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  target: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  bounds: POINTER_MAP_SCAN_BOUNDS.optional(),
+});
+
+export const PointerMapScanTargetsSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  targets: z.array(z.string().regex(/^0x[0-9a-fA-F]+$/)).min(1).max(8),
+  bounds: POINTER_MAP_SCAN_BOUNDS.optional(),
+});
+
+export const PointerMapAddNodeSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  label: z.string().min(1).max(128),
+  candidate: z.object({
+    moduleName: z.string().min(1).max(260),
+    moduleOffset: z.number().int().nonnegative(),
+    offsets: z.array(z.number().int()).max(8),
+    depth: z.number().int().nonnegative(),
+  }),
+});
+
+export const PointerMapRemoveNodeSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  nodeId: z.string().min(1).max(128),
+});
+
+export const PointerMapSaveSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  gameId: z.string().min(1).max(128).optional(),
+  executableIdentity: z.string().min(1).max(260).optional(),
+  architecture: z.string().min(1).max(32).optional(),
+});
+
 export const LiveMemoryScanAobSchema = z.object({
   signature: z.string().min(3).max(512),
   moduleName: z.string().min(1).max(260).optional(),

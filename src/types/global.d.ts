@@ -2,6 +2,58 @@ declare module 'xml2js';
 declare module '*.css';
 declare module 'sql.js';
 
+// Phase 2 P2-2 — pointer map renderer DTOs, mirroring serializePointerMap/
+// serializePointerMapScanResult in electron/live-memory-ipc.ts. moduleOffset
+// is a "0x..." string on the wire (see PointerMapCreateSchema and friends),
+// matching liveMemoryPointerScan's existing candidate shape above.
+interface PointerMapNodeDto {
+  id: string;
+  label: string;
+  path: { moduleName: string; moduleOffset: string; offsets: number[] };
+  depth: number;
+  status: 'unresolved' | 'resolved' | 'module_missing' | 'read_failed' | 'process_exited';
+  lastResolvedAddress: string | null;
+  lastResolvedAt: string | null;
+  createdAt: string;
+  targetAddress: string | null;
+  scanId: string | null;
+}
+
+interface PointerMapDto {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  nodes: PointerMapNodeDto[];
+}
+
+interface PointerMapCompletenessDto {
+  state: 'complete' | 'complete_with_skipped_regions' | 'cancelled' | 'process_exited' | 'resource_limit' | 'failed';
+  skipped?: Array<{ baseAddress: string; size: string; reason: string }>;
+  atByte?: string;
+  reason?: string;
+}
+
+interface PointerMapTargetOutcomeDto {
+  targetAddress: string;
+  requestedDepth: number;
+  deepestLevelCompleted: number;
+  termination: string;
+  completeness: PointerMapCompletenessDto;
+  candidateCount: number;
+  nodesAdded: number;
+  truncated: boolean;
+}
+
+interface PointerMapScanResultDto {
+  map: PointerMapDto;
+  perTarget: PointerMapTargetOutcomeDto[];
+  aggregateCompleteness: PointerMapCompletenessDto;
+  targetsRequested: number;
+  targetsScanned: number;
+  resourceLimited: boolean;
+}
+
 interface Window {
   electronAPI: {
     e2eTrainerState: string | null;
@@ -794,6 +846,59 @@ interface Window {
       };
       error?: string;
     }>;
+    // Phase 2 P2-2 — pointer map production surface (renderer view).
+    pointerMapCreate: (payload: { name: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapList: () => Promise<{ success: boolean; maps?: PointerMapDto[]; error?: string }>;
+    pointerMapGet: (payload: { mapId: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapRename: (payload: { mapId: string; name: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapDelete: (payload: { mapId: string }) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+    pointerMapScanTarget: (payload: {
+      mapId: string;
+      target: string;
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number };
+    }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
+    pointerMapScanTargets: (payload: {
+      mapId: string;
+      targets: string[];
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number };
+    }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
+    pointerMapResolve: (payload: { mapId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      resolvedCount?: number;
+      failedCount?: number;
+      error?: string;
+    }>;
+    pointerMapRefresh: (payload: { mapId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      resolvedCount?: number;
+      failedCount?: number;
+      error?: string;
+    }>;
+    pointerMapAddNode: (payload: {
+      mapId: string;
+      label: string;
+      candidate: { moduleName: string; moduleOffset: number; offsets: number[]; depth: number };
+    }) => Promise<{ success: boolean; map?: PointerMapDto; nodeId?: string; error?: string }>;
+    pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      error?: string;
+    }>;
+    pointerMapSave: (payload: {
+      mapId: string;
+      gameId?: string;
+      executableIdentity?: string;
+      architecture?: string;
+    }) => Promise<{ success: boolean; error?: string }>;
+    pointerMapLoad: (payload: { mapId: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapListSaved: () => Promise<{
+      success: boolean;
+      maps?: Array<{ mapId: string; name: string; nodeCount: number; gameId: string | null; createdAt: string; updatedAt: string }>;
+      error?: string;
+    }>;
+    pointerMapDeleteSaved: (payload: { mapId: string }) => Promise<{ success: boolean; error?: string }>;
     liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) => Promise<{
       success: boolean;
       found?: boolean;

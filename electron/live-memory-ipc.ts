@@ -29,6 +29,14 @@ import {
   LiveMemoryResolveControlSchema,
   LiveMemoryResolveDefinitionFeatureSchema,
   LiveMemoryPointerScanSchema,
+  PointerMapCreateSchema,
+  PointerMapIdSchema,
+  PointerMapRenameSchema,
+  PointerMapScanTargetSchema,
+  PointerMapScanTargetsSchema,
+  PointerMapAddNodeSchema,
+  PointerMapRemoveNodeSchema,
+  PointerMapSaveSchema,
   LiveMemoryScanAobSchema,
   LiveMemoryScannerRoutingModeSchema,
   LiveMemoryScanFirstStartSchema,
@@ -50,6 +58,9 @@ import {
 import type { ScanMatch } from '../src/core/live-memory/types.js';
 import type { CanonicalCompleteness, CanonicalSkippedRange } from '../src/core/live-memory/scanner-backend.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
+import type { PointerMap } from '../src/core/live-memory/pointer-map.js';
+import type { PointerMapScanTargetsResult } from '../src/core/live-memory/pointer-map-orchestration.js';
+import { listSavedPointerMaps } from '../src/core/live-memory/pointer-map-store.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
 import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
@@ -1044,6 +1055,226 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  // Phase 2 P2-2 — pointer map IPC contract (ROADMAP "pointer maps"). Every
+  // handler routes through the same requireTrustedSender/requireSession/
+  // feature-flag/schema-parse sequence as every other live-memory handler
+  // in this file — no arbitrary filesystem path and no process authority
+  // beyond whatever this session already has attached (mission §10).
+
+  ipcMain.handle('pointer-map-create', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapCreateSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapCreate(parsed.name)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_create_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-list', async (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, maps: session.pointerMapList().map(serializePointerMap) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_list_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-get', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const map = session.pointerMapGet(parsed.mapId);
+      if (!map) return { success: false, error: 'pointer_map_not_found' };
+      return { success: true, map: serializePointerMap(map) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_get_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-rename', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapRenameSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapRename(parsed.mapId, parsed.name)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_rename_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-delete', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, deleted: session.pointerMapDelete(parsed.mapId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_delete_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-target', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapScanTargetSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapScanTarget(parsed.mapId, BigInt(parsed.target), parsed.bounds);
+      return { success: true, result: serializePointerMapScanResult(result) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_target_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-targets', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapScanTargetsSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapScanTargets(
+        parsed.mapId,
+        parsed.targets.map((t) => BigInt(t)),
+        parsed.bounds,
+      );
+      return { success: true, result: serializePointerMapScanResult(result) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_targets_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-resolve', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapResolve(parsed.mapId);
+      return { success: true, map: serializePointerMap(result.map), resolvedCount: result.resolvedCount, failedCount: result.failedCount };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_resolve_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-refresh', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapRefresh(parsed.mapId);
+      return { success: true, map: serializePointerMap(result.map), resolvedCount: result.resolvedCount, failedCount: result.failedCount };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_refresh_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-add-node', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapAddNodeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const node = session.pointerMapAddNode(parsed.mapId, parsed.label, parsed.candidate);
+      return { success: true, map: serializePointerMap(session.pointerMapGet(parsed.mapId)!), nodeId: node.id };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_add_node_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-remove-node', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapRemoveNodeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapRemoveNode(parsed.mapId, parsed.nodeId)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_remove_node_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-save', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapSaveSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapSave(parsed.mapId, {
+        gameId: parsed.gameId,
+        executableIdentity: parsed.executableIdentity,
+        architecture: parsed.architecture,
+      });
+      // Explicit cast rather than relying on narrowing here — this file
+      // compiles under tsconfig.electron.json (non-strict), where this
+      // discriminated union does not reliably narrow across the branch.
+      if (!result.ok) return { success: false, error: (result as { ok: false; error: string }).error };
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_save_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-load', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapLoad(parsed.mapId)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_load_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-list-saved', async (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      requireSession(event);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, maps: listSavedPointerMaps() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_list_saved_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-delete-saved', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      session.pointerMapDeleteSaved(parsed.mapId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_delete_saved_failed') };
+    }
+  });
+
   ipcMain.handle('live-memory-scan-aob', async (event, payload: unknown) => {
     try {
       const senderCheck = requireTrustedSender(event);
@@ -2011,6 +2242,51 @@ function serializeAutoMatrixResult(result: {
  * byte offsets cross the IPC boundary as decimal strings, never as a Number —
  * the same rule every other BigInt in this file follows.
  */
+function serializePointerMap(map: PointerMap) {
+  return {
+    id: map.id,
+    name: map.name,
+    createdAt: map.createdAt,
+    updatedAt: map.updatedAt,
+    nodes: map.nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      path: {
+        moduleName: node.path.moduleName,
+        moduleOffset: `0x${node.path.moduleOffset.toString(16)}`,
+        offsets: node.path.offsets,
+      },
+      depth: node.depth,
+      status: node.status,
+      lastResolvedAddress: node.lastResolvedAddress,
+      lastResolvedAt: node.lastResolvedAt,
+      createdAt: node.createdAt,
+      targetAddress: node.targetAddress,
+      scanId: node.scanId,
+    })),
+  };
+}
+
+function serializePointerMapScanResult(result: PointerMapScanTargetsResult) {
+  return {
+    map: serializePointerMap(result.map),
+    perTarget: result.perTarget.map((t) => ({
+      targetAddress: t.targetAddress,
+      requestedDepth: t.requestedDepth,
+      deepestLevelCompleted: t.deepestLevelCompleted,
+      termination: t.termination,
+      completeness: serializeCompleteness(t.completeness),
+      candidateCount: t.candidateCount,
+      nodesAdded: t.nodesAdded,
+      truncated: t.truncated,
+    })),
+    aggregateCompleteness: serializeCompleteness(result.aggregateCompleteness),
+    targetsRequested: result.targetsRequested,
+    targetsScanned: result.targetsScanned,
+    resourceLimited: result.resourceLimited,
+  };
+}
+
 function serializeCompleteness(completeness: CanonicalCompleteness) {
   switch (completeness.state) {
     case 'complete':
