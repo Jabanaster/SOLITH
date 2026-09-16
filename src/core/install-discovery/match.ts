@@ -5,6 +5,7 @@ import { createInstallIdentity, INSTALL_IDENTITY_VERSION } from './identity.js';
 import { getModPackForGame } from '../trainer-catalog/store.js';
 import { hashExecutableFileSHA256 } from '../live-memory/installed-exe-hash.js';
 import { normalizeInstallPlatform, normalizeModPackPlatform, sameCanonicalProvider } from './provider-identity.js';
+import { checkExecutableRoleApplicability } from './trainer-applicability.js';
 
 function normalizeExe(name: string): string {
   return path.basename(name).toLowerCase();
@@ -143,6 +144,15 @@ export function matchInstalledToCatalog(
       } else if (candidates.length > 1) {
         match = resolveAmbiguousExecutableMatch(candidates, game, resolvedOptions);
       }
+    }
+
+    // Trainer-applicability boundary (ROADMAP.md Phase 3): a catalog match
+    // is never accepted for an install whose own resolved executable is a
+    // launcher/updater/tool/server/benchmark/anti-cheat-bootstrap binary —
+    // bad catalog data or a scanner picking up the wrong file must not
+    // attach a trainer to the wrong process.
+    if (match && game.executablePath && !checkExecutableRoleApplicability(game.executablePath).applicable) {
+      match = undefined;
     }
 
     const identity = createInstallIdentity(game);

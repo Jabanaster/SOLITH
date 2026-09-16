@@ -64,4 +64,21 @@ describe('install-discovery catalog match', () => {
     );
     assert.equal(records[0].catalogGameId, 'palworld');
   });
+
+  test('a steamAppId match is rejected when the recorded executable is a launcher, not the game (trainer-applicability boundary)', () => {
+    const records = matchInstalledToCatalog(
+      [
+        {
+          platform: 'steam',
+          installPath: 'C:/Games/Steam/steamapps/common/Stardew Valley',
+          executablePath: 'C:/Games/Steam/steamapps/common/Stardew Valley/StardewLauncher.exe',
+          steamAppId: 413150,
+          displayName: 'Stardew Valley',
+        },
+      ],
+      CATALOG,
+      new Date().toISOString(),
+    );
+    assert.equal(records[0].catalogGameId, undefined, 'a launcher must never be accepted as the matched game process');
+  });
 });
