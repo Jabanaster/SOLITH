@@ -70,6 +70,27 @@ interface FixtureHandle {
 
 function spawnFixture(): Promise<FixtureHandle> {
   const child = spawn(FIXTURE_PATH, [], { stdio: ['pipe', 'pipe', 'inherit'] });
+
+  // Stage 7.5 — absorb EPIPE on the fixture's stdin.
+  //
+  // Teardown writes "exit\n" and then kills the child. `stream.write()` does
+  // NOT report a broken pipe synchronously — it emits an asynchronous 'error'
+  // event — so the `try { ... } catch {}` around that write cannot catch it.
+  // With no 'error' listener attached, Node escalates EPIPE to an
+  // uncaughtException, and because it lands after the test function has
+  // already returned, the test runner reports it as "generated asynchronous
+  // activity after the test ended" and fails the whole file.
+  //
+  // This is what intermittently failed `PR Windows` on the CI runner (observed
+  // at ff10505, fb5f7d0, 6fcd0c5 and 252a34c, while passing at 0fcc77d and
+  // af5a0bd) — a race whose outcome depends on how quickly the child dies
+  // relative to the write, which is exactly the kind of thing a loaded shared
+  // runner changes. Attaching a listener makes the error handled rather than
+  // fatal; it does not hide a real failure, because a fixture that has already
+  // been told to exit has no further output anyone is waiting on.
+  child.stdin.on('error', () => {
+    /* fixture already gone — nothing left to say to it */
+  });
   return new Promise((resolve, reject) => {
     let buffered = '';
     const fields: Record<string, string> = {};
