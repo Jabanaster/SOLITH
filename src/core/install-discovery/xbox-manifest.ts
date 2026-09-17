@@ -21,20 +21,71 @@ function readFileSafe(filePath: string): string | null {
   }
 }
 
+// Every tag/attribute name this module looks up is a hardcoded literal at
+// the call site (never derived from file content), but building a RegExp
+// from a variable still trips static ReDoS analysis (Semgrep
+// detect-non-literal-regexp). These three helpers use plain string search
+// instead of dynamic regex construction — equivalent for this module's
+// bounded, well-formed, fixed-schema Microsoft XML inputs (see the module
+// doc comment) without needing a non-literal RegExp at all.
+function isWordChar(ch: string | undefined): boolean {
+  return !!ch && /[A-Za-z0-9_]/.test(ch);
+}
+
+function findTagStart(xml: string, tagName: string): number {
+  const needle = `<${tagName}`.toLowerCase();
+  const lowerXml = xml.toLowerCase();
+  let idx = 0;
+  while ((idx = lowerXml.indexOf(needle, idx)) !== -1) {
+    if (!isWordChar(xml[idx + needle.length])) return idx;
+    idx += needle.length;
+  }
+  return -1;
+}
+
 function firstElement(xml: string, tagName: string): string | undefined {
-  const match = new RegExp(`<${tagName}\\b[^>]*>`, 'i').exec(xml);
-  return match?.[0];
+  const start = findTagStart(xml, tagName);
+  if (start === -1) return undefined;
+  const end = xml.indexOf('>', start);
+  if (end === -1) return undefined;
+  return xml.slice(start, end + 1);
 }
 
 function attrValue(elementText: string | undefined, attrName: string): string | undefined {
   if (!elementText) return undefined;
-  const match = new RegExp(`${attrName}\\s*=\\s*"([^"]*)"`, 'i').exec(elementText);
-  return match?.[1]?.trim() || undefined;
+  const lowerText = elementText.toLowerCase();
+  const lowerAttr = attrName.toLowerCase();
+  let idx = 0;
+  while ((idx = lowerText.indexOf(lowerAttr, idx)) !== -1) {
+    let cursor = idx + attrName.length;
+    while (elementText[cursor] === ' ' || elementText[cursor] === '\t') cursor++;
+    if (elementText[cursor] === '=') {
+      cursor++;
+      while (elementText[cursor] === ' ' || elementText[cursor] === '\t') cursor++;
+      if (elementText[cursor] === '"') {
+        const valueEnd = elementText.indexOf('"', cursor + 1);
+        if (valueEnd !== -1) {
+          const value = elementText.slice(cursor + 1, valueEnd).trim();
+          return value || undefined;
+        }
+      }
+    }
+    idx += attrName.length;
+  }
+  return undefined;
 }
 
 function textElement(xml: string, tagName: string): string | undefined {
-  const match = new RegExp(`<${tagName}\\b[^>]*>([^<]*)</${tagName}>`, 'i').exec(xml);
-  return match?.[1]?.trim() || undefined;
+  const openStart = findTagStart(xml, tagName);
+  if (openStart === -1) return undefined;
+  const openEnd = xml.indexOf('>', openStart);
+  if (openEnd === -1) return undefined;
+  const nextLt = xml.indexOf('<', openEnd + 1);
+  if (nextLt === -1) return undefined;
+  const closeTag = `</${tagName}>`.toLowerCase();
+  if (xml.slice(nextLt, nextLt + closeTag.length).toLowerCase() !== closeTag) return undefined;
+  const text = xml.slice(openEnd + 1, nextLt);
+  return text.trim() || undefined;
 }
 
 export interface AppxManifestInfo {
