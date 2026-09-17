@@ -149,5 +149,9 @@ export function createStructureSnapshotId(): string {
 /** Maximum inspection window (spec §12 — bounded reads, no accidental multi-gigabyte structure reads). Mirrors research/hex-inspector.ts's existing 4096-byte precedent. */
 export const MAX_STRUCTURE_DISCOVERY_LENGTH = 4096;
 
+/** Spec §18 resource limits — bounds the in-memory session registries (structures/snapshots accumulate across repeated discover/capture calls, unlike a single bounded read). Session-level, enforced by LiveMemorySession, not here. */
+export const MAX_DISCOVERED_STRUCTURES_PER_SESSION = 100;
+export const MAX_SNAPSHOTS_PER_STRUCTURE = 50;
+
 /** Candidate widths tried at every offset, per spec §5/§6. Order matters: widest-first keeps wide interpretations (pointer/f64/u64) from being shadowed by an arbitrary narrower pick when both are plausible. */
 export const CANDIDATE_FIELD_WIDTHS: readonly CandidateFieldWidth[] = [8, 4, 2, 1];

@@ -59,12 +59,14 @@ import {
   compareStructureSnapshots,
   refreshStructure,
 } from './structure-discovery.js';
-import type {
-  DiscoveredField,
-  DiscoveredStructure,
-  StructureDiscoveryRequest,
-  StructureSnapshot,
-  StructureSnapshotDiffResult,
+import {
+  MAX_DISCOVERED_STRUCTURES_PER_SESSION,
+  MAX_SNAPSHOTS_PER_STRUCTURE,
+  type DiscoveredField,
+  type DiscoveredStructure,
+  type StructureDiscoveryRequest,
+  type StructureSnapshot,
+  type StructureSnapshotDiffResult,
 } from './structure-model.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
@@ -1551,6 +1553,14 @@ export class LiveMemorySession {
   structureDiscover(request: StructureDiscoveryRequest): DiscoveredStructure {
     const { driver, handle } = this.getMemoryAccessOrThrow();
     const structure = discoverStructure(driver, handle, request, { pointerWidth: LiveMemorySession.STRUCTURE_POINTER_WIDTH });
+    // Spec §18 resource limit — the registry itself (not one read, already
+    // bounded by MAX_STRUCTURE_DISCOVERY_LENGTH) accumulates across repeated
+    // calls in a long session; evict the oldest entry (insertion-order,
+    // matching Map's own iteration order) rather than growing unbounded.
+    if (this.structures.size >= MAX_DISCOVERED_STRUCTURES_PER_SESSION) {
+      const oldestId = this.structures.keys().next().value;
+      if (oldestId !== undefined) this.structureDelete(oldestId);
+    }
     this.structures.set(structure.id, structure);
     return structure;
   }
@@ -1598,6 +1608,12 @@ export class LiveMemorySession {
     const structure = this.requireStructure(structureId);
     const { driver, handle } = this.getMemoryAccessOrThrow();
     const snapshot = captureStructureSnapshot(driver, handle, structure);
+    // Spec §18 resource limit — evict this structure's own oldest snapshot
+    // (never another structure's) once its per-structure cap is reached.
+    const existingForStructure = Array.from(this.structureSnapshots.values()).filter((s) => s.structureId === structureId);
+    if (existingForStructure.length >= MAX_SNAPSHOTS_PER_STRUCTURE) {
+      this.structureSnapshots.delete(existingForStructure[0].id);
+    }
     this.structureSnapshots.set(snapshot.id, snapshot);
     return snapshot;
   }
