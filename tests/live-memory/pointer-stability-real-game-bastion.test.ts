@@ -39,11 +39,17 @@
  *
  * Module relocation itself (OLD MODULE BASE != CURRENT MODULE BASE) is
  * separately, rigorously proven against the fixture in
- * pointer-stability-module-relocation.test.ts; this real-game campaign is
- * not required to also reproduce relocation (Bastion.exe, like many older
- * XNA titles, is linked without /DYNAMICBASE, so its own module base does
- * not vary across launches on this machine — a real, observed fact, not a
- * limitation of the test).
+ * pointer-stability-module-relocation.test.ts. This real-game campaign is
+ * not required to also reproduce relocation to be valid evidence, but in
+ * fact it does: Bastion.exe's own module base genuinely varies across real
+ * launches on this machine (ASLR is in effect; measured 4/5 real restarts
+ * relocated in both the originally certified campaign and an independent
+ * re-run). No claim of a fixed/non-ASLR module base should be made here
+ * unless independently proven from the PE file's own load-configuration
+ * metadata — this test does not attempt that and makes no such claim; the
+ * `correct` check below accepts either `stable_exact` or `stable_relocated`
+ * so the test remains valid regardless of which the OS loader produces on
+ * any given run.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
