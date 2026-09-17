@@ -399,6 +399,63 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('trainer-research-merge-ue-scripts', payload),
   liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
+  // Phase 2 P2-2 — pointer map production surface. Every address crossing
+  // this boundary is a "0x..." string, never a bare Number — a real 64-bit
+  // process's addresses can exceed Number.MAX_SAFE_INTEGER (mission §11).
+  pointerMapCreate: (payload: { name: string }) => ipcRenderer.invoke('pointer-map-create', payload),
+  pointerMapList: () => ipcRenderer.invoke('pointer-map-list'),
+  pointerMapGet: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-get', payload),
+  pointerMapRename: (payload: { mapId: string; name: string }) => ipcRenderer.invoke('pointer-map-rename', payload),
+  pointerMapDelete: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-delete', payload),
+  pointerMapScanTarget: (payload: {
+    mapId: string;
+    target: string;
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-target', payload),
+  pointerMapScanTargets: (payload: {
+    mapId: string;
+    targets: string[];
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-targets', payload),
+  pointerMapResolve: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-resolve', payload),
+  pointerMapRefresh: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-refresh', payload),
+  pointerMapAddNode: (payload: {
+    mapId: string;
+    label: string;
+    candidate: { moduleName: string; moduleOffset: number; offsets: number[]; depth: number };
+  }) => ipcRenderer.invoke('pointer-map-add-node', payload),
+  pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) =>
+    ipcRenderer.invoke('pointer-map-remove-node', payload),
+  // P2-4 — real restart-stability validation. groundTruth is a serializable
+  // spec (u32/u64 expected value), never a closure.
+  pointerMapValidateNode: (payload: {
+    mapId: string;
+    nodeId: string;
+    groundTruth: { kind: 'u32'; expected: number; description: string } | { kind: 'u64'; expected: string; description: string };
+  }) => ipcRenderer.invoke('pointer-map-validate-node', payload),
+  pointerMapValidateAfterRestart: (payload: {
+    mapId: string;
+    groundTruthByNodeId: Record<
+      string,
+      { kind: 'u32'; expected: number; description: string } | { kind: 'u64'; expected: string; description: string }
+    >;
+  }) => ipcRenderer.invoke('pointer-map-validate-after-restart', payload),
+  pointerMapGetNodeStability: (payload: { mapId: string; nodeId: string }) =>
+    ipcRenderer.invoke('pointer-map-get-node-stability', payload),
+  pointerMapSave: (payload: { mapId: string; gameId?: string; executableIdentity?: string; architecture?: string }) =>
+    ipcRenderer.invoke('pointer-map-save', payload),
+  pointerMapLoad: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-load', payload),
+  pointerMapListSaved: () => ipcRenderer.invoke('pointer-map-list-saved'),
+  pointerMapDeleteSaved: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-delete-saved', payload),
+  // P2-3.1 §5/§6 — cancellable pointer-map scan contract, same start/cancel/poll
+  // transport shape as liveMemoryScanFirstStart/liveMemoryScanCancel/liveMemoryScanPoll below.
+  pointerMapScanStart: (payload: {
+    mapId: string;
+    targets: string[];
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-start', payload),
+  pointerMapScanCancel: (payload: { operationId: string }) => ipcRenderer.invoke('pointer-map-scan-cancel', payload),
+  pointerMapScanPoll: (payload: { operationId: string }) => ipcRenderer.invoke('pointer-map-scan-poll', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
   liveMemoryScannerRoutingModeGet: () => ipcRenderer.invoke('live-memory-scanner-routing-mode-get'),

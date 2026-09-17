@@ -2,6 +2,98 @@ declare module 'xml2js';
 declare module '*.css';
 declare module 'sql.js';
 
+// Phase 2 P2-2 — pointer map renderer DTOs, mirroring serializePointerMap/
+// serializePointerMapScanResult in electron/live-memory-ipc.ts. moduleOffset
+// is a "0x..." string on the wire (see PointerMapCreateSchema and friends),
+// matching liveMemoryPointerScan's existing candidate shape above.
+// P2-4 — restart-stability wire shapes, mirroring pointer-stability.ts's
+// StabilityStatus/StabilityObservation/StabilityBaseline exactly.
+type StabilityStatusDto =
+  | 'stable_exact'
+  | 'stable_relocated'
+  | 'target_moved_chain_valid'
+  | 'chain_broken'
+  | 'module_missing'
+  | 'read_failed'
+  | 'process_exited'
+  | 'false_positive';
+
+interface StabilityBaselineDto {
+  pid: number | null;
+  moduleBase: string | null;
+  resolvedAddress: string;
+  recordedAt: string;
+}
+
+interface StabilityObservationDto {
+  launchNumber: number;
+  pid: number | null;
+  moduleBase: string | null;
+  resolvedAddress: string | null;
+  status: StabilityStatusDto;
+  failureReason: string | null;
+  observedAt: string;
+}
+
+interface NodeStabilityStateDto {
+  baseline: StabilityBaselineDto | null;
+  observations: StabilityObservationDto[];
+}
+
+/** The wire shape sent TO the main process — never a closure, see pointer-stability.ts's StabilityGroundTruthSpec. */
+type StabilityGroundTruthSpecDto =
+  | { kind: 'u32'; expected: number; description: string }
+  | { kind: 'u64'; expected: string; description: string };
+
+interface PointerMapNodeDto {
+  id: string;
+  label: string;
+  path: { moduleName: string; moduleOffset: string; offsets: number[] };
+  depth: number;
+  status: 'unresolved' | 'resolved' | 'module_missing' | 'read_failed' | 'process_exited';
+  lastResolvedAddress: string | null;
+  lastResolvedAt: string | null;
+  createdAt: string;
+  targetAddress: string | null;
+  scanId: string | null;
+  stability: NodeStabilityStateDto;
+}
+
+interface PointerMapDto {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  nodes: PointerMapNodeDto[];
+}
+
+interface PointerMapCompletenessDto {
+  state: 'complete' | 'complete_with_skipped_regions' | 'cancelled' | 'process_exited' | 'resource_limit' | 'failed';
+  skipped?: Array<{ baseAddress: string; size: string; reason: string }>;
+  atByte?: string;
+  reason?: string;
+}
+
+interface PointerMapTargetOutcomeDto {
+  targetAddress: string;
+  requestedDepth: number;
+  deepestLevelCompleted: number;
+  termination: string;
+  completeness: PointerMapCompletenessDto;
+  candidateCount: number;
+  nodesAdded: number;
+  truncated: boolean;
+}
+
+interface PointerMapScanResultDto {
+  map: PointerMapDto;
+  perTarget: PointerMapTargetOutcomeDto[];
+  aggregateCompleteness: PointerMapCompletenessDto;
+  targetsRequested: number;
+  targetsScanned: number;
+  resourceLimited: boolean;
+}
+
 interface Window {
   electronAPI: {
     e2eTrainerState: string | null;
@@ -792,6 +884,103 @@ interface Window {
         levelsSearched: number;
         scansPerformed: number;
       };
+      error?: string;
+    }>;
+    // Phase 2 P2-2 — pointer map production surface (renderer view).
+    pointerMapCreate: (payload: { name: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapList: () => Promise<{ success: boolean; maps?: PointerMapDto[]; error?: string }>;
+    pointerMapGet: (payload: { mapId: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapRename: (payload: { mapId: string; name: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapDelete: (payload: { mapId: string }) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+    pointerMapScanTarget: (payload: {
+      mapId: string;
+      target: string;
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
+    pointerMapScanTargets: (payload: {
+      mapId: string;
+      targets: string[];
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
+    pointerMapResolve: (payload: { mapId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      resolvedCount?: number;
+      failedCount?: number;
+      error?: string;
+    }>;
+    pointerMapRefresh: (payload: { mapId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      resolvedCount?: number;
+      failedCount?: number;
+      error?: string;
+    }>;
+    pointerMapAddNode: (payload: {
+      mapId: string;
+      label: string;
+      candidate: { moduleName: string; moduleOffset: number; offsets: number[]; depth: number };
+    }) => Promise<{ success: boolean; map?: PointerMapDto; nodeId?: string; error?: string }>;
+    pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      error?: string;
+    }>;
+    /** P2-4 — real restart-stability validation, same start-shape convention as the rest of this pointer-map contract. */
+    pointerMapValidateNode: (payload: {
+      mapId: string;
+      nodeId: string;
+      groundTruth: StabilityGroundTruthSpecDto;
+    }) => Promise<{ success: boolean; map?: PointerMapDto; observation?: StabilityObservationDto; error?: string }>;
+    pointerMapValidateAfterRestart: (payload: {
+      mapId: string;
+      groundTruthByNodeId: Record<string, StabilityGroundTruthSpecDto>;
+    }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      observations?: StabilityObservationDto[];
+      skippedNodeIds?: string[];
+      error?: string;
+    }>;
+    pointerMapGetNodeStability: (payload: { mapId: string; nodeId: string }) => Promise<{
+      success: boolean;
+      stability?: NodeStabilityStateDto;
+      error?: string;
+    }>;
+    pointerMapSave: (payload: {
+      mapId: string;
+      gameId?: string;
+      executableIdentity?: string;
+      architecture?: string;
+    }) => Promise<{ success: boolean; error?: string }>;
+    pointerMapLoad: (payload: { mapId: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapListSaved: () => Promise<{
+      success: boolean;
+      maps?: Array<{ mapId: string; name: string; nodeCount: number; gameId: string | null; createdAt: string; updatedAt: string }>;
+      error?: string;
+    }>;
+    pointerMapDeleteSaved: (payload: { mapId: string }) => Promise<{ success: boolean; error?: string }>;
+    /**
+     * P2-3.1 §5/§6 — real cancellable pointer-map scan contract, same
+     * start-returns-operationId-before-the-scan-finishes shape as
+     * `liveMemoryScanFirstStart`/`liveMemoryScanCancel`/`liveMemoryScanPoll`
+     * below, reusing the identical operation registry (not a parallel one).
+     */
+    pointerMapScanStart: (payload: {
+      mapId: string;
+      targets: string[];
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; operationId?: string; error?: string }>;
+    pointerMapScanCancel: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      found?: boolean;
+      alreadyTerminal?: boolean;
+      error?: string;
+    }>;
+    pointerMapScanPoll: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      status?: 'pending' | 'complete' | 'cancelled' | 'error' | 'not_found';
+      result?: PointerMapScanResultDto;
       error?: string;
     }>;
     liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) => Promise<{

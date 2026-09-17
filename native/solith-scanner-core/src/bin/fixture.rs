@@ -233,6 +233,16 @@ const POINTER_TARGET_VALUE: u32 = 0x5A5A_1234;
 const POINTER_CYCLE_OFFSET: usize = 32;
 static POINTER_ROOT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+// -- Phase 2 P2-2 (mission §15): a second, wholly independent module-rooted
+// pointer chain in the same real process, so a real multi-target
+// scanTargetsIntoMap([A, B]) run has two genuine, unrelated targets to
+// resolve rather than two views of the same one. Deliberately depth-1
+// (POINTER_ROOT_B -> NODE_B1 -> value) rather than mirroring Target A's
+// depth-3/cycle shape — the point of Target B is independence, not
+// duplicating coverage §11/§13 already have.
+const POINTER_B_TARGET_VALUE: u32 = 0xB0B0_5678;
+static POINTER_ROOT_B: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 #[cfg(windows)]
 fn main() {
     let pid = std::process::id();
@@ -262,6 +272,40 @@ fn main() {
         }
         println!("BENCH_REGION_BASE=0x{:x}", region as usize);
         println!("BENCH_REGION_SIZE={size}");
+    }
+
+    // Optional second CLI arg (P2-3.1 §8 real-process cancellation proof):
+    // plant this many small, separately-VirtualAlloc'd "noise" regions. A
+    // single findPointersNear() call scans every committed region in the
+    // process once per BFS frontier item; a real large game process has
+    // thousands of small individual heap allocations (allocator arenas,
+    // per-object headers, etc.), and the resulting many-small-regions shape
+    // adds real, non-simulated wall-clock latency dominated by per-region
+    // native round-trip overhead rather than raw memory bandwidth. This lets
+    // a real-process E2E test observe (and genuinely interrupt) an in-flight
+    // scan without any timing hack in the product code being tested.
+    let noise_region_count: Option<usize> = std::env::args().nth(2).and_then(|s| s.parse().ok());
+    if let Some(count) = noise_region_count {
+        const NOISE_REGION_SIZE: usize = 64 * 1024;
+        for i in 0..count {
+            let region = unsafe {
+                VirtualAlloc(
+                    std::ptr::null(),
+                    NOISE_REGION_SIZE,
+                    MEM_COMMIT | MEM_RESERVE,
+                    PAGE_READWRITE,
+                )
+            };
+            assert!(!region.is_null(), "VirtualAlloc(noise_region) failed");
+            unsafe {
+                let slice = std::slice::from_raw_parts_mut(region as *mut u8, NOISE_REGION_SIZE);
+                for (j, b) in slice.iter_mut().enumerate() {
+                    *b = ((i as u32).wrapping_mul(2246822519).wrapping_add(j as u32) >> 16) as u8;
+                }
+            }
+        }
+        println!("NOISE_REGION_COUNT={count}");
+        println!("NOISE_REGION_SIZE={NOISE_REGION_SIZE}");
     }
 
     let big_region = unsafe {
@@ -361,6 +405,29 @@ fn main() {
         );
     }
     POINTER_ROOT.store(pointer_nodes[0] as u64, std::sync::atomic::Ordering::SeqCst);
+
+    // -- P2-2 Target B: independent single-node chain.
+    let pointer_node_b = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            POINTER_NODE_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(
+        !pointer_node_b.is_null(),
+        "VirtualAlloc(pointer_node_b) failed"
+    );
+    unsafe {
+        std::ptr::write_bytes(pointer_node_b as *mut u8, 0, POINTER_NODE_SIZE);
+        std::ptr::write_unaligned(
+            (pointer_node_b as usize + POINTER_TARGET_OFFSET) as *mut u32,
+            POINTER_B_TARGET_VALUE,
+        );
+    }
+    POINTER_ROOT_B.store(pointer_node_b as u64, std::sync::atomic::Ordering::SeqCst);
+    let pointer_root_b_addr = &POINTER_ROOT_B as *const _ as usize;
     let pointer_root_addr = &POINTER_ROOT as *const _ as usize;
     unsafe {
         let slice =
@@ -603,6 +670,9 @@ fn main() {
     writeln!(out, "POINTER_TARGET_OFFSET={POINTER_TARGET_OFFSET}").unwrap();
     writeln!(out, "POINTER_TARGET_VALUE=0x{POINTER_TARGET_VALUE:x}").unwrap();
     writeln!(out, "POINTER_CYCLE_OFFSET={POINTER_CYCLE_OFFSET}").unwrap();
+    writeln!(out, "POINTER_ROOT_B_ADDRESS=0x{pointer_root_b_addr:x}").unwrap();
+    writeln!(out, "POINTER_NODE_B1_BASE=0x{:x}", pointer_node_b as usize).unwrap();
+    writeln!(out, "POINTER_B_TARGET_VALUE=0x{POINTER_B_TARGET_VALUE:x}").unwrap();
     writeln!(out, "MUTATION_REGION_BASE=0x{mutation_base:x}").unwrap();
     writeln!(out, "MUTATION_REGION_SIZE={MUTATION_REGION_SIZE}").unwrap();
     writeln!(out, "MUTATION_MARKER_OFFSET={MUTATION_MARKER_OFFSET}").unwrap();

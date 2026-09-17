@@ -1,0 +1,33 @@
+# Phase 2 P2-3 — Pointer-Chain Visualization
+
+## What was built
+
+- [`src/app/live-memory/pointer-map-ui.ts`](../../src/app/live-memory/pointer-map-ui.ts) — pure, renderer-side display logic (no React, no IPC), unit-tested per the repo's own convention (`tests/pointer-map-ui.test.ts`, 41 tests): `pointerMapDtoNodeChainSteps` (a DTO-shape port of P2-1's `pointerMapNodeChainSteps` — no re-derived pointer semantics, just adapted to the wire type), `nodeStatusBadge`/`completenessBadge` (status → `{label, variant}`), `isStaleReloadedNode` (distinguishes "never resolved" from "unresolved after reload"), `groupNodesByTarget`, `filterPointerMapNodes`, `sortPointerMapNodes`, `distinctModuleNames`.
+- [`src/app/components/PointerMapPanel.tsx`](../../src/app/components/PointerMapPanel.tsx) + [`PointerMapPanel.module.css`](../../src/app/components/PointerMapPanel.module.css) — the actual UI, following the `AddressDataResearchPanel` convention (`{attached}` prop, owns `window.electronAPI` and its own state). Wired into [`LiveMemoryTrainerPage.tsx`](../../src/app/pages/LiveMemoryTrainerPage.tsx), unconditionally rendered (map management doesn't need the section gate the way scan/resolve do, though the underlying IPC currently still requires an attached session — see "A real finding" below).
+
+## Requirement coverage (mission §2–§13)
+
+| Requirement | How it's met |
+|---|---|
+| Real DTOs, no re-derived semantics (§2) | `PointerMapDto`/`PointerMapNodeDto`/`PointerMapScanResultDto` consumed directly; chain steps come from a direct port of P2-1's own flattening function |
+| BigInt-safe addresses (§2) | Every address is the wire `"0x…"` string as-is; no `Number()` coercion anywhere in the component or the pure helpers |
+| Multi-target UX (§4) | `groupNodesByTarget` keeps each target's nodes in its own group; a manually-added node (no target) gets its own "Manually added" group rather than being merged |
+| Resolution state UX (§5) | `nodeStatusBadge` gives every one of the 5 canonical statuses (`resolved`/`unresolved`/`module_missing`/`read_failed`/`process_exited`) a distinct, never-green-for-failure badge; `isStaleReloadedNode` flags a reloaded-but-not-yet-re-resolved node with its own "Stale — needs re-resolve" badge so its (now-untrusted) historical address is never shown as current authority |
+| Completeness UX (§6) | `completenessBadge` covers all 6 `CanonicalCompleteness` states; a target group with zero nodes shows an explicit "scan was incomplete, absence is not authoritative" vs "scan completed with zero candidates" message, sourced from the real per-target outcome, never a bare "No pointers found" |
+| Map management (§7) | Create/rename/delete/save/load/list-saved all call the existing P2-2 preload methods directly — no renderer-side reimplementation of map/service logic. Delete uses the repo's established `window.confirm(...)` idiom |
+| Scan into map (§8) | Target address(es) + depth/offset/candidate-per-level bounds → `pointerMapScanTargets`; candidates render grouped under the map, immediately, from the real IPC response |
+| Chain inspection (§9) | Selecting a node shows id/target/module/root/offsets/depth/resolution state/provenance/last-resolved-time/chain steps — no field fabricated; intermediate addresses are never shown because the model doesn't produce them |
+| Live refresh (§10) | An explicit "Refresh / Resolve" button calling `pointerMapResolve` — no hidden polling |
+| Large-map UX (§11) | No virtualization library added (none exists in this repo to reuse — see doc 006); pure grouping/filtering/sorting logic tested at 1/10/50/100/200 nodes (the P2-2 map cap) |
+| Filtering/sorting (§12) | Filter by target/status/module, sort by scan-order/depth/module — the set mission §12 asked to "at minimum evaluate," nothing more |
+| Copy/export (§13) | Copy full expression/module/offsets/resolved address; export wires into the existing `exportMemoryFeatureToYaml`/`downloadTextFile` trainer-export path (the same one `LiveMemoryTrainerPage`'s pre-existing single-scan candidates already use) — no competing export implementation |
+
+## A real, pre-existing P2-2 gap found and fixed
+
+Real-process testing during this stage found that the P2-2 IPC bounds schema (`POINTER_MAP_SCAN_BOUNDS` in [`electron/ipc-validation.ts`](../../electron/ipc-validation.ts)) never declared `maxCandidatesPerLevel` — even though the **core scanner already accepted it** (`PointerScanBounds`), and P2-2's own real-process test suite already needed `maxCandidatesPerLevel: 16` to reliably find a real depth-3 module-rooted path among a real process's incidental pointer-shaped noise (doc 003). Because zod silently drops unknown keys rather than erroring, any caller — including this new UI — that tried to set that bound had it stripped before it ever reached the scanner. Fixed by adding the field to the IPC schema (capped at 64), the preload/`global.d.ts` bounds types, and giving the UI's own scan form a `maxCandidatesPerLevel` input defaulting to 32 (higher than the core test's proven 16, since the UI is a general workflow, not a fixed test fixture). This was a genuine architecture gap in P2-2's IPC contract, not something introduced by this stage's own code — found and fixed before this stage closes, per the standing rule established in P2-2's own report.
+
+A second real gap, found the same way: `PointerMapPanel`'s target grouping was originally derived only from `map.nodes`, so a target that was genuinely scanned but found **zero** real candidates produced no group at all — silently absent rather than visibly "scanned, zero results." Fixed by unioning `groupNodesByTarget(map.nodes)` with any `lastScanResult.perTarget` target not already represented, so a truthful zero-candidate target still renders its own group with the zero-result messaging mission §6/§15 requires.
+
+## Cancellation — a documented scope decision, not an omission
+
+See doc 006 §6 for the full reasoning: `pointerMapScanTargets` runs synchronously to completion inside one IPC call (a bounded BFS with hard result caps, unlike the byte-level value scanner which genuinely needs async operation-ID/poll/cancel plumbing because it can run for a long time over gigabytes of memory). There is no in-flight window a "Cancel" button could interrupt, so none was added — adding one would be exactly the "hidden developer API as the user workflow" anti-pattern mission §8 warns against. What is real: the scan trigger is disabled while a call is in flight, and a target whose outcome does carry `completeness.state === 'cancelled'` (the orchestration layer's already-tested between-target abort path) renders with the same truthful badge as any other incomplete state.
