@@ -52,6 +52,10 @@ describe('trainer-research PE analyzer', () => {
     assert.ok(report.sections.some((s) => s.name === '.text'));
     assert.equal(report.sha256.length, 64);
     assert.ok(report.peTimestamp);
+    assert.match(report.fileVersion ?? '', /^\d+\.\d+\.\d+/);
+    assert.match(report.productVersion ?? '', /^\d+\.\d+\.\d+/);
+    assert.ok(report.companyName);
+    assert.ok(report.productName);
   });
 });
 

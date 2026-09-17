@@ -15,6 +15,11 @@ export interface TrainerExeAnalysis {
   subsystem?: string;
   imageBase?: string;
   entryPoint?: string;
+  /** VS_VERSIONINFO fields, when the PE carries one (see ../executable-identity/pe-version-info.ts). */
+  fileVersion?: string;
+  productVersion?: string;
+  companyName?: string;
+  productName?: string;
   sections: PeSectionInfo[];
   interestingStrings: string[];
   warnings: string[];

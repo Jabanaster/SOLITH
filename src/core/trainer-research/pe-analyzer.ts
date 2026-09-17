@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { TrainerExeAnalysis } from './types.js';
 import { resolvePeStructuralMetadata } from '../executable-identity/pe-metadata.js';
+import { resolvePeVersionInfo } from '../executable-identity/pe-version-info.js';
 
 const MAX_ANALYZE_BYTES = 50 * 1024 * 1024;
 const MAX_STRINGS = 400;
@@ -151,6 +152,7 @@ export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
   }
 
   const { machine, peTimestamp } = readCoffMachineAndTimestamp(buf);
+  const versionInfo = resolvePeVersionInfo(resolved);
 
   const strings = extractAsciiStrings(buf)
     .sort((a, b) => scoreInterestingString(b) - scoreInterestingString(a))
@@ -172,6 +174,10 @@ export function analyzeTrainerExecutable(filePath: string): TrainerExeAnalysis {
     subsystem: structural.subsystem,
     imageBase: structural.imageBase,
     entryPoint: structural.entryPoint,
+    fileVersion: versionInfo?.fileVersion,
+    productVersion: versionInfo?.productVersion,
+    companyName: versionInfo?.companyName,
+    productName: versionInfo?.productName,
     sections: structural.sections,
     interestingStrings: strings,
     warnings,
