@@ -51,6 +51,20 @@ const SERVER_RE = /(?:^|[^a-z])(?:dedicated[-_ ]?server|ds)(?:[^a-z]|$)|_server(
 // binary (`bin/Atomfall_dx12.exe`) otherwise created a false PRIMARY_GAME
 // ambiguity during Xbox/MS Store install discovery (ROADMAP.md Phase 3).
 const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|^createdump\.exe$|^gamelaunchhelper\.exe$/i;
+// Real, publicly-documented engine/build-suffix conventions used to name the
+// actual playable binary distinctly from a bare `<GameName>.exe` launcher
+// stub, when both ship side by side (ROADMAP.md Phase 3 P3-8.1 — Atomfall's
+// live session binds selected the `Atomfall.exe` launcher over the real
+// engine binary `Atomfall_dx12.exe` while both processes were alive
+// concurrently, because neither name matches LAUNCHER_RE and bare
+// name-classification alone cannot break the tie). Two independent
+// conventions, confirmed against real installs: Unreal Engine's cooked
+// Shipping-configuration binary naming (`<Name>-Win64-Shipping.exe`, e.g.
+// Palworld) and graphics-API-suffixed multi-renderer builds
+// (`<Name>_dx12.exe`, e.g. Atomfall's GDK build). Used only as a same-game
+// tie-break among executables ALREADY established as candidates for the
+// same catalog entry — never invents a new game identity.
+const ENGINE_BUILD_SUFFIX_RE = /-(?:win64|win32|linux64|linux)-shipping\.exe$|_(?:dx9|dx10|dx11|dx12|d3d11|d3d12|vulkan|opengl)\.exe$/i;
 
 function classifySingleExecutable(executableName: string): ExecutableRole | 'GAME_CANDIDATE' {
   const name = executableName.toLowerCase();
@@ -106,11 +120,20 @@ export function classifyExecutableRoles(
   } else if (gameCandidates.length === 1) {
     result.set(gameCandidates[0], 'PRIMARY_GAME');
   } else if (gameCandidates.length > 1) {
-    // Multiple game-like candidates, no catalog evidence to pick one —
-    // fail closed on the PRIMARY_GAME designation rather than guess
-    // (consistent with the Phase 3 ambiguous-executable-match policy).
-    for (const name of gameCandidates) {
-      result.set(name, 'UNKNOWN');
+    const suffixed = gameCandidates.filter((name) => ENGINE_BUILD_SUFFIX_RE.test(name));
+    if (suffixed.length === 1) {
+      const primary = suffixed[0];
+      for (const name of gameCandidates) {
+        result.set(name, name === primary ? 'PRIMARY_GAME' : 'ALTERNATE_GAME');
+      }
+    } else {
+      // Multiple game-like candidates, no catalog evidence and no
+      // engine-build-suffix evidence to pick one — fail closed on the
+      // PRIMARY_GAME designation rather than guess (consistent with the
+      // Phase 3 ambiguous-executable-match policy).
+      for (const name of gameCandidates) {
+        result.set(name, 'UNKNOWN');
+      }
     }
   }
 
