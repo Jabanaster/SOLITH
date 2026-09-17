@@ -213,41 +213,77 @@ test('exact scan: u64 beyond JS safe integer round-trips exactly via BigInt', as
 
 test('exact scan: cancellation works from real JS', async () => {
   await withFixture(async (child, fields) => {
-    const target = addon.NativeScanTarget.attach(child.pid);
-    const regions = target.enumerateRegions();
-    const region = typesRegion(fields, regions);
-    const cancellation = new addon.ScanCancellationHandle();
-    const progress = new addon.ScanProgressHandle();
+    // `chunksRead > 0` proves the scan has read AT LEAST one chunk — it does
+    // NOT prove the scan is still in flight, because it is equally true of
+    // the LAST chunk. On a fast/lightly-loaded machine the ~1024-chunk
+    // (4 MiB / 4096-byte) scan takes long enough that observing the first
+    // chunk leaves ample chunks still to go before `cancel()` lands. On a
+    // throttled/oversubscribed CI runner, an occasional multi-millisecond
+    // Node event-loop stall (GC, scheduler contention) can let the native
+    // scan finish ALL ~1024 chunks before this loop's very first
+    // `setTimeout(1)` callback even fires — so `cancellation.cancel()` is
+    // called against an operation that already resolved 'complete', a real,
+    // honestly-reported outcome, not a defect in cancellation itself (the
+    // same category of race the JS-IPC-level cancellation tests already
+    // document and retry for: AOB's "first-match search frequently
+    // completes before cancel is observed", and case A/C/D's own 5-attempt
+    // retry loop in scanner-backend-cancellation.test.ts). Retried here the
+    // same honest way: never fake the result, just don't let one unlucky
+    // scheduling window fail the whole suite.
+    let observedCancelled = false;
+    let lastOutcome;
+    for (let attempt = 0; attempt < 5 && !observedCancelled; attempt++) {
+      const target = addon.NativeScanTarget.attach(child.pid);
+      const regions = target.enumerateRegions();
+      const region = typesRegion(fields, regions);
+      const cancellation = new addon.ScanCancellationHandle();
+      const progress = new addon.ScanProgressHandle();
 
-    // Tiny chunks -> many chunks -> real chance to observe progress and cancel mid-scan.
-    const outcomePromise = target.scanExact(
-      region,
-      'u32',
-      0xffffffff,
-      null,
-      'bytewise',
-      4096n,
-      3n,
-      null,
-      cancellation,
-      progress,
-    );
+      // Tiny chunks -> many chunks -> real chance to observe progress and cancel mid-scan.
+      const outcomePromise = target.scanExact(
+        region,
+        'u32',
+        0xffffffff,
+        null,
+        'bytewise',
+        4096n,
+        3n,
+        null,
+        cancellation,
+        progress,
+      );
 
-    let cancelled = false;
-    for (let i = 0; i < 500 && !cancelled; i++) {
-      const snap = progress.snapshot();
-      if (snap.chunksRead > 0) {
-        // 9. cancellation works
-        cancellation.cancel();
-        cancelled = true;
-        break;
+      let sawProgress = false;
+      for (let i = 0; i < 500 && !sawProgress; i++) {
+        const snap = progress.snapshot();
+        if (snap.chunksRead > 0) {
+          // 9. cancellation works
+          cancellation.cancel();
+          sawProgress = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1));
       }
-      await new Promise((resolve) => setTimeout(resolve, 1));
-    }
-    assert.equal(cancelled, true, 'never observed progress to cancel on');
+      assert.equal(sawProgress, true, 'never observed progress to cancel on');
 
-    const outcome = await outcomePromise;
-    assert.equal(outcome.completeness.state, 'cancelled');
+      lastOutcome = await outcomePromise;
+      if (lastOutcome.completeness.state === 'cancelled') observedCancelled = true;
+      else {
+        // Diagnostic instrumentation (mission §9/§10): if this ever needs
+        // re-investigation from CI logs alone, the exact non-cancelled
+        // terminal state and attempt number are on record, not silently
+        // swallowed by the retry.
+        console.error(
+          `[exact-scan cancellation retry] attempt ${attempt + 1}/5 observed '${lastOutcome.completeness.state}' instead of 'cancelled' — scan finished before the cancel signal landed, retrying`,
+        );
+      }
+    }
+
+    assert.equal(
+      observedCancelled,
+      true,
+      `at least one of 5 attempts must observe a genuine cancelled terminal state — last observed: ${lastOutcome && lastOutcome.completeness.state}`,
+    );
   });
 });
 
