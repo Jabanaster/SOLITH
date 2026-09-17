@@ -11,22 +11,33 @@
  *
  * Scoped to a single Electron session (create -> scan -> validate twice)
  * rather than a save -> relaunch -> load -> validate cycle: driving the
- * real "Load" button revealed a genuine, PRE-EXISTING defect (not
- * introduced by P2-4, and never previously exercised by any e2e test —
- * grep confirms no earlier test ever clicks "Load"): after a successful
- * pointerMapLoad IPC call, the immediately-following pointerMapList call
- * (fired by PointerMapPanel's own post-load refresh) intermittently-but-
- * reproducibly returns `not_attached`, even though the session is
- * genuinely attached. Reproduced across a same-session detach/reattach
- * AND across two entirely separate fresh Electron app launches sharing
- * the same on-disk userData — ruling out a session-lifecycle race as the
- * cause. This is a real defect in the existing Load workflow, filed
- * separately rather than silently worked around or left uninvestigated;
- * see the P2-4 evidence doc for the full writeup. The 10-restart backend
- * campaign already provides the rigorous, load-bearing restart-stability
- * evidence mission §5/§6/§7 require; this test's remaining job — proving
- * the rendered form/button really drives the real classification code —
- * is fully covered by validating twice within one live session.
+ * real "Load" button originally surfaced what looked like a genuine
+ * pointer-map-load/pointer-map-list session race — the panel's post-load
+ * refresh appeared to intermittently report `not_attached` despite a
+ * genuinely attached session.
+ *
+ * P2-4.1 (mission §7/§8) root-caused it: it was never a backend/session
+ * race at all. `PointerMapPanel` calls its own `loadMaps()` unconditionally
+ * on mount, before any attach has happened, and that call correctly (and
+ * harmlessly) gets `not_attached` back — but `loadMaps()`'s failure branch
+ * unconditionally wrote that into the panel's local status message and
+ * nothing ever cleared it on a later successful refresh. The stale
+ * "Failed to list pointer maps: not_attached" text then sat there,
+ * genuinely displayed, until some other panel action overwrote it — and if
+ * "Load" on an already-saved map was the user's first interaction with the
+ * panel (no Create/Scan beforehand), that stale text was still the only
+ * thing on screen for the brief window between the click and
+ * `handleLoadSavedMap`'s own final, correct "Loaded ..." message. Fixed in
+ * `src/app/components/PointerMapPanel.tsx`'s `loadMaps()`: a `not_attached`
+ * list result is the expected pre-attach state, not a failure, and no
+ * longer sets the message at all. Scope: cosmetic UI status text only —
+ * saved stability pointer-maps on disk, the pointer-map-load/list backend
+ * IPC handlers, and P2-4's restart-validation classification logic were
+ * never affected. The first test below stays scoped to
+ * create -> scan -> validate twice within one live session (its actual
+ * job — proving the rendered form/button really drives the real
+ * classification code); the fixed Load workflow itself is proven by the
+ * second test below.
  */
 import { test, expect } from '@playwright/test';
 import { _electron as electron } from 'playwright';
@@ -210,3 +221,109 @@ function assertContains(haystack: string, needle: string): void {
     throw new Error(`Expected text to contain "${needle}", got: ${haystack.slice(0, 500)}`);
   }
 }
+
+describeReal('pointer-map UI — Load as the first interaction after a fresh attach never shows a stale not_attached error', async () => {
+  test.setTimeout(120_000);
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const userDataDir = path.join(os.tmpdir(), `solith-p241-load-userdata-${runId}`);
+  const appDataDir = path.join(os.tmpdir(), `solith-p241-load-appdata-${runId}`);
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.mkdirSync(appDataDir, { recursive: true });
+
+  async function attachToFixture(win: Page, handle: FixtureHandle) {
+    await win.click('text=Refresh Process List');
+    await win.waitForSelector('#live-memory-process-picker', { timeout: 10_000 });
+    await win.getByLabel('Show all processes').check();
+    await win.selectOption('#live-memory-process-picker', String(handle.child.pid));
+    await win.getByLabel(/I accept the single-player/).click();
+    await win.waitForSelector('text=I understand — enable', { timeout: 5_000 });
+    await win.click('text=I understand — enable');
+
+    let attached = false;
+    for (let attempt = 0; attempt < 5 && !attached; attempt++) {
+      await clickByText(win, 'Attach', 'button.btn-primary', true);
+      try {
+        await win.waitForSelector('button:has-text("Detach")', { timeout: 5_000 });
+        attached = true;
+      } catch {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+    expect(attached, 'real Attach must succeed against the real fixture process').toBe(true);
+  }
+
+  // Session 1: create and save a real map against a real fixture instance,
+  // then close everything — the saved map is the only thing that survives.
+  const fixture1 = await spawnFixture();
+  const app1: ElectronApplication = await electron.launch({
+    args: [MAIN_BUNDLE],
+    env: { ...process.env, ELECTRON_USER_DATA_PATH: userDataDir, APPDATA: appDataDir, USERPROFILE: appDataDir, NODE_ENV: 'test' },
+  });
+  try {
+    const win1: Page = await app1.firstWindow();
+    await win1.waitForLoadState('domcontentloaded');
+    await win1.waitForSelector('#root > *', { timeout: 20_000 });
+    await win1.click('button[title="Live Memory Trainer"]');
+    await win1.waitForSelector('text=Pointer Maps', { timeout: 10_000 });
+    await attachToFixture(win1, fixture1);
+
+    await win1.fill('input[aria-label="New pointer map name"]', 'P2-4.1 Load Regression');
+    await win1.click('text=Create Map');
+    await win1.waitForSelector('text=Created pointer map', { timeout: 5_000 });
+    expect(await clickByText(win1, 'Save', 'button, a, [role="button"]', true), 'Save button must be clickable').toBe(true);
+    await win1.waitForSelector('text=/Pointer map saved\\.|Save failed/', { timeout: 5_000 });
+    expect(await bodyContains(win1, 'Save failed'), 'the real save must succeed').toBe(false);
+  } finally {
+    await app1.close().catch(() => {});
+    killFixture(fixture1);
+  }
+
+  // Session 2: a genuinely fresh app launch and a genuinely new fixture
+  // process instance (a real restart) sharing the same on-disk userData —
+  // attach, then click Load on the saved map as the FIRST interaction with
+  // the panel, with no Create/Scan beforehand. Poll the body continuously
+  // through the async window between the click and the final message so a
+  // transient stale "not_attached" text cannot slip past an end-state-only
+  // assertion.
+  const fixture2 = await spawnFixture();
+  const app2: ElectronApplication = await electron.launch({
+    args: [MAIN_BUNDLE],
+    env: { ...process.env, ELECTRON_USER_DATA_PATH: userDataDir, APPDATA: appDataDir, USERPROFILE: appDataDir, NODE_ENV: 'test' },
+  });
+  try {
+    const win2: Page = await app2.firstWindow();
+    await win2.waitForLoadState('domcontentloaded');
+    await win2.waitForSelector('#root > *', { timeout: 20_000 });
+    await win2.click('button[title="Live Memory Trainer"]');
+    await win2.waitForSelector('text=Pointer Maps', { timeout: 10_000 });
+    await attachToFixture(win2, fixture2);
+
+    let sawStaleError = false;
+    const pollUntilLoaded = (async () => {
+      const start = Date.now();
+      while (Date.now() - start < 15_000) {
+        if (await bodyContains(win2, 'Failed to list pointer maps: not_attached')) {
+          sawStaleError = true;
+          return;
+        }
+        if (await bodyContains(win2, /^Loaded "/m)) return;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    })();
+
+    await win2.waitForSelector('[aria-label="Saved pointer maps"] li', { timeout: 10_000 });
+    expect(
+      await clickByText(win2, 'Load', '[aria-label="Saved pointer maps"] button.btn-secondary'),
+      'Load must be clickable as the very first panel interaction',
+    ).toBe(true);
+    await pollUntilLoaded;
+
+    expect(sawStaleError, 'the fixed Load workflow must never surface a stale not_attached error').toBe(false);
+    await waitUntilBodyMatches(win2, /^Loaded "P2-4\.1 Load Regression"/m);
+  } finally {
+    await app2.close().catch(() => {});
+    killFixture(fixture2);
+    fs.rmSync(userDataDir, { recursive: true, force: true });
+    fs.rmSync(appDataDir, { recursive: true, force: true });
+  }
+});

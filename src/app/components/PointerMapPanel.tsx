@@ -115,7 +115,12 @@ const PointerMapPanel: React.FC<PointerMapPanelProps> = ({ attached, attachedExe
         setSelectedMapId(null);
         setSelectedNodeId(null);
       }
-    } else if (!result?.success) {
+    } else if (!result?.success && result?.error !== 'not_attached') {
+      // 'not_attached' is the expected pre-attach state (this effect also
+      // fires on mount, before any attach has happened) — surfacing it as a
+      // failure leaves stale "Failed to list pointer maps: not_attached"
+      // text on screen with nothing to ever clear it if a later action (e.g.
+      // Load) doesn't itself set a message first.
       setMessage(`Failed to list pointer maps: ${result?.error ?? 'unknown error'}`);
     }
   };
