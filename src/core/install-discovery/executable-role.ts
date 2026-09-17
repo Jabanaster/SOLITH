@@ -26,16 +26,29 @@ export type ExecutableRole =
 
 const LAUNCHER_RE = /launcher|bootstrap(?:per)?/i;
 const UPDATER_RE = /updat(?:e|er)|patcher|\bpatch\b/i;
-const CRASH_REPORTER_RE = /crash[-_ ]?(?:report|handler|reporter)/i;
+// crashpad_handler(.exe) is Google Crashpad's real, widely-bundled crash
+// handler process name (confirmed against a real Crimson Desert install,
+// Steam appid 3321460) — distinct spelling from the report/handler/reporter
+// pattern below, so it needs its own real-evidence entry.
+const CRASH_REPORTER_RE = /crash[-_ ]?(?:report|handler|reporter)|crashpad_handler/i;
 const BENCHMARK_RE = /bench[-_ ]?mark/i;
 const TOOL_RE = /setup|install(?:er)?|uninstall(?:er)?|editor|config(?:urator)?|modding[-_ ]?tool/i;
 // Real, publicly-documented third-party anti-cheat bootstrap executable
 // names — not a guess at what "looks like" anti-cheat.
 const ANTI_CHEAT_RE = /easyanticheat|\beac\b|battleye|\bbe_?launcher\b|vanguard|faceit[-_ ]?ac/i;
 const SERVER_RE = /(?:^|[^a-z])(?:dedicated[-_ ]?server|ds)(?:[^a-z]|$)|_server(?:\.exe)?$|server[-_ ]?host/i;
+// Real, publicly-documented third-party SDK/platform/runtime helper
+// processes that get bundled alongside the actual game binary — e.g.
+// Palworld ships Epic Online Services' embedded browser helper, and any
+// self-contained .NET/CoreCLR game (Stardew Valley) ships Microsoft's
+// createdump.exe crash-dump generator — never the game itself, so a
+// game-like fallback would otherwise wrongly promote it to
+// PRIMARY_GAME/ALTERNATE_GAME (confirmed against real installs of both).
+const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|^createdump\.exe$/i;
 
 function classifySingleExecutable(executableName: string): ExecutableRole | 'GAME_CANDIDATE' {
   const name = executableName.toLowerCase();
+  if (SDK_HELPER_RE.test(name)) return 'TOOL';
   if (CRASH_REPORTER_RE.test(name)) return 'TOOL';
   if (ANTI_CHEAT_RE.test(name)) return 'ANTI_CHEAT_BOOTSTRAP';
   if (BENCHMARK_RE.test(name)) return 'BENCHMARK';

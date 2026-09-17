@@ -65,6 +65,39 @@ describe('classifyExecutableRoles', () => {
     for (const name of inputs) assert.ok(roles.has(name), `missing classification for ${name}`);
   });
 
+  test('bundled third-party SDK helper binaries (Epic Online Services web helper) are never treated as game candidates', () => {
+    // Real-game evidence: Palworld (Steam appid 1623730, ROADMAP.md Phase 3
+    // curated title) ships Engine/Binaries/Win64/EpicWebHelper.exe alongside
+    // the actual game binary — confirmed against a real install.
+    const roles = classifyExecutableRoles(['Palworld-Win64-Shipping.exe', 'EpicWebHelper.exe'], {
+      knownCatalogExecutables: ['Palworld-Win64-Shipping.exe', 'Palworld.exe'],
+    });
+    assert.equal(roles.get('Palworld-Win64-Shipping.exe'), 'PRIMARY_GAME');
+    assert.equal(roles.get('EpicWebHelper.exe'), 'TOOL');
+  });
+
+  test('.NET/CoreCLR createdump.exe crash-dump helper is never treated as a game candidate', () => {
+    // Real-game evidence: Stardew Valley (Steam appid 413150, ROADMAP.md
+    // Phase 3 Exit Gate title) ships createdump.exe at install root
+    // alongside "Stardew Valley.exe" — confirmed against a real install.
+    // Without this, both were classified UNKNOWN (2 unrelated game-like
+    // candidates), and the title could never resolve a primary executable.
+    const roles = classifyExecutableRoles(['Stardew Valley.exe', 'createdump.exe']);
+    assert.equal(roles.get('Stardew Valley.exe'), 'PRIMARY_GAME');
+    assert.equal(roles.get('createdump.exe'), 'TOOL');
+  });
+
+  test('Google Crashpad handler (crashpad_handler.exe) is classified as a tool, not a game candidate', () => {
+    // Real-game evidence: Crimson Desert Enhanced (Steam appid 3321460,
+    // ROADMAP.md Phase 3 curated title) ships bin64/crashpad_handler.exe
+    // alongside the real game binary — confirmed against a real install.
+    const roles = classifyExecutableRoles(['CrimsonDesert.exe', 'crashpad_handler.exe'], {
+      knownCatalogExecutables: ['CrimsonDesert.exe'],
+    });
+    assert.equal(roles.get('CrimsonDesert.exe'), 'PRIMARY_GAME');
+    assert.equal(roles.get('crashpad_handler.exe'), 'TOOL');
+  });
+
   test('multiple catalog-known executables are all PRIMARY_GAME (e.g. 32-bit and 64-bit both shipped)', () => {
     const roles = classifyExecutableRoles(['Game32.exe', 'Game64.exe', 'GameOther.exe'], {
       knownCatalogExecutables: ['Game32.exe', 'Game64.exe'],
