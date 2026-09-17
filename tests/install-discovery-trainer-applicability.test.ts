@@ -56,4 +56,17 @@ describe('checkExecutableRoleApplicability', () => {
     assert.equal(result.applicable, true);
     assert.equal(result.role, 'PRIMARY_GAME');
   });
+
+  test('a launcher named after the game itself is rejected once its full path (parent directory) is available (Atomfall evidence)', () => {
+    const result = checkExecutableRoleApplicability('Z:/XboxGames/Atomfall/Content/Launcher/Atomfall.exe');
+    assert.equal(result.applicable, false);
+    assert.equal(result.role, 'LAUNCHER');
+    assert.equal(result.reason, 'wrong_executable_role');
+  });
+
+  test('the real engine binary next to that same launcher still succeeds', () => {
+    const result = checkExecutableRoleApplicability('Z:/XboxGames/Atomfall/Content/bin/Atomfall_dx12.exe');
+    assert.equal(result.applicable, true);
+    assert.equal(result.role, 'PRIMARY_GAME');
+  });
 });

@@ -131,6 +131,38 @@ describe('classifyExecutableRoles', () => {
     }
   });
 
+  test('a filename with no role keyword is classified by its containing directory when path context is supplied (Atomfall Launcher\\ evidence)', () => {
+    // "Atomfall.exe" alone matches no pattern at all — the launcher shares
+    // the game's own name. Real GDK/Xbox packaging signals its role only
+    // through the folder it ships in. Generic mechanism: any executable
+    // name paired with a directory context gets checked the same way.
+    const roles = classifyExecutableRoles(['Atomfall.exe', 'Atomfall_dx12.exe'], {
+      parentDirectoryByName: { 'Atomfall.exe': 'Launcher', 'Atomfall_dx12.exe': 'bin' },
+    });
+    assert.equal(roles.get('Atomfall.exe'), 'LAUNCHER');
+    assert.equal(roles.get('Atomfall_dx12.exe'), 'PRIMARY_GAME');
+  });
+
+  test('without directory context, the same "Atomfall.exe" name is a bare game candidate (basename alone carries no role keyword)', () => {
+    // Documents the pre-existing, still-correct basename-only behavior when
+    // no path context is available — proves the new directory check is
+    // additive, not a replacement for the basename check.
+    const roles = classifyExecutableRoles(['Atomfall.exe']);
+    assert.equal(roles.get('Atomfall.exe'), 'PRIMARY_GAME');
+  });
+
+  test('directory-based classification does not apply to the exact-basename-anchored vendor patterns (no regression on the gamelaunchhelper invariant)', () => {
+    // A legitimate executable must never be rejected merely because a parent
+    // directory contains a vendor helper's name — established when
+    // gamelaunchhelper.exe was closed. Confirms extending directory checks to
+    // the keyword-substring roles did not accidentally widen the anchored
+    // SDK_HELPER_RE/GDK_LAUNCH_HELPER_RE patterns too.
+    const roles = classifyExecutableRoles(['RealGame.exe'], {
+      parentDirectoryByName: { 'RealGame.exe': 'gamelaunchhelper' },
+    });
+    assert.equal(roles.get('RealGame.exe'), 'PRIMARY_GAME');
+  });
+
   test('multiple catalog-known executables are all PRIMARY_GAME (e.g. 32-bit and 64-bit both shipped)', () => {
     const roles = classifyExecutableRoles(['Game32.exe', 'Game64.exe', 'GameOther.exe'], {
       knownCatalogExecutables: ['Game32.exe', 'Game64.exe'],

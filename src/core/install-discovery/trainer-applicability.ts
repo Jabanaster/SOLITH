@@ -32,7 +32,9 @@ const APPLICABLE_ROLES: ReadonlySet<ExecutableRole> = new Set(['PRIMARY_GAME', '
  */
 export function checkExecutableRoleApplicability(executablePath: string): TrainerApplicabilityResult {
   const name = path.basename(executablePath);
-  const role = classifyExecutableRoles([name]).get(name) ?? 'UNKNOWN';
+  const parentDirName = path.basename(path.dirname(executablePath));
+  const role =
+    classifyExecutableRoles([name], { parentDirectoryByName: { [name]: parentDirName } }).get(name) ?? 'UNKNOWN';
   if (APPLICABLE_ROLES.has(role)) {
     return { applicable: true, role };
   }

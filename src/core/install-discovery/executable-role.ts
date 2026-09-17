@@ -56,23 +56,69 @@ const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|
 // (e.g. "mygamelaunchhelpertool.exe", "notgamelaunchhelper.exe").
 const GDK_LAUNCH_HELPER_RE = /^gamelaunchhelper\.exe$/i;
 
-function classifySingleExecutable(executableName: string): ExecutableRole | 'GAME_CANDIDATE' {
+/**
+ * Classifies one executable's role. `parentDirName` (the immediate
+ * containing directory's own name, e.g. "Launcher" for
+ * ".../Launcher/Atomfall.exe") is optional and, when supplied, is checked
+ * against the same keyword-substring patterns as the filename itself —
+ * real packaging conventions (GDK/Xbox titles, Ubisoft/EA-style launchers)
+ * commonly name the bootstrap binary after the game itself and only signal
+ * its role via the folder it ships in (Docs/phase3 Atomfall evidence:
+ * `Launcher\Atomfall.exe` vs the real engine `bin\Atomfall_dx12.exe` — the
+ * filename "Atomfall.exe" alone contains no role keyword at all). This is a
+ * generic packaging-convention signal, not specific to any one title.
+ *
+ * The exact-basename-anchored vendor patterns (SDK_HELPER_RE,
+ * GDK_LAUNCH_HELPER_RE) deliberately stay filename-only — extending them to
+ * directory content would violate the already-certified invariant that a
+ * legitimate executable is never rejected merely because a parent directory
+ * contains a vendor helper's name (see the `gamelaunchhelper` closure).
+ */
+function classifySingleExecutable(
+  executableName: string,
+  parentDirName?: string,
+): ExecutableRole | 'GAME_CANDIDATE' {
   const name = executableName.toLowerCase();
+  const dir = parentDirName?.toLowerCase();
   if (SDK_HELPER_RE.test(name)) return 'TOOL';
   if (GDK_LAUNCH_HELPER_RE.test(name)) return 'TOOL';
-  if (CRASH_REPORTER_RE.test(name)) return 'TOOL';
-  if (ANTI_CHEAT_RE.test(name)) return 'ANTI_CHEAT_BOOTSTRAP';
-  if (BENCHMARK_RE.test(name)) return 'BENCHMARK';
-  if (SERVER_RE.test(name)) return 'SERVER';
-  if (UPDATER_RE.test(name)) return 'UPDATER';
-  if (TOOL_RE.test(name)) return 'TOOL';
-  if (LAUNCHER_RE.test(name)) return 'LAUNCHER';
+  if (CRASH_REPORTER_RE.test(name) || (dir !== undefined && CRASH_REPORTER_RE.test(dir))) return 'TOOL';
+  if (ANTI_CHEAT_RE.test(name) || (dir !== undefined && ANTI_CHEAT_RE.test(dir))) return 'ANTI_CHEAT_BOOTSTRAP';
+  if (BENCHMARK_RE.test(name) || (dir !== undefined && BENCHMARK_RE.test(dir))) return 'BENCHMARK';
+  if (SERVER_RE.test(name) || (dir !== undefined && SERVER_RE.test(dir))) return 'SERVER';
+  if (UPDATER_RE.test(name) || (dir !== undefined && UPDATER_RE.test(dir))) return 'UPDATER';
+  if (TOOL_RE.test(name) || (dir !== undefined && TOOL_RE.test(dir))) return 'TOOL';
+  if (LAUNCHER_RE.test(name) || (dir !== undefined && LAUNCHER_RE.test(dir))) return 'LAUNCHER';
   return 'GAME_CANDIDATE';
+}
+
+/**
+ * Single-executable role classification exposed for callers that already
+ * know (from a live process list, not a batch discovery scan) that a given
+ * name is a candidate for one specific game and just need its role signal —
+ * e.g. picking which of several simultaneously-running processes for the
+ * same catalog game is the actual engine vs. its launcher. Does not perform
+ * the batch elimination/ambiguity logic in `classifyExecutableRoles` (that
+ * logic answers "which of these unrelated names is THE game"; this answers
+ * "is this one name a non-game role at all").
+ */
+export function classifyExecutableRoleForRanking(
+  executableName: string,
+  parentDirName?: string,
+): ExecutableRole | 'GAME_CANDIDATE' {
+  return classifySingleExecutable(executableName, parentDirName);
 }
 
 export interface ClassifyExecutableRolesOptions {
   /** Catalog-declared executable names for this game (TrainerCatalogEntry.executables), when known — used to pick PRIMARY_GAME among multiple game-like candidates deterministically instead of guessing. */
   knownCatalogExecutables?: string[];
+  /**
+   * Immediate containing-directory name for each input name, when the
+   * caller has real path context (a discovery scan, not just a bare
+   * filename list) — see `classifySingleExecutable`'s doc comment. Keyed by
+   * the same string given in `executableNames`.
+   */
+  parentDirectoryByName?: Record<string, string>;
 }
 
 /**
@@ -94,7 +140,7 @@ export function classifyExecutableRoles(
   const gameCandidates: string[] = [];
 
   for (const name of executableNames) {
-    const classified = classifySingleExecutable(name);
+    const classified = classifySingleExecutable(name, options.parentDirectoryByName?.[name]);
     if (classified === 'GAME_CANDIDATE') {
       gameCandidates.push(name);
     } else {

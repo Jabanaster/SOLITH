@@ -5,6 +5,7 @@
  * using the returned plan. Reuses catalog name matching + fingerprint-verify.
  */
 
+import path from 'node:path';
 import {
   fingerprintBlocksAttach,
   verifyDefinitionFingerprint,
@@ -13,6 +14,7 @@ import {
 import type { MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { evaluateWriteConsent } from './write-consent.js';
 import type { LiveProcessListEntry } from './native-memory-driver.js';
+import { classifyExecutableRoleForRanking } from '../install-discovery/executable-role.js';
 import type { OnlineGuardInput, OnlineGuardResult } from './types.js';
 import {
   resolveSignatureWithCoverage,
@@ -89,12 +91,50 @@ export function matchCatalogProcess(
 }
 
 /**
+ * A live process's role signal for candidate ranking — reuses the same
+ * generic executable-role classification install-discovery applies to
+ * files on disk (launcher/updater/tool/etc. keyword patterns, now also
+ * checked against the process's own containing directory when its full
+ * path is known). Not title-specific: any game whose real engine binary and
+ * its launcher/bootstrap binary are both live at once goes through this.
+ */
+function classifyLiveProcessRole(proc: LiveProcessListEntry): ReturnType<typeof classifyExecutableRoleForRanking> {
+  const parentDirName = proc.executablePath ? path.basename(path.dirname(proc.executablePath)) : undefined;
+  return classifyExecutableRoleForRanking(proc.name, parentDirName);
+}
+
+/**
+ * Among live processes that all matched the same catalog game, pick the one
+ * to bind the session to. A launcher/updater/tool/etc. process must never
+ * outrank the actual game engine process when both are simultaneously live
+ * (Docs/phase3 Atomfall evidence: `Launcher\Atomfall.exe` +
+ * `bin\Atomfall_dx12.exe` both running — the engine must win). Deterministic:
+ * within the preferred pool (or, if every candidate classifies as a
+ * non-game role — e.g. only the launcher is live so far — within the full
+ * set, preserving prior first-seen behavior), the first process in OS
+ * enumeration order wins; OS enumeration order carries no semantic meaning
+ * about launcher-vs-engine, so filtering out recognized non-game roles
+ * before picking is what actually makes the launcher-vs-engine choice
+ * order-independent, not the residual first-found tie-break itself.
+ */
+function selectPrimaryLiveCandidate(
+  candidates: Array<{ proc: LiveProcessListEntry; match: CatalogExecutableEntry }>,
+): { proc: LiveProcessListEntry; match: CatalogExecutableEntry } {
+  const gameCandidates = candidates.filter((c) => classifyLiveProcessRole(c.proc) === 'GAME_CANDIDATE');
+  const pool = gameCandidates.length > 0 ? gameCandidates : candidates;
+  return pool[0];
+}
+
+/**
  * Match every running process against catalog executables (not just the
- * first hit). One detection per matched catalogGameId; if multiple running
- * processes map to the same game, the first live match wins for that game.
- * Builds an executable->entry index once so this stays O(processes + catalog)
- * rather than O(processes * catalog) — matters now that callers pass the full,
- * unbounded catalog (see D07 fix) rather than a fixed-size page.
+ * first hit). One detection per matched catalogGameId. When multiple live
+ * processes map to the same game (a launcher and the actual engine both
+ * running at once), `selectPrimaryLiveCandidate` picks the real game
+ * process by role, not by which one the OS process snapshot happened to
+ * list first. Builds an executable->entry index once so this stays
+ * O(processes + catalog) rather than O(processes * catalog) — matters now
+ * that callers pass the full, unbounded catalog (see D07 fix) rather than a
+ * fixed-size page.
  */
 export function matchAllCatalogProcesses(
   processes: LiveProcessListEntry[],
@@ -107,17 +147,27 @@ export function matchAllCatalogProcesses(
       if (!byExecutable.has(key)) byExecutable.set(key, entry);
     }
   }
-  const seenGameIds = new Set<string>();
-  const detections: ProcessWatchDetection[] = [];
+
+  const candidatesByGame = new Map<string, Array<{ proc: LiveProcessListEntry; match: CatalogExecutableEntry }>>();
   for (const proc of processes) {
     const match = byExecutable.get(proc.name.toLowerCase());
-    if (!match || seenGameIds.has(match.catalogGameId)) continue;
-    seenGameIds.add(match.catalogGameId);
+    if (!match) continue;
+    const list = candidatesByGame.get(match.catalogGameId);
+    if (list) {
+      list.push({ proc, match });
+    } else {
+      candidatesByGame.set(match.catalogGameId, [{ proc, match }]);
+    }
+  }
+
+  const detections: ProcessWatchDetection[] = [];
+  for (const candidates of candidatesByGame.values()) {
+    const chosen = selectPrimaryLiveCandidate(candidates);
     detections.push({
-      catalogGameId: match.catalogGameId,
-      displayName: match.displayName,
-      pid: proc.pid,
-      executable: proc.name,
+      catalogGameId: chosen.match.catalogGameId,
+      displayName: chosen.match.displayName,
+      pid: chosen.proc.pid,
+      executable: chosen.proc.name,
     });
   }
   return detections;

@@ -123,9 +123,23 @@ export function discoverGameExecutables(
 
   found.sort((a, b) => a.depth - b.depth || a.relativePath.localeCompare(b.relativePath));
 
+  // Real path context (the immediate containing directory), not just the
+  // bare filename — a packaged install's launcher/bootstrap binary commonly
+  // shares the game's own name (e.g. GDK/Xbox titles) and only signals its
+  // role via the folder it ships in (Launcher\Atomfall.exe vs the real
+  // engine bin\Atomfall_dx12.exe). Keyed by basename, first-occurrence-wins,
+  // matching the existing basename-keyed `roles` Map below.
+  const parentDirectoryByName: Record<string, string> = {};
+  for (const f of found) {
+    const base = path.basename(f.absolutePath);
+    if (!(base in parentDirectoryByName)) {
+      parentDirectoryByName[base] = path.basename(path.dirname(f.absolutePath));
+    }
+  }
+
   const roles = classifyExecutableRoles(
     found.map((f) => path.basename(f.absolutePath)),
-    { knownCatalogExecutables: options.knownCatalogExecutables },
+    { knownCatalogExecutables: options.knownCatalogExecutables, parentDirectoryByName },
   );
 
   return found.map((f) => ({

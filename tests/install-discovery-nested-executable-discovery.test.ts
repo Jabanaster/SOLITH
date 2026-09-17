@@ -55,6 +55,28 @@ describe('discoverGameExecutables / resolvePrimaryExecutable', () => {
     assert.equal(all[2].role, 'TOOL');
   });
 
+  test('a launcher named after the game itself is classified by its containing directory, not left ambiguous with the real engine binary (Atomfall evidence)', () => {
+    // Real, evidenced GDK/Xbox packaging shape: the launcher/bootstrap binary
+    // shares the game's own name and contains no role keyword in its
+    // filename at all — only its parent directory ("Launcher") signals its
+    // role. Before this fix, both files classified as bare GAME_CANDIDATEs
+    // (2 unrelated game-like candidates, no catalog evidence) and the whole
+    // install failed closed to UNKNOWN/no-primary. Generic: any title with
+    // this folder convention resolves correctly now, not just Atomfall.
+    const root = makeInstall('launcher-named-like-game', [
+      'Launcher/Atomfall.exe',
+      'bin/Atomfall_dx12.exe',
+    ]);
+    const all = discoverGameExecutables(root);
+    const launcher = all.find((e) => e.relativePath === 'Launcher/Atomfall.exe');
+    const engine = all.find((e) => e.relativePath === 'bin/Atomfall_dx12.exe');
+    assert.equal(launcher?.role, 'LAUNCHER', 'the folder name alone must be enough to classify the launcher');
+    assert.equal(engine?.role, 'PRIMARY_GAME', 'the real engine binary must resolve as the sole game candidate');
+
+    const primary = resolvePrimaryExecutable(root);
+    assert.equal(primary?.relativePath, 'bin/Atomfall_dx12.exe');
+  });
+
   test('unrelated helper executables (crash reporter, updater) never become the resolved primary', () => {
     const root = makeInstall('with-helpers', [
       'GameCrashReporter.exe',
