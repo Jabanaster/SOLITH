@@ -117,6 +117,41 @@ describe('compileSolithCtRegistry', () => {
     assert.equal(written.aobSignatures.length, 2);
   });
 
+  test('PD-06: computed script -> AOB links are preserved, not discarded as []', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ct-registry-'));
+    const ctPath = path.join(dir, 'Avowed.CT');
+    fs.writeFileSync(ctPath, SAMPLE_CT, 'utf8');
+
+    const registry = await compileSolithCtRegistry(ctPath, {
+      game: 'Avowed',
+      title: 'Avowed',
+      compiledAt: '2026-07-20T00:00:00.000Z',
+    });
+
+    const aobIds = registry.pipeline.aob_signatures.map((s) => s.aob_id);
+    assert.equal(aobIds.length, 2);
+
+    // Both AOB signatures were extracted from script index 0 ("Create Console");
+    // that real, computed correlation must now show up on the script's ref
+    // instead of being silently thrown away.
+    const createConsoleRef = registry.pipeline.script_catalog_refs[0];
+    assert.equal(createConsoleRef?.script_id, 'ct-script-0-create-console');
+    assert.deepEqual([...(createConsoleRef?.linked_aob_ids ?? [])].sort(), [...aobIds].sort());
+
+    // The second script has no AOB scans in it at all — genuinely empty, not fabricated.
+    const noSignatureRef = registry.pipeline.script_catalog_refs[1];
+    assert.equal(noSignatureRef?.script_id, 'ct-script-1-no-signature-script');
+    assert.deepEqual(noSignatureRef?.linked_aob_ids, []);
+
+    // Pointer entries never coexist with a script under the current importer
+    // (a scripted CheatEntry is rejected before it can become an accepted
+    // pointer), so these must stay empty rather than fabricate a link.
+    for (const entry of registry.pipeline.entries) {
+      assert.deepEqual(entry.linked_script_ids, []);
+      assert.deepEqual(entry.linked_aob_ids, []);
+    }
+  });
+
   test('records manual-import user trust intent without granting runtime certification', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'solith-ct-registry-'));
     const ctPath = path.join(dir, 'Manual.CT');

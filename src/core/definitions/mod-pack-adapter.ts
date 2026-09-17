@@ -9,6 +9,7 @@ import {
   type SaveFieldFeatureV1,
   type SolithDefinitionV1,
 } from './schema.v1.js';
+import { detectTrainerDefinitionVersion } from './migrations/version-detect.js';
 
 function mapCheatValueType(valueType: string): MemoryDataType {
   switch (valueType) {
@@ -180,11 +181,14 @@ export function solithDefinitionToModPack(definition: SolithDefinitionV1): ModPa
   };
 }
 
-/** Detect schema.v1 definition JSON stored in trainer_mod_packs.payloadJson. */
+/**
+ * Detect schema.v1 definition JSON stored in trainer_mod_packs.payloadJson,
+ * as opposed to a legacy ModPack payload (no schemaVersion field). Delegates
+ * to the centralized version-detection stage (migrations/version-detect.ts)
+ * rather than re-implementing the schemaVersion check ad hoc here — P4-2:
+ * version detection must have exactly one source of truth.
+ */
 export function isSolithDefinitionPayload(raw: unknown): raw is SolithDefinitionV1 {
-  return (
-    !!raw &&
-    typeof raw === 'object' &&
-    (raw as SolithDefinitionV1).schemaVersion === SOLITH_DEFINITION_SCHEMA_VERSION
-  );
+  const detected = detectTrainerDefinitionVersion(raw);
+  return detected.kind === 'versioned' && detected.version === SOLITH_DEFINITION_SCHEMA_VERSION;
 }
