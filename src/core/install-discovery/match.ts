@@ -117,7 +117,14 @@ export function matchInstalledToCatalog(
   const byExecutable = new Map<string, TrainerCatalogEntry[]>();
 
   for (const entry of catalog) {
-    if (entry.steamAppId != null && entry.steamAppId < 1_000_000) {
+    // No upper bound on steamAppId — real Steam appids routinely exceed
+    // 1,000,000 today (e.g. Starfield 1716740, Palworld 1623730, Crimson
+    // Desert Enhanced 3321460, Baldur's Gate 3 1086940, all confirmed
+    // against real installs). An earlier `< 1_000_000` ceiling here was
+    // this exact D07 defect class recurring inside the fix for D07 itself
+    // — it silently dropped Baldur's Gate 3 out of steamAppId-tier
+    // matching entirely.
+    if (entry.steamAppId != null) {
       bySteamId.set(entry.steamAppId, entry);
     }
     for (const exe of entry.executables) {
