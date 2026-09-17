@@ -420,6 +420,8 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 - RECLASS.NET: still DEFERRED_TO_P2-15 — `ROADMAP.md`'s own text (line 323 area, "Symbol/module awareness + Ghidra external adapter... ReClass.NET's Repository/Technology Adoption reference-adoption role") assigns that completion criterion to P2-15, not P2-5. Concept notes only recorded (`Docs/phase2/030`); no code copied/linked/imported.
 - Evidence: `Docs/phase2/029` (baseline) and `030` (final certification, including the fresh-worktree reproduction).
 
+**P2-5 canonical integration — merged 2026-09-17.** PR #46 (`feature/solith-phase2-structure-discovery` → `master`) passed every required remote CI check (PR Static, PR Windows, CI Fast, Gitleaks, Semgrep, OSV-Scanner, Vendored memoryjs integrity) on its exact head `bc4c71a40a58bfe399d19b01f879d08be958df12`, first attempt, then merged into `master` via the normal protected-branch workflow (no force, no history rewrite, owner-authorized per SOLITH.MD "FINAL CANONICAL MERGE CLOSEOUT" — same authorization basis as P2-4.1). Canonical merge SHA: `1bbeef7bf24ee807310c1431003d1ebec4506e8e`. `git diff` between that SHA and PR #46's head is empty except for 4 unrelated lines from PR #45 (a concurrently-merged, unrelated docs closeout) — `master` now contains the complete P2-5 lineage.
+
 ---
 
 ### PHASE 3 — Game Identity, Executable Detection & Catalog
