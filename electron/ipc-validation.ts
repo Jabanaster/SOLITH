@@ -714,6 +714,45 @@ export const ResearchHexSchema = z.object({
   size: z.number().int().min(16).max(4096).default(256),
 });
 
+/** Phase 2 P2-5 — bounded structure discovery (spec §3/§12: 4096-byte cap enforced again below, matching structure-model.ts's own MAX_STRUCTURE_DISCOVERY_LENGTH so the boundary rejects an oversized request rather than silently clamping it here and again inside the engine). */
+export const StructureDiscoverSchema = z.object({
+  label: z.string().min(1).max(120),
+  baseAddress: LIVE_ADDRESS_STRING,
+  length: z.number().int().min(1).max(4096),
+});
+
+export const StructureListSchema = z.object({});
+
+export const StructureGetSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
+export const StructureRefreshSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
+export const StructureDeleteSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
+export const StructureInspectFieldSchema = z.object({
+  structureId: z.string().min(1).max(80),
+  offset: z.number().int().nonnegative().max(4095),
+});
+
+export const StructureCaptureSnapshotSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
+export const StructureListSnapshotsSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
+export const StructureCompareSnapshotsSchema = z.object({
+  snapshotAId: z.string().min(1).max(80),
+  snapshotBId: z.string().min(1).max(80),
+});
+
 /** Phase 9 — pointer candidate analysis (runs pointer scan then scores). */
 export const ResearchPointerAnalyzeSchema = z.object({
   address: z.string().regex(/^0x[0-9a-fA-F]+$/),

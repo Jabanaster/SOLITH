@@ -47,6 +47,15 @@ import {
   LiveMemoryScanOperationIdSchema,
   ResearchViewSchema,
   ResearchHexSchema,
+  StructureDiscoverSchema,
+  StructureListSchema,
+  StructureGetSchema,
+  StructureRefreshSchema,
+  StructureDeleteSchema,
+  StructureInspectFieldSchema,
+  StructureCaptureSnapshotSchema,
+  StructureListSnapshotsSchema,
+  StructureCompareSnapshotsSchema,
   ResearchPointerAnalyzeSchema,
   ResearchResolvePathSchema,
   ResearchSnapshotDiffSchema,
@@ -1556,6 +1565,153 @@ export function registerLiveMemoryIpc(): void {
       return { success: true, window };
     } catch (error) {
       return { success: false, error: sanitize(error, 'research_hex_failed') };
+    }
+  });
+
+  // ── Phase 2 P2-5 structure discovery (read-only) ────────────────────────────
+
+  ipcMain.handle('structure:discover', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureDiscoverSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const structure = bundle.session.structureDiscover({
+        label: parsed.label,
+        baseAddress: BigInt(parsed.baseAddress),
+        length: parsed.length,
+      });
+      bundle.audit.append({
+        op: 'read',
+        address: parsed.baseAddress,
+        reason: `structure:discover:length=${structure.length}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, structure };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_discover_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:list', (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      StructureListSchema.parse({});
+      return { success: true, structures: bundle.session.structureList() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_list_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:get', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureGetSchema.parse(payload);
+      return { success: true, structure: bundle.session.structureGet(parsed.structureId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_get_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:refresh', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureRefreshSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const structure = bundle.session.structureRefresh(parsed.structureId);
+      bundle.audit.append({
+        op: 'read',
+        address: structure.baseAddressHex,
+        reason: `structure:refresh:${structure.id}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, structure };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_refresh_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:delete', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureDeleteSchema.parse(payload);
+      return { success: true, deleted: bundle.session.structureDelete(parsed.structureId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_delete_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:inspect-field', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureInspectFieldSchema.parse(payload);
+      const field = bundle.session.structureInspectField(parsed.structureId, parsed.offset);
+      return { success: true, field };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_inspect_field_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:capture-snapshot', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureCaptureSnapshotSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const structure = bundle.session.structureGet(parsed.structureId);
+      const snapshot = bundle.session.structureCaptureSnapshot(parsed.structureId);
+      bundle.audit.append({
+        op: 'read',
+        address: structure?.baseAddressHex,
+        reason: `structure:capture-snapshot:${snapshot.id}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, snapshot };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_capture_snapshot_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:list-snapshots', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureListSnapshotsSchema.parse(payload);
+      return { success: true, snapshots: bundle.session.structureListSnapshots(parsed.structureId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_list_snapshots_failed') };
+    }
+  });
+
+  ipcMain.handle('structure:compare-snapshots', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = StructureCompareSnapshotsSchema.parse(payload);
+      const diff = bundle.session.structureCompareSnapshots(parsed.snapshotAId, parsed.snapshotBId);
+      return { success: true, diff };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'structure_compare_snapshots_failed') };
     }
   });
 

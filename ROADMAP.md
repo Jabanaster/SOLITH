@@ -115,7 +115,7 @@ Reproduced from `36-step-0.13.5-capability-state-matrix.md` (re-certified fresh 
 | Freeze/revert | IMPLEMENTED_UNVERIFIED | Same basis; known freeze/write address-validation inconsistency | 2 |
 | Pointer scanning | PARTIAL | Exists, tested, inherits scanner's silent-truncation defects | 1 (truth-reporting), 2 (feature) |
 | AOB scanning | PARTIAL | Works sub-cap; fails silently above cap; two incompatible grammars | 1 |
-| Structure discovery | ABSENT | No typed memory-node/class-reconstruction UX | 2 |
+| Structure discovery | IMPLEMENTED_VERIFIED | P2-5: canonical `DiscoveredStructure`/`DiscoveredField` model with evidence-gated candidate interpretation (never "decodable" == "semantically true"), wired into `LiveMemorySession`/IPC/preload/UI (`StructureDiscoveryPanel.tsx`), a real dedicated fixture region (`STRUCT_REGION`), a real 10/10 fixture-restart stress campaign plus 3/3 independent certification runs (byte-for-byte reconstruction, real pointer/string evidence, real Snapshot A/mutate/Snapshot B/compare via the fixture's own `writestruct` command), real-game proof (Godlike Burger, real PE-header read, DOS-magic ground truth), UI e2e 3/3 (dev build) + 3/3 (packaged), session-level resource limits (spec §18), and a fresh-worktree reproduction. See `Docs/phase2/030` for the full closure detail, including one real bug found and fixed (a process-exit race between a successful read and module/region enumeration) and one disclosed, out-of-scope native-driver finding (post-exit raw reads can remain non-deterministically successful). | 2 |
 | Adaptive scan planner | ABSENT | Confirmed absent across every ref/worktree | 2 |
 | Pointer maps (model + live orchestration) | IMPLEMENTED_VERIFIED | P2-1/P2-2 implemented and tested (522/522 live-memory, 2033/2033 root). P2-3.1 closed pointer-chain visualization and real cancellation. P2-4 closed the pointer-stability classification model, persistence, and UI with a real 10/10 fixture restart campaign. P2-4.1 closed the last remaining gap: real-game restart evidence was 0/0 in P2-4 (`Docs/phase2/018`); a real 5/5-restart campaign against Bastion.exe, using a deterministic process-owned static ground truth independently verified via PE-file parsing, closed it (`Docs/phase2/023`). See the pointer-stability-testing row below for the full P2-4.1 closure detail | 2 |
 | Pointer-chain visualization | IMPLEMENTED_VERIFIED | P2-3 added real production UI (`PointerMapPanel.tsx`) consuming P2-1/P2-2 DTOs directly. P2-3.1 closed the two remaining gaps: (1) root-caused and fixed the real depth-3 discovery flake (candidate-ordering instability under real heap/allocator noise — `Docs/phase2/011`), verified with 30/30 real depth-3 discoveries post-fix including a clean 10-run stress proof and a separate 3-run certification of the real-process/real-UI critical flow; (2) implemented real, production cancellation (`Docs/phase2/012`) — a genuinely interruptible mid-scan operation (not a synchronous call wrapped in a cosmetic button), reusing the existing scan-operation registry, proven via a 10-case backend matrix and real-process/packaged UI e2e proofs (3/3 clean each). Full regression is clean (`Docs/phase2/013`: 532/532 live-memory, 2074/2074+10/10 root, zero fail/cancelled) and independently reproduced in a fresh worktree with no copied build artifacts (`Docs/phase2/014`). This is the complete visualization requirement; pointer stability testing remains a distinct, separately-tracked item (next row) owned by P2-4 | 2 |
@@ -149,7 +149,7 @@ Reproduced from `36-step-0.13.5-capability-state-matrix.md` (re-certified fresh 
 | Signing | CERTIFIED | Ed25519 catalog-update signing, pinned trust root, fails closed | — (already closed) |
 | Release certification | PARTIAL | Phase 0's narrow certification is real; the 10-game/whole-product gate has not been attempted | 15 |
 
-**Summary counts** (used in the FINAL RESPONSE below): CERTIFIED 5 · IMPLEMENTED_UNVERIFIED 3 · PARTIAL 22 · PRESERVED_NOT_INTEGRATED 3 · ABSENT 8 · DEFERRED 0 · FUTURE 0 — 41 state-instances across 40 capability-family rows; the Wisp shell row carries two states (PARTIAL on the certified branch, PRESERVED_NOT_INTEGRATED on the unmerged branch) and is counted once in each column.
+**Summary counts** (used in the FINAL RESPONSE below): CERTIFIED 5 · IMPLEMENTED_UNVERIFIED 3 · PARTIAL 22 · PRESERVED_NOT_INTEGRATED 3 · ABSENT 7 · DEFERRED 0 · FUTURE 0 — 41 state-instances across 40 capability-family rows; the Wisp shell row carries two states (PARTIAL on the certified branch, PRESERVED_NOT_INTEGRATED on the unmerged branch) and is counted once in each column. This tally has never included the growing IMPLEMENTED_VERIFIED column (pointer maps, pointer-chain visualization, pointer stability testing, and now structure discovery) — a pre-existing omission from before this stage, not reopened here; ABSENT is decremented by exactly one (structure discovery only) to keep this line's own arithmetic honest against the row above it.
 
 ---
 
@@ -293,10 +293,10 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 
 **Phase 2 — Advanced Memory Engineering — status summary.** Presentational index only (2026-09-16) — added for at-a-glance navigation; changes no requirement, status, count, or evidence below. The detailed P2-1 through P2-17 execution/certification checkpoints below remain authoritative; this groups them, it does not replace them.
 
-- Current workstream: **P2-A — Pointer Engineering & Stability**
-- Current checkpoint: **P2-4 — Pointer Stability / Real-Game Restart Validation (CERTIFIED COMPLETE as of P2-4.1)**
-- Completed checkpoints: P2-1, P2-2, P2-3, P2-4 (P2-4.1 final closure)
-- Phase 2 overall: **NOT_COMPLETE** (P2-5 through P2-17 remain open — P2-4's closure does not certify Phase 2)
+- Current workstream: **P2-B — Memory Understanding**
+- Current checkpoint: **P2-5 — Structure Discovery Engine (CERTIFIED COMPLETE)**
+- Completed checkpoints: P2-1, P2-2, P2-3, P2-4 (P2-4.1 final closure), P2-5
+- Phase 2 overall: **NOT_COMPLETE** (P2-6 through P2-17 remain open — P2-5's closure does not certify Phase 2)
 - Requirements: **28 total** (see "Phase 2 requirement count" note below)
 
 **Phase 2 workstreams** (navigation/grouping only — every P2-x stage listed here is the same authoritative execution checkpoint defined throughout the rest of this section; grouping them does not change their requirements, evidence, or certification status):
@@ -306,10 +306,10 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
   - P2-2 Pointer-map live orchestration — COMPLETE
   - P2-3 Pointer-chain visualization — CERTIFIED COMPLETE
   - P2-4 Pointer stability / real-game restart validation — CERTIFIED COMPLETE (P2-4.1 closed the real-game restart evidence, module-relocation proof, pointer-map Load defect, and CI cancellation-flake gaps the user identified in P2-4's NOT_COMPLETE closure — `Docs/phase2/023` through `027`)
-- **P2-B — Memory Understanding** — NOT STARTED
-  - P2-5 Structure discovery engine
-  - P2-6 Typed memory-view expansion
-  - P2-7 Value/type inference
+- **P2-B — Memory Understanding** — IN PROGRESS (1 of 3 checkpoints closed)
+  - P2-5 Structure discovery engine — CERTIFIED COMPLETE (`Docs/phase2/030`)
+  - P2-6 Typed memory-view expansion — NOT STARTED
+  - P2-7 Value/type inference — NOT STARTED
 - **P2-C — Memory Interaction & Control** — NOT STARTED
   - P2-8 Memory map + watchlists
   - P2-9 Freeze/write/revert + address-validation/hotkey verification
@@ -405,6 +405,20 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 **P2-4.1 canonical integration — 2026-09-17.** A post-certification integration audit found one evidence-accuracy defect (not a logic/behavior defect): `tests/live-memory/pointer-stability-real-game-bastion.test.ts`'s own docstring incorrectly claimed Bastion.exe's module base never varies across launches, contradicting the campaign's own recorded 4/5-relocated result. Corrected in commit `b81f694` (comment-only; re-run confirmed 5/5 pass, same 1 stable_exact / 4 stable_relocated result, no assertion or behavior changed). PR #35 (head `b81f694`) passed all required checks a second time, first attempt, then merged to canonical `master` normally (no force, no history rewrite):
 
 **P2-4.1 canonical integration: PR #35 merged at `4f7abf730cf1d7e8b7e568b3c93d3d7d697fc76c`.** PR #32 and PR #33 (the two ancestor stacked PRs whose commits `b81f694` already fully contains) auto-transitioned to MERGED by GitHub once their commits became reachable from `master`. No prior evidence in this file or in `Docs/phase2/016` through `028` was retracted or rewritten by this integration step.
+
+**P2-5 Final Closure Reconciliation — 2026-09-17 (branch `feature/solith-phase2-structure-discovery`, isolated worktree per the "ONE ACTIVE CLAUDE SESSION = ONE WORKTREE" rule).** Starting checkpoint `a13854d` (canonical `DiscoveredStructure`/`DiscoveredField` model and driver-agnostic engine only, `Docs/phase2/029`'s own baseline). This note preserves every line of prior Phase 2 evidence unchanged — nothing here retracts or overwrites P2-1 through P2-4.1.
+
+- `LiveMemorySession`/IPC/preload/UI wiring closed (`structureDiscover/List/Get/Delete/Refresh/InspectField/CaptureSnapshot/ListSnapshots/CompareSnapshots`, `structure:*` IPC channels, `StructureDiscoveryPanel.tsx` mounted next to `PointerMapPanel`) — none of this existed at the starting checkpoint, which was engine-only.
+- Real fixture extension (`fixture.rs`'s `STRUCT_REGION`: sentinel int32/float32/u64/module-external pointer/mutable int32/raw bytes/ASCII string/unaligned field, plus a `writestruct` mutation command) and real-process certification: byte-for-byte reconstruction against the fixture's own known plant, real pointer/string evidence correctly isolated, real Snapshot A/mutate/Snapshot B/compare. **10-restart fixture stress: 10/10. Independent full-file certification: 3/3.**
+- Real bug found and fixed during failure-injection work: `discoverStructure` threw uncaught when the target process exited between a successful window read and module/region enumeration, instead of degrading gracefully — fixed (fall back to no known modules/regions, pointer candidates simply don't classify) and regression-tested.
+- Real-game proof (Godlike Burger, production attach path, real PE-header read at the real module base, DOS-magic `"MZ"` ground truth) and a real-game snapshot proof, recorded honestly as `READ_ONLY_STRUCTURE_DISCOVERY_PROOF` per the mission's own instruction (no semantically controlled field exists on a running executable's own static header).
+- UI e2e: **3/3** real-process (dev build) and **3/3** packaged (`dist/win-unpacked`). Real, disclosed finding from that work: `readBuffer()` against a `VirtualAlloc`'d region can remain non-deterministically successful for an unbounded time after the target process is confirmed terminated (`getModules()`/`getRegions()` correctly detect the exit in the same session; the raw byte-read path does not) — a pre-existing native-driver/OS characteristic shared by every live-memory feature that reads raw bytes, not introduced by or fixable within P2-5's scope. Flagged for the native-driver owner; the e2e assertion was written to match what is actually true rather than force a claim that isn't.
+- Session-level resource limits closed (spec §18): `MAX_DISCOVERED_STRUCTURES_PER_SESSION` (100), `MAX_SNAPSHOTS_PER_STRUCTURE` (50), oldest-first eviction. The remaining §18 items were already structurally bounded (window length cap, per-field string-scan width, no pointer-follow-by-design, stateless comparison) and needed no new code.
+- Structure discovery: ABSENT → **IMPLEMENTED_VERIFIED** (matrix row above updated).
+- Phase 2 requirement count recomputed from P2-4.1's own 28-item split (unchanged methodology, one item moved): **6 COMPLETE** (pointer maps; pointer-chain visualization; pointer stability testing; module-relative addressing; restart stability validation; **structure discovery**), **5 PARTIAL** (pointer scanning; multi-level pointer scanning; freeze/write/revert; address validation; ReClass.NET adoption), **17 ABSENT** (AOB/signature engineering with resiliency; symbol/module awareness; typed memory views; value/type inference; memory-region inspection; memory map; watchlists; hotkeys; instruction-aware analysis; resilient rediscovery; version-aware rediscovery; Adaptive Scan Planner; Zydis; Vectorscan; Ghidra; DynamoRIO; Dear ImGui) — 6 + 5 + 17 = 28.
+- **Phase 2 is NOT certified.** P2-A and P2-5 are now closed (5 of 28 requirements... plus structure discovery, 6 of 28); P2-6 through P2-17 (22 of 28 requirements) remain untouched. Do not start P2-6 automatically — the next authorized stage is P2-6 (typed memory-view expansion), pending explicit owner authorization.
+- RECLASS.NET: still DEFERRED_TO_P2-15 — `ROADMAP.md`'s own text (line 323 area, "Symbol/module awareness + Ghidra external adapter... ReClass.NET's Repository/Technology Adoption reference-adoption role") assigns that completion criterion to P2-15, not P2-5. Concept notes only recorded (`Docs/phase2/030`); no code copied/linked/imported.
+- Evidence: `Docs/phase2/029` (baseline) and `030` (final certification, including the fresh-worktree reproduction).
 
 ---
 

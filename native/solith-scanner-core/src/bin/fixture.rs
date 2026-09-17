@@ -23,6 +23,10 @@
 //! - `writefar <decimal_offset> <hex_le_bytes>` -> identical, but targets
 //!   `PATTERN_REGION` (8 MiB) instead of `REFINE_REGION` (64 KiB), so a test
 //!   can plant a signature beyond the legacy 1 MiB read ceiling.
+//! - `writestruct <decimal_offset> <hex_le_bytes>` -> identical, but targets
+//!   `STRUCT_REGION` (4 KiB, Phase 2 P2-5) — the deterministic multi-field
+//!   struct layout used by the structure-discovery real-process
+//!   certification's Snapshot A / mutate / Snapshot B campaign.
 //! - anything else -> `UNKNOWN_CMD` is printed and the loop continues.
 //! - EOF, or no input for 30s -> exits after a bounded wait, so a test that
 //!   forgets to signal it can never hang CI forever. The 30s bound resets on
@@ -64,6 +68,44 @@ const GUARD_NOACCESS_PAGE_OFFSET: usize = 4096; // the middle page becomes PAGE_
 const MUTATION_REGION_SIZE: usize = 3 * 4096; // 3 pages, matching GUARD_REGION's shape
 const MUTATION_MARKER_OFFSET: usize = 4096; // middle page, mirroring GUARD's layout
 const MUTATION_MARKER_PATTERN: [u8; 4] = [0xAA, 0xBB, 0xCC, 0xDD];
+
+// ── Phase 2 P2-5 (SOLITH.MD mission §10): a dedicated deterministic
+// multi-field struct layout for the structure-discovery real-process
+// certification, distinct from TYPES_REGION above (whose fields are spread
+// across a 4 MiB region at named-but-unrelated offsets for scanner-coverage
+// testing) and from the unrelated single-int C# `gate2-2-memory-fixture`.
+// This region is laid out exactly as the mission's own field list:
+//   +0x00 int32 sentinel
+//   +0x04 float32
+//   +0x08 uint64
+//   +0x10 pointer to a secondary allocation (STRUCT_SECONDARY_REGION)
+//   +0x18 mutable int32 (rewritable via the `writestruct` stdin command)
+//   +0x1C raw bytes
+//   +0x20 ASCII string payload
+//   +0x31 a second, deliberately unaligned int32 field
+// Bytes between fields are filled with the same decoy-noise pattern the
+// other regions use, so segmentFields' low-confidence bytes are real,
+// non-zero, realistic-looking data rather than an artificial all-zero gap.
+const STRUCT_REGION_SIZE: usize = 4096;
+const STRUCT_SENTINEL_OFFSET: usize = 0x00;
+const STRUCT_SENTINEL_VALUE: i32 = -777_000_111;
+const STRUCT_FLOAT_OFFSET: usize = 0x04;
+const STRUCT_FLOAT_VALUE: f32 = 98.6;
+const STRUCT_U64_OFFSET: usize = 0x08;
+const STRUCT_U64_VALUE: u64 = 0x1122_3344_5566_7788;
+const STRUCT_POINTER_OFFSET: usize = 0x10;
+const STRUCT_MUTABLE_I32_OFFSET: usize = 0x18;
+const STRUCT_MUTABLE_I32_INITIAL: i32 = 42;
+const STRUCT_RAW_BYTES_OFFSET: usize = 0x1C;
+const STRUCT_RAW_BYTES_PATTERN: [u8; 4] = [0xDE, 0xAD, 0xBE, 0xEF];
+const STRUCT_STRING_OFFSET: usize = 0x20;
+const STRUCT_STRING_TEXT: &str = "StructPayload";
+const STRUCT_UNALIGNED_OFFSET: usize = 0x31; // not a multiple of 2/4/8
+const STRUCT_UNALIGNED_VALUE: i32 = -12345;
+
+const STRUCT_SECONDARY_REGION_SIZE: usize = 4096;
+const STRUCT_SECONDARY_MARKER_OFFSET: usize = 0x08;
+const STRUCT_SECONDARY_MARKER_VALUE: u32 = 0xFEED_1234;
 
 // ── Stage 3 (mission §3.11): all 10 primitive types, aligned/unaligned,
 // repeated, boundary-straddling, extreme 64-bit values, float specials,
@@ -436,6 +478,70 @@ fn main() {
             .copy_from_slice(&MUTATION_MARKER_PATTERN);
     }
 
+    // -- P2-5: secondary allocation first, so its address is known when the
+    // primary struct region's pointer field is planted below.
+    let struct_secondary_region = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            STRUCT_SECONDARY_REGION_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(
+        !struct_secondary_region.is_null(),
+        "VirtualAlloc(struct_secondary_region) failed"
+    );
+    let struct_secondary_base = struct_secondary_region as usize;
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(
+            struct_secondary_region as *mut u8,
+            STRUCT_SECONDARY_REGION_SIZE,
+        );
+        for (i, b) in slice.iter_mut().enumerate() {
+            *b = ((i as u32).wrapping_mul(0x27D4_EB2F) >> 24) as u8;
+        }
+        slice[STRUCT_SECONDARY_MARKER_OFFSET..STRUCT_SECONDARY_MARKER_OFFSET + 4]
+            .copy_from_slice(&STRUCT_SECONDARY_MARKER_VALUE.to_le_bytes());
+    }
+
+    let struct_region = unsafe {
+        VirtualAlloc(
+            std::ptr::null(),
+            STRUCT_REGION_SIZE,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        )
+    };
+    assert!(
+        !struct_region.is_null(),
+        "VirtualAlloc(struct_region) failed"
+    );
+    let struct_base = struct_region as usize;
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(struct_region as *mut u8, STRUCT_REGION_SIZE);
+        for (i, b) in slice.iter_mut().enumerate() {
+            *b = ((i as u32).wrapping_mul(0x1656_67B1) >> 24) as u8;
+        }
+        slice[STRUCT_SENTINEL_OFFSET..STRUCT_SENTINEL_OFFSET + 4]
+            .copy_from_slice(&STRUCT_SENTINEL_VALUE.to_le_bytes());
+        slice[STRUCT_FLOAT_OFFSET..STRUCT_FLOAT_OFFSET + 4]
+            .copy_from_slice(&STRUCT_FLOAT_VALUE.to_le_bytes());
+        slice[STRUCT_U64_OFFSET..STRUCT_U64_OFFSET + 8]
+            .copy_from_slice(&STRUCT_U64_VALUE.to_le_bytes());
+        slice[STRUCT_POINTER_OFFSET..STRUCT_POINTER_OFFSET + 8]
+            .copy_from_slice(&(struct_secondary_base as u64).to_le_bytes());
+        slice[STRUCT_MUTABLE_I32_OFFSET..STRUCT_MUTABLE_I32_OFFSET + 4]
+            .copy_from_slice(&STRUCT_MUTABLE_I32_INITIAL.to_le_bytes());
+        slice[STRUCT_RAW_BYTES_OFFSET..STRUCT_RAW_BYTES_OFFSET + STRUCT_RAW_BYTES_PATTERN.len()]
+            .copy_from_slice(&STRUCT_RAW_BYTES_PATTERN);
+        let struct_string = STRUCT_STRING_TEXT.as_bytes();
+        slice[STRUCT_STRING_OFFSET..STRUCT_STRING_OFFSET + struct_string.len()]
+            .copy_from_slice(struct_string);
+        slice[STRUCT_UNALIGNED_OFFSET..STRUCT_UNALIGNED_OFFSET + 4]
+            .copy_from_slice(&STRUCT_UNALIGNED_VALUE.to_le_bytes());
+    }
+
     let types_region = unsafe {
         VirtualAlloc(
             std::ptr::null(),
@@ -676,6 +782,41 @@ fn main() {
     writeln!(out, "MUTATION_REGION_BASE=0x{mutation_base:x}").unwrap();
     writeln!(out, "MUTATION_REGION_SIZE={MUTATION_REGION_SIZE}").unwrap();
     writeln!(out, "MUTATION_MARKER_OFFSET={MUTATION_MARKER_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_REGION_BASE=0x{struct_base:x}").unwrap();
+    writeln!(out, "STRUCT_REGION_SIZE={STRUCT_REGION_SIZE}").unwrap();
+    writeln!(out, "STRUCT_SENTINEL_OFFSET={STRUCT_SENTINEL_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_SENTINEL_VALUE={STRUCT_SENTINEL_VALUE}").unwrap();
+    writeln!(out, "STRUCT_FLOAT_OFFSET={STRUCT_FLOAT_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_FLOAT_VALUE={STRUCT_FLOAT_VALUE}").unwrap();
+    writeln!(out, "STRUCT_U64_OFFSET={STRUCT_U64_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_U64_VALUE=0x{STRUCT_U64_VALUE:x}").unwrap();
+    writeln!(out, "STRUCT_POINTER_OFFSET={STRUCT_POINTER_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_MUTABLE_I32_OFFSET={STRUCT_MUTABLE_I32_OFFSET}").unwrap();
+    writeln!(
+        out,
+        "STRUCT_MUTABLE_I32_INITIAL={STRUCT_MUTABLE_I32_INITIAL}"
+    )
+    .unwrap();
+    writeln!(out, "STRUCT_RAW_BYTES_OFFSET={STRUCT_RAW_BYTES_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_STRING_OFFSET={STRUCT_STRING_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_STRING_TEXT={STRUCT_STRING_TEXT}").unwrap();
+    writeln!(out, "STRUCT_UNALIGNED_OFFSET={STRUCT_UNALIGNED_OFFSET}").unwrap();
+    writeln!(out, "STRUCT_UNALIGNED_VALUE={STRUCT_UNALIGNED_VALUE}").unwrap();
+    writeln!(
+        out,
+        "STRUCT_SECONDARY_REGION_BASE=0x{struct_secondary_base:x}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "STRUCT_SECONDARY_MARKER_OFFSET={STRUCT_SECONDARY_MARKER_OFFSET}"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "STRUCT_SECONDARY_MARKER_VALUE=0x{STRUCT_SECONDARY_MARKER_VALUE:x}"
+    )
+    .unwrap();
     writeln!(out, "READY").unwrap();
     out.flush().unwrap();
 
@@ -713,6 +854,12 @@ fn main() {
     // one-substitution budget matches coincidentally in a real process).
     let pattern_slice =
         unsafe { std::slice::from_raw_parts_mut(pattern_region as *mut u8, PATTERN_REGION_SIZE) };
+    // P2-5 §11 real-process certification: mutate STRUCT_MUTABLE_I32_OFFSET
+    // between Snapshot A and Snapshot B via `writestruct`, so the
+    // snapshot/diff engine is proven against a genuinely changed live
+    // process value, not a Rust-array simulation.
+    let struct_slice =
+        unsafe { std::slice::from_raw_parts_mut(struct_region as *mut u8, STRUCT_REGION_SIZE) };
 
     loop {
         match rx.recv_timeout(Duration::from_secs(30)) {
@@ -727,6 +874,8 @@ fn main() {
                     apply_write_command(refine_slice, rest, &mut out);
                 } else if let Some(rest) = cmd.strip_prefix("writefar ") {
                     apply_write_command(pattern_slice, rest, &mut out);
+                } else if let Some(rest) = cmd.strip_prefix("writestruct ") {
+                    apply_write_command(struct_slice, rest, &mut out);
                 } else if let Some(rest) = cmd.strip_prefix("protect_mutation ") {
                     apply_protect_mutation_command(mutation_region, rest, &mut out);
                 } else if cmd == "decommit_mutation" {

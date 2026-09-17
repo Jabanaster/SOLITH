@@ -53,6 +53,21 @@ import {
   type PointerMapSaveIdentity,
   type PointerMapSummary,
 } from './pointer-map-store.js';
+import {
+  discoverStructure,
+  captureStructureSnapshot,
+  compareStructureSnapshots,
+  refreshStructure,
+} from './structure-discovery.js';
+import {
+  MAX_DISCOVERED_STRUCTURES_PER_SESSION,
+  MAX_SNAPSHOTS_PER_STRUCTURE,
+  type DiscoveredField,
+  type DiscoveredStructure,
+  type StructureDiscoveryRequest,
+  type StructureSnapshot,
+  type StructureSnapshotDiffResult,
+} from './structure-model.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
 import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
@@ -397,6 +412,17 @@ export class LiveMemorySession {
    * is currently attached.
    */
   private readonly pointerMaps = new Map<string, PointerMap>();
+
+  /**
+   * P2-5 — discovered structures live in-memory only, same lifetime rule as
+   * pointerMaps: driver-independent (structure-discovery.ts holds no driver
+   * reference of its own), so a structure simply goes stale after
+   * detach/re-attach until structureRefresh is called against whatever is
+   * currently attached. Snapshots are keyed separately since one structure
+   * may accumulate many snapshots over time (spec §7/§8).
+   */
+  private readonly structures = new Map<string, DiscoveredStructure>();
+  private readonly structureSnapshots = new Map<string, StructureSnapshot>();
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -1512,6 +1538,96 @@ export class LiveMemorySession {
     const map = this.pointerMaps.get(mapId);
     if (!map) throw new Error(`Pointer map "${mapId}" not found.`);
     return map;
+  }
+
+  /**
+   * P2-5 — every curated SOLITH title is a 64-bit Windows process (the same
+   * assumption pointer-scanner.ts already hardcodes via readBigUInt64LE);
+   * no 32-bit target has ever been supported anywhere in this codebase, so
+   * this is a real, existing product constraint being surfaced explicitly
+   * here — not a new guess invented for structure discovery.
+   */
+  private static readonly STRUCTURE_POINTER_WIDTH = 8 as const;
+
+  /** Bounded structure discovery over the attached process (spec §3/§12). */
+  structureDiscover(request: StructureDiscoveryRequest): DiscoveredStructure {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    const structure = discoverStructure(driver, handle, request, { pointerWidth: LiveMemorySession.STRUCTURE_POINTER_WIDTH });
+    // Spec §18 resource limit — the registry itself (not one read, already
+    // bounded by MAX_STRUCTURE_DISCOVERY_LENGTH) accumulates across repeated
+    // calls in a long session; evict the oldest entry (insertion-order,
+    // matching Map's own iteration order) rather than growing unbounded.
+    if (this.structures.size >= MAX_DISCOVERED_STRUCTURES_PER_SESSION) {
+      const oldestId = this.structures.keys().next().value;
+      if (oldestId !== undefined) this.structureDelete(oldestId);
+    }
+    this.structures.set(structure.id, structure);
+    return structure;
+  }
+
+  structureList(): DiscoveredStructure[] {
+    return Array.from(this.structures.values());
+  }
+
+  structureGet(structureId: string): DiscoveredStructure | null {
+    return this.structures.get(structureId) ?? null;
+  }
+
+  structureDelete(structureId: string): boolean {
+    for (const snapshot of this.structureSnapshots.values()) {
+      if (snapshot.structureId === structureId) this.structureSnapshots.delete(snapshot.id);
+    }
+    return this.structures.delete(structureId);
+  }
+
+  private requireStructure(structureId: string): DiscoveredStructure {
+    const structure = this.structures.get(structureId);
+    if (!structure) throw new Error(`Structure "${structureId}" not found.`);
+    return structure;
+  }
+
+  /** Re-reads the exact same window (spec §14/§15) — replaces the stored entry in place, same id, truthful fresh completeness/fields. */
+  structureRefresh(structureId: string): DiscoveredStructure {
+    const existing = this.requireStructure(structureId);
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    const refreshed = refreshStructure(driver, handle, existing, { pointerWidth: LiveMemorySession.STRUCTURE_POINTER_WIDTH });
+    const kept = { ...refreshed, id: structureId };
+    this.structures.set(structureId, kept);
+    return kept;
+  }
+
+  /** One field row from an already-discovered structure (spec §16 field inspector) — never re-derives semantics, just looks the row up. */
+  structureInspectField(structureId: string, offset: number): DiscoveredField {
+    const structure = this.requireStructure(structureId);
+    const field = structure.fields.find((f) => f.offset === offset);
+    if (!field) throw new Error(`No field at offset ${offset} in structure "${structureId}".`);
+    return field;
+  }
+
+  structureCaptureSnapshot(structureId: string): StructureSnapshot {
+    const structure = this.requireStructure(structureId);
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    const snapshot = captureStructureSnapshot(driver, handle, structure);
+    // Spec §18 resource limit — evict this structure's own oldest snapshot
+    // (never another structure's) once its per-structure cap is reached.
+    const existingForStructure = Array.from(this.structureSnapshots.values()).filter((s) => s.structureId === structureId);
+    if (existingForStructure.length >= MAX_SNAPSHOTS_PER_STRUCTURE) {
+      this.structureSnapshots.delete(existingForStructure[0].id);
+    }
+    this.structureSnapshots.set(snapshot.id, snapshot);
+    return snapshot;
+  }
+
+  structureListSnapshots(structureId: string): StructureSnapshot[] {
+    return Array.from(this.structureSnapshots.values()).filter((s) => s.structureId === structureId);
+  }
+
+  structureCompareSnapshots(snapshotAId: string, snapshotBId: string): StructureSnapshotDiffResult {
+    const a = this.structureSnapshots.get(snapshotAId);
+    const b = this.structureSnapshots.get(snapshotBId);
+    if (!a) throw new Error(`Structure snapshot "${snapshotAId}" not found.`);
+    if (!b) throw new Error(`Structure snapshot "${snapshotBId}" not found.`);
+    return compareStructureSnapshots(a, b);
   }
 
   /**

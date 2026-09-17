@@ -500,6 +500,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   researchSnapshotSave: (payload: { snapshot: unknown; label?: string }) =>
     ipcRenderer.invoke('research:snapshot-save', payload),
 
+  // Phase 2 P2-5 — bounded structure discovery (read-only)
+  structureDiscover: (payload: { label: string; baseAddress: string; length: number }) =>
+    ipcRenderer.invoke('structure:discover', payload),
+  structureList: () => ipcRenderer.invoke('structure:list'),
+  structureGet: (payload: { structureId: string }) => ipcRenderer.invoke('structure:get', payload),
+  structureRefresh: (payload: { structureId: string }) => ipcRenderer.invoke('structure:refresh', payload),
+  structureDelete: (payload: { structureId: string }) => ipcRenderer.invoke('structure:delete', payload),
+  structureInspectField: (payload: { structureId: string; offset: number }) =>
+    ipcRenderer.invoke('structure:inspect-field', payload),
+  structureCaptureSnapshot: (payload: { structureId: string }) =>
+    ipcRenderer.invoke('structure:capture-snapshot', payload),
+  structureListSnapshots: (payload: { structureId: string }) =>
+    ipcRenderer.invoke('structure:list-snapshots', payload),
+  structureCompareSnapshots: (payload: { snapshotAId: string; snapshotBId: string }) =>
+    ipcRenderer.invoke('structure:compare-snapshots', payload),
+
   inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-propose-hook', payload),
   inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) =>
