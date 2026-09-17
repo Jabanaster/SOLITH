@@ -1,0 +1,23 @@
+{
+  "name": "solith-scanner-napi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native SOLITH Phase 1 scanner-foundation addon (napi-rs). Not published; consumed in-repo only. Isolated package.json/node_modules so Stage 2's native toolchain addition does not touch the root workspace's dependency tree.",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "binaryName": "solith-scanner-napi",
+    "targets": [
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  }
+}

@@ -2,6 +2,98 @@ declare module 'xml2js';
 declare module '*.css';
 declare module 'sql.js';
 
+// Phase 2 P2-2 — pointer map renderer DTOs, mirroring serializePointerMap/
+// serializePointerMapScanResult in electron/live-memory-ipc.ts. moduleOffset
+// is a "0x..." string on the wire (see PointerMapCreateSchema and friends),
+// matching liveMemoryPointerScan's existing candidate shape above.
+// P2-4 — restart-stability wire shapes, mirroring pointer-stability.ts's
+// StabilityStatus/StabilityObservation/StabilityBaseline exactly.
+type StabilityStatusDto =
+  | 'stable_exact'
+  | 'stable_relocated'
+  | 'target_moved_chain_valid'
+  | 'chain_broken'
+  | 'module_missing'
+  | 'read_failed'
+  | 'process_exited'
+  | 'false_positive';
+
+interface StabilityBaselineDto {
+  pid: number | null;
+  moduleBase: string | null;
+  resolvedAddress: string;
+  recordedAt: string;
+}
+
+interface StabilityObservationDto {
+  launchNumber: number;
+  pid: number | null;
+  moduleBase: string | null;
+  resolvedAddress: string | null;
+  status: StabilityStatusDto;
+  failureReason: string | null;
+  observedAt: string;
+}
+
+interface NodeStabilityStateDto {
+  baseline: StabilityBaselineDto | null;
+  observations: StabilityObservationDto[];
+}
+
+/** The wire shape sent TO the main process — never a closure, see pointer-stability.ts's StabilityGroundTruthSpec. */
+type StabilityGroundTruthSpecDto =
+  | { kind: 'u32'; expected: number; description: string }
+  | { kind: 'u64'; expected: string; description: string };
+
+interface PointerMapNodeDto {
+  id: string;
+  label: string;
+  path: { moduleName: string; moduleOffset: string; offsets: number[] };
+  depth: number;
+  status: 'unresolved' | 'resolved' | 'module_missing' | 'read_failed' | 'process_exited';
+  lastResolvedAddress: string | null;
+  lastResolvedAt: string | null;
+  createdAt: string;
+  targetAddress: string | null;
+  scanId: string | null;
+  stability: NodeStabilityStateDto;
+}
+
+interface PointerMapDto {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  nodes: PointerMapNodeDto[];
+}
+
+interface PointerMapCompletenessDto {
+  state: 'complete' | 'complete_with_skipped_regions' | 'cancelled' | 'process_exited' | 'resource_limit' | 'failed';
+  skipped?: Array<{ baseAddress: string; size: string; reason: string }>;
+  atByte?: string;
+  reason?: string;
+}
+
+interface PointerMapTargetOutcomeDto {
+  targetAddress: string;
+  requestedDepth: number;
+  deepestLevelCompleted: number;
+  termination: string;
+  completeness: PointerMapCompletenessDto;
+  candidateCount: number;
+  nodesAdded: number;
+  truncated: boolean;
+}
+
+interface PointerMapScanResultDto {
+  map: PointerMapDto;
+  perTarget: PointerMapTargetOutcomeDto[];
+  aggregateCompleteness: PointerMapCompletenessDto;
+  targetsRequested: number;
+  targetsScanned: number;
+  resourceLimited: boolean;
+}
+
 interface Window {
   electronAPI: {
     e2eTrainerState: string | null;
@@ -138,12 +230,29 @@ interface Window {
     liveMemoryScanFirst: (payload: {
       dataType: string;
       targetValue: number;
+      // Stage 7.1 §3/§4 — exact int64 wire value (decimal string). A
+      // `number` alone cannot carry a value beyond
+      // Number.MAX_SAFE_INTEGER without loss. Ignored for any dataType
+      // other than 'int64'.
+      targetValueBigint?: string;
       maxRegionBytes?: number;
       maxTotalBytes?: number;
       maxMatches?: number;
     }) => Promise<{
       success: boolean;
-      result?: { matches: { address: string; value: number }[]; regionsScanned: number; bytesScanned: number; truncated: boolean };
+      result?: {
+        matches: { address: string; value: number; valueBigint?: string }[];
+        regionsScanned: number;
+        bytesScanned: number;
+        truncated: boolean;
+        // Stage 7 — which backend actually served this scan (LEGACY/NATIVE
+        // routing is real and observable, not compile-time-only) and
+        // whether an empty match set is authoritative (legacy's AOB/scan
+        // paths never had a real "definitely not present" signal; see
+        // ScannerBackend's doc comments).
+        backend?: 'legacy' | 'native';
+        isAuthoritativeAbsence?: boolean;
+      };
       error?: string;
     }>;
     liveMemoryScanFirstAutoMatrix: (payload: {
@@ -777,10 +886,183 @@ interface Window {
       };
       error?: string;
     }>;
+    // Phase 2 P2-2 — pointer map production surface (renderer view).
+    pointerMapCreate: (payload: { name: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapList: () => Promise<{ success: boolean; maps?: PointerMapDto[]; error?: string }>;
+    pointerMapGet: (payload: { mapId: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapRename: (payload: { mapId: string; name: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapDelete: (payload: { mapId: string }) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+    pointerMapScanTarget: (payload: {
+      mapId: string;
+      target: string;
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
+    pointerMapScanTargets: (payload: {
+      mapId: string;
+      targets: string[];
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; result?: PointerMapScanResultDto; error?: string }>;
+    pointerMapResolve: (payload: { mapId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      resolvedCount?: number;
+      failedCount?: number;
+      error?: string;
+    }>;
+    pointerMapRefresh: (payload: { mapId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      resolvedCount?: number;
+      failedCount?: number;
+      error?: string;
+    }>;
+    pointerMapAddNode: (payload: {
+      mapId: string;
+      label: string;
+      candidate: { moduleName: string; moduleOffset: number; offsets: number[]; depth: number };
+    }) => Promise<{ success: boolean; map?: PointerMapDto; nodeId?: string; error?: string }>;
+    pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      error?: string;
+    }>;
+    /** P2-4 — real restart-stability validation, same start-shape convention as the rest of this pointer-map contract. */
+    pointerMapValidateNode: (payload: {
+      mapId: string;
+      nodeId: string;
+      groundTruth: StabilityGroundTruthSpecDto;
+    }) => Promise<{ success: boolean; map?: PointerMapDto; observation?: StabilityObservationDto; error?: string }>;
+    pointerMapValidateAfterRestart: (payload: {
+      mapId: string;
+      groundTruthByNodeId: Record<string, StabilityGroundTruthSpecDto>;
+    }) => Promise<{
+      success: boolean;
+      map?: PointerMapDto;
+      observations?: StabilityObservationDto[];
+      skippedNodeIds?: string[];
+      error?: string;
+    }>;
+    pointerMapGetNodeStability: (payload: { mapId: string; nodeId: string }) => Promise<{
+      success: boolean;
+      stability?: NodeStabilityStateDto;
+      error?: string;
+    }>;
+    pointerMapSave: (payload: {
+      mapId: string;
+      gameId?: string;
+      executableIdentity?: string;
+      architecture?: string;
+    }) => Promise<{ success: boolean; error?: string }>;
+    pointerMapLoad: (payload: { mapId: string }) => Promise<{ success: boolean; map?: PointerMapDto; error?: string }>;
+    pointerMapListSaved: () => Promise<{
+      success: boolean;
+      maps?: Array<{ mapId: string; name: string; nodeCount: number; gameId: string | null; createdAt: string; updatedAt: string }>;
+      error?: string;
+    }>;
+    pointerMapDeleteSaved: (payload: { mapId: string }) => Promise<{ success: boolean; error?: string }>;
+    /**
+     * P2-3.1 §5/§6 — real cancellable pointer-map scan contract, same
+     * start-returns-operationId-before-the-scan-finishes shape as
+     * `liveMemoryScanFirstStart`/`liveMemoryScanCancel`/`liveMemoryScanPoll`
+     * below, reusing the identical operation registry (not a parallel one).
+     */
+    pointerMapScanStart: (payload: {
+      mapId: string;
+      targets: string[];
+      bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+    }) => Promise<{ success: boolean; operationId?: string; error?: string }>;
+    pointerMapScanCancel: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      found?: boolean;
+      alreadyTerminal?: boolean;
+      error?: string;
+    }>;
+    pointerMapScanPoll: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      status?: 'pending' | 'complete' | 'cancelled' | 'error' | 'not_found';
+      result?: PointerMapScanResultDto;
+      error?: string;
+    }>;
     liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) => Promise<{
       success: boolean;
       found?: boolean;
       address?: string;
+      backend?: 'legacy' | 'native';
+      isAuthoritativeAbsence?: boolean;
+      error?: string;
+    }>;
+    /**
+     * Stage 7 §7.5 — explicit, observable scanner backend routing control.
+     * Was missing from this renderer-facing type declaration since Stage 7
+     * added the underlying IPC channels/preload methods — renderer code
+     * had no type-safe way to call them until this fix (Stage 7 final
+     * closure §8: "runtime-observable... testable... not compile-time-only"
+     * requires the renderer contract to actually expose this).
+     */
+    liveMemoryScannerRoutingModeGet: () => Promise<{
+      success: boolean;
+      mode?: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
+      diagnostics?: {
+        mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
+        allowFallbackToLegacyOnNativeFailure: boolean;
+        operationCount: number;
+        fallbackCount: number;
+        lastOperation?: unknown;
+      };
+      error?: string;
+    }>;
+    liveMemoryScannerRoutingModeSet: (payload: { mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE' }) => Promise<{
+      success: boolean;
+      mode?: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE';
+      error?: string;
+    }>;
+    /**
+     * Stage 7.2/7.3 §2/§3/§12 — cancellable production scan contract.
+     * `liveMemoryScanFirstStart`/`liveMemoryScanAobStart` return an
+     * `operationId` immediately (before the scan finishes), so
+     * `liveMemoryScanCancel` can reference an operation that is genuinely
+     * still in flight; `liveMemoryScanPoll` returns its terminal state once
+     * available. `targetValueBigint`/`valueBigint` are decimal STRINGS, never
+     * a plain `number`, so a future int64/u64 consumer of this declared type
+     * cannot be handed a value that has already lost precision.
+     */
+    liveMemoryScanFirstStart: (payload: {
+      // Stage 7.4 §1 — legacy names plus the 10 canonical short names
+      // (the only way to reach i8/i16/u16/u64).
+      dataType:
+        | 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64'
+        | 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32' | 'i64' | 'u64' | 'f32' | 'f64';
+      targetValue: number;
+      targetValueBigint?: string;
+      maxRegionBytes?: number;
+      maxTotalBytes?: number;
+      maxMatches?: number;
+    }) => Promise<{ success: boolean; operationId?: string; error?: string }>;
+    liveMemoryScanAobStart: (payload: { signature: string; moduleName?: string }) => Promise<{
+      success: boolean;
+      operationId?: string;
+      error?: string;
+    }>;
+    liveMemoryScanCancel: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      found?: boolean;
+      alreadyTerminal?: boolean;
+      error?: string;
+    }>;
+    liveMemoryScanPoll: (payload: { operationId: string }) => Promise<{
+      success: boolean;
+      status?: 'pending' | 'complete' | 'cancelled' | 'error' | 'not_found';
+      kind?: 'exact' | 'aob';
+      result?: {
+        backend?: 'legacy' | 'native';
+        isAuthoritativeAbsence?: boolean;
+        matches?: Array<{ address: string; value: number; valueBigint?: string }>;
+        regionsScanned?: number;
+        bytesScanned?: number;
+        truncated?: boolean;
+        found?: boolean;
+        address?: string;
+      };
       error?: string;
     }>;
     /** Phase 9 — typed reinterpret at one address (read-only). */

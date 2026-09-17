@@ -37,10 +37,19 @@ test('package.json is the single authoritative product version', () => {
   assert.match(readme, new RegExp(`solith@${version.replace(/\./g, '\\.')}`));
   assert.doesNotMatch(readme, /2\.4\.0-rc\.\d+/);
 
-  const roadmap = readText('ROADMAP.md');
-  assert.match(roadmap, new RegExp(`solith@${version.replace(/\./g, '\\.')}`));
-  assert.match(roadmap, /Current Baseline \(Solith 2\.4\.0-alpha\.2\)/);
-  assert.doesNotMatch(roadmap, /Current Baseline \(Solith 2\.4\.0-rc/);
+  // ROADMAP.md is intentionally NOT checked here. It is a phase/roadmap
+  // planning document, not a version-bearing product surface, and requiring
+  // it to duplicate the application version made a documentation file a
+  // second hand-maintained copy of package.json's version — exactly the
+  // coupling this suite exists to avoid everywhere else. The canonical
+  // roadmap (Step 0.14 onward) identifies its baseline by certified git SHA
+  // instead. See Docs/roadmap/STEP_0.14.1_ROADMAP_CONTRACT_REPAIR.md.
+  //
+  // Electron's own app.getVersion() (electron/main.ts) and the Settings ->
+  // About UI (AboutSection.tsx) both read the version dynamically from the
+  // packaged app metadata at runtime rather than holding a separate literal,
+  // so neither can drift from package.json by construction and neither
+  // needs a static string-match assertion here.
 
   const changelog = readText('CHANGELOG.md');
   assert.match(changelog, new RegExp(`## v${version.replace(/\./g, '\\.')}`));

@@ -131,6 +131,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   liveMemoryScanFirst: (payload: {
     dataType: string;
     targetValue: number;
+    // Stage 7.1 §3/§4 — exact int64 wire value (decimal string; a `number`
+    // alone cannot carry a value beyond Number.MAX_SAFE_INTEGER without
+    // loss). Ignored for any dataType other than 'int64'. See
+    // LiveMemoryScanFirstSchema and LiveMemorySession.scanExactViaBackend.
+    targetValueBigint?: string;
     maxRegionBytes?: number;
     maxTotalBytes?: number;
     maxMatches?: number;
@@ -394,8 +399,89 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('trainer-research-merge-ue-scripts', payload),
   liveMemoryPointerScan: (payload: { address: string; maxDepth?: number; maxOffsetPerLevel?: number }) =>
     ipcRenderer.invoke('live-memory-pointer-scan', payload),
+  // Phase 2 P2-2 — pointer map production surface. Every address crossing
+  // this boundary is a "0x..." string, never a bare Number — a real 64-bit
+  // process's addresses can exceed Number.MAX_SAFE_INTEGER (mission §11).
+  pointerMapCreate: (payload: { name: string }) => ipcRenderer.invoke('pointer-map-create', payload),
+  pointerMapList: () => ipcRenderer.invoke('pointer-map-list'),
+  pointerMapGet: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-get', payload),
+  pointerMapRename: (payload: { mapId: string; name: string }) => ipcRenderer.invoke('pointer-map-rename', payload),
+  pointerMapDelete: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-delete', payload),
+  pointerMapScanTarget: (payload: {
+    mapId: string;
+    target: string;
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-target', payload),
+  pointerMapScanTargets: (payload: {
+    mapId: string;
+    targets: string[];
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-targets', payload),
+  pointerMapResolve: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-resolve', payload),
+  pointerMapRefresh: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-refresh', payload),
+  pointerMapAddNode: (payload: {
+    mapId: string;
+    label: string;
+    candidate: { moduleName: string; moduleOffset: number; offsets: number[]; depth: number };
+  }) => ipcRenderer.invoke('pointer-map-add-node', payload),
+  pointerMapRemoveNode: (payload: { mapId: string; nodeId: string }) =>
+    ipcRenderer.invoke('pointer-map-remove-node', payload),
+  // P2-4 — real restart-stability validation. groundTruth is a serializable
+  // spec (u32/u64 expected value), never a closure.
+  pointerMapValidateNode: (payload: {
+    mapId: string;
+    nodeId: string;
+    groundTruth: { kind: 'u32'; expected: number; description: string } | { kind: 'u64'; expected: string; description: string };
+  }) => ipcRenderer.invoke('pointer-map-validate-node', payload),
+  pointerMapValidateAfterRestart: (payload: {
+    mapId: string;
+    groundTruthByNodeId: Record<
+      string,
+      { kind: 'u32'; expected: number; description: string } | { kind: 'u64'; expected: string; description: string }
+    >;
+  }) => ipcRenderer.invoke('pointer-map-validate-after-restart', payload),
+  pointerMapGetNodeStability: (payload: { mapId: string; nodeId: string }) =>
+    ipcRenderer.invoke('pointer-map-get-node-stability', payload),
+  pointerMapSave: (payload: { mapId: string; gameId?: string; executableIdentity?: string; architecture?: string }) =>
+    ipcRenderer.invoke('pointer-map-save', payload),
+  pointerMapLoad: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-load', payload),
+  pointerMapListSaved: () => ipcRenderer.invoke('pointer-map-list-saved'),
+  pointerMapDeleteSaved: (payload: { mapId: string }) => ipcRenderer.invoke('pointer-map-delete-saved', payload),
+  // P2-3.1 §5/§6 — cancellable pointer-map scan contract, same start/cancel/poll
+  // transport shape as liveMemoryScanFirstStart/liveMemoryScanCancel/liveMemoryScanPoll below.
+  pointerMapScanStart: (payload: {
+    mapId: string;
+    targets: string[];
+    bounds?: { maxDepth?: number; maxOffsetPerLevel?: number; maxResults?: number; maxTotalScans?: number; maxCandidatesPerLevel?: number };
+  }) => ipcRenderer.invoke('pointer-map-scan-start', payload),
+  pointerMapScanCancel: (payload: { operationId: string }) => ipcRenderer.invoke('pointer-map-scan-cancel', payload),
+  pointerMapScanPoll: (payload: { operationId: string }) => ipcRenderer.invoke('pointer-map-scan-poll', payload),
   liveMemoryScanAob: (payload: { signature: string; moduleName?: string }) =>
     ipcRenderer.invoke('live-memory-scan-aob', payload),
+  liveMemoryScannerRoutingModeGet: () => ipcRenderer.invoke('live-memory-scanner-routing-mode-get'),
+  liveMemoryScannerRoutingModeSet: (payload: { mode: 'LEGACY' | 'NATIVE' | 'SHADOW_COMPARE' }) =>
+    ipcRenderer.invoke('live-memory-scanner-routing-mode-set', payload),
+  // Stage 7.2/7.3 §2/§3/§12 — cancellable production scan contract. Start
+  // returns an `operationId` before the scan finishes; cancel/poll reference
+  // it. This is the real preload transport for mid-flight cancellation —
+  // not a UI-only flag.
+  liveMemoryScanFirstStart: (payload: {
+    // Stage 7.4 §1 — the 6 legacy names plus the 10 canonical short names
+    // (i8/u8/i16/u16/i32/u32/i64/u64/f32/f64), which is the only way to
+    // reach i8/i16/u16/u64.
+    dataType:
+      | 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64'
+      | 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32' | 'i64' | 'u64' | 'f32' | 'f64';
+    targetValue: number;
+    targetValueBigint?: string;
+    maxRegionBytes?: number;
+    maxTotalBytes?: number;
+    maxMatches?: number;
+  }) => ipcRenderer.invoke('live-memory-scan-first-start', payload),
+  liveMemoryScanAobStart: (payload: { signature: string; moduleName?: string }) =>
+    ipcRenderer.invoke('live-memory-scan-aob-start', payload),
+  liveMemoryScanCancel: (payload: { operationId: string }) => ipcRenderer.invoke('live-memory-scan-cancel', payload),
+  liveMemoryScanPoll: (payload: { operationId: string }) => ipcRenderer.invoke('live-memory-scan-poll', payload),
 
   // Phase 9 — read-only address/data research tools
   researchView: (payload: { address: string; types: string[] }) =>

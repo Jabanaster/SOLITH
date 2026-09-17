@@ -222,6 +222,13 @@ export interface ScanBounds {
   maxTotalBytes?: number;
   /** Cap on returned matches for a first scan, to keep the result set usable. Default 10000. */
   maxMatches?: number;
+  /**
+   * Cooperative cancellation, checked between regions. A cancelled scan
+   * reports `completeness: { state: 'cancelled' }` and is never an
+   * authoritative absence — partial results stay, the claim of completeness
+   * does not.
+   */
+  signal?: { aborted: boolean };
 }
 
 // ── Freeze (continuous re-write, mirrors mainstream "Infinite X" toggles) ──

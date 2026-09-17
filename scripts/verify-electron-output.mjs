@@ -109,6 +109,26 @@ check('headless-verification-worker.js < 500 KB (not bloated)', headlessWorkerSi
 check('solith-readonly-scanner.exe > 10 KB on Windows (not empty/stub)', process.platform !== 'win32' || scannerSize > 10_000, `actual: ${scannerSize} bytes`);
 check('solith-readonly-scanner.exe < 5 MB on Windows (not bloated)', process.platform !== 'win32' || scannerSize < 5_000_000, `actual: ${(scannerSize/1024).toFixed(1)} KB`);
 
+// ── Stage 7 §7.17/§7.18 — native scanner addon build integration ────────────
+// Not copied into dist-electron (it ships via node_modules + extraResources —
+// see package.json's `solith-scanner-napi` dependency and `build.extraResources`),
+// so this checks its real build output location instead of DIST.
+const napiAddonPath = join(ROOT, 'native', 'solith-scanner-napi', 'solith-scanner-napi.win32-x64-msvc.node');
+const napiAddonSize = existsSync(napiAddonPath) ? statSync(napiAddonPath).size : 0;
+check('solith-scanner-napi.win32-x64-msvc.node exists on Windows (native scanner addon)', process.platform !== 'win32' || napiAddonSize > 0);
+check('solith-scanner-napi.win32-x64-msvc.node > 10 KB on Windows (not empty/stub)', process.platform !== 'win32' || napiAddonSize > 10_000, `actual: ${napiAddonSize} bytes`);
+check('solith-scanner-napi.win32-x64-msvc.node < 20 MB on Windows (not bloated)', process.platform !== 'win32' || napiAddonSize < 20_000_000, `actual: ${(napiAddonSize/1024).toFixed(1)} KB`);
+if (process.platform === 'win32') {
+  try {
+    const { createRequire } = await import('node:module');
+    const nativeRequire = createRequire(import.meta.url);
+    const addon = nativeRequire('solith-scanner-napi');
+    check('solith-scanner-napi resolves via node_modules and exposes NativeScanTarget', typeof addon.NativeScanTarget === 'function');
+  } catch (err) {
+    check('solith-scanner-napi resolves via node_modules and exposes NativeScanTarget', false, String(err));
+  }
+}
+
 // ── 7. Catalog-update trust root ────────────────────────────────────────────
 // TRUSTED_CATALOG_UPDATE_PUBLIC_KEY_PEM in src/core/catalog-updates/signing.ts
 // is a placeholder Ed25519 keypair (see that file's header comment) — it must

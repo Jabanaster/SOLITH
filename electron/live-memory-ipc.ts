@@ -29,7 +29,22 @@ import {
   LiveMemoryResolveControlSchema,
   LiveMemoryResolveDefinitionFeatureSchema,
   LiveMemoryPointerScanSchema,
+  PointerMapCreateSchema,
+  PointerMapIdSchema,
+  PointerMapRenameSchema,
+  PointerMapScanTargetSchema,
+  PointerMapScanTargetsSchema,
+  PointerMapAddNodeSchema,
+  PointerMapRemoveNodeSchema,
+  PointerMapSaveSchema,
+  PointerMapValidateNodeSchema,
+  PointerMapValidateAfterRestartSchema,
+  PointerMapGetNodeStabilitySchema,
   LiveMemoryScanAobSchema,
+  LiveMemoryScannerRoutingModeSchema,
+  LiveMemoryScanFirstStartSchema,
+  LiveMemoryScanAobStartSchema,
+  LiveMemoryScanOperationIdSchema,
   ResearchViewSchema,
   ResearchHexSchema,
   ResearchPointerAnalyzeSchema,
@@ -44,7 +59,13 @@ import {
   InProcessRegisterInjectorHelperSchema,
 } from './ipc-validation.js';
 import type { ScanMatch } from '../src/core/live-memory/types.js';
+import type { CanonicalCompleteness, CanonicalSkippedRange } from '../src/core/live-memory/scanner-backend.js';
 import type { LiveMemorySession } from '../src/core/live-memory/live-memory-session.js';
+import type { PointerMap, PointerMapNode } from '../src/core/live-memory/pointer-map.js';
+import type { PointerMapScanTargetsResult } from '../src/core/live-memory/pointer-map-orchestration.js';
+import type { NodeStabilityResult, MapStabilityResult } from '../src/core/live-memory/pointer-stability-orchestration.js';
+import type { StabilityGroundTruthSpec } from '../src/core/live-memory/pointer-stability.js';
+import { listSavedPointerMaps } from '../src/core/live-memory/pointer-map-store.js';
 import type { MemoryManager } from '../src/core/live-memory/memory-manager.js';
 import type { MemoryAuditLog } from '../src/core/live-memory/audit-log.js';
 import type { LiveCorrelationWatcher } from '../src/core/live-memory/live-correlation-watcher.js';
@@ -488,12 +509,37 @@ export function registerLiveMemoryIpc(): void {
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryScanFirstSchema.parse(payload);
-      const result = session.scanFirst(parsed.dataType, parsed.targetValue, {
-        maxRegionBytes: parsed.maxRegionBytes,
-        maxTotalBytes: parsed.maxTotalBytes,
-        maxMatches: parsed.maxMatches,
-      });
-      return { success: true, result: serializeScanResult(result) };
+      // Stage 7 §7.10-§7.12 — routed through the backend contract (LEGACY
+      // by default, byte-for-byte equivalent to the pre-Stage-7 `scanFirst`
+      // call it replaces; see LegacyScannerBackend's doc comment).
+      // Stage 7.1 §7.1-C — when the caller supplies the exact int64 wire
+      // value, pass it through untouched instead of letting the session
+      // reconstruct it from the already-lossy `targetValue` number.
+      const exactTargetValueBigint =
+        parsed.targetValueBigint !== undefined ? BigInt(parsed.targetValueBigint) : undefined;
+      const result = await session.scanExactViaBackend(
+        parsed.dataType,
+        parsed.targetValue,
+        {
+          maxRegionBytes: parsed.maxRegionBytes,
+          maxTotalBytes: parsed.maxTotalBytes,
+          maxMatches: parsed.maxMatches,
+        },
+        exactTargetValueBigint,
+      );
+      return {
+        success: true,
+        result: {
+          ...serializeScanResult(result),
+          backend: result.backend,
+          isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+          matches: result.matches.map((m) => ({
+            address: m.address.toString(),
+            value: m.value,
+            ...(m.valueBigint !== undefined ? { valueBigint: m.valueBigint.toString() } : {}),
+          })),
+        },
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_first_failed') };
     }
@@ -538,8 +584,20 @@ export function registerLiveMemoryIpc(): void {
       const session = requireSession(event);
       const parsed = LiveMemoryScanNextSchema.parse(payload);
       const previous: ScanMatch[] = parsed.previous.map((m) => ({ address: BigInt(m.address), value: m.value }));
-      const matches = session.scanNext(parsed.dataType, parsed.comparison, previous);
-      return { success: true, matches: serializeMatches(matches) };
+      const result = session.scanNext(parsed.dataType, parsed.comparison, previous);
+      // `matches` is unchanged for existing renderer code; the coverage fields
+      // are additive, and are what let the UI distinguish "narrowed to zero
+      // because nothing matched" from "narrowed to zero because candidates
+      // could not be re-read" (D01 final closure).
+      return {
+        success: true,
+        matches: serializeMatches(result.matches),
+        candidatesConsidered: result.candidatesConsidered,
+        candidatesUnreadable: result.candidatesUnreadable,
+        truncated: result.truncated,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+        completeness: serializeCompleteness(result.completeness),
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_next_failed') };
     }
@@ -557,7 +615,14 @@ export function registerLiveMemoryIpc(): void {
         maxRegionBytes: parsed.maxRegionBytes,
         maxTotalBytes: parsed.maxTotalBytes,
       });
-      return { success: true, ...result };
+      return {
+        success: true,
+        regionsScanned: result.regionsScanned,
+        bytesScanned: result.bytesScanned,
+        truncated: result.truncated,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+        completeness: serializeCompleteness(result.completeness),
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'scan_first_unknown_failed') };
     }
@@ -584,6 +649,8 @@ export function registerLiveMemoryIpc(): void {
           regionsScanned: result.regionsScanned,
           bytesScanned: result.bytesScanned,
           truncated: result.truncated,
+          isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+          completeness: serializeCompleteness(result.completeness),
         },
       };
     } catch (error) {
@@ -600,10 +667,19 @@ export function registerLiveMemoryIpc(): void {
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryReadManySchema.parse(payload);
-      const results = session.readMany(parsed.addresses.map((a) => ({ address: BigInt(a.address), dataType: a.dataType })));
+      const outcome = session.readManyWithCoverage(
+        parsed.addresses.map((a) => ({ address: BigInt(a.address), dataType: a.dataType })),
+      );
+      // `values` keeps its exact shape. `requested` and `unreadable` are
+      // additive: omission alone is ambiguous to a polling caller, which
+      // cannot tell "this candidate was freed" from "this candidate was never
+      // asked for", so the Watch Live panel needs the count to distinguish a
+      // genuinely dead candidate list from a transient read failure.
       return {
         success: true,
-        values: results.map((r) => ({ address: r.address.toString(), value: r.value, dataType: r.dataType })),
+        values: outcome.values.map((r) => ({ address: r.address.toString(), value: r.value, dataType: r.dataType })),
+        requested: outcome.requested,
+        unreadable: outcome.unreadable.map((r) => ({ address: r.address.toString(), dataType: r.dataType })),
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'read_many_failed') };
@@ -899,7 +975,7 @@ export function registerLiveMemoryIpc(): void {
       if (!resolved.control) return { success: false, error: 'unknown_control' };
 
       const address = resolved.feature
-        ? session.resolveMemoryFeature(resolved.feature)
+        ? await session.resolveMemoryFeature(resolved.feature)
         : session.resolveControl(resolved.control);
       const currentValue = session.readValue(address);
       return {
@@ -933,7 +1009,7 @@ export function registerLiveMemoryIpc(): void {
       const feature = definition.memoryFeatures?.find((f) => f.id === parsed.featureId);
       if (!feature) return { success: false, error: 'unknown_feature' };
 
-      const address = session.resolveMemoryFeature(feature);
+      const address = await session.resolveMemoryFeature(feature);
       const currentValue = session.readValue(address);
       return {
         success: true,
@@ -968,12 +1044,346 @@ export function registerLiveMemoryIpc(): void {
             depth: c.depth,
           })),
           truncated: scanResult.truncated,
+          requestedDepth: scanResult.requestedDepth,
           levelsSearched: scanResult.levelsSearched,
+          deepestLevelCompleted: scanResult.deepestLevelCompleted,
           scansPerformed: scanResult.scansPerformed,
+          candidatesExplored: scanResult.candidatesExplored,
+          candidatesDropped: scanResult.candidatesDropped,
+          termination: scanResult.termination,
+          isAuthoritativeAbsence: scanResult.isAuthoritativeAbsence,
+          completeness: serializeCompleteness(scanResult.completeness),
         },
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'pointer_scan_failed') };
+    }
+  });
+
+  // Phase 2 P2-2 — pointer map IPC contract (ROADMAP "pointer maps"). Every
+  // handler routes through the same requireTrustedSender/requireSession/
+  // feature-flag/schema-parse sequence as every other live-memory handler
+  // in this file — no arbitrary filesystem path and no process authority
+  // beyond whatever this session already has attached (mission §10).
+
+  ipcMain.handle('pointer-map-create', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapCreateSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapCreate(parsed.name)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_create_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-list', async (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, maps: session.pointerMapList().map(serializePointerMap) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_list_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-get', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const map = session.pointerMapGet(parsed.mapId);
+      if (!map) return { success: false, error: 'pointer_map_not_found' };
+      return { success: true, map: serializePointerMap(map) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_get_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-rename', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapRenameSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapRename(parsed.mapId, parsed.name)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_rename_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-delete', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, deleted: session.pointerMapDelete(parsed.mapId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_delete_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-target', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapScanTargetSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapScanTarget(parsed.mapId, BigInt(parsed.target), parsed.bounds);
+      return { success: true, result: serializePointerMapScanResult(result) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_target_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-targets', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapScanTargetsSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapScanTargets(
+        parsed.mapId,
+        parsed.targets.map((t) => BigInt(t)),
+        parsed.bounds,
+      );
+      return { success: true, result: serializePointerMapScanResult(result) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_targets_failed') };
+    }
+  });
+
+  // P2-3.1 §5/§6 — real production cancellation for pointer-map scans, the
+  // same start->operationId->cancel(id)->truthful-terminal-state model as
+  // `live-memory-scan-first-start`/`-cancel`/`-poll` above, reusing the same
+  // session-level operation registry rather than a parallel subsystem.
+  ipcMain.handle('pointer-map-scan-start', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapScanTargetsSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const operationId = session.startPointerMapScanOperation(
+        parsed.mapId,
+        parsed.targets.map((t) => BigInt(t)),
+        parsed.bounds,
+      );
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_start_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-cancel', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.cancelPointerMapScanOperation(parsed.operationId);
+      return { success: true, found: outcome.found, alreadyTerminal: outcome.alreadyTerminal };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_cancel_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-scan-poll', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.getPointerMapScanOperationStatus(parsed.operationId);
+      if (!outcome) return { success: true, status: 'not_found' as const };
+      return {
+        success: true,
+        status: outcome.status,
+        result: outcome.result ? serializeScanOperationResult(outcome.kind, outcome.result) : undefined,
+        error: outcome.error,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_scan_poll_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-resolve', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapResolve(parsed.mapId);
+      return { success: true, map: serializePointerMap(result.map), resolvedCount: result.resolvedCount, failedCount: result.failedCount };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_resolve_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-refresh', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapRefresh(parsed.mapId);
+      return { success: true, map: serializePointerMap(result.map), resolvedCount: result.resolvedCount, failedCount: result.failedCount };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_refresh_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-add-node', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapAddNodeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const node = session.pointerMapAddNode(parsed.mapId, parsed.label, parsed.candidate);
+      return { success: true, map: serializePointerMap(session.pointerMapGet(parsed.mapId)!), nodeId: node.id };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_add_node_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-remove-node', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapRemoveNodeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapRemoveNode(parsed.mapId, parsed.nodeId)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_remove_node_failed') };
+    }
+  });
+
+  // P2-4 (mission §14) — real restart-stability validation. Reuses
+  // pointerMapResolve's requireSession/attach gating; ground truth is a
+  // serializable spec (never a closure), the same BigInt-safe-IPC
+  // convention as every other value crossing this boundary.
+  ipcMain.handle('pointer-map-validate-node', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapValidateNodeSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapValidateNodeAfterRestart(parsed.mapId, parsed.nodeId, parsed.groundTruth as StabilityGroundTruthSpec);
+      return { success: true, map: serializePointerMap(result.map), observation: result.observation };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_validate_node_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-validate-after-restart', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapValidateAfterRestartSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapValidateAfterRestart(
+        parsed.mapId,
+        parsed.groundTruthByNodeId as Record<string, StabilityGroundTruthSpec>,
+      );
+      return {
+        success: true,
+        map: serializePointerMap(result.map),
+        observations: result.observations,
+        skippedNodeIds: result.skippedNodeIds,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_validate_after_restart_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-get-node-stability', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapGetNodeStabilitySchema.parse(payload);
+      const stability = session.pointerMapGetNodeStability(parsed.mapId, parsed.nodeId);
+      return { success: true, stability: stability ?? { baseline: null, observations: [] } };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_get_node_stability_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-save', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapSaveSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const result = session.pointerMapSave(parsed.mapId, {
+        gameId: parsed.gameId,
+        executableIdentity: parsed.executableIdentity,
+        architecture: parsed.architecture,
+      });
+      // Explicit cast rather than relying on narrowing here — this file
+      // compiles under tsconfig.electron.json (non-strict), where this
+      // discriminated union does not reliably narrow across the branch.
+      if (!result.ok) return { success: false, error: (result as { ok: false; error: string }).error };
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_save_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-load', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, map: serializePointerMap(session.pointerMapLoad(parsed.mapId)) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_load_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-list-saved', async (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      requireSession(event);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      return { success: true, maps: listSavedPointerMaps() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_list_saved_failed') };
+    }
+  });
+
+  ipcMain.handle('pointer-map-delete-saved', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = PointerMapIdSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      session.pointerMapDeleteSaved(parsed.mapId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'pointer_map_delete_saved_failed') };
     }
   });
 
@@ -985,11 +1395,115 @@ export function registerLiveMemoryIpc(): void {
       const parsed = LiveMemoryScanAobSchema.parse(payload);
       if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
 
-      const result = session.scanAobSignature(parsed.signature, parsed.moduleName);
-      if (!result) return { success: true, found: false };
-      return { success: true, found: true, address: result.address };
+      // Stage 7 §7.13 — routed through the backend contract (LEGACY by
+      // default; see `live-memory-scanner-routing-mode` to switch).
+      const result = await session.scanAobViaBackend(parsed.signature, parsed.moduleName);
+      if (!result.address) {
+        return { success: true, found: false, backend: result.backend, isAuthoritativeAbsence: result.isAuthoritativeAbsence };
+      }
+      return {
+        success: true,
+        found: true,
+        address: result.address,
+        backend: result.backend,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+      };
     } catch (error) {
       return { success: false, error: sanitize(error, 'aob_scan_failed') };
+    }
+  });
+
+  // Stage 7 §7.5 — observable, explicit backend-routing control. Additive:
+  // no existing channel's shape changes. Never silently applied to an
+  // in-flight scan — takes effect on the next routed call.
+  ipcMain.handle('live-memory-scanner-routing-mode-get', (event) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    const session = requireSession(event);
+    return { success: true, mode: session.getScannerRoutingMode(), diagnostics: session.getScannerBackendDiagnostics() };
+  });
+
+  ipcMain.handle('live-memory-scanner-routing-mode-set', (event, payload: unknown) => {
+    const senderCheck = requireTrustedSender(event);
+    if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+    const session = requireSession(event);
+    const parsed = LiveMemoryScannerRoutingModeSchema.parse(payload);
+    session.setScannerRoutingMode(parsed.mode);
+    return { success: true, mode: session.getScannerRoutingMode() };
+  });
+
+  // Stage 7.2/7.3 §2/§3/§12 — production scan cancellation. Unlike
+  // `live-memory-scan-first`/`live-memory-scan-aob`, whose handler promise
+  // does not resolve until the whole scan finishes, these `-start` channels
+  // return an `operationId` immediately (the scan runs in the background),
+  // so the renderer has something real to reference in a
+  // `live-memory-scan-cancel` call fired WHILE the scan is still in flight —
+  // the exact model mission §2 requires: start -> operationId -> cancel(id)
+  // -> native cancellation token -> truthful terminal state.
+  ipcMain.handle('live-memory-scan-first-start', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanFirstStartSchema.parse(payload);
+      const exactTargetValueBigint =
+        parsed.targetValueBigint !== undefined ? BigInt(parsed.targetValueBigint) : undefined;
+      const operationId = session.startExactScanOperation(
+        parsed.dataType,
+        parsed.targetValue,
+        { maxRegionBytes: parsed.maxRegionBytes, maxTotalBytes: parsed.maxTotalBytes, maxMatches: parsed.maxMatches },
+        exactTargetValueBigint,
+      );
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_first_start_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-aob-start', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanAobStartSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+      const operationId = session.startAobScanOperation(parsed.signature, parsed.moduleName);
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_aob_start_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-cancel', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.cancelScanOperation(parsed.operationId);
+      return { success: true, found: outcome.found, alreadyTerminal: outcome.alreadyTerminal };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_cancel_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-scan-poll', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryScanOperationIdSchema.parse(payload);
+      const outcome = session.getScanOperationStatus(parsed.operationId);
+      if (!outcome) return { success: true, status: 'not_found' as const };
+      return {
+        success: true,
+        status: outcome.status,
+        kind: outcome.kind,
+        result: outcome.result ? serializeScanOperationResult(outcome.kind, outcome.result) : undefined,
+        error: outcome.error,
+      };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'scan_poll_failed') };
     }
   });
 
@@ -1072,8 +1586,13 @@ export function registerLiveMemoryIpc(): void {
       return {
         success: true,
         report,
+        requestedDepth: scanResult.requestedDepth,
         levelsSearched: scanResult.levelsSearched,
+        deepestLevelCompleted: scanResult.deepestLevelCompleted,
         scansPerformed: scanResult.scansPerformed,
+        termination: scanResult.termination,
+        isAuthoritativeAbsence: scanResult.isAuthoritativeAbsence,
+        completeness: serializeCompleteness(scanResult.completeness),
       };
     } catch (error) {
       return { success: false, error: sanitize(error, 'research_pointer_analyze_failed') };
@@ -1203,12 +1722,36 @@ export function registerLiveMemoryIpc(): void {
       const access = session.getMemoryAccess();
       if (!access) return { success: false, error: 'not_attached' };
 
-      const { installHookFromProposal } = await import('../src/core/in-process-script/hook-engine.js');
+      const { getHookProposal, installHookFromProposal } = await import('../src/core/in-process-script/hook-engine.js');
+      const proposal = getHookProposal(parsed.proposalId);
+      if (!proposal) return { success: false, error: 'unknown_hook_proposal' };
+      const { plan } = proposal;
+      if (!plan.executablePlan || plan.status !== 'ready' || !plan.presetId) {
+        return { success: false, error: 'hook_plan_not_executable' };
+      }
+
+      // Stage 7.4 §8 — the hook-site AOB lookup is routed through the
+      // production backend contract (native by default, legacy only under
+      // explicit rollback) instead of hook-engine.ts calling
+      // `scanAobInProcess` directly. `isAuthoritativeAbsence` distinguishes
+      // a genuinely absent signature from an incomplete scan (mission's
+      // "incomplete zero-match MUST NOT become authoritative not-found")
+      // so the two cases get distinct, structured error codes rather than
+      // being collapsed into one ambiguous failure.
+      const aobResult = await session.scanAobViaBackend(plan.aobSignature, plan.moduleName);
+      if (!aobResult.address) {
+        return {
+          success: false,
+          error: aobResult.isAuthoritativeAbsence ? 'aob_signature_not_found' : 'aob_signature_scan_incomplete',
+        };
+      }
+
       const manifest = installHookFromProposal({
         sessionKey: String(event.sender.id),
         proposalId: parsed.proposalId,
         driver: access.driver,
         handle: access.handle,
+        hookSite: BigInt(aobResult.address),
       });
       return { success: true, manifest, guard };
     } catch (error) {
@@ -1719,6 +2262,42 @@ function serializeScanResult(result: { matches: ScanMatch[]; regionsScanned: num
   };
 }
 
+/**
+ * Stage 7.2/7.3 §2/§12 — serializes a polled scan-operation result for the
+ * wire, matching the exact shapes `live-memory-scan-first`/`live-memory-scan-aob`
+ * already send (BigInt values as decimal strings, never raw BigInt, never a
+ * lossy Number narrowing).
+ */
+function serializeScanOperationResult(kind: 'exact' | 'aob' | 'pointerMap', result: unknown) {
+  if (kind === 'pointerMap') {
+    return serializePointerMapScanResult(result as PointerMapScanTargetsResult);
+  }
+  if (kind === 'exact') {
+    const exact = result as {
+      backend: 'legacy' | 'native';
+      isAuthoritativeAbsence: boolean;
+      matches: Array<ScanMatch & { valueBigint?: bigint }>;
+      regionsScanned: number;
+      bytesScanned: number;
+      truncated: boolean;
+    };
+    return {
+      ...serializeScanResult(exact),
+      backend: exact.backend,
+      isAuthoritativeAbsence: exact.isAuthoritativeAbsence,
+      matches: exact.matches.map((m) => ({
+        address: m.address.toString(),
+        value: m.value,
+        ...(m.valueBigint !== undefined ? { valueBigint: m.valueBigint.toString() } : {}),
+      })),
+    };
+  }
+  const aob = result as { address: string | null; backend: 'legacy' | 'native'; isAuthoritativeAbsence: boolean };
+  return aob.address
+    ? { found: true, address: aob.address, backend: aob.backend, isAuthoritativeAbsence: aob.isAuthoritativeAbsence }
+    : { found: false, backend: aob.backend, isAuthoritativeAbsence: aob.isAuthoritativeAbsence };
+}
+
 function serializeAutoMatrixResult(result: {
   buckets: Array<{
     mode: string;
@@ -1729,8 +2308,18 @@ function serializeAutoMatrixResult(result: {
     truncated: boolean;
     skipped?: boolean;
     reason?: string;
+    completeness: CanonicalCompleteness;
+    isAuthoritativeAbsence: boolean;
+    skippedRegions: CanonicalSkippedRange[];
   }>;
-  unknown?: { regionsScanned: number; bytesScanned: number; truncated: boolean };
+  unknown?: {
+    regionsScanned: number;
+    bytesScanned: number;
+    truncated: boolean;
+    completeness: CanonicalCompleteness;
+    isAuthoritativeAbsence: boolean;
+    skippedRegions: CanonicalSkippedRange[];
+  };
   totals: {
     buckets: number;
     matches: number;
@@ -1748,8 +2337,102 @@ function serializeAutoMatrixResult(result: {
     buckets: result.buckets.map((bucket) => ({
       ...bucket,
       matches: serializeTypedMatches(bucket.matches),
+      completeness: serializeCompleteness(bucket.completeness),
+      skippedRegions: serializeSkippedRegions(bucket.skippedRegions),
+    })),
+    ...(result.unknown
+      ? {
+          unknown: {
+            ...result.unknown,
+            completeness: serializeCompleteness(result.unknown.completeness),
+            skippedRegions: serializeSkippedRegions(result.unknown.skippedRegions),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * BigInt-safe wire form of the canonical completeness states. Addresses and
+ * byte offsets cross the IPC boundary as decimal strings, never as a Number —
+ * the same rule every other BigInt in this file follows.
+ */
+function serializePointerMap(map: PointerMap) {
+  return {
+    id: map.id,
+    name: map.name,
+    createdAt: map.createdAt,
+    updatedAt: map.updatedAt,
+    nodes: map.nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      path: {
+        moduleName: node.path.moduleName,
+        moduleOffset: `0x${node.path.moduleOffset.toString(16)}`,
+        offsets: node.path.offsets,
+      },
+      depth: node.depth,
+      status: node.status,
+      lastResolvedAddress: node.lastResolvedAddress,
+      lastResolvedAt: node.lastResolvedAt,
+      createdAt: node.createdAt,
+      targetAddress: node.targetAddress,
+      scanId: node.scanId,
+      stability: serializeNodeStability(node.stability),
     })),
   };
+}
+
+/** P2-4 — a node's restart-stability history. Absent (pre-P2-4 in-memory data, should not occur post-migration) serializes as an explicit empty state rather than `undefined`, so the renderer never needs its own null-check. */
+function serializeNodeStability(stability: PointerMapNode['stability']) {
+  const state = stability ?? { baseline: null, observations: [] };
+  return {
+    baseline: state.baseline,
+    observations: state.observations,
+  };
+}
+
+function serializePointerMapScanResult(result: PointerMapScanTargetsResult) {
+  return {
+    map: serializePointerMap(result.map),
+    perTarget: result.perTarget.map((t) => ({
+      targetAddress: t.targetAddress,
+      requestedDepth: t.requestedDepth,
+      deepestLevelCompleted: t.deepestLevelCompleted,
+      termination: t.termination,
+      completeness: serializeCompleteness(t.completeness),
+      candidateCount: t.candidateCount,
+      nodesAdded: t.nodesAdded,
+      truncated: t.truncated,
+    })),
+    aggregateCompleteness: serializeCompleteness(result.aggregateCompleteness),
+    targetsRequested: result.targetsRequested,
+    targetsScanned: result.targetsScanned,
+    resourceLimited: result.resourceLimited,
+  };
+}
+
+function serializeCompleteness(completeness: CanonicalCompleteness) {
+  switch (completeness.state) {
+    case 'complete':
+      return { state: completeness.state };
+    case 'complete_with_skipped_regions':
+      return { state: completeness.state, skipped: serializeSkippedRegions(completeness.skipped) };
+    case 'cancelled':
+    case 'process_exited':
+    case 'resource_limit':
+      return { state: completeness.state, atByte: completeness.atByte.toString() };
+    case 'failed':
+      return { state: completeness.state, reason: completeness.reason };
+  }
+}
+
+function serializeSkippedRegions(skipped: CanonicalSkippedRange[]) {
+  return skipped.map((range) => ({
+    baseAddress: range.baseAddress.toString(),
+    size: range.size.toString(),
+    reason: range.reason,
+  }));
 }
 
 function serializeFreezeStatus(status: {

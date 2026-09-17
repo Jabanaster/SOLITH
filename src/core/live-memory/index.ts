@@ -43,6 +43,24 @@ export { scanForPointerPath } from './pointer-scanner.js';
 export type { PointerScanBounds, PointerPathCandidate, PointerScanResult } from './pointer-scanner.js';
 export { resolvePointerPath } from './pointer-resolver.js';
 export type { LivePointerPath } from './pointer-resolver.js';
+export {
+  createEmptyPointerMap,
+  pointerMapNodeFromCandidate,
+  addPointerMapNode,
+  removePointerMapNode,
+  renamePointerMap,
+  resolvePointerMap,
+  pointerMapNodeChainSteps,
+} from './pointer-map.js';
+export { scanTargetsIntoMap, aggregatePointerMapCompleteness } from './pointer-map-orchestration.js';
+export type { PointerMapTargetOutcome, PointerMapScanTargetsResult } from './pointer-map-orchestration.js';
+export type {
+  PointerMap,
+  PointerMapNode,
+  PointerMapNodeStatus,
+  PointerMapResolution,
+  PointerChainStep,
+} from './pointer-map.js';
 export { parseAobSignature, findAobInBuffer, scanAobInProcess } from './aob-resolver.js';
 export type { AobPattern, AobScanOptions } from './aob-resolver.js';
 export {
@@ -50,10 +68,18 @@ export {
   findBestFuzzyAobInBuffer,
   scanExactSignature,
   scanFuzzySignature,
+  scanFuzzySignatureViaSource,
+  classifyFuzzySignatureDifference,
   resolveSignature,
+  resolveSignatureWithCoverage,
   resolveSignatureInBuffer,
 } from './signature-engine.js';
-export type { FuzzyScanOptions, SignatureMatch } from './signature-engine.js';
+export type {
+  FuzzyAobResolverFn,
+  FuzzyScanOptions,
+  FuzzySignatureOutcome,
+  SignatureMatch,
+} from './signature-engine.js';
 export { MemoryAuditLog } from './audit-log.js';
 export type { MemoryAuditEntry, MemoryAuditOp, MemoryAuditLogOptions } from './audit-log.js';
 export { MemoryManager } from './memory-manager.js';

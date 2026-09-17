@@ -1,0 +1,62 @@
+[package]
+name = "solith-scanner-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Pure Windows process-memory scanner mechanics for SOLITH Phase 1 (region enumeration, chunked reading, completeness/error model). No Electron or Node dependency."
+
+[lib]
+name = "solith_scanner_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "solith-scanner-fixture"
+path = "src/bin/fixture.rs"
+
+[[bin]]
+name = "bench_reader"
+path = "src/bin/bench_reader.rs"
+
+[[bin]]
+name = "bench_exact_scan"
+path = "src/bin/bench_exact_scan.rs"
+
+[[bin]]
+name = "bench_session"
+path = "src/bin/bench_session.rs"
+
+[[bin]]
+name = "bench_pattern"
+path = "src/bin/bench_pattern.rs"
+
+[dependencies]
+# Session-snapshot persistence (Stage 6 §6.9-6.12) is the only place this
+# crate needs structured, versioned (de)serialization; serde/serde_json are
+# battle-tested rather than hand-rolling a parser for untrusted on-disk
+# input (Stage 6 §6.24's "corruption rejection" requirement).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+# Same windows-sys major version already frozen/proven in this repo by
+# native/solith-readonly-scanner (Step 0.13.5 adoption freeze) — reused for
+# consistency, not re-decided here.
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Memory",
+  "Win32_System_ProcessStatus",
+  "Win32_System_Threading",
+  "Win32_System_SystemInformation",
+] }
+
+[dev-dependencies]
+
+[target.'cfg(windows)'.dev-dependencies]
+# Same crate/version as the main dependency above — tests/session_integration.rs
+# needs direct access to GetProcessHandleCount/GetCurrentProcess to prove
+# Stage 4's session-cleanup handle-leak check (mission §4.15), which is not
+# part of this crate's own public API surface.
+windows-sys = { version = "0.61", features = ["Win32_System_Threading"] }

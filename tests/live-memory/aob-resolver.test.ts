@@ -30,16 +30,46 @@ describe('aob-resolver', () => {
     driver.addRegion(moduleBase, region);
 
     const handle = driver.openProcess(1);
-    const match = scanAobInProcess(driver, handle, '48 8B 05 ? ? ? ?', { moduleName: 'Demo.exe' });
-    assert.equal(match, moduleBase + 8n);
+    const outcome = scanAobInProcess(driver, handle, '48 8B 05 ? ? ? ?', { moduleName: 'Demo.exe' });
+    assert.equal(outcome.address, moduleBase + 8n);
+    assert.equal(outcome.completeness.state, 'complete');
+    assert.deepEqual(outcome.skippedRegions, []);
   });
 
-  test('scanAobInProcess returns null on miss', () => {
+  test('scanAobInProcess reports a miss over fully-read regions as an authoritative absence', () => {
     const driver = new FakeMemoryDriver();
     driver.addModule('Demo.exe', 0x1000n, 0x100);
     driver.addRegion(0x1000n, Buffer.alloc(32, 0));
     const handle = driver.openProcess(1);
-    const match = scanAobInProcess(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' });
-    assert.equal(match, null);
+    const outcome = scanAobInProcess(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' });
+    assert.equal(outcome.address, null);
+    assert.equal(outcome.completeness.state, 'complete');
+    assert.equal(outcome.isAuthoritativeAbsence, true);
+    assert.equal(outcome.regionsRead, 1);
+  });
+
+  // D01/D03 closure: the case that used to be indistinguishable from the one
+  // above. A signature that is not found because a region could not be read is
+  // never an authoritative absence.
+  test('scanAobInProcess never claims absence when an eligible region could not be read', () => {
+    const driver = new FakeMemoryDriver();
+    driver.addModule('Demo.exe', 0x1000n, 0x200);
+    driver.addRegion(0x1000n, Buffer.alloc(32, 0));
+    driver.addRegion(0x1100n, Buffer.alloc(32, 0));
+    const handle = driver.openProcess(1);
+
+    const realRead = driver.readBuffer.bind(driver);
+    driver.readBuffer = ((h: unknown, base: bigint, size: number) => {
+      if (base === 0x1100n) throw new Error('read failed: region too large');
+      return realRead(h as never, base, size);
+    }) as typeof driver.readBuffer;
+
+    const outcome = scanAobInProcess(driver, handle, 'DE AD BE EF', { moduleName: 'Demo.exe' });
+    assert.equal(outcome.address, null);
+    assert.equal(outcome.isAuthoritativeAbsence, false);
+    assert.equal(outcome.completeness.state, 'complete_with_skipped_regions');
+    assert.equal(outcome.skippedRegions.length, 1);
+    assert.equal(outcome.skippedRegions[0].baseAddress, 0x1100n);
+    assert.match(outcome.skippedRegions[0].reason, /region_read_failed/);
   });
 });

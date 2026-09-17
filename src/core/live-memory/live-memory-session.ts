@@ -11,17 +11,76 @@ import {
   scanFirstUnknown as scanFirstUnknownSnapshot,
   scanNextFromSnapshotMultiType,
 } from './memory-scanner.js';
-import type { AutoFirstScanMatrixResult, AutoFirstScanQuery, ScanResult, TypedScanResult, UnknownScanSnapshot } from './memory-scanner.js';
+import type {
+  AutoFirstScanMatrixResult,
+  AutoFirstScanQuery,
+  NextScanResult,
+  ScanCoverage,
+  ScanResult,
+  TypedScanResult,
+  UnknownScanSnapshot,
+} from './memory-scanner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
-import { scanForPointerPath, type PointerScanBounds } from './pointer-scanner.js';
-import { scanAobInProcess } from './aob-resolver.js';
+import { scanForPointerPath, type PointerScanBounds, type PointerPathCandidate } from './pointer-scanner.js';
+import {
+  addPointerMapNode,
+  createEmptyPointerMap,
+  pointerMapNodeFromCandidate,
+  removePointerMapNode,
+  renamePointerMap,
+  resolvePointerMap,
+  type PointerMap,
+  type PointerMapNode,
+  type PointerMapResolution,
+} from './pointer-map.js';
+import {
+  scanTargetsIntoMap,
+  scanTargetsIntoMapCancellable,
+  type PointerMapScanTargetsResult,
+} from './pointer-map-orchestration.js';
+import {
+  validateNodeAfterRestart,
+  validateMapAfterRestart,
+  type NodeStabilityResult,
+  type MapStabilityResult,
+} from './pointer-stability-orchestration.js';
+import { groundTruthFromSpec, type StabilityGroundTruthSpec } from './pointer-stability.js';
+import {
+  deleteSavedPointerMap,
+  loadPointerMap,
+  savePointerMap,
+  listSavedPointerMaps,
+  type PointerMapSaveIdentity,
+  type PointerMapSummary,
+} from './pointer-map-store.js';
+import { LegacyScannerBackend } from './scanner-backend-legacy.js';
+import { NativeScannerBackend } from './scanner-backend-native.js';
+import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
+import {
+  liveValueTypeToCanonical,
+  ScannerBackendError,
+  type CanonicalCompleteness,
+  type CanonicalMetrics,
+  type CanonicalScanBounds,
+  type RoutedWireValueType,
+  type ScanControl,
+  type ScannerBackendKind,
+  type ScannerRoutingMode,
+} from './scanner-backend.js';
 import {
   fingerprintBlocksAttach,
   verifyDefinitionFingerprint,
   type FingerprintVerifyResult,
 } from '../definitions/fingerprint-verify.js';
 import type { MemoryFeatureV1 } from '../definitions/schema.v1.js';
-import { resolveMemoryFeatureAddress, SessionAddressCache } from './feature-resolver.js';
+import { resolveMemoryFeatureAddress, SessionAddressCache, type AobResolverFn } from './feature-resolver.js';
+import {
+  classifyFuzzySignatureDifference,
+  scanFuzzySignatureViaSource,
+  type FuzzyAobResolverFn,
+  type FuzzyScanOptions,
+  type FuzzySignatureOutcome,
+} from './signature-engine.js';
 import {
   registerActiveFreeze,
   unregisterActiveFreeze,
@@ -191,6 +250,38 @@ export function byteWidthForType(dataType: LiveValueType): number {
   }
 }
 
+/**
+ * Stage 7.2/7.3 production cancellation (mission §2/§12). A scan started via
+ * `startExactScanOperation`/`startAobScanOperation` is tracked here from the
+ * moment its `operationId` is handed back to the caller (synchronously,
+ * before the scan itself has run at all) until its terminal state is
+ * observed. `status` transitions exactly once, `pending` -> one of
+ * `complete`/`cancelled`/`error` — there is no path back to `pending`.
+ */
+export type ScanOperationStatus = 'pending' | 'complete' | 'cancelled' | 'error';
+
+export interface ScanOperationEntry {
+  readonly kind: 'exact' | 'aob' | 'pointerMap';
+  readonly controller: AbortController;
+  status: ScanOperationStatus;
+  result?: unknown;
+  error?: string;
+}
+
+export interface ScanOperationCancelResult {
+  /** False only for an operation ID this session has never seen (mission's "cancel unknown operation ID"). */
+  found: boolean;
+  /** True if the operation had already reached a terminal state before this cancel request arrived. */
+  alreadyTerminal: boolean;
+}
+
+export interface ScanOperationStatusResult {
+  status: ScanOperationStatus;
+  kind: 'exact' | 'aob' | 'pointerMap';
+  result?: unknown;
+  error?: string;
+}
+
 export function compareRollbackValue(dataType: LiveValueType, current: number, expected: number): RollbackValueComparison {
   switch (dataType) {
     case 'float':
@@ -270,6 +361,42 @@ export class LiveMemorySession {
   private readonly addressCache = new SessionAddressCache();
   private lastFingerprint: FingerprintVerifyResult | null = null;
   private catalogGameId: string | null = null;
+  /**
+   * Stage 7 §7.5 backend routing. Created lazily on first backend-routed
+   * scan call (not eagerly in `attach()`) since it only needs `this.handle`,
+   * which `attach()` already guarantees by the time any scan method runs.
+   * Torn down on `detach()` alongside every other per-attach session state.
+   */
+  private backendRouter: ScannerBackendRouter | null = null;
+  /**
+   * Stage 7.3 §2 (owner-authorized production migration): the shipping
+   * default is NATIVE. A freshly attached session reaches
+   * `NativeScannerBackend` for exact/AOB scans with no override, no
+   * environment variable, and no config flag required. LEGACY remains fully
+   * selectable via `setScannerRoutingMode('LEGACY')` for explicit rollback.
+   */
+  private scannerRoutingMode: ScannerRoutingMode = 'NATIVE';
+  /**
+   * Stage 7.2/7.3 production cancellation registry (mission §2/§12) — one
+   * entry per in-flight or completed-but-not-yet-cleared scan operation
+   * started via `startExactScanOperation`/`startAobScanOperation`. Real
+   * cancellation: `controller.abort()` sets `control.signal.aborted`, which
+   * `NativeScannerBackend` observes between region reads (wired to a real
+   * `ScanCancellationHandle`) and `LegacyScannerBackend` observes only as a
+   * pre-flight check (documented asymmetry, not hidden). Cleared on
+   * `detach()` alongside every other per-attach session state.
+   */
+  private readonly scanOperations = new Map<string, ScanOperationEntry>();
+
+  /**
+   * Phase 2 P2-2 pointer maps, keyed by mapId. Holds no OS handle or PID —
+   * every map is driver-independent (see pointer-map.ts) — so it does not
+   * need clearing on detach()/re-attach the way scanOperations does; a map
+   * created against one process instance simply goes stale (all nodes
+   * unresolved) until pointerMapResolve/Refresh is called against whatever
+   * is currently attached.
+   */
+  private readonly pointerMaps = new Map<string, PointerMap>();
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -666,6 +793,313 @@ export class LiveMemorySession {
     return scanFirstRegions(this.driver, this.handle, dataType, targetValue, bounds);
   }
 
+  private getOrCreateBackendRouter(): ScannerBackendRouter {
+    if (!this.handle) throw new Error('No process attached.');
+    if (!this.backendRouter) {
+      const legacyBackend = new LegacyScannerBackend(this.driver, this.handle);
+      // Stage 7.5 - the native scanner core has no module enumeration of its
+      // own (forward-assigned to Stage 8), so both backends are given the same
+      // OS module list here. This keeps module-scoped resolution fail-closed
+      // and identical across backends instead of letting a NATIVE-mode fuzzy
+      // request silently widen to the entire address space, which for a
+      // drift-tolerant matcher is a false-positive hazard, not a convenience.
+      // See NativeScannerBackend's TargetModuleProvider doc.
+      const handle = this.handle;
+      const nativeBackend = new NativeScannerBackend(() =>
+        this.driver.getModules(handle).map((m) => ({
+          name: m.name,
+          baseAddress: m.baseAddress,
+          size: BigInt(m.size),
+        })),
+      );
+      this.backendRouter = new ScannerBackendRouter(legacyBackend, nativeBackend, {
+        mode: this.scannerRoutingMode,
+      });
+    }
+    return this.backendRouter;
+  }
+
+  /**
+   * Backend-routed current mode (mission §7.5) — observable in diagnostics,
+   * switchable without recreating the session or rebuilding (mission
+   * §7.16's rollback-without-rebuild requirement).
+   */
+  getScannerRoutingMode(): ScannerRoutingMode {
+    return this.scannerRoutingMode;
+  }
+
+  setScannerRoutingMode(mode: ScannerRoutingMode): void {
+    this.scannerRoutingMode = mode;
+    this.backendRouter?.setMode(mode);
+  }
+
+  getScannerBackendDiagnostics(): ScannerBackendDiagnosticsSnapshot | null {
+    return this.backendRouter?.diagnostics() ?? null;
+  }
+
+  /**
+   * Exact-value scan, routed through the Stage 7 backend contract (mission
+   * §7.3/§7.10-§7.12) — the migration seam for the 1 MiB, alignment, and
+   * int64 shipping defects. `dataType`/`targetValue`/`bounds` and the
+   * `matches`/`regionsScanned`/`bytesScanned`/`truncated` shape of the
+   * returned object are unchanged from `scanFirst`'s own contract so this
+   * is a drop-in replacement at the IPC boundary; `backend`,
+   * `isAuthoritativeAbsence`, and (for `int64` only) each match's
+   * `valueBigint` are new, additive fields — nothing existing is removed
+   * or down-converted.
+   */
+  async scanExactViaBackend(
+    dataType: RoutedWireValueType,
+    targetValue: number,
+    bounds?: ScanBounds,
+    exactTargetValueBigint?: bigint,
+    control?: ScanControl,
+  ): Promise<{
+    backend: 'legacy' | 'native';
+    isAuthoritativeAbsence: boolean;
+    matches: Array<ScanMatch & { valueBigint?: bigint }>;
+    regionsScanned: number;
+    bytesScanned: number;
+    truncated: boolean;
+    /**
+     * The full canonical metrics the backend produced. `regionsScanned` and
+     * `bytesScanned` above are the two fields the IPC wire format has always
+     * carried; this exposes the rest — `regionsConsidered`, `regionsSkipped`
+     * and `bytesRequested` — which is what makes an honest coverage
+     * percentage (bytesRead / bytesRequested) computable by a caller rather
+     * than only by the backend itself.
+     */
+    metrics: CanonicalMetrics;
+    /** Structured completeness, of which `truncated` is the boolean summary. */
+    completeness: CanonicalCompleteness;
+  }> {
+    if (!this.target) throw new Error('No process attached.');
+    const router = this.getOrCreateBackendRouter();
+    const primitiveType = liveValueTypeToCanonical(dataType);
+    const canonicalBounds: CanonicalScanBounds = {
+      maxRegionBytes: bounds?.maxRegionBytes,
+      maxTotalBytes: bounds?.maxTotalBytes,
+      maxMatches: bounds?.maxMatches,
+    };
+    // Stage 7.1 §7.1-C fix: `targetValue` is a `number` and has already lost
+    // precision beyond Number.MAX_SAFE_INTEGER by the time it reaches this
+    // method — deriving the int64 search value from it via `BigInt(Math.trunc(...))`
+    // (the pre-Stage-7.1 behavior, still the fallback below for callers that
+    // don't have an exact value) can never round-trip a real int64 beyond
+    // 2^53 correctly. `exactTargetValueBigint` is the real fix: callers that
+    // hold the true BigInt (the IPC handler, once the wire format carries
+    // one — see LiveMemoryScanFirstSchema.targetValueBigint) pass it directly,
+    // so precision is preserved end to end instead of round-tripped through
+    // a lossy Number. Stage 7.4 §2 generalizes the gate from `dataType ===
+    // 'int64'` to "the canonical type is one of the two 64-bit widths" —
+    // gating on the already-resolved `primitiveType` rather than the raw
+    // wire spelling means this works identically whether the caller used
+    // the legacy name ('int64') or a canonical short name ('i64'/'u64').
+    const isSixtyFourBit = primitiveType === 'i64' || primitiveType === 'u64';
+    const valueBigint =
+      exactTargetValueBigint !== undefined
+        ? exactTargetValueBigint
+        : isSixtyFourBit
+          ? BigInt(Math.trunc(targetValue))
+          : undefined;
+    const outcome = await router.routedExactScan(
+      this.target.pid,
+      primitiveType,
+      valueBigint === undefined ? targetValue : undefined,
+      valueBigint,
+      canonicalBounds,
+      control,
+    );
+    return {
+      backend: outcome.backend,
+      isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
+      matches: outcome.matches.map((m) => ({
+        address: m.address,
+        value: m.valueNumber ?? (m.valueBigint !== undefined ? Number(m.valueBigint) : 0),
+        ...(m.valueBigint !== undefined ? { valueBigint: m.valueBigint } : {}),
+      })),
+      regionsScanned: outcome.metrics.regionsRead,
+      bytesScanned: Number(outcome.metrics.bytesRead),
+      truncated: outcome.completeness.state !== 'complete',
+      metrics: outcome.metrics,
+      completeness: outcome.completeness,
+    };
+  }
+
+  /**
+   * AOB scan, routed through the Stage 7 backend contract (mission
+   * §7.3/§7.13) — the migration seam for the AOB shipping defect. Return
+   * shape is additive over `scanAobSignature`'s `{ address }` — adds
+   * `backend` and `isAuthoritativeAbsence` (legacy AOB never had a real
+   * authoritative-not-found signal at all; see
+   * `LegacyScannerBackend.aobScan`'s doc for why it is always `false` for
+   * legacy).
+   */
+  async scanAobViaBackend(
+    signature: string,
+    moduleName?: string,
+    control?: ScanControl,
+  ): Promise<{ address: string | null; backend: 'legacy' | 'native'; isAuthoritativeAbsence: boolean }> {
+    if (!this.target) throw new Error('No process attached.');
+    const router = this.getOrCreateBackendRouter();
+    const outcome = await router.routedAobScan(this.target.pid, signature, moduleName, {}, control);
+    return {
+      address: outcome.matches.length > 0 ? `0x${outcome.matches[0].address.toString(16)}` : null,
+      backend: outcome.backend,
+      isAuthoritativeAbsence: outcome.isAuthoritativeAbsence,
+    };
+  }
+
+  /**
+   * Stage 7.5 - drift-tolerant (fuzzy) AOB resolution, routed through the
+   * same backend contract every other production scan already uses. This is
+   * the migration seam for D14 (fuzzy AOB legacy-only) and, on this path, for
+   * D01/D03: under NATIVE the reads are chunked and completeness-reporting,
+   * so a region over 1 MiB is actually searched instead of being silently
+   * dropped and reported as "not found".
+   *
+   * The drift algorithm itself is not routed anywhere - it stays a pure
+   * function over buffers in `signature-engine.ts`. Only the reads move.
+   */
+  async scanFuzzyAobViaBackend(
+    signature: string,
+    options: FuzzyScanOptions = {},
+    control?: ScanControl,
+  ): Promise<FuzzySignatureOutcome> {
+    if (!this.target) throw new Error('No process attached.');
+    const router = this.getOrCreateBackendRouter();
+    // The type argument is pinned rather than inferred: `classifyFuzzySignatureDifference`
+    // accepts a `Pick<FuzzySignatureOutcome, 'match' | 'completeness'>`, which is
+    // narrower than what `run` returns, and letting both call sites drive inference
+    // silently drops `isAuthoritativeAbsence` from the result type.
+    const { result, backend } = await router.routedMemorySourceOperation<Omit<FuzzySignatureOutcome, 'backend'>>(
+      this.target.pid,
+      'fuzzyAobScan',
+      (source) => scanFuzzySignatureViaSource(source, signature, options, {}, control),
+      classifyFuzzySignatureDifference,
+    );
+    return { backend, ...result };
+  }
+
+  /**
+   * Stage 7.5 - the fuzzy counterpart to `createAobResolver()`. Bound by
+   * every production call site that resolves definition features
+   * (`process-watcher.ts`'s `resolveDefinitionFeatures`, reached from
+   * `zero-input-prepare.ts` and the `live-memory-zero-input-prepare` IPC
+   * handler), so the shipping fuzzy path no longer calls `MemoryDriver`
+   * directly at all.
+   */
+  createFuzzyAobResolver(): FuzzyAobResolverFn {
+    return (signature: string, options: FuzzyScanOptions) =>
+      this.scanFuzzyAobViaBackend(signature, options);
+  }
+
+  /**
+   * Stage 7.4 §5-§8 — a bound AOB resolver for production call sites that
+   * live outside this session's own methods (`feature-resolver.ts`'s
+   * `resolveMemoryFeatureAddress`, `signature-engine.ts`'s exact-match sub-path,
+   * consumed via `process-watcher.ts`'s `resolveDefinitionFeatures`). Always
+   * routes through `scanAobViaBackend`/the router — the same NATIVE-by-default,
+   * LEGACY-only-on-explicit-rollback dispatch every other routed operation
+   * gets. This is what makes "no direct legacy read-loop fallback in normal
+   * NATIVE mode" (mission §7's own words) true for these callers: they never
+   * call `scanAobInProcess` themselves anymore when bound to a real session,
+   * so there is no code path left that could silently prefer legacy while
+   * NATIVE is the active mode.
+   */
+  createAobResolver(): AobResolverFn {
+    return async (signature: string, moduleName: string | undefined) => {
+      const result = await this.scanAobViaBackend(signature, moduleName);
+      return {
+        address: result.address !== null ? BigInt(result.address) : null,
+        isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+      };
+    };
+  }
+
+  /**
+   * Stage 7.2/7.3 production cancellation (mission §2/§3/§12). Starts an
+   * exact-value scan asynchronously and returns its `operationId`
+   * synchronously, before the scan itself has done any work — this is the
+   * one property that makes real mid-flight cancellation possible: the
+   * caller has an ID to cancel *while the scan is still running*, unlike
+   * `scanExactViaBackend`, whose promise does not resolve until the scan is
+   * already finished. `cancelScanOperation(operationId)` aborts the real
+   * `AbortController` behind this operation, which `NativeScannerBackend`
+   * observes between region reads via a genuine `ScanCancellationHandle` —
+   * not a UI-only flag and not a discarded response.
+   */
+  startExactScanOperation(
+    dataType: RoutedWireValueType,
+    targetValue: number,
+    bounds?: ScanBounds,
+    exactTargetValueBigint?: bigint,
+  ): string {
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'exact', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+    void this.scanExactViaBackend(dataType, targetValue, bounds, exactTargetValueBigint, { signal: controller.signal })
+      .then((result) => {
+        entry.status = result.truncated && controller.signal.aborted ? 'cancelled' : 'complete';
+        entry.result = result;
+      })
+      .catch((err) => {
+        entry.status = err instanceof ScannerBackendError && err.kind === 'cancelled' ? 'cancelled' : 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /** Stage 7.2/7.3 production cancellation — AOB variant of `startExactScanOperation`. */
+  startAobScanOperation(signature: string, moduleName?: string): string {
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'aob', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+    void this.scanAobViaBackend(signature, moduleName, { signal: controller.signal })
+      .then((result) => {
+        entry.status = controller.signal.aborted ? 'cancelled' : 'complete';
+        entry.result = result;
+      })
+      .catch((err) => {
+        entry.status = err instanceof ScannerBackendError && err.kind === 'cancelled' ? 'cancelled' : 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /**
+   * Requests cancellation of a previously started scan operation (mission
+   * §2's required contract: "cancellation request references that ID").
+   * Idempotent — a duplicate cancel on the same operation, or a cancel
+   * arriving after the operation already reached a terminal state (complete,
+   * already cancelled, or errored), is always safe and never throws;
+   * `AbortController.abort()` itself is a documented no-op on an
+   * already-aborted controller. Cancelling an operation ID this session has
+   * never seen returns `found: false` rather than throwing, so a stale or
+   * mistyped ID from the renderer cannot crash the main process.
+   */
+  cancelScanOperation(operationId: string): ScanOperationCancelResult {
+    const entry = this.scanOperations.get(operationId);
+    if (!entry) return { found: false, alreadyTerminal: false };
+    const alreadyTerminal = entry.status !== 'pending';
+    if (!alreadyTerminal) entry.controller.abort();
+    return { found: true, alreadyTerminal };
+  }
+
+  /**
+   * Polls a scan operation's current status (mission §2's "caller receives
+   * Cancelled completeness/state"). Returns `null` only for an operation ID
+   * this session has never seen — a legitimate, still-`pending` operation
+   * returns its entry with `status: 'pending'` and no `result` yet.
+   */
+  getScanOperationStatus(operationId: string): ScanOperationStatusResult | null {
+    const entry = this.scanOperations.get(operationId);
+    if (!entry) return null;
+    return { status: entry.status, kind: entry.kind, result: entry.result, error: entry.error };
+  }
+
   /**
    * UX-first manual scan: runs compatible first-scan modes across every value
    * type in one read-only pass matrix, and optionally captures an unknown-value
@@ -692,14 +1126,22 @@ export class LiveMemorySession {
               regionsScanned: unknown.regionsScanned,
               bytesScanned: unknown.bytesScanned,
               truncated: unknown.truncated,
+              skippedRegions: unknown.skippedRegions,
+              completeness: unknown.completeness,
+              isAuthoritativeAbsence: unknown.isAuthoritativeAbsence,
             },
           }
         : {}),
     };
   }
 
-  /** Next scan: read-only narrowing of a prior candidate set. */
-  scanNext(dataType: LiveValueType, comparison: ScanComparison, previous: ScanMatch[]): ScanMatch[] {
+  /**
+   * Next scan: read-only narrowing of a prior candidate set. Returns the
+   * survivors plus truthful coverage — candidates that could not be re-read
+   * are reported, not silently conflated with candidates that failed the
+   * comparison (D01 final closure).
+   */
+  scanNext(dataType: LiveValueType, comparison: ScanComparison, previous: ScanMatch[]): NextScanResult {
     if (!this.handle) throw new Error('No process attached.');
     return scanNextMatches(this.driver, this.handle, dataType, comparison, previous);
   }
@@ -718,7 +1160,10 @@ export class LiveMemorySession {
    * and Stamina together). A single unkeyed snapshot field would let a
    * second scanFirstUnknown silently clobber the first one's baseline.
    */
-  scanFirstUnknown(key: string, bounds?: ScanBounds): { regionsScanned: number; bytesScanned: number; truncated: boolean } {
+  scanFirstUnknown(
+    key: string,
+    bounds?: ScanBounds,
+  ): { regionsScanned: number; bytesScanned: number; truncated: boolean } & ScanCoverage {
     if (!this.handle) throw new Error('No process attached.');
     const snapshot = scanFirstUnknownSnapshot(this.driver, this.handle, bounds);
     this.unknownSnapshots.set(key, snapshot);
@@ -726,6 +1171,9 @@ export class LiveMemorySession {
       regionsScanned: snapshot.regionsScanned,
       bytesScanned: snapshot.bytesScanned,
       truncated: snapshot.truncated,
+      skippedRegions: snapshot.skippedRegions,
+      completeness: snapshot.completeness,
+      isAuthoritativeAbsence: snapshot.isAuthoritativeAbsence,
     };
   }
 
@@ -765,17 +1213,34 @@ export class LiveMemorySession {
    * steady-state reasoning as scanNext.
    */
   readMany(addresses: { address: bigint; dataType: LiveValueType }[]): { address: bigint; value: number; dataType: LiveValueType }[] {
+    return this.readManyWithCoverage(addresses).values;
+  }
+
+  /**
+   * Same bulk read as {@link readMany}, but reports which addresses could not
+   * be read instead of only omitting them. Omission alone is ambiguous to a
+   * polling caller — an address missing from the result could equally mean
+   * "freed" or "never asked for" — so the Watch Live panel needs the count to
+   * distinguish a genuinely dead candidate list from a transient read failure.
+   */
+  readManyWithCoverage(addresses: { address: bigint; dataType: LiveValueType }[]): {
+    values: { address: bigint; value: number; dataType: LiveValueType }[];
+    requested: number;
+    unreadable: { address: bigint; dataType: LiveValueType }[];
+  } {
     if (!this.handle) throw new Error('No process attached.');
     const results: { address: bigint; value: number; dataType: LiveValueType }[] = [];
+    const unreadable: { address: bigint; dataType: LiveValueType }[] = [];
     for (const target of addresses) {
       try {
         const value = this.driver.readMemory(this.handle, target.address, target.dataType);
         results.push({ address: target.address, value, dataType: target.dataType });
       } catch {
+        unreadable.push({ address: target.address, dataType: target.dataType });
         continue;
       }
     }
-    return results;
+    return { values: results, requested: addresses.length, unreadable };
   }
 
   /**
@@ -801,9 +1266,9 @@ export class LiveMemorySession {
    * Resolves a schema.v1 memory feature to a concrete address. Uses the per-session
    * AOB/pointer cache so freeze loops do not re-scan on every tick.
    */
-  resolveMemoryFeature(feature: MemoryFeatureV1): LiveMemoryAddress {
+  async resolveMemoryFeature(feature: MemoryFeatureV1): Promise<LiveMemoryAddress> {
     if (!this.handle) throw new Error('No process attached.');
-    return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache);
+    return resolveMemoryFeatureAddress(this.driver, this.handle, feature, this.addressCache, this.createAobResolver());
   }
 
   /** Expose session address cache for Zero-Input bulk resolve. */
@@ -822,12 +1287,255 @@ export class LiveMemorySession {
     return scanForPointerPath(this.driver, this.handle, targetAddress, bounds);
   }
 
-  /** Read-only AOB scan in the attached process (Script Research Analyzer). */
-  scanAobSignature(signature: string, moduleName?: string): { address: string } | null {
+  // --- Phase 2 P2-2: pointer maps -----------------------------------------
+  //
+  // The production service seam for ROADMAP's "pointer maps" requirement.
+  // Orchestration itself (scanTargetsIntoMap, resolvePointerMap, etc.) is
+  // pure and lives in pointer-map.ts/pointer-map-orchestration.ts so it is
+  // independently testable; these methods are the thin, stateful wiring
+  // that gives IPC one authoritative place to reach it, matching how
+  // pointerScan/resolveControl above already work.
+
+  pointerMapCreate(name: string): PointerMap {
+    const map = createEmptyPointerMap(name);
+    this.pointerMaps.set(map.id, map);
+    return map;
+  }
+
+  pointerMapList(): PointerMap[] {
+    return Array.from(this.pointerMaps.values());
+  }
+
+  pointerMapGet(mapId: string): PointerMap | null {
+    return this.pointerMaps.get(mapId) ?? null;
+  }
+
+  pointerMapRename(mapId: string, name: string): PointerMap {
+    const map = this.requirePointerMap(mapId);
+    const renamed = renamePointerMap(map, name);
+    this.pointerMaps.set(mapId, renamed);
+    return renamed;
+  }
+
+  /** Removes the map from this session's live registry. Does not touch any saved copy — see pointerMapDeleteSaved. */
+  pointerMapDelete(mapId: string): boolean {
+    return this.pointerMaps.delete(mapId);
+  }
+
+  /**
+   * Scans one or more concrete target addresses into an existing map in one
+   * production operation — the actual "pointer maps" requirement (not
+   * satisfied by a single scan with maxDepth > 1). See
+   * pointer-map-orchestration.ts for per-target/aggregate completeness,
+   * cancellation and resource-limit semantics.
+   */
+  pointerMapScanTargets(mapId: string, targets: bigint[], bounds?: PointerScanBounds): PointerMapScanTargetsResult {
     if (!this.handle) throw new Error('No process attached.');
-    const match = scanAobInProcess(this.driver, this.handle, signature, { moduleName });
-    if (match == null) return null;
-    return { address: `0x${match.toString(16)}` };
+    const map = this.requirePointerMap(mapId);
+    const result = scanTargetsIntoMap(this.driver, this.handle, map, targets, bounds);
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /**
+   * Real production cancellation for pointer-map scans (P2-3.1 §5/§6) — the
+   * exact same start/cancel/poll shape as `startExactScanOperation`/
+   * `cancelScanOperation`/`getScanOperationStatus` above, reusing this
+   * session's one `scanOperations` registry rather than a parallel
+   * subsystem. Returns an `operationId` synchronously, before any scanning
+   * has happened, so the caller has something to cancel *while the scan is
+   * still running* — made genuinely possible by `scanTargetsIntoMapCancellable`
+   * awaiting a real event-loop turn between BFS steps (pointer-scanner.ts's
+   * `pointerScanGenerator`), unlike the fully synchronous
+   * `scanTargetsIntoMap` this wraps for the non-cancellable path.
+   */
+  startPointerMapScanOperation(mapId: string, targets: bigint[], bounds?: PointerScanBounds): string {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const driver = this.driver;
+    const handle = this.handle;
+
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'pointerMap', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+
+    const signal = { get aborted() { return controller.signal.aborted; } };
+    void scanTargetsIntoMapCancellable(driver, handle, map, targets, { ...bounds, signal })
+      .then((result) => {
+        // The map may have been deleted (or scanned again) while this
+        // operation was in flight; only persist into a registry entry that
+        // still exists, and never resurrect a map the user removed.
+        if (this.pointerMaps.has(mapId)) this.pointerMaps.set(mapId, result.map);
+        entry.status = controller.signal.aborted ? 'cancelled' : 'complete';
+        entry.result = result;
+      })
+      .catch((err) => {
+        entry.status = 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /** Requests cancellation of a pointer-map scan operation. Same idempotent, never-throws contract as `cancelScanOperation`. */
+  cancelPointerMapScanOperation(operationId: string): ScanOperationCancelResult {
+    return this.cancelScanOperation(operationId);
+  }
+
+  /** Polls a pointer-map scan operation's current status. Same contract as `getScanOperationStatus`. */
+  getPointerMapScanOperationStatus(operationId: string): ScanOperationStatusResult | null {
+    return this.getScanOperationStatus(operationId);
+  }
+
+  /** Convenience wrapper for the single-target case — same orchestration, one-element target list. */
+  pointerMapScanTarget(mapId: string, target: bigint, bounds?: PointerScanBounds): PointerMapScanTargetsResult {
+    return this.pointerMapScanTargets(mapId, [target], bounds);
+  }
+
+  /** Manually appends a caller-supplied candidate (e.g. from a one-off pointerScan call) rather than an orchestrated multi-target scan. */
+  pointerMapAddNode(
+    mapId: string,
+    label: string,
+    candidate: PointerPathCandidate,
+    provenance?: { targetAddress: string; scanId: string },
+  ): PointerMapNode {
+    const map = this.requirePointerMap(mapId);
+    const node = pointerMapNodeFromCandidate(label, candidate, provenance ?? null);
+    this.pointerMaps.set(mapId, addPointerMapNode(map, node));
+    return node;
+  }
+
+  pointerMapRemoveNode(mapId: string, nodeId: string): PointerMap {
+    const map = this.requirePointerMap(mapId);
+    const updated = removePointerMapNode(map, nodeId);
+    this.pointerMaps.set(mapId, updated);
+    return updated;
+  }
+
+  /**
+   * P2-4 — real restart-stability validation (mission §12/§16). Re-resolves
+   * ONE node against the currently attached process and independently
+   * verifies the destination holds the intended value (`groundTruth`) — not
+   * merely that the chain traversed without error, which is all
+   * pointerMapResolve above proves. Requires an active attach: a saved map's
+   * stale nodes cannot be "validated" against nothing.
+   */
+  pointerMapValidateNodeAfterRestart(
+    mapId: string,
+    nodeId: string,
+    groundTruth: StabilityGroundTruthSpec,
+  ): NodeStabilityResult {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = validateNodeAfterRestart(
+      this.driver,
+      this.handle,
+      map,
+      nodeId,
+      groundTruthFromSpec(groundTruth),
+      this.target?.pid ?? null,
+    );
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Same operation applied to every node in the map that has a known ground truth — nodes without one are recorded as skipped, never silently validated. */
+  pointerMapValidateAfterRestart(
+    mapId: string,
+    groundTruthByNodeId: Record<string, StabilityGroundTruthSpec>,
+  ): MapStabilityResult {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = validateMapAfterRestart(
+      this.driver,
+      this.handle,
+      map,
+      (node) => {
+        const spec = groundTruthByNodeId[node.id];
+        return spec ? groundTruthFromSpec(spec) : null;
+      },
+      this.target?.pid ?? null,
+    );
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Read-only accessor — the node's own persisted stability history, never re-derived or guessed. */
+  pointerMapGetNodeStability(mapId: string, nodeId: string): PointerMapNode['stability'] | null {
+    const map = this.requirePointerMap(mapId);
+    return map.nodes.find((n) => n.id === nodeId)?.stability ?? null;
+  }
+
+  /** Re-resolves every node in the map against the currently attached process. Must be called fresh after every attach. */
+  pointerMapResolve(mapId: string): PointerMapResolution {
+    if (!this.handle) throw new Error('No process attached.');
+    const map = this.requirePointerMap(mapId);
+    const result = resolvePointerMap(this.driver, this.handle, map);
+    this.pointerMaps.set(mapId, result.map);
+    return result;
+  }
+
+  /** Same operation as pointerMapResolve, exposed under the name mission §2's required end-state list uses ("refresh/re-resolve map"). */
+  pointerMapRefresh(mapId: string): PointerMapResolution {
+    return this.pointerMapResolve(mapId);
+  }
+
+  pointerMapSave(mapId: string, identity?: PointerMapSaveIdentity): { ok: true } | { ok: false; error: 'oversized' } {
+    const map = this.requirePointerMap(mapId);
+    return savePointerMap(map, identity);
+  }
+
+  /** Loads a saved map into this session's live registry. Comes back inactive/unresolved by construction — see pointer-map-store.ts. */
+  pointerMapLoad(mapId: string): PointerMap {
+    const result = loadPointerMap(mapId);
+    if (result.ok) {
+      this.pointerMaps.set(result.map.id, result.map);
+      return result.map;
+    }
+    // tsconfig.electron.json runs non-strict, where this discriminated
+    // union does not always narrow across the branch boundary the way it
+    // does under the (strict) root tsconfig — the explicit cast keeps this
+    // correct under both rather than relying on inconsistent narrowing.
+    throw new Error(`Failed to load pointer map "${mapId}": ${(result as { ok: false; error: string }).error}`);
+  }
+
+  pointerMapListSaved(): PointerMapSummary[] {
+    return listSavedPointerMaps();
+  }
+
+  pointerMapDeleteSaved(mapId: string): void {
+    deleteSavedPointerMap(mapId);
+    this.pointerMaps.delete(mapId);
+  }
+
+  private requirePointerMap(mapId: string): PointerMap {
+    const map = this.pointerMaps.get(mapId);
+    if (!map) throw new Error(`Pointer map "${mapId}" not found.`);
+    return map;
+  }
+
+  /**
+   * Read-only AOB scan in the attached process (Script Research Analyzer).
+   *
+   * Phase 1 final closure: this was the last direct `scanAobInProcess` call
+   * left on a normal production path. It bypassed the backend router
+   * entirely — so this endpoint ran the legacy read loop even with NATIVE as
+   * the active backend, and returned a bare `null` that could not distinguish
+   * "the signature is not in this process" from "regions were unreadable, so
+   * we did not look everywhere". Both are fixed by routing it like every
+   * other production scanner operation.
+   */
+  async scanAobSignature(
+    signature: string,
+    moduleName?: string,
+  ): Promise<{ address: string | null; isAuthoritativeAbsence: boolean; backend: ScannerBackendKind }> {
+    if (!this.handle) throw new Error('No process attached.');
+    const result = await this.scanAobViaBackend(signature, moduleName);
+    return {
+      address: result.address !== null ? `0x${BigInt(result.address).toString(16)}` : null,
+      isAuthoritativeAbsence: result.isAuthoritativeAbsence,
+      backend: result.backend,
+    };
   }
 
   /** Captures the current value and stages a proposed write. Does not write anything yet. */
@@ -1300,6 +2008,13 @@ export class LiveMemorySession {
     if (this.handle) {
       this.driver.closeProcess(this.handle);
     }
+    // Fire-and-forget: NativeScannerBackend.detach()'s real work
+    // (`target.detach()`) is synchronous and runs before the first
+    // `await` point inside the async function body, so this releases the
+    // native handle immediately despite not being awaited here — `detach()`
+    // itself must stay synchronous to match its existing callers.
+    void this.backendRouter?.detachNative();
+    this.backendRouter = null;
     this.handle = null;
     this.target = null;
     this.pendingProposals.clear();
@@ -1310,5 +2025,14 @@ export class LiveMemorySession {
     this.addressCache.clear();
     this.lastFingerprint = null;
     this.catalogGameId = null;
+    // Stage 7.2/7.3 cancellation registry: abort anything still pending
+    // (mission's "cancel after process exit" / detach-while-scanning
+    // safety) so a stray `.then`/`.catch` never fires after this session's
+    // other per-attach state has already been torn down, then drop every
+    // entry — a detached session has no operations left to poll or cancel.
+    for (const entry of this.scanOperations.values()) {
+      if (entry.status === 'pending') entry.controller.abort();
+    }
+    this.scanOperations.clear();
   }
 }

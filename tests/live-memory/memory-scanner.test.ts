@@ -75,6 +75,15 @@ test('scanFirst skips a region larger than maxRegionBytes', () => {
 
   assert.equal(result.matches.length, 0);
   assert.equal(result.regionsScanned, 0);
+  // D01 final closure: the region was excluded for cost, not because it holds
+  // nothing — and this scan demonstrably would have matched inside it. An
+  // empty result here is not a proof of absence.
+  assert.equal(result.skippedRegions.length, 1);
+  assert.equal(result.skippedRegions[0].baseAddress, 0x6000n);
+  assert.match(result.skippedRegions[0].reason, /region_exceeds_max_region_bytes/);
+  assert.equal(result.completeness.state, 'complete_with_skipped_regions');
+  assert.equal(result.truncated, true);
+  assert.equal(result.isAuthoritativeAbsence, false);
 });
 
 test('scanFirst stops and reports truncated when maxTotalBytes is exceeded', () => {
@@ -136,9 +145,13 @@ test('scanNext (exact): keeps only addresses whose current value matches the tar
 
   const result = scanNext(driver, HANDLE, 'int32', { kind: 'exact', value: 500 }, previous);
 
-  assert.equal(result.length, 1);
-  assert.equal(result[0].address, 0x100n);
-  assert.equal(result[0].value, 500);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x100n);
+  assert.equal(result.matches[0].value, 500);
+  assert.equal(result.candidatesConsidered, 2);
+  assert.equal(result.candidatesUnreadable, 0);
+  assert.equal(result.truncated, false);
+  assert.equal(result.completeness.state, 'complete');
 });
 
 test('scanNext (changed): keeps addresses whose value differs from the prior scan', () => {
@@ -153,9 +166,9 @@ test('scanNext (changed): keeps addresses whose value differs from the prior sca
 
   const result = scanNext(driver, HANDLE, 'int32', { kind: 'changed' }, previous);
 
-  assert.equal(result.length, 1);
-  assert.equal(result[0].address, 0x200n);
-  assert.equal(result[0].value, 600);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x200n);
+  assert.equal(result.matches[0].value, 600);
 });
 
 test('scanNext (unchanged): keeps addresses whose value matches the prior scan', () => {
@@ -170,8 +183,8 @@ test('scanNext (unchanged): keeps addresses whose value matches the prior scan',
 
   const result = scanNext(driver, HANDLE, 'int32', { kind: 'unchanged' }, previous);
 
-  assert.equal(result.length, 1);
-  assert.equal(result[0].address, 0x100n);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x100n);
 });
 
 test('scanNext (increased / decreased): direction-based narrowing, e.g. health went down', () => {
@@ -185,15 +198,15 @@ test('scanNext (increased / decreased): direction-based narrowing, e.g. health w
   ];
 
   const decreased = scanNext(driver, HANDLE, 'int32', { kind: 'decreased' }, previous);
-  assert.equal(decreased.length, 1);
-  assert.equal(decreased[0].address, 0x100n);
+  assert.equal(decreased.matches.length, 1);
+  assert.equal(decreased.matches[0].address, 0x100n);
 
   const increased = scanNext(driver, HANDLE, 'int32', { kind: 'increased' }, previous);
-  assert.equal(increased.length, 1);
-  assert.equal(increased[0].address, 0x200n);
+  assert.equal(increased.matches.length, 1);
+  assert.equal(increased.matches[0].address, 0x200n);
 });
 
-test('scanNext drops addresses that fail to read instead of throwing', () => {
+test('scanNext drops addresses that fail to read instead of throwing, and says so', () => {
   const driver = new FakeMemoryDriver();
   driver.setValue(0x100n, 500); // readable
   // 0x999n is never seeded — readMemory will throw for it.
@@ -205,8 +218,54 @@ test('scanNext drops addresses that fail to read instead of throwing', () => {
 
   const result = scanNext(driver, HANDLE, 'int32', { kind: 'exact', value: 500 }, previous);
 
-  assert.equal(result.length, 1);
-  assert.equal(result[0].address, 0x100n);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x100n);
+  // D01 final closure: an unreadable candidate is reported, not silently
+  // conflated with a candidate that failed the comparison.
+  assert.equal(result.candidatesConsidered, 2);
+  assert.equal(result.candidatesUnreadable, 1);
+  assert.equal(result.truncated, true);
+  assert.equal(result.completeness.state, 'complete_with_skipped_regions');
+  assert.equal(result.skippedRegions.length, 1);
+  assert.equal(result.skippedRegions[0].baseAddress, 0x999n);
+});
+
+// C from the D01 test matrix: zero survivors plus an unreadable candidate must
+// never read as "the value is gone from this process".
+test('scanNext with zero survivors and an unreadable candidate is not an authoritative absence', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 123); // readable, but no longer matches
+
+  const previous = [
+    { address: 0x100n, value: 500 },
+    { address: 0x999n, value: 500 },
+  ];
+
+  const result = scanNext(driver, HANDLE, 'int32', { kind: 'exact', value: 500 }, previous);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.isAuthoritativeAbsence, false);
+  assert.equal(result.candidatesUnreadable, 1);
+});
+
+// A from the D01 test matrix: fully readable memory still reports complete, so
+// the new truthfulness cannot be satisfied by always claiming incompleteness.
+test('scanNext over fully readable candidates reports a complete, authoritative zero result', () => {
+  const driver = new FakeMemoryDriver();
+  driver.setValue(0x100n, 123);
+  driver.setValue(0x200n, 456);
+
+  const previous = [
+    { address: 0x100n, value: 500 },
+    { address: 0x200n, value: 500 },
+  ];
+
+  const result = scanNext(driver, HANDLE, 'int32', { kind: 'exact', value: 500 }, previous);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.truncated, false);
+  assert.equal(result.completeness.state, 'complete');
+  assert.equal(result.isAuthoritativeAbsence, true);
 });
 
 test('scanFirstRange keeps aligned floats inside an inclusive window', () => {
@@ -324,7 +383,84 @@ test('scanFirstRange skips unreadable regions without aborting later matches', (
   assert.equal(result.matches.length, 1);
   assert.equal(result.matches[0].address, 0xb000n);
   assert.equal(result.regionsScanned, 1);
+  // A region was skipped because it was unreadable, so the scan did not
+  // cover the full address space it was asked to cover. Reporting
+  // truncated: false here would certify a false completeness claim.
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange continues past an unreadable middle region and still finds a later match', () => {
+  const driver = new FakeMemoryDriver();
+  const before = filledBuffer(16, 0);
+  before.writeFloatLE(61.0, 0);
+  const after = filledBuffer(16, 0);
+  after.writeFloatLE(61.0, 0);
+  driver.addRegion(0x11000n, before, true);
+  driver.addUnreadableRegion(0x12000n, 16, true);
+  driver.addRegion(0x13000n, after, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.deepEqual(
+    result.matches.map((m) => m.address),
+    [0x11000n, 0x13000n],
+  );
+  assert.equal(result.regionsScanned, 2);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange preserves earlier matches when the final region is unreadable', () => {
+  const driver = new FakeMemoryDriver();
+  const good = filledBuffer(16, 0);
+  good.writeFloatLE(61.0, 0);
+  driver.addRegion(0x14000n, good, true);
+  driver.addUnreadableRegion(0x15000n, 16, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x14000n);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange reports truncated: false when every requested region is readable', () => {
+  const driver = new FakeMemoryDriver();
+  const region = filledBuffer(16, 0);
+  region.writeFloatLE(61.0, 0);
+  driver.addRegion(0x16000n, region, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
   assert.equal(result.truncated, false);
+});
+
+test('scanFirstRange reports truncated: true with zero matches when the only region is unreadable', () => {
+  const driver = new FakeMemoryDriver();
+  driver.addUnreadableRegion(0x17000n, 16, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.regionsScanned, 0);
+  assert.equal(result.truncated, true);
+});
+
+test('scanFirstRange keeps scanning after multiple unreadable regions and still reports truncated', () => {
+  const driver = new FakeMemoryDriver();
+  const good = filledBuffer(16, 0);
+  good.writeFloatLE(61.0, 0);
+  driver.addUnreadableRegion(0x18000n, 16, true);
+  driver.addRegion(0x19000n, good, true);
+  driver.addUnreadableRegion(0x1a000n, 16, true);
+
+  const result = scanFirstRange(driver, HANDLE, 'float', 60.5, 61.5);
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].address, 0x19000n);
+  assert.equal(result.regionsScanned, 1);
+  assert.equal(result.truncated, true);
 });
 
 test('scanFirstAutoMatrix scans all requested modes and value types in one read-only matrix', () => {

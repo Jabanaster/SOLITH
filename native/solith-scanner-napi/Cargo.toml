@@ -1,0 +1,29 @@
+[package]
+name = "solith-scanner-napi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Thin napi-rs adapter exposing solith-scanner-core to Electron/Node for SOLITH Phase 1 (Stage 2: native scanner foundation)."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# NOTE (Stage 2 evidence doc 14): Step 0.13.5's adoption freeze recorded only
+# the `napi-derive-v3.6.5` tag. `napi-derive` is pinned exactly to that
+# version below. `napi` itself has no separately-recorded frozen version;
+# empirically, napi-derive 3.6.5's generated code depends on runtime APIs
+# (class-accessor descriptors, native-borrow registration) not present in
+# napi 3.6.1 — the two crates' patch numbers are not in lockstep in the
+# upstream repository. `napi` is therefore pinned to 3.12.4, the newest
+# version on crates.io and the version Cargo's own resolver selects as
+# compatible with napi-derive 3.6.5 — the minimum version bump actually
+# required to compile against the frozen napi-derive tag, not a "float to
+# latest" choice.
+napi = { version = "=3.12.4", features = ["napi6"] }
+napi-derive = "=3.6.5"
+solith-scanner-core = { path = "../solith-scanner-core" }
+
+[build-dependencies]
+napi-build = "2"

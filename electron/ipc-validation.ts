@@ -295,6 +295,20 @@ export const TrainerHostRollbackSchema = z.object({
 // ── Live Memory Trainer IPC Schemas (V2, feature-flagged, see PROJECT_SPEC.md Section 3.1) ──
 
 const LIVE_VALUE_TYPE = z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']);
+// Stage 7.4 §1 — the routed exact-scan schemas (the two behind
+// `scanExactViaBackend`: `LiveMemoryScanFirstSchema`/`LiveMemoryScanFirstStartSchema`)
+// additionally accept the 10 canonical short type names, which is the only
+// way a caller can request the 4 widths the legacy vocabulary has no name
+// for at all (i8, i16, u16, u64). Every other schema below (read/write/
+// scan-next/auto-matrix/research) stays on the original 6-value `LIVE_VALUE_TYPE`
+// — those are legacy-only surfaces (`MemoryDriver`'s own `LiveValueType`
+// union), out of this stage's scope, and widening them would let a request
+// pass validation only to fail deeper inside code that never claimed to
+// support these widths.
+const LIVE_VALUE_TYPE_ROUTED = z.enum([
+  'int32', 'uint32', 'float', 'double', 'int64', 'byte',
+  'i8', 'u8', 'i16', 'u16', 'i32', 'u32', 'i64', 'u64', 'f32', 'f64',
+]);
 // Decimal or 0x-prefixed hex string — parsed with BigInt() in the main process.
 const LIVE_ADDRESS_STRING = z.string().min(1).max(20).regex(/^(0x[0-9a-fA-F]+|\d+)$/, 'Address must be decimal or 0x-hex');
 const UNKNOWN_SCAN_KEY = z.string().min(1).max(128);
@@ -365,8 +379,17 @@ export const LiveMemoryRollbackSchema = z.object({
 // (even a trusted-by-default one) should not be able to request a scan large
 // enough to hang the main process.
 export const LiveMemoryScanFirstSchema = z.object({
-  dataType: LIVE_VALUE_TYPE,
+  dataType: LIVE_VALUE_TYPE_ROUTED,
   targetValue: z.number().finite(),
+  // Stage 7.1 §7.1-C — `targetValue` alone cannot carry an exact int64 value
+  // beyond Number.MAX_SAFE_INTEGER (a `number` has already lost precision by
+  // the time it's on the wire). This optional decimal-string sibling lets a
+  // dataType: 'int64'/'i64'/'u64' caller supply the real value exactly;
+  // `targetValue` stays required for every other type and as a best-effort
+  // display value even when this is present. Ignored for any 32-bit-or-narrower
+  // dataType (Stage 7.4 §2 generalizes this from "int64 only" to "any 64-bit
+  // canonical type", since u64 has exactly the same precision problem).
+  targetValueBigint: z.string().regex(/^-?\d{1,20}$/).optional(),
   maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
   // 4 GiB ceiling — real-machine testing showed the 2 GiB production default is itself
   // sometimes insufficient (Stardew Valley alone used ~957 MiB), so the client-overridable
@@ -550,9 +573,130 @@ export const LiveMemoryPointerScanSchema = z.object({
   maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
 });
 
+// Phase 2 P2-2 — pointer map IPC contract. Every address is a hex string,
+// never a bare Number, matching LiveMemoryPointerScanSchema above — the
+// values these chains resolve to can exceed Number.MAX_SAFE_INTEGER on a
+// real 64-bit process, so precision-losing JSON transport is not an option
+// (mission §11).
+const POINTER_MAP_SCAN_BOUNDS = z.object({
+  maxDepth: z.number().int().min(1).max(8).optional(),
+  maxOffsetPerLevel: z.number().int().positive().max(65536).optional(),
+  maxResults: z.number().int().positive().max(200).optional(),
+  maxTotalScans: z.number().int().positive().max(2000).optional(),
+  // Real-process discovery (P2-3 evidence) found the scanner's own
+  // conservative default (3) routinely crowds out a real module-rooted
+  // pointer path among the megabytes of incidental pointer-shaped bytes a
+  // real process holds. This bound was already accepted by the core scanner
+  // (pointer-scanner.ts's PointerScanBounds) but missing from this IPC
+  // schema, silently stripping it from any caller's request before it ever
+  // reached the scanner.
+  maxCandidatesPerLevel: z.number().int().positive().max(64).optional(),
+});
+
+export const PointerMapCreateSchema = z.object({
+  name: z.string().min(1).max(128),
+});
+
+export const PointerMapIdSchema = z.object({
+  mapId: z.string().min(1).max(128),
+});
+
+export const PointerMapRenameSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  name: z.string().min(1).max(128),
+});
+
+export const PointerMapScanTargetSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  target: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  bounds: POINTER_MAP_SCAN_BOUNDS.optional(),
+});
+
+export const PointerMapScanTargetsSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  targets: z.array(z.string().regex(/^0x[0-9a-fA-F]+$/)).min(1).max(8),
+  bounds: POINTER_MAP_SCAN_BOUNDS.optional(),
+});
+
+export const PointerMapAddNodeSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  label: z.string().min(1).max(128),
+  candidate: z.object({
+    moduleName: z.string().min(1).max(260),
+    moduleOffset: z.number().int().nonnegative(),
+    offsets: z.array(z.number().int()).max(8),
+    depth: z.number().int().nonnegative(),
+  }),
+});
+
+export const PointerMapRemoveNodeSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  nodeId: z.string().min(1).max(128),
+});
+
+export const PointerMapSaveSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  gameId: z.string().min(1).max(128).optional(),
+  executableIdentity: z.string().min(1).max(260).optional(),
+  architecture: z.string().min(1).max(32).optional(),
+});
+
+/** P2-4 — the serializable ground-truth spec (StabilityGroundTruthSpec's wire shape). `u64.expected` is a decimal STRING, the same BigInt-safe-IPC rule every other value crossing this boundary follows. */
+export const POINTER_STABILITY_GROUND_TRUTH = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('u32'), expected: z.number().int().min(0).max(0xffffffff), description: z.string().min(1).max(256) }),
+  z.object({ kind: z.literal('u64'), expected: z.string().regex(/^\d{1,20}$/), description: z.string().min(1).max(256) }),
+]);
+
+export const PointerMapValidateNodeSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  nodeId: z.string().min(1).max(128),
+  groundTruth: POINTER_STABILITY_GROUND_TRUTH,
+});
+
+export const PointerMapValidateAfterRestartSchema = z.object({
+  mapId: z.string().min(1).max(128),
+  groundTruthByNodeId: z.record(z.string().min(1).max(128), POINTER_STABILITY_GROUND_TRUTH).refine((obj) => Object.keys(obj).length <= 200),
+});
+
+export const PointerMapGetNodeStabilitySchema = z.object({
+  mapId: z.string().min(1).max(128),
+  nodeId: z.string().min(1).max(128),
+});
+
 export const LiveMemoryScanAobSchema = z.object({
   signature: z.string().min(3).max(512),
   moduleName: z.string().min(1).max(260).optional(),
+});
+
+/** Stage 7 §7.5 — explicit scanner backend routing mode control. */
+export const LiveMemoryScannerRoutingModeSchema = z.object({
+  mode: z.enum(['LEGACY', 'NATIVE', 'SHADOW_COMPARE']),
+});
+
+/**
+ * Stage 7.2/7.3 §2/§12 — cancellable scan start. Same fields as
+ * `LiveMemoryScanFirstSchema`; kept as a distinct schema (rather than a
+ * shared reference) so the two request shapes can diverge independently if
+ * a future stage needs to.
+ */
+export const LiveMemoryScanFirstStartSchema = z.object({
+  dataType: LIVE_VALUE_TYPE_ROUTED,
+  targetValue: z.number().finite(),
+  targetValueBigint: z.string().regex(/^-?\d{1,20}$/).optional(),
+  maxRegionBytes: z.number().int().positive().max(256 * 1024 * 1024).optional(),
+  maxTotalBytes: z.number().int().positive().max(4 * 1024 * 1024 * 1024).optional(),
+  maxMatches: z.number().int().positive().max(5000).optional(),
+});
+
+/** Stage 7.2/7.3 §2/§12 — cancellable AOB scan start. */
+export const LiveMemoryScanAobStartSchema = z.object({
+  signature: z.string().min(3).max(512),
+  moduleName: z.string().min(1).max(260).optional(),
+});
+
+/** Stage 7.2/7.3 §2/§12 — references an operation started by either scan-start channel. */
+export const LiveMemoryScanOperationIdSchema = z.object({
+  operationId: z.string().uuid(),
 });
 
 /** Phase 9 — read-only research view (typed reinterpret at one address). */

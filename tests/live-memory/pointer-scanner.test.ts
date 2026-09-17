@@ -90,6 +90,11 @@ test('does not find a path when maxDepth is too shallow to reach the module', ()
 
   assert.equal(result.candidates.length, 0);
   assert.equal(result.levelsSearched, 1);
+  // D05: finding nothing because the search was capped is not the same answer
+  // as finding nothing because there is nothing to find.
+  assert.equal(result.termination, 'depth_limit_reached');
+  assert.equal(result.truncated, true);
+  assert.equal(result.isAuthoritativeAbsence, false);
 });
 
 test('does not find a path when the real offset exceeds maxOffsetPerLevel', () => {
@@ -128,6 +133,15 @@ test('a pointer stored in a region larger than maxRegionBytes is not found (regi
   const result = scanForPointerPath(driver, HANDLE, targetAddress, { maxRegionBytes: 512 });
 
   assert.equal(result.candidates.length, 0);
+  // D05/D01: a region excluded purely for exceeding maxRegionBytes is a region
+  // that was never examined, so the empty result must not claim completeness.
+  assert.ok(
+    result.skippedRegions.some((r) => r.baseAddress === 0x400000n),
+    'the oversized region must be recorded as skipped',
+  );
+  assert.equal(result.completeness.state, 'complete_with_skipped_regions');
+  assert.equal(result.truncated, true);
+  assert.equal(result.isAuthoritativeAbsence, false);
 });
 
 test('resolvePointerPath throws a clear error when the module is not loaded', () => {

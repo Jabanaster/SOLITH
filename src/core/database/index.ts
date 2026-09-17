@@ -1604,6 +1604,28 @@ function applySchema(): void {
     )
   `);
 
+  // Phase 2 P2-2 pointer-map persistence (ROADMAP "pointer maps"). `data`
+  // holds the full serialized PointerMap (nodes, offset chains, provenance)
+  // as JSON — nested/variable-shape by nature, matching how other
+  // variable-shape rows in this schema (e.g. aliasesJson/genresJson above)
+  // are stored, rather than normalizing pointer nodes into their own table.
+  // schemaVersion guards against loading a shape a future/older build wrote.
+  // Never stores an OS handle or a live PID as reusable authority — see
+  // pointer-map-store.ts, which is the only writer/reader of this table.
+  rawDb!.run(`
+    CREATE TABLE IF NOT EXISTS pointer_maps (
+      mapId TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      schemaVersion INTEGER NOT NULL,
+      gameId TEXT,
+      executableIdentity TEXT,
+      architecture TEXT,
+      data TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    )
+  `);
+
   reconcileCatalogOrphans();
 }
 

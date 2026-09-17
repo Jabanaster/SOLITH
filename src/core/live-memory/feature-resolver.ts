@@ -5,6 +5,26 @@ import { resolvePointerPath } from './pointer-resolver.js';
 import type { LiveMemoryAddress, LiveProcessHandle, MemoryDriver } from './types.js';
 
 /**
+ * Stage 7.4 §5-§6 — an async AOB lookup bound to a real backend (native by
+ * default, legacy only under explicit rollback). When supplied,
+ * `resolveMemoryFeatureAddress` routes its AOB step through this instead of
+ * calling `scanAobInProcess` directly, which is what closes the AOB shipping
+ * defect for this caller: `LiveMemorySession.createAobResolver()` is the
+ * production implementation, always dispatching through the router.
+ * `isAuthoritativeAbsence` distinguishes "genuinely not present" (a complete
+ * scan found nothing) from "scan was incomplete" (mission's own "incomplete
+ * zero-match MUST NOT become authoritative not-found" rule) — a caller that
+ * only checks `address === null` still behaves correctly either way, since
+ * both cases correctly fall through to the pointer-path fallback below.
+ */
+export interface AobResolverFn {
+  (signature: string, moduleName: string | undefined): Promise<{
+    address: bigint | null;
+    isAuthoritativeAbsence: boolean;
+  }>;
+}
+
+/**
  * Per-session address cache for AOB / pointer resolution results.
  * Cleared on LiveMemorySession.detach() — never shared across sessions.
  */
@@ -79,12 +99,13 @@ function resolveViaPointerPath(
  * `scan_first` / `scan_unknown` features cannot be resolved upfront — they require
  * the Discovery Lab scan workflow.
  */
-export function resolveMemoryFeatureAddress(
+export async function resolveMemoryFeatureAddress(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   feature: MemoryFeatureV1,
   cache: SessionAddressCache,
-): LiveMemoryAddress {
+  aobResolver?: AobResolverFn,
+): Promise<LiveMemoryAddress> {
   if (feature.type === 'scan_first' || feature.type === 'scan_unknown') {
     throw new Error(`Feature "${feature.id}" (${feature.type}) requires discovery scanning before resolution.`);
   }
@@ -102,9 +123,14 @@ export function resolveMemoryFeatureAddress(
   let address: bigint;
 
   if (resolution.signature) {
-    const match = scanAobInProcess(driver, handle, resolution.signature, {
-      moduleName: resolution.moduleName,
-    });
+    // Stage 7.4 §5-§6 — routed through the real backend contract when a
+    // resolver is bound (every production caller now binds one); falls back
+    // to the direct legacy call only for callers that genuinely have no
+    // session/router to bind to (e.g. a unit test exercising this function
+    // in isolation against a `FakeMemoryDriver`).
+    const match = aobResolver
+      ? (await aobResolver(resolution.signature, resolution.moduleName)).address
+      : scanAobInProcess(driver, handle, resolution.signature, { moduleName: resolution.moduleName }).address;
 
     if (match !== null) {
       const anchor = match + BigInt(parseHexOffset(resolution.baseOffset));

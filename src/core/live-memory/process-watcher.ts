@@ -14,11 +14,17 @@ import type { MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.
 import { evaluateWriteConsent } from './write-consent.js';
 import type { LiveProcessListEntry } from './native-memory-driver.js';
 import type { OnlineGuardInput, OnlineGuardResult } from './types.js';
-import { resolveSignature, type FuzzyScanOptions, type SignatureMatch } from './signature-engine.js';
+import {
+  resolveSignatureWithCoverage,
+  type FuzzyAobResolverFn,
+  type FuzzyScanOptions,
+  type SignatureMatch,
+} from './signature-engine.js';
 import {
   parseHexOffset,
   resolveMemoryFeatureAddress,
   SessionAddressCache,
+  type AobResolverFn,
 } from './feature-resolver.js';
 import type { LiveProcessHandle, MemoryDriver } from './types.js';
 
@@ -54,6 +60,19 @@ export interface ResolvedFeatureAddress {
   resolution: 'cache' | 'exact_aob' | 'fuzzy_aob' | 'pointer' | 'failed';
   signatureDistance?: number;
   error?: string;
+  /**
+   * Stage 7.5 - which backend actually served the drift-tolerant sub-path,
+   * when it ran. Present only for a backend-routed fuzzy resolution.
+   */
+  fuzzyBackend?: 'legacy' | 'native';
+  /**
+   * Stage 7.5 - the canonical completeness label of the fuzzy search, when it
+   * ran. `'unknown'` marks the unbound legacy fallback, which genuinely has no
+   * coverage signal. This exists so a zero-match fuzzy result can never again
+   * be read as a confident absence when the search never covered the address
+   * space it claimed to (D03).
+   */
+  signatureCoverage?: string;
 }
 
 /**
@@ -176,8 +195,19 @@ function applyPointerChain(
 /**
  * Resolve all memory features for Zero-Input apply.
  * Order per feature: session cache → exact/fuzzy AOB → static pointer path.
+ *
+ * Stage 7.4 §5-§7 / Stage 7.5 — `exactAobResolver` routes the exact-AOB
+ * sub-path and `resolveMemoryFeatureAddress`'s own AOB step through the real
+ * backend contract; `fuzzyAobResolver` now routes the drift-tolerant sub-path
+ * the same way. Both are bound by every production caller, so no shipping
+ * signature resolution reaches `MemoryDriver` directly any more. The earlier
+ * claim recorded here — that the fuzzy path must always stay legacy because
+ * no native equivalent exists — was corrected in Stage 7.5: drift tolerance is
+ * a pure buffer computation, not a scan primitive, and the primitives it does
+ * need (region enumeration, chunked completeness-reporting reads) were already
+ * native and already certified.
  */
-export function resolveDefinitionFeatures(
+export async function resolveDefinitionFeatures(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   features: MemoryFeatureV1[],
@@ -185,7 +215,9 @@ export function resolveDefinitionFeatures(
   fuzzyOptions: FuzzyScanOptions = {},
   /** Prior match addresses per featureId — used as SignatureEngine hint windows. */
   featureHints?: Map<string, bigint>,
-): ResolvedFeatureAddress[] {
+  exactAobResolver?: AobResolverFn,
+  fuzzyAobResolver?: FuzzyAobResolverFn,
+): Promise<ResolvedFeatureAddress[]> {
   const results: ResolvedFeatureAddress[] = [];
 
   for (const feature of features) {
@@ -206,10 +238,11 @@ export function resolveDefinitionFeatures(
     }
 
     const { resolution } = feature;
+    let signatureCoverageForFeature: string | null = null;
     try {
       if (resolution.signature) {
         const hintAddress = featureHints?.get(feature.id);
-        const match: SignatureMatch | null = resolveSignature(
+        const resolved = await resolveSignatureWithCoverage(
           driver,
           handle,
           resolution.signature,
@@ -218,7 +251,12 @@ export function resolveDefinitionFeatures(
             ...fuzzyOptions,
             ...(hintAddress != null ? { hintAddress } : {}),
           },
+          exactAobResolver,
+          fuzzyAobResolver,
         );
+        const match: SignatureMatch | null = resolved.match;
+        const signatureCoverage = resolved.completeness?.state ?? 'unknown';
+        signatureCoverageForFeature = signatureCoverage;
         if (match) {
           const baseOffset = parseHexOffset(resolution.baseOffset);
           let address = match.address + BigInt(baseOffset);
@@ -231,14 +269,21 @@ export function resolveDefinitionFeatures(
             address,
             resolution: match.mode === 'exact' ? 'exact_aob' : 'fuzzy_aob',
             signatureDistance: match.distance,
+            ...(resolved.fuzzyBackend ? { fuzzyBackend: resolved.fuzzyBackend } : {}),
+            signatureCoverage,
           });
           continue;
         }
       }
 
       // Exact/fuzzy AOB missed (or no signature) — fall back to static pointer path.
-      const liveAddr = resolveMemoryFeatureAddress(driver, handle, feature, cache);
-      results.push({ featureId: feature.id, address: liveAddr.address, resolution: 'pointer' });
+      const liveAddr = await resolveMemoryFeatureAddress(driver, handle, feature, cache, exactAobResolver);
+      results.push({
+        featureId: feature.id,
+        address: liveAddr.address,
+        resolution: 'pointer',
+        ...(signatureCoverageForFeature !== null ? { signatureCoverage: signatureCoverageForFeature } : {}),
+      });
     } catch (err) {
       results.push({
         featureId: feature.id,

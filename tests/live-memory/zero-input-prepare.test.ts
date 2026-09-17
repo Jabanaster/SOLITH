@@ -188,6 +188,15 @@ describe('zero-input-prepare', () => {
     driver.addRegion(0x1000n, region);
     const session = new LiveMemorySession(driver);
     session._injectRemoteConnectionObserver(async () => CLEAN);
+    // Stage 7.5 - the drift-tolerant sub-path is now backend-routed like every
+    // other production scan, and the production default is NATIVE. This test
+    // drives a `FakeMemoryDriver` against a PID that does not exist, so the
+    // native backend has nothing real to attach to; explicit LEGACY rollback
+    // is the honest routing mode for a fake-driver unit test. That the NATIVE
+    // default instead fails loudly here (a typed `attach_failed`, never a
+    // silent fall back to legacy) is the correct no-hidden-fallback behavior,
+    // and is asserted directly in signature-engine-fuzzy-backend.test.ts.
+    session.setScannerRoutingMode('LEGACY');
 
     const result = await prepareZeroInputSession(session, {
       detection: {

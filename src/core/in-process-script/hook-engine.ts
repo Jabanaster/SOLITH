@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { scanAobInProcess } from '../live-memory/aob-resolver.js';
 import type { MemoryDriver, LiveProcessHandle } from '../live-memory/types.js';
 import { buildAbsoluteJumpPatch } from './code-cave.js';
 import { allocateCodeCave, writeProcessBuffer } from './native-bridge.js';
@@ -27,11 +26,23 @@ export function getActiveHookManifest(sessionKey: string): HookInstallManifest |
   return activeManifests.get(sessionKey);
 }
 
+/**
+ * Stage 7.4 §8 — the AOB lookup for the hook site is now done by the
+ * caller (the `in-process-confirm-hook` IPC handler), routed through
+ * `LiveMemorySession.scanAobViaBackend` (native by default, legacy only
+ * under explicit rollback), and the resolved address is passed in as
+ * `hookSite`. This function no longer performs its own scan — scoping the
+ * migration to scanner resolution only, per mission §8's explicit
+ * instruction not to touch unrelated hook execution/injection semantics.
+ * Everything below this point (code-cave allocation, shellcode build, the
+ * actual process writes) is unchanged.
+ */
 export function installHookFromProposal(input: {
   sessionKey: string;
   proposalId: string;
   driver: MemoryDriver;
   handle: LiveProcessHandle;
+  hookSite: bigint;
 }): HookInstallManifest {
   const proposal = proposals.get(input.proposalId);
   if (!proposal) throw new Error('Unknown hook proposal.');
@@ -40,13 +51,7 @@ export function installHookFromProposal(input: {
     throw new Error('Hook plan is not executable.');
   }
 
-  const hookSite = scanAobInProcess(input.driver, input.handle, plan.aobSignature, {
-    moduleName: plan.moduleName,
-  });
-  if (hookSite == null) {
-    throw new Error('AOB signature not found in target process.');
-  }
-
+  const hookSite = input.hookSite;
   const patchSize = plan.patchByteCount;
   const originalBytes = input.driver.readBuffer(input.handle, hookSite, patchSize);
   const cave = allocateCodeCave(input.handle, 4096);
