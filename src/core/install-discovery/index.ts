@@ -26,6 +26,7 @@ import type {
   InstalledGameRecord,
   RawInstalledGame,
 } from './types.js';
+import type { TrainerCatalogEntry } from '../trainer-catalog/types.js';
 
 const NON_GAME_PATH_RE = /(?:common[ _-]?redistributables?|steamworks|redist|redistributable|sdk|engine|plugins?|launcher|editor|tools?|realityscan|source|intermediate|deriveddatacache|marketplace|samples|templates|unreal|ue[_-]?\d|game[ _-]?project|\.git|\.svn)/i;
 const NON_GAME_EXE_RE = /(?:setup|install|uninstall|crashreport|launcher|editor|updat(?:e|er)|bootstrap)/i;
@@ -175,11 +176,47 @@ function commonInstallRoots(): string[] {
  * sibling game's nested executable and misreport it as installed at the
  * library root instead of at that sibling's own folder.
  */
-function resolveInstallExecutable(installPath: string, options: { maxDepth?: number } = {}): string | undefined {
+function resolveInstallExecutable(
+  installPath: string,
+  options: { maxDepth?: number; knownCatalogExecutables?: string[] } = {},
+): string | undefined {
   return resolvePrimaryExecutable(installPath, options)?.absolutePath;
 }
 
-function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): RawInstalledGame[] {
+// A folder/display-name match only ever supplies `knownCatalogExecutables` —
+// the same "catalog already validated this executable name for this game"
+// evidence `resolvePrimaryExecutable` already accepts from platform scanners
+// (steam.ts et al). It never establishes game identity itself: executable
+// identity (executable-role.ts's LAUNCHER/TOOL/etc. rejection, the
+// PRIMARY_GAME/Shipping-binary resolution) runs exactly as it does with no
+// hint at all — this only gives it catalog-known names to prefer when the
+// result would otherwise be ambiguous or undiscoverable.
+function normalizeDisplayNameForHint(name: string): string {
+  // entry.displayName is already HTML-entity-decoded by rowToEntry
+  // (trainer-catalog/store.ts) — trimming here only guards against
+  // incidental whitespace, it is not a new decoding/matching heuristic.
+  return name.trim().toLowerCase();
+}
+
+function catalogExecutableHintForFolder(
+  folderName: string,
+  catalog: TrainerCatalogEntry[],
+): string[] | undefined {
+  const normalized = normalizeDisplayNameForHint(folderName);
+  const matches = catalog.filter((entry) => normalizeDisplayNameForHint(entry.displayName) === normalized);
+  // Any duplicate normalized display name is unconditionally ambiguous — no
+  // hint at all, regardless of which duplicate(s) carry executable metadata,
+  // look more "complete", or would otherwise seem preferable. This function
+  // never inspects `executables` or anything else about the candidates until
+  // AFTER this uniqueness check has already decided whether a hint exists.
+  return matches.length === 1 ? matches[0].executables : undefined;
+}
+
+function scanShallowRoot(
+  root: string,
+  failures: InstallDiscoveryFailure[],
+  catalog: TrainerCatalogEntry[],
+): RawInstalledGame[] {
   const resolvedRoot = path.resolve(root);
   const results: RawInstalledGame[] = [];
   try {
@@ -189,7 +226,8 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
       return results;
     }
 
-    const rootExe = resolveInstallExecutable(resolvedRoot, { maxDepth: 0 });
+    const rootHint = catalogExecutableHintForFolder(path.basename(resolvedRoot), catalog);
+    const rootExe = resolveInstallExecutable(resolvedRoot, { maxDepth: 0, knownCatalogExecutables: rootHint });
     if (rootExe) {
       const rejected = rejectManualCandidate(resolvedRoot, rootExe);
       if (rejected) { failures.push({ location: resolvedRoot, reason: 'rejected_non_game:' + rejected }); } else results.push({
@@ -204,7 +242,8 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const child = path.join(resolvedRoot, entry.name);
-      const executablePath = resolveInstallExecutable(child);
+      const childHint = catalogExecutableHintForFolder(entry.name, catalog);
+      const executablePath = resolveInstallExecutable(child, { knownCatalogExecutables: childHint });
       if (!executablePath) continue;
       const rejected = rejectManualCandidate(child, executablePath);
       if (rejected) { failures.push({ location: child, reason: 'rejected_non_game:' + rejected }); continue; }
@@ -260,10 +299,16 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
   ]);
 
   const platformRaw = discoverRawInstalls(options, failures);
+  // Fetched once here (rather than only later, as before) so the manual/Xbox
+  // shallow scan below can pass a catalog-executable hint into resolution —
+  // see catalogExecutableHintForFolder's doc comment for why this is safe.
+  // One snapshot for the whole scan call — not re-queried per folder — so
+  // scan semantics never depend on catalog-read timing.
+  const catalogForHints = getFullCatalogForMatching();
   const selectedRootRaw = [
     ...(options.userSelectedRoots ?? []),
     ...(options.includeCommonRoots ? commonInstallRoots() : []),
-  ].flatMap((root) => scanShallowRoot(root, failures));
+  ].flatMap((root) => scanShallowRoot(root, failures, catalogForHints));
 
   const discoveredRaw = [...platformRaw, ...selectedRootRaw];
   const rejected: InstallDiscoveryRejectedCandidate[] = failures
@@ -283,8 +328,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     });
     return false;
   });
-  const catalog = getFullCatalogForMatching();
-  const matched = deduplicateConcreteInstalls(matchInstalledToCatalog(raw, catalog, scannedAt));
+  const matched = deduplicateConcreteInstalls(matchInstalledToCatalog(raw, catalogForHints, scannedAt));
   const classificationReasons = new Map<string, string>();
   const addable = matched.filter((record) => {
     if (record.catalogGameId || (record.platform !== 'manual' && record.platform !== 'xbox')) return true;
