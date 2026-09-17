@@ -61,6 +61,15 @@ import {
   TypedViewRefreshSchema,
   TypedViewReinterpretSchema,
   InferStructureBehaviorSchema,
+  MemoryMapListRegionsSchema,
+  MemoryMapListModulesSchema,
+  WatchAddSchema,
+  WatchListSchema,
+  WatchGetSchema,
+  WatchRemoveSchema,
+  WatchRefreshSchema,
+  WatchRefreshAllSchema,
+  WatchSetLabelSchema,
   ResearchPointerAnalyzeSchema,
   ResearchResolvePathSchema,
   ResearchSnapshotDiffSchema,
@@ -1812,6 +1821,147 @@ export function registerLiveMemoryIpc(): void {
       return { success: true, results };
     } catch (error) {
       return { success: false, error: sanitize(error, 'infer_structure_behavior_failed') };
+    }
+  });
+
+  // Phase 2 P2-8 — memory map (region/module browser, read-only, reuses the existing research MemoryViewer enumeration).
+  ipcMain.handle('memory-map:list-regions', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = MemoryMapListRegionsSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const list = bundle.session.listMemoryRegions(parsed);
+      return { success: true, list };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'memory_map_list_regions_failed') };
+    }
+  });
+
+  ipcMain.handle('memory-map:list-modules', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = MemoryMapListModulesSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const list = bundle.session.listMemoryModules(parsed);
+      return { success: true, list };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'memory_map_list_modules_failed') };
+    }
+  });
+
+  // Phase 2 P2-8 — watchlists.
+  ipcMain.handle('watchlist:add', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = WatchAddSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const source =
+        parsed.source.kind === 'absolute'
+          ? { kind: 'absolute' as const, address: parsed.source.address }
+          : parsed.source.kind === 'module_relative'
+            ? { kind: 'module_relative' as const, moduleName: parsed.source.moduleName, offset: parsed.source.offset }
+            : parsed.source.kind === 'pointer_map_node'
+              ? { kind: 'pointer_map_node' as const, mapId: parsed.source.mapId, nodeId: parsed.source.nodeId }
+              : { kind: 'structure_field' as const, structureId: parsed.source.structureId, offset: parsed.source.offset };
+
+      const watch = bundle.session.watchAdd({ source, width: parsed.width, label: parsed.label ?? null, refreshIntervalMs: parsed.refreshIntervalMs });
+      bundle.audit.append({
+        op: 'read',
+        reason: `watchlist:add:${watch.id}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, watch };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_add_failed') };
+    }
+  });
+
+  ipcMain.handle('watchlist:list', (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      WatchListSchema.parse({});
+      return { success: true, watches: bundle.session.watchList() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_list_failed') };
+    }
+  });
+
+  ipcMain.handle('watchlist:get', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = WatchGetSchema.parse(payload);
+      return { success: true, watch: bundle.session.watchGet(parsed.watchId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_get_failed') };
+    }
+  });
+
+  ipcMain.handle('watchlist:remove', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = WatchRemoveSchema.parse(payload);
+      return { success: true, removed: bundle.session.watchRemove(parsed.watchId) };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_remove_failed') };
+    }
+  });
+
+  ipcMain.handle('watchlist:refresh', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = WatchRefreshSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const watch = bundle.session.watchRefresh(parsed.watchId);
+      return { success: true, watch };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_refresh_failed') };
+    }
+  });
+
+  ipcMain.handle('watchlist:refresh-all', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      WatchRefreshAllSchema.parse(payload ?? {});
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const watches = bundle.session.watchRefreshAll();
+      return { success: true, watches };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_refresh_all_failed') };
+    }
+  });
+
+  ipcMain.handle('watchlist:set-label', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = WatchSetLabelSchema.parse(payload);
+      const watch = bundle.session.watchSetLabel(parsed.watchId, parsed.label);
+      return { success: true, watch };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'watchlist_set_label_failed') };
     }
   });
 

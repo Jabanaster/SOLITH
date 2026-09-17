@@ -11,6 +11,19 @@ const MEM_COMMIT = 0x1000;
 const PAGE_NOACCESS = 0x01;
 const PAGE_GUARD = 0x100;
 const WRITABLE_PROTECT_FLAGS = 0x04 | 0x08 | 0x40 | 0x80; // PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+// P2-8 memory map — additional real Win32 protection/type flags (readonly reference, MSDN VirtualQuery constants).
+const READABLE_PROTECT_FLAGS = 0x02 | 0x04 | 0x08 | 0x20 | 0x40 | 0x80; // PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+const EXECUTABLE_PROTECT_FLAGS = 0x10 | 0x20 | 0x40 | 0x80; // PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+const MEM_IMAGE = 0x1000000;
+const MEM_MAPPED = 0x40000;
+const MEM_PRIVATE = 0x20000;
+
+function regionTypeLabel(type: number): 'image' | 'mapped' | 'private' | 'unknown' {
+  if (type === MEM_IMAGE) return 'image';
+  if (type === MEM_MAPPED) return 'mapped';
+  if (type === MEM_PRIVATE) return 'private';
+  return 'unknown';
+}
 
 // memoryjs is a CJS native addon; this project is pure ESM ("type": "module"),
 // so a CommonJS-style require is synthesized via createRequire rather than
@@ -60,12 +73,14 @@ interface MemoryjsRegion {
   RegionSize: number;
   State: number;
   Protect: number;
+  Type: number;
 }
 
 interface MemoryjsModuleEntry {
   szModule: string;
   modBaseAddr: number;
   modBaseSize: number;
+  szExePath?: string;
 }
 
 interface MemoryjsModule {
@@ -382,6 +397,11 @@ export const nativeMemoryDriver: MemoryDriver = {
           baseAddress: BigInt(region.BaseAddress),
           size: region.RegionSize,
           writable: (region.Protect & WRITABLE_PROTECT_FLAGS) !== 0,
+          readable: (region.Protect & READABLE_PROTECT_FLAGS) !== 0,
+          executable: (region.Protect & EXECUTABLE_PROTECT_FLAGS) !== 0,
+          guarded: (region.Protect & PAGE_GUARD) !== 0,
+          rawProtect: region.Protect,
+          regionType: regionTypeLabel(region.Type),
         });
       }
       return regions;
@@ -454,6 +474,7 @@ export const nativeMemoryDriver: MemoryDriver = {
         name: String(m.szModule),
         baseAddress: BigInt(m.modBaseAddr),
         size: Number(m.modBaseSize),
+        path: m.szExePath ? String(m.szExePath) : null,
       }));
     } catch (err) {
       throw new Error(

@@ -530,6 +530,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   inferStructureBehavior: (payload: { structureId: string }) =>
     ipcRenderer.invoke('inference:infer-structure-behavior', payload),
 
+  // Phase 2 P2-8 — memory map (read-only)
+  memoryMapListRegions: (payload: { writableOnly?: boolean; maxRegions?: number } = {}) =>
+    ipcRenderer.invoke('memory-map:list-regions', payload),
+  memoryMapListModules: (payload: { maxModules?: number } = {}) =>
+    ipcRenderer.invoke('memory-map:list-modules', payload),
+
+  // Phase 2 P2-8 — watchlists
+  watchlistAdd: (payload: {
+    source:
+      | { kind: 'absolute'; address: string }
+      | { kind: 'module_relative'; moduleName: string; offset: string }
+      | { kind: 'pointer_map_node'; mapId: string; nodeId: string }
+      | { kind: 'structure_field'; structureId: string; offset: number };
+    width: 1 | 2 | 4 | 8;
+    label?: string | null;
+    refreshIntervalMs?: number;
+  }) => ipcRenderer.invoke('watchlist:add', payload),
+  watchlistList: () => ipcRenderer.invoke('watchlist:list'),
+  watchlistGet: (payload: { watchId: string }) => ipcRenderer.invoke('watchlist:get', payload),
+  watchlistRemove: (payload: { watchId: string }) => ipcRenderer.invoke('watchlist:remove', payload),
+  watchlistRefresh: (payload: { watchId: string }) => ipcRenderer.invoke('watchlist:refresh', payload),
+  watchlistRefreshAll: () => ipcRenderer.invoke('watchlist:refresh-all'),
+  watchlistSetLabel: (payload: { watchId: string; label: string | null }) =>
+    ipcRenderer.invoke('watchlist:set-label', payload),
+
   inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-propose-hook', payload),
   inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) =>

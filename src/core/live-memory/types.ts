@@ -131,6 +131,8 @@ export interface MemoryModule {
   name: string;
   baseAddress: bigint;
   size: number;
+  /** P2-8 memory map — full on-disk path, when the driver can report it (optional: not every driver/fixture populates this). */
+  path?: string | null;
 }
 
 /** A single committed virtual-memory region inside the attached process. */
@@ -139,6 +141,13 @@ export interface MemoryRegion {
   size: number;
   /** True if the region is writable (required for anything the scanner should treat as a write candidate). */
   writable: boolean;
+  /** P2-8 memory map — real Win32 protection/type detail, optional: not every driver/fixture populates this (existing consumers never needed it). */
+  readable?: boolean;
+  executable?: boolean;
+  guarded?: boolean;
+  /** Raw PAGE_* protection flags, for a truthful low-level display — never fabricated from `writable` alone. */
+  rawProtect?: number;
+  regionType?: 'image' | 'mapped' | 'private' | 'unknown';
 }
 
 export interface LiveProcessHandle {

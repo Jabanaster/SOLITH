@@ -1189,6 +1189,48 @@ interface Window {
       error?: string;
     }>;
 
+    /** Phase 2 P2-8 — memory map (read-only). */
+    memoryMapListRegions: (payload?: { writableOnly?: boolean; maxRegions?: number }) => Promise<{
+      success: boolean;
+      list?: import('../core/live-memory/research/memory-viewer.js').MemoryRegionList;
+      error?: string;
+    }>;
+    memoryMapListModules: (payload?: { maxModules?: number }) => Promise<{
+      success: boolean;
+      list?: import('../core/live-memory/research/memory-viewer.js').MemoryModuleList;
+      error?: string;
+    }>;
+
+    /** Phase 2 P2-8 — watchlists. */
+    watchlistAdd: (payload: {
+      source: import('../core/live-memory/watchlist-model.js').WatchAddressSource;
+      width: 1 | 2 | 4 | 8;
+      label?: string | null;
+      refreshIntervalMs?: number;
+    }) => Promise<{ success: boolean; watch?: import('../core/live-memory/watchlist-model.js').WatchItem; error?: string }>;
+    watchlistList: () => Promise<{ success: boolean; watches?: import('../core/live-memory/watchlist-model.js').WatchItem[]; error?: string }>;
+    watchlistGet: (payload: { watchId: string }) => Promise<{
+      success: boolean;
+      watch?: import('../core/live-memory/watchlist-model.js').WatchItem | null;
+      error?: string;
+    }>;
+    watchlistRemove: (payload: { watchId: string }) => Promise<{ success: boolean; removed?: boolean; error?: string }>;
+    watchlistRefresh: (payload: { watchId: string }) => Promise<{
+      success: boolean;
+      watch?: import('../core/live-memory/watchlist-model.js').WatchItem;
+      error?: string;
+    }>;
+    watchlistRefreshAll: () => Promise<{
+      success: boolean;
+      watches?: import('../core/live-memory/watchlist-model.js').WatchItem[];
+      error?: string;
+    }>;
+    watchlistSetLabel: (payload: { watchId: string; label: string | null }) => Promise<{
+      success: boolean;
+      watch?: import('../core/live-memory/watchlist-model.js').WatchItem;
+      error?: string;
+    }>;
+
     inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) => Promise<{
       success: boolean;
       proposal?: import('../core/in-process-script/types.js').HookInstallProposal;

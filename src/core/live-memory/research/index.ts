@@ -7,6 +7,8 @@ export type {
   MemoryViewEntry,
   MemoryRegionSummary,
   MemoryRegionList,
+  MemoryModuleSummary,
+  MemoryModuleList,
 } from './memory-viewer.js';
 export { HexInspector } from './hex-inspector.js';
 export type { HexWindow, HexRow } from './hex-inspector.js';

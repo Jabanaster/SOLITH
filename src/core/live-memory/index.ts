@@ -165,6 +165,8 @@ export type {
   MemoryViewEntry,
   MemoryRegionSummary,
   MemoryRegionList,
+  MemoryModuleSummary,
+  MemoryModuleList,
   HexWindow,
   HexRow,
   PointerCandidateReport,
@@ -189,6 +191,14 @@ export type {
   TypedInterpretationsByWidth,
   TypedViewReadState,
 } from './typed-memory-view.js';
+export {
+  createWatchItemId,
+  MAX_WATCH_ITEMS_PER_SESSION,
+  MIN_WATCH_REFRESH_INTERVAL_MS,
+  MAX_WATCH_REFRESH_INTERVAL_MS,
+  DEFAULT_WATCH_REFRESH_INTERVAL_MS,
+} from './watchlist-model.js';
+export type { WatchItem, WatchAddressSource, WatchResolveState, WatchChangeState } from './watchlist-model.js';
 export { inferFieldBehavior, inferStructureBehavior } from './value-type-inference.js';
 export type {
   FieldBehaviorCandidate,
