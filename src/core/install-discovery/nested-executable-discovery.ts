@@ -36,11 +36,35 @@ export interface DiscoverGameExecutablesOptions {
   maxDepth?: number;
   /** Catalog-declared executable names for this game, when known — passed through to executable-role classification so PRIMARY_GAME is resolved by evidence, not position. */
   knownCatalogExecutables?: string[];
+  /**
+   * Opt-in only: when true, and 2+ PRIMARY_GAME candidates remain after the
+   * Shipping-binary tie-break, `knownCatalogExecutables[0]` is trusted as
+   * the curator's declared preferred executable (e.g. Baldur's Gate 3's
+   * `bg3.exe` over `bg3_dx11.exe` — both are equally real, independently
+   * launchable game binaries with no engine-level naming convention to
+   * prefer one). Defaults to false because `executables` array order is
+   * only verified meaningful for hand-curated literal source arrays (see
+   * `steam-executable-lookup.ts`, `bundled-community-games.ts`) — it is
+   * NOT verified safe for catalog data whose order may be an artifact of
+   * scrape/ingestion/Set-deduplication order rather than curator intent.
+   * Callers must only set this when they know their `knownCatalogExecutables`
+   * came from a source where position 0 is a deliberate author choice.
+   */
+  trustDeclaredExecutableOrder?: boolean;
   /** Override which directory (base)names are pruned entirely. */
   ignoredDirectoryPattern?: RegExp;
 }
 
 const DEFAULT_MAX_DEPTH = 6;
+
+// Real, publicly-documented Unreal Engine cooked-binary naming convention
+// (e.g. Palworld-Win64-Shipping.exe) — the engine always ships this as the
+// actual game process; a shorter root-level stub with the bare game name
+// (e.g. Palworld.exe) is a wrapper that merely relaunches it. Used only as
+// a tie-break among executables the catalog has ALREADY validated as the
+// same known game — never invents a new game identity, and never applies
+// when the ambiguity is between unknown candidates.
+const SHIPPING_BINARY_RE = /-(?:win64|win32|linux64|linux)-shipping\.exe$/i;
 
 function collectExecutablesRecursive(
   root: string,
@@ -122,5 +146,28 @@ export function resolvePrimaryExecutable(
   options: DiscoverGameExecutablesOptions = {},
 ): DiscoveredExecutable | undefined {
   const primaries = discoverGameExecutables(installPath, options).filter((e) => e.role === 'PRIMARY_GAME');
-  return primaries.length === 1 ? primaries[0] : undefined;
+  if (primaries.length === 1) return primaries[0];
+
+  if (primaries.length > 1) {
+    const shipping = primaries.filter((e) => SHIPPING_BINARY_RE.test(path.basename(e.absolutePath)));
+    if (shipping.length === 1) return shipping[0];
+
+    // Second tier, opt-in only (see trustDeclaredExecutableOrder doc) — the
+    // catalog's own declared preferred executable. Reuses an existing,
+    // already-established codebase convention — index 0 of an `executables`
+    // list is treated as the primary executable elsewhere
+    // (mod-pack-adapter.ts's `primaryExecutable`, import-definition-ct.ts,
+    // bundled-definition-seed.ts) — rather than inventing new
+    // renderer-preference infrastructure. Never picks by filesystem or
+    // alphabetical order — only a caller-verified, curator-declared name.
+    if (options.trustDeclaredExecutableOrder) {
+      const firstKnown = options.knownCatalogExecutables?.[0]?.toLowerCase();
+      if (firstKnown) {
+        const declared = primaries.filter((e) => path.basename(e.absolutePath).toLowerCase() === firstKnown);
+        if (declared.length === 1) return declared[0];
+      }
+    }
+  }
+
+  return undefined;
 }

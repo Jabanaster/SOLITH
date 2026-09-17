@@ -90,11 +90,74 @@ describe('discoverGameExecutables / resolvePrimaryExecutable', () => {
     const root = makeInstall('multi-valid-known', ['x86/Game32.exe', 'x64/Game64.exe']);
     const all = discoverGameExecutables(root, { knownCatalogExecutables: ['Game32.exe', 'Game64.exe'] });
     assert.ok(all.every((e) => e.role === 'PRIMARY_GAME'));
-    // Genuinely 2 primaries — resolvePrimaryExecutable still fails closed
-    // rather than arbitrarily picking one, since "single primary" cannot be
-    // asserted here; callers needing one specific build must use catalog
-    // executable order or another explicit signal, not this function.
+    // Genuinely 2 primaries, neither an Unreal Shipping binary, and the
+    // caller has NOT opted into trustDeclaredExecutableOrder (this fixture's
+    // array order carries no verified meaning) — no evidence to break the
+    // tie, so resolvePrimaryExecutable still fails closed rather than
+    // arbitrarily picking one.
     assert.equal(resolvePrimaryExecutable(root, { knownCatalogExecutables: ['Game32.exe', 'Game64.exe'] }), undefined);
+  });
+
+  test('declared-order tie-break is opt-in only: an unopted-in caller still fails closed even with a hand-ordered list', () => {
+    const root = makeInstall('multi-valid-known-no-opt-in', ['x86/Game32.exe', 'x64/Game64.exe']);
+    assert.equal(
+      resolvePrimaryExecutable(root, {
+        knownCatalogExecutables: ['Game32.exe', 'Game64.exe'],
+        trustDeclaredExecutableOrder: false,
+      }),
+      undefined,
+    );
+  });
+
+  // Real-game regression (Baldur's Gate 3, Steam appid 1086940 — one of the
+  // ROADMAP.md Phase 3 Exit Gate's 7 curated titles): the real install ships
+  // TWO fully independent, equally-real, independently-launchable game
+  // binaries at bin/bg3.exe (Vulkan, default) and bin/bg3_dx11.exe (DX11
+  // fallback) — unlike Palworld, neither name carries an engine-level
+  // naming convention to prefer one. steam-executable-lookup.ts's
+  // hand-authored ['bg3.exe', 'bg3_dx11.exe'] is the only real evidence
+  // available, so a caller who has verified that source (steam.ts) may opt
+  // into trusting its declared order.
+  test('declared executable order resolves the primary when opted in (Baldur\'s Gate 3 real-install shape)', () => {
+    const root = makeInstall('bg3-declared-order', ['bin/bg3.exe', 'bin/bg3_dx11.exe']);
+    const primary = resolvePrimaryExecutable(root, {
+      knownCatalogExecutables: ['bg3.exe', 'bg3_dx11.exe'],
+      trustDeclaredExecutableOrder: true,
+    });
+    assert.equal(primary?.relativePath, 'bin/bg3.exe');
+  });
+
+  test('declared-order tie-break still fails closed when the declared name matches none of the real candidates', () => {
+    const root = makeInstall('bg3-declared-order-no-match', ['bin/other1.exe', 'bin/other2.exe']);
+    assert.equal(
+      resolvePrimaryExecutable(root, {
+        knownCatalogExecutables: ['bg3.exe', 'other1.exe', 'other2.exe'],
+        trustDeclaredExecutableOrder: true,
+      }),
+      undefined,
+      'declared name "bg3.exe" matches none of the real candidates — must not fall back to guessing',
+    );
+  });
+
+  // Real-game regression (Palworld, Steam appid 1623730 — one of the
+  // ROADMAP.md Phase 3 Exit Gate's 7 curated titles): the actual install
+  // ships BOTH a root-level wrapper (Palworld.exe) and the nested Unreal
+  // Engine cooked binary (Pal/Binaries/Win64/Palworld-Win64-Shipping.exe).
+  // The catalog legitimately lists both names as valid executables for the
+  // same game, so both classify PRIMARY_GAME — resolvePrimaryExecutable
+  // must not fail closed here the way it correctly does for genuinely
+  // unrelated candidates (the test above): the Shipping-suffixed binary is
+  // the real, evidence-backed choice.
+  test('Unreal Engine Shipping binary is preferred over a same-name root wrapper when catalog knows both (Palworld real-install shape)', () => {
+    const root = makeInstall('ue-shipping-preference', [
+      'Palworld.exe',
+      'Pal/Binaries/Win64/Palworld-Win64-Shipping.exe',
+      'Engine/Binaries/Win64/EpicWebHelper.exe',
+    ]);
+    const primary = resolvePrimaryExecutable(root, {
+      knownCatalogExecutables: ['Palworld-Win64-Shipping.exe', 'Palworld.exe'],
+    });
+    assert.equal(primary?.relativePath, 'Pal/Binaries/Win64/Palworld-Win64-Shipping.exe');
   });
 
   test('maxDepth: 0 restricts discovery to the root directory itself, never a nested sibling install', () => {
