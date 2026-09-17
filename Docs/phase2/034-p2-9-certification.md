@@ -55,7 +55,12 @@ Already wired end-to-end for the per-cheat discovery flow: a scan candidate surf
 
 ## Real-game proof (mission §27)
 
-Godlike Burger, PID 25920, production attach path. No known semantically-meaningful trainer value (health/currency/etc.) was available without active gameplay in this stage's time budget — disclosed, not hidden. Per the same honesty standard P2-5 established for its own real-game snapshot proof, this stage instead proves the full write pipeline mechanically against a real, genuinely writable, real-game-owned private heap region (found via the production `getRegions()` call, `writable:true` verified): original value recorded (`0`), write performed (`123456789`), read-back verified (exact match), revert performed, revert verified (`0`, exact match to original). Real process, real OS-level write/read/revert, production `proposeWrite`/`confirmWrite`/`rollback` — not a claim about what the bytes mean.
+Godlike Burger, PID 25920, production attach path. No known semantically-meaningful trainer value (health/currency/etc.) was available without active gameplay in this stage's time budget — disclosed, not hidden. Per the same honesty standard P2-5 established for its own real-game snapshot proof, this stage instead proves the full write/freeze/revert pipeline mechanically against real, genuinely writable, real-game-owned private heap regions (found via the production `getRegions()` call, `writable:true` verified) — not a claim about what the bytes mean:
+
+- **Write/revert**: original value recorded (`0`), write performed (`123456789`), read-back verified (exact match), revert performed, revert verified (`0`, exact match to original).
+- **Freeze/unfreeze**: `startFreeze` on a second real region; an independent competing real write (`1`) was genuinely overwritten back to the frozen value (`55555`) within the freeze's own real polling loop; `stopFreeze` genuinely stopped reassertion (an independent write after stop stuck).
+
+Both used the exact production `proposeWrite`/`confirmWrite`/`rollback`/`startFreeze`/`stopFreeze` classes. Both target regions were restored to their true pre-test value (`0`) after the proof, leaving the running game process unmodified.
 
 ## Resource limits (mission §36)
 
