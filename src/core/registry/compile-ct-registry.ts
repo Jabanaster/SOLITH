@@ -42,6 +42,16 @@ export interface CtCompilerPipelineEntry {
     pointer_chain: string[];
     is_valid_math: boolean;
   };
+  /**
+   * Always empty today: a CheatEntry carrying an AssemblerScript/LuaScript/
+   * CheatScript child is rejected wholesale by parseCheatTableXml
+   * (ct-import.ts's hasRejectedScript) and never becomes an accepted pointer
+   * entry, so no accepted entry can ever have a script or AOB signature
+   * genuinely extracted from it. Populating these here would fabricate a
+   * link the source data does not support (PD-06). The real, computed
+   * script→AOB correlation is exposed on script_catalog_refs[].linked_aob_ids
+   * instead, since scripts are where that data actually originates.
+   */
   linked_script_ids: string[];
   linked_aob_ids: string[];
   entry_state: {
@@ -68,6 +78,8 @@ export interface CtCompilerPipelineScriptRef {
   catalog_storage_key: string;
   excerpt: string;
   rejection_flags: Array<'L0_UNVERIFIED' | 'CONTAINS_AA' | 'CONTAINS_LUA' | 'CONTAINS_SCRIPT_METADATA'>;
+  /** AOB signatures extracted from this script's body (aob_signatures[].origin === script_id). */
+  linked_aob_ids: string[];
 }
 
 export interface CtCompilerPipelineRegistry {
@@ -302,6 +314,7 @@ function buildPipelineRegistry(input: {
         catalog_storage_key: scriptStorageKey(scriptId),
         excerpt: script.script_excerpt,
         rejection_flags: scriptRejectionFlags(script),
+        linked_aob_ids: aobIdsBySourceScript.get(index) ?? [],
       };
     }),
     rejections: input.pointers.rejected,
