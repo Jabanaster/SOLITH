@@ -58,6 +58,25 @@ function makeLauncherPlusGameFixture(): FixturePackage {
   return { root: contentRoot, contentRoot, installLocation: contentRoot };
 }
 
+/** Atomfall-shaped plus the real evidenced reproduction: gamelaunchhelper.exe (Microsoft's GDK bridge process) shipped at the package root alongside the Launcher/ stub and the real engine binary. */
+function makeLauncherPlusGameWithHelperFixture(): FixturePackage {
+  const contentRoot = makeXboxContentRoot('launcher-plus-game-with-helper');
+  fs.mkdirSync(path.join(contentRoot, 'Launcher'), { recursive: true });
+  fs.mkdirSync(path.join(contentRoot, 'bin'), { recursive: true });
+  fs.writeFileSync(path.join(contentRoot, 'Launcher', 'TestGame.exe'), '');
+  fs.writeFileSync(path.join(contentRoot, 'bin', 'TestGame_dx12.exe'), '');
+  fs.writeFileSync(path.join(contentRoot, 'gamelaunchhelper.exe'), '');
+  fs.writeFileSync(
+    path.join(contentRoot, 'appxmanifest.xml'),
+    APPXMANIFEST_TEMPLATE('Publisher.TestGame', 'Test Game', 'Launcher\\TestGame.exe'),
+  );
+  fs.writeFileSync(
+    path.join(contentRoot, 'MicrosoftGame.config'),
+    GAME_CONFIG_TEMPLATE('STORE123', 'TITLE456', 'Test Game', 'Launcher/TestGame.exe'),
+  );
+  return { root: contentRoot, contentRoot, installLocation: contentRoot };
+}
+
 /** Generic single-executable Xbox title — no Launcher/ indirection at all. */
 function makeSingleExecutableFixture(): FixturePackage {
   const contentRoot = makeXboxContentRoot('single-exe');
@@ -136,6 +155,31 @@ describe('install-discovery xbox scan', () => {
     assert.ok(game.executablePath, 'primary executable should resolve');
     assert.ok(game.executablePath!.replace(/\\/g, '/').endsWith('bin/TestGame_dx12.exe'));
     assert.ok(!path.relative(fixture.contentRoot, game.executablePath!).toLowerCase().includes('launcher'));
+  });
+
+  test('gamelaunchhelper.exe never becomes the resolved primary, and never blocks resolution of the real engine binary (production caller — the actual evidenced reproduction shape)', () => {
+    const fixture = makeLauncherPlusGameWithHelperFixture();
+    cleanupRoots.push(fixture.root);
+    const fixturePath = writeFixtureManifest(fixture.root, [
+      {
+        name: 'Test.Game',
+        packageFamilyName: 'Publisher.TestGame_abc123',
+        packageFullName: 'Publisher.TestGame_1.0.0.0_x64__abc123',
+        publisher: 'CN=TEST-PUBLISHER',
+        version: '1.0.0.0',
+        installLocation: fixture.installLocation,
+      },
+    ]);
+
+    const games = scanXboxInstallsFromFixture(fixturePath);
+    assert.equal(games.length, 1);
+    const game = games[0];
+    assert.ok(game.executablePath, 'primary executable should still resolve with the helper binary present');
+    assert.ok(game.executablePath!.replace(/\\/g, '/').endsWith('bin/TestGame_dx12.exe'));
+    assert.ok(
+      !game.executablePath!.toLowerCase().includes('gamelaunchhelper'),
+      'gamelaunchhelper.exe must never be selected as the resolved executable',
+    );
   });
 
   test('resolves a genuine single-executable title with no Launcher/ indirection', () => {

@@ -106,4 +106,26 @@ describe('classifyExecutableRoles', () => {
     assert.equal(roles.get('Game64.exe'), 'PRIMARY_GAME');
     assert.equal(roles.get('GameOther.exe'), 'ALTERNATE_GAME');
   });
+
+  test('gamelaunchhelper.exe (Microsoft GDK bridge process) is classified as TOOL, never a game candidate', () => {
+    // Real-game evidence: Atomfall (ROADMAP.md Phase 3 curated title) ships
+    // gamelaunchhelper.exe at the package root of every current-generation
+    // Xbox/PC Game Pass (GDK) title, alongside the real engine binary
+    // bin/Atomfall_dx12.exe — confirmed against a real installed package.
+    const roles = classifyExecutableRoles(['Atomfall_dx12.exe', 'gamelaunchhelper.exe']);
+    assert.equal(roles.get('Atomfall_dx12.exe'), 'PRIMARY_GAME');
+    assert.equal(roles.get('gamelaunchhelper.exe'), 'TOOL');
+  });
+
+  test('gamelaunchhelper.exe matching is case-insensitive (GDK packages are not consistent about casing)', () => {
+    const roles = classifyExecutableRoles(['Game.exe', 'GameLaunchHelper.EXE']);
+    assert.equal(roles.get('GameLaunchHelper.EXE'), 'TOOL');
+  });
+
+  test('gamelaunchhelper matching is basename-exact, not a substring ban — unrelated executables containing that sequence stay real game candidates', () => {
+    for (const name of ['mygamelaunchhelpertool.exe', 'gamelaunchhelper_backup.exe', 'notgamelaunchhelper.exe']) {
+      const roles = classifyExecutableRoles([name]);
+      assert.equal(roles.get(name), 'PRIMARY_GAME', `${name} must not be rejected by the gamelaunchhelper rule`);
+    }
+  });
 });
