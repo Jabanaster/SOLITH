@@ -516,6 +516,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   structureCompareSnapshots: (payload: { snapshotAId: string; snapshotBId: string }) =>
     ipcRenderer.invoke('structure:compare-snapshots', payload),
 
+  // Phase 2 P2-6 — typed memory-view expansion (read-only)
+  typedViewRead: (payload: { address: string; length: 1 | 2 | 4 | 8 }) =>
+    ipcRenderer.invoke('typed-view:read', payload),
+  typedViewReadMany: (payload: { requests: { address: string; length: 1 | 2 | 4 | 8 }[] }) =>
+    ipcRenderer.invoke('typed-view:read-many', payload),
+  typedViewRefresh: (payload: { address: string; length: 1 | 2 | 4 | 8 }) =>
+    ipcRenderer.invoke('typed-view:refresh', payload),
+  typedViewReinterpret: (payload: { rawHex: string }) =>
+    ipcRenderer.invoke('typed-view:reinterpret', payload),
+
+  // Phase 2 P2-7 — value/type inference (read-only)
+  inferStructureBehavior: (payload: { structureId: string }) =>
+    ipcRenderer.invoke('inference:infer-structure-behavior', payload),
+
   inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) =>
     ipcRenderer.invoke('in-process-propose-hook', payload),
   inProcessConfirmHook: (payload: { proposalId: string; userApprovedAction: true }) =>

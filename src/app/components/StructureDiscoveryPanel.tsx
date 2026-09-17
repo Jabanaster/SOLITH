@@ -5,6 +5,7 @@ import type {
   StructureSnapshot,
   StructureSnapshotDiffResult,
 } from '../../core/live-memory/structure-model.js';
+import type { FieldInferenceResult } from '../../core/live-memory/value-type-inference.js';
 
 export interface StructureDiscoveryPanelProps {
   attached: boolean;
@@ -50,6 +51,7 @@ export const StructureDiscoveryPanel: React.FC<StructureDiscoveryPanelProps> = (
   const [snapshotA, setSnapshotA] = useState<StructureSnapshot | null>(null);
   const [snapshotB, setSnapshotB] = useState<StructureSnapshot | null>(null);
   const [diff, setDiff] = useState<StructureSnapshotDiffResult | null>(null);
+  const [inference, setInference] = useState<FieldInferenceResult[] | null>(null);
 
   const run = useCallback(
     async (fn: () => Promise<void>) => {
@@ -82,6 +84,7 @@ export const StructureDiscoveryPanel: React.FC<StructureDiscoveryPanelProps> = (
       setSnapshotA(null);
       setSnapshotB(null);
       setDiff(null);
+      setInference(null);
       const s = result.structure;
       setMessage(
         `Discovered ${s.fields.length} field(s), ${s.unknownSpans.length} unknown span(s) — ${s.completeness.state}${s.truncated ? ' (truncated to max)' : ''}`,
@@ -133,6 +136,19 @@ export const StructureDiscoveryPanel: React.FC<StructureDiscoveryPanelProps> = (
       setMessage('Snapshot B captured — capture Snapshot A first to compare.');
     });
 
+  const handleInfer = () =>
+    run(async () => {
+      if (!structure) return;
+      const result = await api!.inferStructureBehavior!({ structureId: structure.id });
+      if (!result.success || !result.results) {
+        setMessage(result.error ?? 'inference:infer-structure-behavior failed');
+        return;
+      }
+      setInference(result.results);
+      const withEvidence = result.results.filter((r) => r.candidates.length > 0).length;
+      setMessage(`Inferred behavior for ${withEvidence}/${result.results.length} field(s) with enough snapshot evidence — capture more snapshots for the rest.`);
+    });
+
   const rows = useMemo(() => (structure ? combineRows(structure) : []), [structure]);
   const selectedField = useMemo(
     () => (selectedOffset === null ? null : structure?.fields.find((f) => f.offset === selectedOffset) ?? null),
@@ -179,6 +195,9 @@ export const StructureDiscoveryPanel: React.FC<StructureDiscoveryPanelProps> = (
         </button>
         <button className="btn-secondary" type="button" onClick={handleSnapshotB} disabled={!attached || busy || !structure}>
           Snapshot B · Compare
+        </button>
+        <button className="btn-secondary" type="button" onClick={handleInfer} disabled={!attached || busy || !structure}>
+          Infer Behavior (P2-7)
         </button>
       </div>
       {message && (
@@ -300,6 +319,33 @@ export const StructureDiscoveryPanel: React.FC<StructureDiscoveryPanelProps> = (
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {inference && (
+        <div aria-label="Value/type inference" style={{ marginTop: 12 }}>
+          <h4>Value/Type Inference (P2-7, candidates — never semantic truth)</h4>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th align="left">Offset</th>
+                <th align="left">Behavior candidates</th>
+                <th align="left">Observations</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inference.map((r) => (
+                <tr key={r.offset}>
+                  <td>0x{r.offset.toString(16)}</td>
+                  <td>
+                    {r.candidates.length === 0
+                      ? 'insufficient evidence — capture more snapshots'
+                      : r.candidates.map((c) => `${c.behavior} (${c.confidence})`).join(', ')}
+                  </td>
+                  <td>{r.evidence.observationCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </section>

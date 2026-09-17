@@ -56,6 +56,11 @@ import {
   StructureCaptureSnapshotSchema,
   StructureListSnapshotsSchema,
   StructureCompareSnapshotsSchema,
+  TypedViewReadSchema,
+  TypedViewReadManySchema,
+  TypedViewRefreshSchema,
+  TypedViewReinterpretSchema,
+  InferStructureBehaviorSchema,
   ResearchPointerAnalyzeSchema,
   ResearchResolvePathSchema,
   ResearchSnapshotDiffSchema,
@@ -1712,6 +1717,101 @@ export function registerLiveMemoryIpc(): void {
       return { success: true, diff };
     } catch (error) {
       return { success: false, error: sanitize(error, 'structure_compare_snapshots_failed') };
+    }
+  });
+
+  // Phase 2 P2-6 — typed memory-view expansion (read-only; builds on P2-5's structure-discovery/interpretation engine).
+  ipcMain.handle('typed-view:read', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = TypedViewReadSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const view = bundle.session.readTypedValue({ address: BigInt(parsed.address), length: parsed.length });
+      bundle.audit.append({
+        op: 'read',
+        address: parsed.address,
+        reason: `typed-view:read:length=${parsed.length}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, view };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'typed_view_read_failed') };
+    }
+  });
+
+  ipcMain.handle('typed-view:read-many', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = TypedViewReadManySchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const views = bundle.session.readTypedValues(
+        parsed.requests.map((r) => ({ address: BigInt(r.address), length: r.length })),
+      );
+      bundle.audit.append({
+        op: 'read',
+        reason: `typed-view:read-many:count=${views.length}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, views };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'typed_view_read_many_failed') };
+    }
+  });
+
+  ipcMain.handle('typed-view:refresh', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = TypedViewRefreshSchema.parse(payload);
+      if (!(await isFeatureEnabled())) return { success: false, error: 'feature_disabled' };
+
+      const view = bundle.session.refreshTypedValue({ address: BigInt(parsed.address), length: parsed.length });
+      bundle.audit.append({
+        op: 'read',
+        address: parsed.address,
+        reason: `typed-view:refresh:length=${parsed.length}`,
+        pid: bundle.session.getAttachedPid() ?? undefined,
+        executableName: bundle.session.getAttachedExecutableName() ?? undefined,
+      });
+      return { success: true, view };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'typed_view_refresh_failed') };
+    }
+  });
+
+  ipcMain.handle('typed-view:reinterpret', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = TypedViewReinterpretSchema.parse(payload);
+      const interpretationsByWidth = bundle.session.reinterpretValue(parsed.rawHex);
+      return { success: true, interpretationsByWidth };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'typed_view_reinterpret_failed') };
+    }
+  });
+
+  // Phase 2 P2-7 — value/type inference (read-only; over an existing structure's own snapshot history, no new capture mechanism).
+  ipcMain.handle('inference:infer-structure-behavior', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const bundle = requireBundle(event);
+      const parsed = InferStructureBehaviorSchema.parse(payload);
+      const results = bundle.session.inferStructureBehavior(parsed.structureId);
+      return { success: true, results };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'infer_structure_behavior_failed') };
     }
   });
 

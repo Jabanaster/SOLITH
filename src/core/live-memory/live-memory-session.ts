@@ -68,6 +68,15 @@ import {
   type StructureSnapshot,
   type StructureSnapshotDiffResult,
 } from './structure-model.js';
+import {
+  readTypedMemoryView,
+  readTypedMemoryViews,
+  reinterpretRawHex,
+  type TypedMemoryView,
+  type TypedMemoryViewRequest,
+  type TypedInterpretationsByWidth,
+} from './typed-memory-view.js';
+import { inferStructureBehavior, type FieldInferenceResult } from './value-type-inference.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
 import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
@@ -1628,6 +1637,53 @@ export class LiveMemorySession {
     if (!a) throw new Error(`Structure snapshot "${snapshotAId}" not found.`);
     if (!b) throw new Error(`Structure snapshot "${snapshotBId}" not found.`);
     return compareStructureSnapshots(a, b);
+  }
+
+  /**
+   * P2-6 — typed memory-view expansion. Builds on P2-5's
+   * `FieldInterpretation`/`decodeInterpretations` (typed-memory-view.ts) —
+   * one canonical typed-value read, not a second interpretation engine.
+   * Transient by design (no per-view id/registry): a typed view is a live
+   * snapshot of a few bytes, cheap to re-read, unlike a discovered structure.
+   */
+  readTypedValue(request: TypedMemoryViewRequest): TypedMemoryView {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    return readTypedMemoryView(driver, handle, request);
+  }
+
+  /** Bounded batch of readTypedValue (spec §36 — no unbounded request size; see MAX_TYPED_VIEW_BATCH). */
+  readTypedValues(requests: TypedMemoryViewRequest[]): TypedMemoryView[] {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    return readTypedMemoryViews(driver, handle, requests);
+  }
+
+  /** Live re-read counterpart to reinterpretValue — fetches fresh bytes and recomputes every width's interpretations. */
+  refreshTypedValue(request: TypedMemoryViewRequest): TypedMemoryView {
+    return this.readTypedValue(request);
+  }
+
+  /**
+   * Pure reinterpretation of bytes ALREADY read (spec §6 — "without
+   * rereading or mutating memory unnecessarily") — no I/O, no attach
+   * required. Recomputes every width's `FieldInterpretation[]` from a
+   * previously captured `rawHex` (e.g. from a prior readTypedValue result).
+   */
+  reinterpretValue(rawHex: string): TypedInterpretationsByWidth {
+    return reinterpretRawHex(rawHex);
+  }
+
+  /**
+   * P2-7 — value/type inference. Pure evidence-based behavior inference
+   * (value-type-inference.ts) over a structure's OWN snapshot history
+   * (P2-5's structureCaptureSnapshot/structureListSnapshots — no new
+   * capture mechanism, spec §13). Requires no live read of its own; a
+   * structure with fewer than 2 captured snapshots yields empty candidates
+   * for every field (spec §11 — decodable is never treated as inferred).
+   */
+  inferStructureBehavior(structureId: string): FieldInferenceResult[] {
+    const structure = this.requireStructure(structureId);
+    const snapshots = this.structureListSnapshots(structureId).sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+    return inferStructureBehavior(structure, snapshots);
   }
 
   /**

@@ -60,7 +60,31 @@ export function decodeInterpretations(buffer: Buffer, offset: number, width: Can
   if (stringCandidate.classified) {
     out.push({ kind: stringCandidate.encoding === 'ascii' ? 'ascii' : 'utf16', value: stringCandidate.text });
   }
+  const utf8Text = decodeUtf8Candidate(buffer, offset, width);
+  if (utf8Text !== null) {
+    out.push({ kind: 'utf8', value: utf8Text });
+  }
   return out;
+}
+
+/**
+ * P2-6 typed-view reinterpretation only — deliberately NOT part of
+ * `classifyStringCandidate`'s evidence-gated ascii/utf16 candidate system
+ * (that stays exactly as P2-5 certified it). Only reported when the bytes
+ * decode as *valid* UTF-8 AND genuinely use a multi-byte sequence — pure
+ * ASCII bytes already decode identically under the 'ascii' kind above, so a
+ * duplicate 'utf8' entry there would add no information.
+ */
+function decodeUtf8Candidate(buffer: Buffer, offset: number, width: CandidateFieldWidth): string | null {
+  const span = buffer.subarray(offset, offset + width);
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(span);
+  } catch {
+    return null;
+  }
+  const hasMultiByteChar = Array.from(text).some((ch) => (ch.codePointAt(0) ?? 0) > 0x7f);
+  return hasMultiByteChar ? text : null;
 }
 
 function formatFloat(value: number): string {

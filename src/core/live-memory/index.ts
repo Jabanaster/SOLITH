@@ -176,6 +176,27 @@ export type {
   SessionSnapshotDiff,
 } from './research/index.js';
 export {
+  readTypedMemoryView,
+  readTypedMemoryViews,
+  reinterpretRawHex,
+  TYPED_VIEW_WIDTHS,
+  MAX_TYPED_VIEW_LENGTH,
+  MAX_TYPED_VIEW_BATCH,
+} from './typed-memory-view.js';
+export type {
+  TypedMemoryView,
+  TypedMemoryViewRequest,
+  TypedInterpretationsByWidth,
+  TypedViewReadState,
+} from './typed-memory-view.js';
+export { inferFieldBehavior, inferStructureBehavior } from './value-type-inference.js';
+export type {
+  FieldBehaviorCandidate,
+  FieldBehaviorEvidence,
+  FieldInferenceEvidence,
+  FieldInferenceResult,
+} from './value-type-inference.js';
+export {
   WritePolicyGate,
   defaultTrainerWritePolicyContext,
   researchProbeWritePolicyContext,

@@ -1159,6 +1159,36 @@ interface Window {
       diff?: import('../core/live-memory/structure-model.js').StructureSnapshotDiffResult;
       error?: string;
     }>;
+
+    /** Phase 2 P2-6 — typed memory-view expansion (read-only). */
+    typedViewRead: (payload: { address: string; length: 1 | 2 | 4 | 8 }) => Promise<{
+      success: boolean;
+      view?: import('../core/live-memory/typed-memory-view.js').TypedMemoryView;
+      error?: string;
+    }>;
+    typedViewReadMany: (payload: { requests: { address: string; length: 1 | 2 | 4 | 8 }[] }) => Promise<{
+      success: boolean;
+      views?: import('../core/live-memory/typed-memory-view.js').TypedMemoryView[];
+      error?: string;
+    }>;
+    typedViewRefresh: (payload: { address: string; length: 1 | 2 | 4 | 8 }) => Promise<{
+      success: boolean;
+      view?: import('../core/live-memory/typed-memory-view.js').TypedMemoryView;
+      error?: string;
+    }>;
+    typedViewReinterpret: (payload: { rawHex: string }) => Promise<{
+      success: boolean;
+      interpretationsByWidth?: import('../core/live-memory/typed-memory-view.js').TypedInterpretationsByWidth;
+      error?: string;
+    }>;
+
+    /** Phase 2 P2-7 — value/type inference (read-only). */
+    inferStructureBehavior: (payload: { structureId: string }) => Promise<{
+      success: boolean;
+      results?: import('../core/live-memory/value-type-inference.js').FieldInferenceResult[];
+      error?: string;
+    }>;
+
     inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) => Promise<{
       success: boolean;
       proposal?: import('../core/in-process-script/types.js').HookInstallProposal;

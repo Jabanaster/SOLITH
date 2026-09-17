@@ -753,6 +753,37 @@ export const StructureCompareSnapshotsSchema = z.object({
   snapshotBId: z.string().min(1).max(80),
 });
 
+/** Phase 2 P2-6 — typed memory-view expansion. Width is one of the four supported scalar widths (typed-memory-view.ts's TYPED_VIEW_WIDTHS), matching MAX_TYPED_VIEW_LENGTH's 8-byte ceiling. */
+const TYPED_VIEW_LENGTH = z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]);
+
+export const TypedViewReadSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  length: TYPED_VIEW_LENGTH,
+});
+
+export const TypedViewReadManySchema = z.object({
+  requests: z
+    .array(z.object({ address: LIVE_ADDRESS_STRING, length: TYPED_VIEW_LENGTH }))
+    .min(1)
+    .max(32),
+});
+
+export const TypedViewRefreshSchema = TypedViewReadSchema;
+
+export const TypedViewReinterpretSchema = z.object({
+  // "0x" + up to 16 hex digits (8 bytes, MAX_TYPED_VIEW_LENGTH), even digit count only.
+  rawHex: z
+    .string()
+    .min(4)
+    .max(18)
+    .regex(/^0x([0-9a-fA-F]{2})+$/),
+});
+
+/** Phase 2 P2-7 — value/type inference, over an already-discovered structure's own snapshot history. */
+export const InferStructureBehaviorSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
 /** Phase 9 — pointer candidate analysis (runs pointer scan then scores). */
 export const ResearchPointerAnalyzeSchema = z.object({
   address: z.string().regex(/^0x[0-9a-fA-F]+$/),

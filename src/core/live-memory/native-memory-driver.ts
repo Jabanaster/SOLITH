@@ -170,6 +170,43 @@ function validateDataType(dataType: LiveValueType, operation: string): void {
 }
 
 /**
+ * Cheap OS-level liveness probe, sufficient to catch process exit even when
+ * this driver's own Windows HANDLE remains open.
+ *
+ * P2-5 disclosed (and P2-6's cross-cutting audit root-caused) a real
+ * native-driver characteristic: `ReadProcessMemory`/`WriteProcessMemory`
+ * against an already-open HANDLE can keep succeeding for an unbounded time
+ * after the target process has actually terminated. This is not a memoryjs
+ * bug — Windows keeps a process's kernel object, and therefore its
+ * still-mapped virtual address space, alive for as long as any HANDLE
+ * reference to it exists, including this driver's own `openProcess` handle,
+ * and neither `ReadProcessMemory` nor `WriteProcessMemory` re-validates
+ * liveness before walking that address space. `getModules`/`getRegions`
+ * never showed this symptom because memoryjs backs them with a *different*
+ * Win32 API (a toolhelp snapshot / PID-keyed query) that reflects the live
+ * OS process table, not this handle.
+ *
+ * `process.kill(pid, 0)` queries that same live OS process table directly
+ * (Node's documented "signal 0" existence probe, supported on Windows),
+ * so it fails the instant the process is truly gone — independent of
+ * whatever the stale HANDLE itself would still report. This is the cheap
+ * tier only (process-exists); it does not detect PID reuse by an unrelated
+ * process. PID-reuse-safe identity verification remains
+ * `LiveMemorySession.verifyAttachedProcessIdentity()`'s job on the
+ * write/freeze/revert paths that already call it — that check is too
+ * expensive (native process metadata queries) to run before every read.
+ */
+function assertProcessStillAlive(pid: number, operation: string): void {
+  try {
+    process.kill(pid, 0);
+  } catch (err) {
+    throw new Error(
+      `PROCESS_EXITED: process ${pid} is no longer running (${operation}): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
  * memoryjs's native binding reads the address argument as a JS Number
  * (`args[1].As<Napi::Number>().Int64Value()` in lib/memoryjs.cc) — passing a
  * BigInt directly causes a native-side cast failure ("Error in native
@@ -212,6 +249,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   readMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType): number {
     try {
       validateHandle(handle, 'readMemory');
+      assertProcessStillAlive(handle.pid, 'readMemory');
       validateAddress(address, 'readMemory');
       validateDataType(dataType, 'readMemory');
 
@@ -234,6 +272,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   writeMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType, value: number): void {
     try {
       validateHandle(handle, 'writeMemory');
+      assertProcessStillAlive(handle.pid, 'writeMemory');
       validateAddress(address, 'writeMemory');
       validateDataType(dataType, 'writeMemory');
 
@@ -356,6 +395,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   readBuffer(handle: LiveProcessHandle, address: bigint, size: number): Buffer {
     try {
       validateHandle(handle, 'readBuffer');
+      assertProcessStillAlive(handle.pid, 'readBuffer');
       validateAddress(address, 'readBuffer');
 
       if (size <= 0 || size > 1048576) {
@@ -382,6 +422,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   writeBuffer(handle: LiveProcessHandle, address: bigint, buffer: Buffer): void {
     try {
       validateHandle(handle, 'writeBuffer');
+      assertProcessStillAlive(handle.pid, 'writeBuffer');
       validateAddress(address, 'writeBuffer');
 
       if (!Buffer.isBuffer(buffer) || buffer.length <= 0 || buffer.length > 1048576) {
@@ -424,6 +465,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   readPointer(handle: LiveProcessHandle, address: bigint): bigint {
     try {
       validateHandle(handle, 'readPointer');
+      assertProcessStillAlive(handle.pid, 'readPointer');
       validateAddress(address, 'readPointer');
 
       const mem = loadMemoryjs() as unknown as MemoryjsModuleWithBigIntRead;

@@ -11,6 +11,7 @@ import {
 import AddressDataResearchPanel from '../components/AddressDataResearchPanel.js';
 import PointerMapPanel from '../components/PointerMapPanel.js';
 import StructureDiscoveryPanel from '../components/StructureDiscoveryPanel.js';
+import TypedMemoryViewPanel from '../components/TypedMemoryViewPanel.js';
 import LiveCorrelationWatcherPanel from '../components/LiveCorrelationWatcherPanel.js';
 import LiveToggleCardsPanel from '../components/LiveToggleCardsPanel.js';
 import SinglePlayerWaiverModal from '../components/SinglePlayerWaiverModal.js';
@@ -977,6 +978,7 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
 
       <PointerMapPanel attached={attached} attachedExecutable={attachedExecutable || null} />
       <StructureDiscoveryPanel attached={attached} processName={attachedExecutable || 'unknown'} pid={selectedPid} />
+      <TypedMemoryViewPanel attached={attached} processName={attachedExecutable || 'unknown'} pid={selectedPid} />
 
       {attached && (
         <section className="v2-monitor-section" aria-label="Memory scan (find value)">
