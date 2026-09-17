@@ -42,6 +42,18 @@ function resolveFallbackUserDataRoot(): string {
   if (isTestRuntime()) {
     return path.join(os.tmpdir(), 'solith-test-runtime', String(process.pid), 'userData');
   }
+  // Outside Electron, outside a test runtime, and with no explicit override —
+  // this is silently a fresh/unseeded per-worktree DB, not the real
+  // production catalog, which is easy to mistake for a genuine "installed
+  // this many games" or "catalog contains this row" result when running an
+  // ad hoc verification script (see Phase 3 session-binding reverification,
+  // Docs/phase3 — the exact trap this warning exists to prevent).
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[app-paths] No ELECTRON_USER_DATA_PATH/SOLITH_TEST_USER_DATA_PATH set and not running inside Electron — ' +
+      'falling back to a per-worktree, unseeded data directory. Set ELECTRON_USER_DATA_PATH to point at a real ' +
+      'userData copy before trusting catalog/install-discovery results from a bare script.',
+  );
   return path.join(projectRoot, 'data');
 }
 
