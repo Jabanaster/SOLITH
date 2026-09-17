@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { searchCatalog } from '../trainer-catalog/store.js';
+import { getFullCatalogForMatching } from '../trainer-catalog/store.js';
 import { setSetting } from '../settings/index.js';
 import { scanEpicInstalls } from './epic.js';
 import { scanGogInstalls } from './gog.js';
 import { countMatchedCatalog, matchInstalledToCatalog } from './match.js';
+import { resolvePrimaryExecutable } from './nested-executable-discovery.js';
 import { scanSteamInstalls } from './steam.js';
+import { scanXboxInstalls } from './xbox.js';
 import { countInstalledGames, getInstalledCatalogGameIds, listInstalledGames, upsertInstalledGames } from './store.js';
 import { runTrainerHealthCheck } from '../trainer-health/index.js';
 import {
@@ -25,7 +27,6 @@ import type {
   RawInstalledGame,
 } from './types.js';
 
-const EXECUTABLE_RE = /\.(exe)$/i;
 const NON_GAME_PATH_RE = /(?:common[ _-]?redistributables?|steamworks|redist|redistributable|sdk|engine|plugins?|launcher|editor|tools?|realityscan|source|intermediate|deriveddatacache|marketplace|samples|templates|unreal|ue[_-]?\d|game[ _-]?project|\.git|\.svn)/i;
 const NON_GAME_EXE_RE = /(?:setup|install|uninstall|crashreport|launcher|editor|updat(?:e|er)|bootstrap)/i;
 const SHARED_RUNTIME_RE = /(?:steamworks(?:[ _-](?:common|shared|sdk|redist(?:ributables?)?))?|common[ _-]?redistributables?|directx(?:[ _-]?(?:redist|runtime))?|vc(?:\+\+)?[ _-]?redist|visual[ _-]?c\+\+[ _-]?redistributable|shared[ _-]?(?:launcher[ _-]?)?runtime)/i;
@@ -158,14 +159,24 @@ function commonInstallRoots(): string[] {
   ];
 }
 
-function findFirstExecutable(installPath: string): string | undefined {
-  try {
-    const entries = fs.readdirSync(installPath, { withFileTypes: true });
-    const exe = entries.find((entry) => entry.isFile() && EXECUTABLE_RE.test(entry.name));
-    return exe ? path.resolve(installPath, exe.name) : undefined;
-  } catch {
-    return undefined;
-  }
+/**
+ * Resolves the one playable executable for a shallow-scan candidate
+ * directory. Searches recursively (a game's real executable is often nested
+ * — `bin/x64/`, `Binaries/Win64/`, etc., never assumed to sit at the root)
+ * and fails closed (returns undefined) when the result is genuinely
+ * ambiguous, rather than returning an arbitrary first match in filesystem
+ * enumeration order as the previous implementation did.
+ *
+ * `maxDepth: 0` is used for the top-level "did the user select an
+ * individual game's own folder" check in scanShallowRoot — that check must
+ * stay shallow, because every immediate subdirectory of a selected library
+ * root is independently scanned (recursively) as its own candidate right
+ * below it; without this bound, the root-level check would reach into a
+ * sibling game's nested executable and misreport it as installed at the
+ * library root instead of at that sibling's own folder.
+ */
+function resolveInstallExecutable(installPath: string, options: { maxDepth?: number } = {}): string | undefined {
+  return resolvePrimaryExecutable(installPath, options)?.absolutePath;
 }
 
 function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): RawInstalledGame[] {
@@ -178,7 +189,7 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
       return results;
     }
 
-    const rootExe = findFirstExecutable(resolvedRoot);
+    const rootExe = resolveInstallExecutable(resolvedRoot, { maxDepth: 0 });
     if (rootExe) {
       const rejected = rejectManualCandidate(resolvedRoot, rootExe);
       if (rejected) { failures.push({ location: resolvedRoot, reason: 'rejected_non_game:' + rejected }); } else results.push({
@@ -193,7 +204,7 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const child = path.join(resolvedRoot, entry.name);
-      const executablePath = findFirstExecutable(child);
+      const executablePath = resolveInstallExecutable(child);
       if (!executablePath) continue;
       const rejected = rejectManualCandidate(child, executablePath);
       if (rejected) { failures.push({ location: child, reason: 'rejected_non_game:' + rejected }); continue; }
@@ -230,6 +241,9 @@ export function discoverRawInstalls(
   if (options.gogFixturePath || !options.offlineRootsOnly) {
     run(options.gogFixturePath ?? 'gog:registry', () => scanGogInstalls(options));
   }
+  if (options.xboxFixturePath || !options.offlineRootsOnly) {
+    run(options.xboxFixturePath ?? 'xbox:appx-packages', () => scanXboxInstalls(options));
+  }
   return results;
 }
 export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {}): InstallDiscoveryPreviewResult {
@@ -240,6 +254,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     options.steamInstallPath ? path.resolve(options.steamInstallPath) : 'steam:libraries',
     options.epicManifestsPath ? path.resolve(options.epicManifestsPath) : 'epic:manifests',
     options.gogFixturePath ? path.resolve(options.gogFixturePath) : 'gog:registry',
+    options.xboxFixturePath ? path.resolve(options.xboxFixturePath) : 'xbox:appx-packages',
     ...(options.userSelectedRoots ?? []).map((root) => path.resolve(root)),
     ...(options.includeCommonRoots ? commonInstallRoots() : []),
   ]);
@@ -268,7 +283,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     });
     return false;
   });
-  const catalog = searchCatalog('', 5000, 0).entries;
+  const catalog = getFullCatalogForMatching();
   const matched = deduplicateConcreteInstalls(matchInstalledToCatalog(raw, catalog, scannedAt));
   const classificationReasons = new Map<string, string>();
   const addable = matched.filter((record) => {
@@ -347,7 +362,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
 
 export function commitInstallDiscoveryRecords(records: InstallDiscoveryCommitSelection[]): { added: number; skipped: number; rejected: number } {
   const committedAt = new Date().toISOString();
-  const catalog = searchCatalog('', 5000, 0).entries;
+  const catalog = getFullCatalogForMatching();
   const validRaw: RawInstalledGame[] = [];
 
   for (const record of records) {

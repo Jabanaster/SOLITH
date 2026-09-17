@@ -41,7 +41,7 @@
     "test": "node scripts/run-node-tests.mjs test",
     "test:definitions": "tsx --test tests/definitions-schema.v1.test.ts tests/target-metadata.test.ts tests/definitions-export.v1.test.ts tests/definitions-compile.v1.test.ts tests/definitions-trainer-controls.v1.test.ts tests/bundled-definition-seed.test.ts tests/cheat-hotkey-slots.test.ts tests/ct-import.test.ts tests/ct-metadata.test.ts tests/ue-dumpspace-import.test.ts tests/script-research.test.ts tests/binary-save-formats.test.ts tests/binary-save-field.test.ts tests/binary-field-proposal.test.ts tests/binary-save-research.test.ts tests/trainer-hotkey-bindings.test.ts tests/trainer-hotkeys.test.ts tests/settings-onboarding.test.ts tests/in-process-script.test.ts tests/in-process-script/hook-engine-aob-migration.test.ts tests/schema-v1-capability-lanes.test.ts tests/schema-v1-dual-read.test.ts tests/schema-v1-phase3-silence.test.ts",
     "test:cheat-toggle": "tsx --test tests/cheat-toggle-store.test.ts",
-    "test:trainer-catalog": "tsx --test tests/trainer-catalog.test.ts tests/trainer-catalog-offline.test.ts tests/trainer-catalog-reconcile.test.ts tests/trainer-catalog-ipc-validation.test.ts tests/trainer-catalog-search.test.ts tests/catalog-definition-export.test.ts tests/ct-import.test.ts tests/ct-library.test.ts tests/ct-import-state.test.ts tests/ct-zip-electron-bridge.test.ts tests/trainer-library-persistence-lifecycle.test.ts tests/add-game-integration.test.ts",
+    "test:trainer-catalog": "tsx --test tests/trainer-catalog.test.ts tests/trainer-catalog-offline.test.ts tests/trainer-catalog-reconcile.test.ts tests/trainer-catalog-ipc-validation.test.ts tests/trainer-catalog-search.test.ts tests/trainer-catalog-full-window.test.ts tests/trainer-catalog-edition-signal.test.ts tests/trainer-catalog-find-edition-groups.test.ts tests/catalog-definition-export.test.ts tests/ct-import.test.ts tests/ct-library.test.ts tests/ct-import-state.test.ts tests/ct-zip-electron-bridge.test.ts tests/trainer-library-persistence-lifecycle.test.ts tests/add-game-integration.test.ts tests/remote-sync-known-steam-app-id.test.ts",
     "generate:trainer-catalog": "node scripts/generate-trainer-catalog-seed.mjs",
     "prepare:branding": "node scripts/prepare-branding-assets.mjs",
     "scan:installed-games": "tsx scripts/scan-installed-games.mjs",
@@ -53,7 +53,7 @@
     "runtime:validate-signatures": "tsx scripts/validate-runtime-signatures.mjs",
     "runtime:analyze-aob-repair": "tsx scripts/analyze-aob-repair-candidates.mjs",
     "smoke:runtime-readonly": "tsx scripts/smoke-windows-readonly-runtime.mjs",
-    "test:install-discovery": "tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts tests/install-discovery-epic-gog.test.ts tests/installed-game-identity.test.ts tests/trainer-library-preview-gates.test.ts",
+    "test:install-discovery": "tsx --test tests/install-discovery-steam.test.ts tests/install-discovery-match.test.ts tests/install-discovery-ambiguous-match.test.ts tests/install-discovery-nested-executable-discovery.test.ts tests/install-discovery-executable-role.test.ts tests/install-discovery-provider-identity.test.ts tests/install-discovery-trainer-applicability.test.ts tests/install-discovery-epic-gog.test.ts tests/install-discovery-xbox.test.ts tests/install-discovery-reconcile-duplicate-executables.test.ts tests/installed-game-identity.test.ts tests/trainer-library-preview-gates.test.ts",
     "test:trainer-health": "tsx --test tests/trainer-health.test.ts tests/trainer-deck-rows.test.ts tests/catalog-demand.test.ts",
     "test:drill-core": "tsx --test tests/drill-core-settings.test.ts",
     "test:electron-smoke": "playwright test tests/electron.smoke.test.ts",
@@ -99,7 +99,8 @@
     "test:phase3": "tsx --test tests/hub-sync.test.ts tests/community-trust.test.ts tests/community-sync-orchestrator.test.ts tests/write-policy.test.ts",
     "test:registry": "tsx --test tests/registry-query.test.ts tests/registry-schema.test.ts tests/registry-cli.test.ts tests/registry-explorer-page.test.tsx tests/ct-registry.test.ts tests/ce-enrichment.test.ts tests/feature-candidates.test.ts tests/runtime-readonly.test.ts tests/runtime-signature-validation.test.ts tests/headless-verification.test.ts tests/delta-engine.test.ts tests/l4-governance.test.ts",
     "test:companion": "tsx --test tests/companion-wisp.test.ts",
-    "test:electron-consent-boundary": "playwright test tests/electron-consent-boundary.e2e.test.ts --config playwright.e2e.config.ts"
+    "test:electron-consent-boundary": "playwright test tests/electron-consent-boundary.e2e.test.ts --config playwright.e2e.config.ts",
+    "test:executable-identity": "tsx --test tests/executable-identity-content-hash.test.ts tests/executable-identity-pe-metadata.test.ts tests/executable-identity-catalog-content-hash.test.ts tests/executable-identity-pe-version-info.test.ts"
   },
   "keywords": [
     "trainer",
@@ -187,16 +188,20 @@
     "yazl": "^3.3.1"
   },
   "dependencies": {
+    "blake3": "^2.1.7",
     "memoryjs": "file:vendor/memoryjs-3.5.1-patched",
+    "node-lief": "^1.3.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "resedit": "^3.1.0",
+    "solith-scanner-napi": "file:native/solith-scanner-napi",
     "sql.js": "^1.14.2",
     "tesseract.js": "^7.0.0",
     "xml2js": "^0.6.2",
+    "xxhash-wasm": "^1.1.0",
     "yaml": "^2.9.0",
     "yauzl": "^3.2.0",
-    "zod": "^4.4.3",
-    "solith-scanner-napi": "file:native/solith-scanner-napi"
+    "zod": "^4.4.3"
   },
   "overrides": {
     "esbuild": "0.28.1",

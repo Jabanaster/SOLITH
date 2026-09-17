@@ -8,7 +8,7 @@ import {
 } from '../definitions/load-catalog-definition.js';
 import type { MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { memoryDataTypeToLiveValue } from '../definitions/schema.v1.js';
-import { searchCatalog } from '../trainer-catalog/store.js';
+import { listCatalogExecutableIndex } from '../trainer-catalog/store.js';
 import { parseHexOffset } from './feature-resolver.js';
 import type { LiveTrainerControl } from './live-trainer-control.js';
 import type { LivePointerPath } from './pointer-resolver.js';
@@ -34,13 +34,22 @@ export interface SchemaLiveDeps {
   findCatalogGameIdsByExecutable?: (executableName: string) => string[];
 }
 
-/** Catalog ids whose entry executables match (case-insensitive). */
+/**
+ * Catalog ids whose entry executables match (case-insensitive), searched
+ * across the whole catalog — not a text-search-derived, fixed-size page.
+ * A prior version ran a 40-row title/searchableText search keyed on the
+ * executable's own filename, which both capped coverage AND depended on
+ * the executable name happening to textually resemble the display name
+ * (many real games ship an executable whose name has no such resemblance,
+ * e.g. an abbreviated internal build name) — the same D07 defect class as
+ * the catalog-process-watch/install-discovery windows, just via a fuzzy
+ * text search instead of a numeric row cap.
+ */
 export function findCatalogGameIdsByExecutable(executableName: string): string[] {
   const needle = executableName.toLowerCase();
   const ids: string[] = [];
   try {
-    const fromSearch = searchCatalog(executableName.replace(/\.exe$/i, ''), 40, 0);
-    for (const entry of fromSearch.entries) {
+    for (const entry of listCatalogExecutableIndex()) {
       if (entry.executables.some((exe) => exe.toLowerCase() === needle)) {
         ids.push(entry.catalogGameId);
       }

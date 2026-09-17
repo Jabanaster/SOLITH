@@ -288,6 +288,30 @@ const CATALOG_ORPHAN_RECONCILIATIONS: readonly CatalogOrphanReconciliationDefini
       expectedSourceUrl: 'https://flingtrainer.com/trainer/assassins-creed-black-flag-resynced-trainer/',
     },
   },
+  /**
+   * Phase 3 Crimson Desert catalog-identity defect (Docs/phase3/004, 006).
+   * `crimson-desert` (FLiNG, pre-rename title) and `crimson-desert-enhanced`
+   * (plitch, current Steam listing title) are the same real Steam release,
+   * appid 3321460 — confirmed against a real installed copy resolving to
+   * `bin64/CrimsonDesert.exe`, the same real executable both the fling row's
+   * guessed name and the curated `STEAM_EXECUTABLE_LOOKUP` entry name. The
+   * `crimson-desert` row is the orphan: it predates the ingestion-time fix
+   * (`known-steam-app-ids.ts`) that now associates the current listing title
+   * with the verified appid, and it never carries a steamAppId of its own by
+   * construction (community FLiNG-only scrapes are never given a curated
+   * Steam AppID unless explicitly authorized). This reconciliation only
+   * applies once a real ingestion sync has actually written
+   * `steamAppId: 3321460` onto the canonical `crimson-desert-enhanced` row —
+   * it never touches a canonical row it hasn't independently verified.
+   */
+  {
+    reconciliationId: 'crimson-desert-rename-orphan-v1',
+    orphanCatalogGameId: 'crimson-desert',
+    canonicalCatalogGameId: 'crimson-desert-enhanced',
+    orphanDisplayName: 'Crimson Desert',
+    orphanModPackId: 'fling-crimson-desert',
+    proof: { method: 'steamAppId', expectedCanonicalSteamAppId: 3321460 },
+  },
 ];
 
 const catalogOrphanReconciliationResults = new Map<string, CatalogOrphanReconciliationResult>();

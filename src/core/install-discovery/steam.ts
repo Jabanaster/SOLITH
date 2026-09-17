@@ -4,6 +4,7 @@ import type { InstallDiscoveryOptions, RawInstalledGame } from './types.js';
 import { parseVdf, vdfStringValue } from './vdf.js';
 import { defaultSteamInstallPath } from './registry-win.js';
 import { executablesForSteamAppId } from '../trainer-catalog/steam-executable-lookup.js';
+import { resolvePrimaryExecutable } from './nested-executable-discovery.js';
 
 function listSteamLibraryRoots(steamRoot: string): string[] {
   const roots = new Set<string>();
@@ -33,24 +34,36 @@ function listSteamLibraryRoots(steamRoot: string): string[] {
   return [...roots];
 }
 
+/**
+ * Resolves the one playable executable for a real Steam install. Real-game
+ * validation (ROADMAP.md Phase 3 Exit Gate curated titles) found the
+ * previous implementation here — a root-directory-only existence check
+ * against `STEAM_EXECUTABLE_LOOKUP`, falling back to the first `.exe` found
+ * in filesystem enumeration order — silently wrong for any title whose real
+ * executable is nested (this is the exact "Crimson Desert resolution gap"
+ * ROADMAP.md Phase 3 names: `bin64/CrimsonDesert.exe`), and for Palworld it
+ * resolved to the root-level launcher stub (`Palworld.exe`) instead of the
+ * real Unreal Engine binary (`Pal/Binaries/Win64/Palworld-Win64-Shipping.exe`)
+ * because the known name was never found at root and the shallow fallback
+ * arbitrarily returned whatever `.exe` happened to be first. Delegates to
+ * the bounded recursive discovery + role classification already used by the
+ * manual/Xbox library scanner, seeded with the curated known-executable
+ * names as evidence, and fails closed (`undefined`) rather than guessing an
+ * arbitrary `.exe` when no confident primary can be resolved.
+ */
 function resolveSteamExecutable(installDir: string, steamAppId: number): string | undefined {
-  const known = executablesForSteamAppId(steamAppId);
-  if (known) {
-    for (const exe of known) {
-      const candidate = path.join(installDir, exe);
-      if (fs.existsSync(candidate)) return candidate;
-    }
-  }
-
-  try {
-    const entries = fs.readdirSync(installDir, { withFileTypes: true });
-    const exes = entries
-      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.exe'))
-      .map((e) => path.join(installDir, e.name));
-    return exes[0];
-  } catch {
-    return undefined;
-  }
+  const known = executablesForSteamAppId(steamAppId) ?? undefined;
+  // STEAM_EXECUTABLE_LOOKUP is a hand-authored literal source array (see
+  // steam-executable-lookup.ts) — its declared order is a verified curator
+  // choice, so it is safe to opt into trustDeclaredExecutableOrder here
+  // (e.g. Baldur's Gate 3's ['bg3.exe', 'bg3_dx11.exe']). This is NOT
+  // extended to the trainer catalog's own executables list, whose order is
+  // not verified to carry the same meaning.
+  const primary = resolvePrimaryExecutable(installDir, {
+    knownCatalogExecutables: known,
+    trustDeclaredExecutableOrder: true,
+  });
+  return primary?.absolutePath;
 }
 
 function parseSteamManifest(manifestPath: string, libraryRoot: string): RawInstalledGame | null {

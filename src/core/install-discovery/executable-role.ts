@@ -1,0 +1,141 @@
+/**
+ * Executable role classification (ROADMAP.md Phase 3: "multiple executable
+ * roles"). A game installation commonly contains more than one .exe, and
+ * not all of them are equivalent — a trainer or process-detection match
+ * must be able to target the actual game process, not merely the first
+ * executable found. This is a distinct concern from install-discovery's
+ * existing `obviousNonGameReason`/`NON_GAME_EXE_RE` (which decides whether
+ * an install is a game AT ALL); this module runs on executables WITHIN an
+ * already-confirmed game installation and assigns each a role.
+ *
+ * No canonical role enum exists elsewhere in the codebase (schema.v1,
+ * TrainerCatalogEntry, InstalledGameRecord) — checked before introducing
+ * this one.
+ */
+
+export type ExecutableRole =
+  | 'PRIMARY_GAME'
+  | 'ALTERNATE_GAME'
+  | 'LAUNCHER'
+  | 'SERVER'
+  | 'BENCHMARK'
+  | 'TOOL'
+  | 'UPDATER'
+  | 'ANTI_CHEAT_BOOTSTRAP'
+  | 'UNKNOWN';
+
+const LAUNCHER_RE = /launcher|bootstrap(?:per)?/i;
+const UPDATER_RE = /updat(?:e|er)|patcher|\bpatch\b/i;
+// crashpad_handler(.exe) is Google Crashpad's real, widely-bundled crash
+// handler process name (confirmed against a real Crimson Desert install,
+// Steam appid 3321460) — distinct spelling from the report/handler/reporter
+// pattern below, so it needs its own real-evidence entry.
+const CRASH_REPORTER_RE = /crash[-_ ]?(?:report|handler|reporter)|crashpad_handler/i;
+const BENCHMARK_RE = /bench[-_ ]?mark/i;
+const TOOL_RE = /setup|install(?:er)?|uninstall(?:er)?|editor|config(?:urator)?|modding[-_ ]?tool/i;
+// Real, publicly-documented third-party anti-cheat bootstrap executable
+// names — not a guess at what "looks like" anti-cheat.
+const ANTI_CHEAT_RE = /easyanticheat|\beac\b|battleye|\bbe_?launcher\b|vanguard|faceit[-_ ]?ac/i;
+const SERVER_RE = /(?:^|[^a-z])(?:dedicated[-_ ]?server|ds)(?:[^a-z]|$)|_server(?:\.exe)?$|server[-_ ]?host/i;
+// Real, publicly-documented third-party SDK/platform/runtime helper
+// processes that get bundled alongside the actual game binary — e.g.
+// Palworld ships Epic Online Services' embedded browser helper, and any
+// self-contained .NET/CoreCLR game (Stardew Valley) ships Microsoft's
+// createdump.exe crash-dump generator — never the game itself, so a
+// game-like fallback would otherwise wrongly promote it to
+// PRIMARY_GAME/ALTERNATE_GAME (confirmed against real installs of both).
+// gamelaunchhelper.exe is Microsoft's own GDK bridge process, shipped at the
+// package root of every current-generation Xbox/PC Game Pass (GDK) title —
+// confirmed against a real installed Atomfall package
+// (`Rebellion.Windscale`), where its presence alongside the real engine
+// binary (`bin/Atomfall_dx12.exe`) otherwise created a false PRIMARY_GAME
+// ambiguity during Xbox/MS Store install discovery (ROADMAP.md Phase 3).
+const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|^createdump\.exe$|^gamelaunchhelper\.exe$/i;
+// Real, publicly-documented engine/build-suffix conventions used to name the
+// actual playable binary distinctly from a bare `<GameName>.exe` launcher
+// stub, when both ship side by side (ROADMAP.md Phase 3 P3-8.1 — Atomfall's
+// live session binds selected the `Atomfall.exe` launcher over the real
+// engine binary `Atomfall_dx12.exe` while both processes were alive
+// concurrently, because neither name matches LAUNCHER_RE and bare
+// name-classification alone cannot break the tie). Two independent
+// conventions, confirmed against real installs: Unreal Engine's cooked
+// Shipping-configuration binary naming (`<Name>-Win64-Shipping.exe`, e.g.
+// Palworld) and graphics-API-suffixed multi-renderer builds
+// (`<Name>_dx12.exe`, e.g. Atomfall's GDK build). Used only as a same-game
+// tie-break among executables ALREADY established as candidates for the
+// same catalog entry — never invents a new game identity.
+const ENGINE_BUILD_SUFFIX_RE = /-(?:win64|win32|linux64|linux)-shipping\.exe$|_(?:dx9|dx10|dx11|dx12|d3d11|d3d12|vulkan|opengl)\.exe$/i;
+
+function classifySingleExecutable(executableName: string): ExecutableRole | 'GAME_CANDIDATE' {
+  const name = executableName.toLowerCase();
+  if (SDK_HELPER_RE.test(name)) return 'TOOL';
+  if (CRASH_REPORTER_RE.test(name)) return 'TOOL';
+  if (ANTI_CHEAT_RE.test(name)) return 'ANTI_CHEAT_BOOTSTRAP';
+  if (BENCHMARK_RE.test(name)) return 'BENCHMARK';
+  if (SERVER_RE.test(name)) return 'SERVER';
+  if (UPDATER_RE.test(name)) return 'UPDATER';
+  if (TOOL_RE.test(name)) return 'TOOL';
+  if (LAUNCHER_RE.test(name)) return 'LAUNCHER';
+  return 'GAME_CANDIDATE';
+}
+
+export interface ClassifyExecutableRolesOptions {
+  /** Catalog-declared executable names for this game (TrainerCatalogEntry.executables), when known — used to pick PRIMARY_GAME among multiple game-like candidates deterministically instead of guessing. */
+  knownCatalogExecutables?: string[];
+}
+
+/**
+ * Classifies every executable found in one game installation. Deterministic
+ * and fails closed: a game-like executable (matches none of the known
+ * non-game-role patterns) is only promoted to PRIMARY_GAME when it is the
+ * sole game-like candidate, or when it is named in `knownCatalogExecutables`.
+ * Any other game-like candidate is ALTERNATE_GAME (e.g. a DX11/DX12 or
+ * 32-bit/64-bit sibling binary) rather than UNKNOWN — it is real, playable
+ * game code, just not the resolved primary. Never silently drops an
+ * executable: every input name appears exactly once in the result.
+ */
+export function classifyExecutableRoles(
+  executableNames: string[],
+  options: ClassifyExecutableRolesOptions = {},
+): Map<string, ExecutableRole> {
+  const knownLower = new Set((options.knownCatalogExecutables ?? []).map((n) => n.toLowerCase()));
+  const result = new Map<string, ExecutableRole>();
+  const gameCandidates: string[] = [];
+
+  for (const name of executableNames) {
+    const classified = classifySingleExecutable(name);
+    if (classified === 'GAME_CANDIDATE') {
+      gameCandidates.push(name);
+    } else {
+      result.set(name, classified);
+    }
+  }
+
+  const knownMatches = gameCandidates.filter((name) => knownLower.has(name.toLowerCase()));
+
+  if (knownMatches.length > 0) {
+    for (const name of gameCandidates) {
+      result.set(name, knownLower.has(name.toLowerCase()) ? 'PRIMARY_GAME' : 'ALTERNATE_GAME');
+    }
+  } else if (gameCandidates.length === 1) {
+    result.set(gameCandidates[0], 'PRIMARY_GAME');
+  } else if (gameCandidates.length > 1) {
+    const suffixed = gameCandidates.filter((name) => ENGINE_BUILD_SUFFIX_RE.test(name));
+    if (suffixed.length === 1) {
+      const primary = suffixed[0];
+      for (const name of gameCandidates) {
+        result.set(name, name === primary ? 'PRIMARY_GAME' : 'ALTERNATE_GAME');
+      }
+    } else {
+      // Multiple game-like candidates, no catalog evidence and no
+      // engine-build-suffix evidence to pick one — fail closed on the
+      // PRIMARY_GAME designation rather than guess (consistent with the
+      // Phase 3 ambiguous-executable-match policy).
+      for (const name of gameCandidates) {
+        result.set(name, 'UNKNOWN');
+      }
+    }
+  }
+
+  return result;
+}
