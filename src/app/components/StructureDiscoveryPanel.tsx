@@ -172,7 +172,7 @@ export const StructureDiscoveryPanel: React.FC<StructureDiscoveryPanelProps> = (
           Discover Structure
         </button>
         <button className="btn-secondary" type="button" onClick={handleRefresh} disabled={!attached || busy || !structure}>
-          Refresh
+          Refresh Structure
         </button>
         <button className="btn-secondary" type="button" onClick={handleSnapshotA} disabled={!attached || busy || !structure}>
           Snapshot A
