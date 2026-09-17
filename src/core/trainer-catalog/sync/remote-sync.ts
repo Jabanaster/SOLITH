@@ -8,6 +8,8 @@ import {
 } from './parse-html.js';
 import type { TrainerSyncSourceConfig } from '../types.js';
 import { getFlingReference } from '../../cheat-system/trainer-reference.js';
+import { knownSteamAppIdForCatalogGameId } from '../known-steam-app-ids.js';
+import { executablesForSteamAppId } from '../steam-executable-lookup.js';
 
 const FETCH_TIMEOUT_MS = 20_000;
 const USER_AGENT = 'Solith-TrainerCatalog/1.0 (+local definitions sync; no binary download)';
@@ -101,6 +103,19 @@ function guessExecutable(gameName: string): string {
   return compact ? `${compact}.exe` : 'Game.exe';
 }
 
+/**
+ * Real executable name(s) for a scraped title, when its catalogGameId has a
+ * hand-verified Steam AppID association (`known-steam-app-ids.ts`) and that
+ * AppID has a curated executable list (`steam-executable-lookup.ts`). Falls
+ * back to the naive title-compaction guess only when no such verified
+ * evidence exists — never a fuzzy or partial title match.
+ */
+function resolveExecutables(catalogGameId: string, gameName: string): string[] {
+  const steamAppId = knownSteamAppIdForCatalogGameId(catalogGameId);
+  const known = steamAppId != null ? executablesForSteamAppId(steamAppId) : null;
+  return known ?? [guessExecutable(gameName)];
+}
+
 function defaultCategories(gameName: string): string[] {
   const lower = gameName.toLowerCase();
   if (/rpg|souls|elden|witcher|avowed|baldur/i.test(lower)) return ['RPG', 'Action'];
@@ -115,10 +130,11 @@ export function remoteTrainerToCatalogEntry(
   provider: TrainerSyncSourceConfig['id'],
 ): TrainerCatalogEntry {
   const catalogGameId = slugifyGameId(trainer.gameName);
-  const entry: TrainerCatalogEntry = {
+  const steamAppId = knownSteamAppIdForCatalogGameId(catalogGameId);
+  let entry: TrainerCatalogEntry = {
     catalogGameId,
     displayName: trainer.gameName,
-    executables: [guessExecutable(trainer.gameName)],
+    executables: resolveExecutables(catalogGameId, trainer.gameName),
     categories: defaultCategories(trainer.gameName),
     verificationStatus: 'community',
     sources: [{ provider, url: trainer.sourceUrl, lastSyncedAt: new Date().toISOString() }],
@@ -127,6 +143,9 @@ export function remoteTrainerToCatalogEntry(
     cheatCount: 0,
     searchableText: '',
   };
+  if (steamAppId != null) {
+    entry = applySteamAppId(entry, steamAppId);
+  }
   entry.searchableText = [entry.displayName, ...entry.executables, ...entry.categories, provider]
     .join(' ')
     .toLowerCase();
@@ -169,7 +188,7 @@ export function remoteTrainerToModPack(
       lastSyncedAt: now,
     },
     verificationStatus: 'community',
-    versions: [{ versionLabel: curated?.versionLabel ?? '*', executables: [guessExecutable(trainer.gameName)] }],
+    versions: [{ versionLabel: curated?.versionLabel ?? '*', executables: resolveExecutables(catalogGameId, trainer.gameName) }],
     cheats,
     connectionBaseline: curated?.soloOnly ? 4 : 6,
     platform: 'unknown',

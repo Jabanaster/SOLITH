@@ -99,6 +99,15 @@ const SEVEN_PAIRS: PairFixture[] = [
       sourceUrl: 'https://flingtrainer.com/trainer/assassins-creed-black-flag-resynced-trainer/',
     },
   },
+  {
+    reconciliationId: 'crimson-desert-rename-orphan-v1',
+    orphanId: 'crimson-desert',
+    canonicalId: 'crimson-desert-enhanced',
+    orphanDisplayName: 'Crimson Desert',
+    orphanPackId: 'fling-crimson-desert',
+    provider: 'fling',
+    proof: { method: 'steamAppId', canonicalSteamAppId: 3321460 },
+  },
 ];
 
 const ALL_PAIRS: PairFixture[] = [BG3, ...SEVEN_PAIRS];
@@ -270,7 +279,7 @@ describe('reconcileBg3Orphan (legacy call-site compatibility)', () => {
   });
 });
 
-describe('reconcileCatalogOrphans — table-driven, all eight authorized pairs', () => {
+describe('reconcileCatalogOrphans — table-driven, all nine authorized pairs', () => {
   before(async () => {
     await resetForTesting(':memory:');
   });
