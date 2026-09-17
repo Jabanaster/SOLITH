@@ -45,10 +45,21 @@ const SERVER_RE = /(?:^|[^a-z])(?:dedicated[-_ ]?server|ds)(?:[^a-z]|$)|_server(
 // game-like fallback would otherwise wrongly promote it to
 // PRIMARY_GAME/ALTERNATE_GAME (confirmed against real installs of both).
 const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|^createdump\.exe$/i;
+// Microsoft's own GDK (Game Development Kit) toolchain-provided
+// launch-bootstrap binary — a fixed, standard filename shipped by every PC
+// Game Pass / Xbox app packaged title (not chosen by the individual game's
+// developer), confirmed against a real GDK install (Docs/phase3/008 §3/§6b).
+// Anchored to the exact basename (like createdump.exe above), never a bare
+// substring — this closes the specific evidenced reproduction only; it is
+// not a claim that every vendor launcher/helper binary is now covered, and
+// deliberately does not match names that merely contain this sequence
+// (e.g. "mygamelaunchhelpertool.exe", "notgamelaunchhelper.exe").
+const GDK_LAUNCH_HELPER_RE = /^gamelaunchhelper\.exe$/i;
 
 function classifySingleExecutable(executableName: string): ExecutableRole | 'GAME_CANDIDATE' {
   const name = executableName.toLowerCase();
   if (SDK_HELPER_RE.test(name)) return 'TOOL';
+  if (GDK_LAUNCH_HELPER_RE.test(name)) return 'TOOL';
   if (CRASH_REPORTER_RE.test(name)) return 'TOOL';
   if (ANTI_CHEAT_RE.test(name)) return 'ANTI_CHEAT_BOOTSTRAP';
   if (BENCHMARK_RE.test(name)) return 'BENCHMARK';

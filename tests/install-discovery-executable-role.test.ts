@@ -98,6 +98,39 @@ describe('classifyExecutableRoles', () => {
     assert.equal(roles.get('crashpad_handler.exe'), 'TOOL');
   });
 
+  test('Microsoft GDK launch-bootstrap helper (gamelaunchhelper.exe) is classified as a tool, not a game candidate', () => {
+    // Real-game evidence: a PC Game Pass / Xbox app packaged title (Docs/phase3/008
+    // §3, Atomfall, Steam appid 801800 also exists but this is the GDK
+    // install) ships Content/gamelaunchhelper.exe alongside the real
+    // executables — a fixed Microsoft toolchain binary name, not
+    // game-specific — confirmed against a real install.
+    const roles = classifyExecutableRoles(['Atomfall.exe', 'gamelaunchhelper.exe'], {
+      knownCatalogExecutables: ['Atomfall.exe'],
+    });
+    assert.equal(roles.get('Atomfall.exe'), 'PRIMARY_GAME');
+    assert.equal(roles.get('gamelaunchhelper.exe'), 'TOOL');
+  });
+
+  test('gamelaunchhelper matcher is anchored to the exact basename, not a substring — case variants of the real name are caught', () => {
+    const roles = classifyExecutableRoles(['GameLaunchHelper.exe', 'GAMELAUNCHHELPER.EXE']);
+    assert.equal(roles.get('GameLaunchHelper.exe'), 'TOOL');
+    assert.equal(roles.get('GAMELAUNCHHELPER.EXE'), 'TOOL');
+  });
+
+  test('names that merely contain "gamelaunchhelper" as a substring are NOT rejected by this rule (no overbroad ban)', () => {
+    // Required negative cases: the fix closes the specific evidenced
+    // reproduction (the exact real GDK binary name) — it must not reject
+    // an unrelated executable just because its name contains that
+    // sequence. Each is tested as the sole candidate (no other rule of any
+    // kind matches any of these three names either, so each resolves
+    // PRIMARY_GAME by elimination — the ordinary, correct outcome for a
+    // real single-executable game).
+    for (const name of ['mygamelaunchhelpertool.exe', 'gamelaunchhelper_backup.exe', 'notgamelaunchhelper.exe']) {
+      const roles = classifyExecutableRoles([name]);
+      assert.equal(roles.get(name), 'PRIMARY_GAME', `${name} must not be rejected by the gamelaunchhelper rule`);
+    }
+  });
+
   test('multiple catalog-known executables are all PRIMARY_GAME (e.g. 32-bit and 64-bit both shipped)', () => {
     const roles = classifyExecutableRoles(['Game32.exe', 'Game64.exe', 'GameOther.exe'], {
       knownCatalogExecutables: ['Game32.exe', 'Game64.exe'],

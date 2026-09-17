@@ -102,4 +102,62 @@ describe('install-discovery catalog match', () => {
     );
     assert.equal(records[0].catalogGameId, undefined, 'a launcher must never be accepted as the matched game process');
   });
+
+  test('a steamAppId match is rejected when the recorded executable is a GDK launch-bootstrap helper, even as the sole candidate (Docs/phase3/008 §6b)', () => {
+    // Regression: checkExecutableRoleApplicability previously classified an
+    // unrecognized executable name in isolation via "sole candidate, no
+    // catalog evidence -> primary by elimination" — so a bad catalog record
+    // (or a scanner bug) that pointed at a real, non-game GDK bootstrapper
+    // would have been wrongly accepted as the matched game process. Exercised
+    // here through the actual production caller (matchInstalledToCatalog),
+    // not just the isolated checkExecutableRoleApplicability helper.
+    const records = matchInstalledToCatalog(
+      [
+        {
+          platform: 'xbox',
+          installPath: 'Z:/Games/SomeGdkTitle',
+          executablePath: 'Z:/Games/SomeGdkTitle/Content/gamelaunchhelper.exe',
+          steamAppId: 413150,
+          displayName: 'Stardew Valley',
+        },
+      ],
+      CATALOG,
+      new Date().toISOString(),
+    );
+    assert.equal(records[0].catalogGameId, undefined, 'a GDK launch-bootstrap helper must never be accepted as the matched game process');
+  });
+
+  test('a legitimate sole-candidate game executable still resolves through the production caller (no regression from the applicability fix)', () => {
+    const records = matchInstalledToCatalog(
+      [
+        {
+          platform: 'steam',
+          installPath: 'C:/Games/Steam/steamapps/common/Stardew Valley',
+          executablePath: 'C:/Games/Steam/steamapps/common/Stardew Valley/Stardew Valley.exe',
+          steamAppId: 413150,
+          displayName: 'Stardew Valley',
+        },
+      ],
+      CATALOG,
+      new Date().toISOString(),
+    );
+    assert.equal(records[0].catalogGameId, 'stardew-valley');
+  });
+
+  test('a steamAppId match survives the production caller even when the executable name merely contains "gamelaunchhelper" (no overbroad ban)', () => {
+    const records = matchInstalledToCatalog(
+      [
+        {
+          platform: 'xbox',
+          installPath: 'Z:/Games/SomeOtherTitle',
+          executablePath: 'Z:/Games/SomeOtherTitle/notgamelaunchhelper.exe',
+          steamAppId: 413150,
+          displayName: 'Stardew Valley',
+        },
+      ],
+      CATALOG,
+      new Date().toISOString(),
+    );
+    assert.equal(records[0].catalogGameId, 'stardew-valley', 'a name that merely contains "gamelaunchhelper" must not be rejected by this rule');
+  });
 });
