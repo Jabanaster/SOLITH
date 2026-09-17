@@ -123,6 +123,36 @@ export type {
   LiveControlSource,
 } from './dual-read-controls.js';
 export {
+  discoverStructure,
+  refreshStructure,
+  captureStructureSnapshot,
+  compareStructureSnapshots,
+} from './structure-discovery.js';
+export type { StructureDiscoveryOptions } from './structure-discovery.js';
+export {
+  createDiscoveredStructureId,
+  createStructureSnapshotId,
+  MAX_STRUCTURE_DISCOVERY_LENGTH,
+  CANDIDATE_FIELD_WIDTHS,
+} from './structure-model.js';
+export type {
+  CandidateFieldWidth,
+  DiscoveredField,
+  DiscoveredStructure,
+  FieldChangeState,
+  FieldConfidence,
+  FieldEvidence,
+  FieldInterpretation,
+  FieldSnapshotDiff,
+  PointerCandidateEvidence,
+  StringCandidateEvidence,
+  StructureDiscoveryRequest,
+  StructureReadCompleteness,
+  StructureSnapshot,
+  StructureSnapshotDiffResult,
+  UnknownSpan,
+} from './structure-model.js';
+export {
   MemoryViewer,
   HexInspector,
   PointerCandidateAnalyzer,

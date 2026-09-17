@@ -190,8 +190,23 @@ export function discoverStructure(
     };
   }
 
-  const modules = driver.getModules(handle);
-  const regions = driver.getRegions(handle);
+  // The window read above already succeeded — those bytes are a real,
+  // already-captured fact. A process that exits (or otherwise becomes
+  // unqueryable) in the gap between that read and this module/region
+  // enumeration must not discard that real evidence: it degrades pointer-
+  // candidate classification (no known modules/regions to check against,
+  // so nothing classifies — an honest "unknown", never a fabricated one)
+  // rather than crashing the whole discovery (spec §9/§19 — process exit
+  // between the read and this call must yield truthful results, not a
+  // thrown exception surfacing as an opaque IPC failure).
+  let modules: import('./types.js').MemoryModule[] = [];
+  let regions: import('./types.js').MemoryRegion[] = [];
+  try {
+    modules = driver.getModules(handle);
+    regions = driver.getRegions(handle);
+  } catch {
+    /* process became unqueryable after the read above — fall back to no known modules/regions. */
+  }
   const fields = runs.flatMap((run) => segmentFields(run.buffer, run.offset, options.pointerWidth, modules, regions));
   fields.sort((a, b) => a.offset - b.offset);
 

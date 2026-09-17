@@ -260,6 +260,29 @@ test('comparing snapshots from different structures throws rather than silently 
   assert.throws(() => compareStructureSnapshots(snapA, snapB));
 });
 
+test('process becoming unqueryable between the read and module/region enumeration degrades gracefully, never crashes the whole discovery (spec §9/§19)', () => {
+  class DiesAfterReadDriver extends FakeMemoryDriver {
+    override getModules(): never {
+      throw new Error('process exited');
+    }
+    override getRegions(): never {
+      throw new Error('process exited');
+    }
+  }
+  const driver = new DiesAfterReadDriver();
+  const buf = Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+  driver.addRegion(BASE, buf, true);
+
+  const result = discoverStructure(driver, HANDLE, { label: 'dies-after-read', baseAddress: BASE, length: 8 }, { pointerWidth: 8 });
+
+  // The read itself already succeeded and captured real bytes — that must
+  // survive even though module/region enumeration failed afterward.
+  assert.equal(result.completeness.state, 'complete');
+  assert.equal(result.fields.reduce((sum, f) => sum + f.width, 0), 8);
+  // No pointer candidate can be classified without any known modules/regions — honest absence, never fabricated.
+  assert.ok(result.fields.every((f) => f.evidence.pointerCandidate.classified === false));
+});
+
 test('BigInt addresses round-trip exactly through baseAddressHex (no Number coercion)', () => {
   const driver = new FakeMemoryDriver();
   const bigAddress = 0x7ffabcdef0n; // exceeds Number.MAX_SAFE_INTEGER-adjacent ranges seen in real 64-bit processes

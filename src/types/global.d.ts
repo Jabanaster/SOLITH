@@ -1117,6 +1117,48 @@ interface Window {
       snapshot?: import('../core/live-memory/research/session-snapshot.js').SessionSnapshot;
       error?: string;
     }>;
+    /** Phase 2 P2-5 — bounded structure discovery (read-only). */
+    structureDiscover: (payload: { label: string; baseAddress: string; length: number }) => Promise<{
+      success: boolean;
+      structure?: import('../core/live-memory/structure-model.js').DiscoveredStructure;
+      error?: string;
+    }>;
+    structureList: () => Promise<{
+      success: boolean;
+      structures?: import('../core/live-memory/structure-model.js').DiscoveredStructure[];
+      error?: string;
+    }>;
+    structureGet: (payload: { structureId: string }) => Promise<{
+      success: boolean;
+      structure?: import('../core/live-memory/structure-model.js').DiscoveredStructure | null;
+      error?: string;
+    }>;
+    structureRefresh: (payload: { structureId: string }) => Promise<{
+      success: boolean;
+      structure?: import('../core/live-memory/structure-model.js').DiscoveredStructure;
+      error?: string;
+    }>;
+    structureDelete: (payload: { structureId: string }) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+    structureInspectField: (payload: { structureId: string; offset: number }) => Promise<{
+      success: boolean;
+      field?: import('../core/live-memory/structure-model.js').DiscoveredField;
+      error?: string;
+    }>;
+    structureCaptureSnapshot: (payload: { structureId: string }) => Promise<{
+      success: boolean;
+      snapshot?: import('../core/live-memory/structure-model.js').StructureSnapshot;
+      error?: string;
+    }>;
+    structureListSnapshots: (payload: { structureId: string }) => Promise<{
+      success: boolean;
+      snapshots?: import('../core/live-memory/structure-model.js').StructureSnapshot[];
+      error?: string;
+    }>;
+    structureCompareSnapshots: (payload: { snapshotAId: string; snapshotBId: string }) => Promise<{
+      success: boolean;
+      diff?: import('../core/live-memory/structure-model.js').StructureSnapshotDiffResult;
+      error?: string;
+    }>;
     inProcessProposeHook: (payload: { plan: unknown; userApprovedAction: true }) => Promise<{
       success: boolean;
       proposal?: import('../core/in-process-script/types.js').HookInstallProposal;
