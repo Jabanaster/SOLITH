@@ -308,9 +308,9 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
   - P2-4 Pointer stability / real-game restart validation — CERTIFIED COMPLETE (P2-4.1 closed the real-game restart evidence, module-relocation proof, pointer-map Load defect, and CI cancellation-flake gaps the user identified in P2-4's NOT_COMPLETE closure — `Docs/phase2/023` through `027`)
 - **P2-B — Memory Understanding** — IN PROGRESS (engine/session/IPC/real-fixture/real-game proof complete for all 3 checkpoints; UI e2e pending for P2-6/P2-7 — see the "Honest correction" note below)
   - P2-5 Structure discovery engine — CERTIFIED COMPLETE (`Docs/phase2/030`)
-  - P2-6 Typed memory-view expansion — CERTIFIED COMPLETE (`Docs/phase2/032`)
-  - P2-7 Value/type inference — CERTIFIED COMPLETE (`Docs/phase2/032`)
-- **P2-C — Memory Interaction & Control** — IN PROGRESS (1 of 2 checkpoints closed)
+  - P2-6 Typed memory-view expansion — NOT_COMPLETE (engine/session/IPC/real-fixture/real-game proof complete; UI e2e pending, `Docs/phase2/032`)
+  - P2-7 Value/type inference — NOT_COMPLETE (engine/session/IPC/real-fixture/real-game proof complete; UI e2e pending, `Docs/phase2/032`)
+- **P2-C — Memory Interaction & Control** — IN PROGRESS (0 of 2 checkpoints fully closed)
   - P2-8 Memory map + watchlists — IN PROGRESS (engine/session/IPC/real-fixture/real-game proof complete; UI e2e pending, `Docs/phase2/033`)
   - P2-9 Freeze/write/revert + address-validation/hotkey verification — NOT_COMPLETE (`Docs/phase2/034` — write/freeze/revert and address-validation are fully proven including a real-game freeze/write/revert exercise; the one open item is a packaged and dedicated real-fixture hotkey proof for THIS mission's own certification standard, not a missing capability — the underlying hotkey-to-write/freeze routing is real, pre-existing, and traced with citations)
 - **P2-D — Adaptive Analysis & Acceleration** — NOT STARTED
