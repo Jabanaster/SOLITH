@@ -44,7 +44,13 @@ const SERVER_RE = /(?:^|[^a-z])(?:dedicated[-_ ]?server|ds)(?:[^a-z]|$)|_server(
 // createdump.exe crash-dump generator — never the game itself, so a
 // game-like fallback would otherwise wrongly promote it to
 // PRIMARY_GAME/ALTERNATE_GAME (confirmed against real installs of both).
-const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|^createdump\.exe$/i;
+// gamelaunchhelper.exe is Microsoft's own GDK bridge process, shipped at the
+// package root of every current-generation Xbox/PC Game Pass (GDK) title —
+// confirmed against a real installed Atomfall package
+// (`Rebellion.Windscale`), where its presence alongside the real engine
+// binary (`bin/Atomfall_dx12.exe`) otherwise created a false PRIMARY_GAME
+// ambiguity during Xbox/MS Store install discovery (ROADMAP.md Phase 3).
+const SDK_HELPER_RE = /epicwebhelper|steamwebhelper|cefsharp\.browsersubprocess|^createdump\.exe$|^gamelaunchhelper\.exe$/i;
 
 function classifySingleExecutable(executableName: string): ExecutableRole | 'GAME_CANDIDATE' {
   const name = executableName.toLowerCase();

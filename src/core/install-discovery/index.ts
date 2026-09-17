@@ -7,6 +7,7 @@ import { scanGogInstalls } from './gog.js';
 import { countMatchedCatalog, matchInstalledToCatalog } from './match.js';
 import { resolvePrimaryExecutable } from './nested-executable-discovery.js';
 import { scanSteamInstalls } from './steam.js';
+import { scanXboxInstalls } from './xbox.js';
 import { countInstalledGames, getInstalledCatalogGameIds, listInstalledGames, upsertInstalledGames } from './store.js';
 import { runTrainerHealthCheck } from '../trainer-health/index.js';
 import {
@@ -240,6 +241,9 @@ export function discoverRawInstalls(
   if (options.gogFixturePath || !options.offlineRootsOnly) {
     run(options.gogFixturePath ?? 'gog:registry', () => scanGogInstalls(options));
   }
+  if (options.xboxFixturePath || !options.offlineRootsOnly) {
+    run(options.xboxFixturePath ?? 'xbox:appx-packages', () => scanXboxInstalls(options));
+  }
   return results;
 }
 export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {}): InstallDiscoveryPreviewResult {
@@ -250,6 +254,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     options.steamInstallPath ? path.resolve(options.steamInstallPath) : 'steam:libraries',
     options.epicManifestsPath ? path.resolve(options.epicManifestsPath) : 'epic:manifests',
     options.gogFixturePath ? path.resolve(options.gogFixturePath) : 'gog:registry',
+    options.xboxFixturePath ? path.resolve(options.xboxFixturePath) : 'xbox:appx-packages',
     ...(options.userSelectedRoots ?? []).map((root) => path.resolve(root)),
     ...(options.includeCommonRoots ? commonInstallRoots() : []),
   ]);
