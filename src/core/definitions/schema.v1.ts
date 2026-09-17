@@ -87,6 +87,13 @@ export interface SolithDefinitionV1 {
   certificationLevel?: CertificationLevel;
   memoryFeatures?: MemoryFeatureV1[];
   saveEditor?: SaveEditorV1;
+  /**
+   * Free-text evidence/review notes carried through import and export as
+   * plain lines (e.g. discovery evidence, session-capture warnings, curator
+   * remarks). Populated when an external format (YAML comments, etc.) would
+   * otherwise destroy this information on ingest — see PD-05.
+   */
+  provenanceNotes?: string[];
 }
 
 export interface MemoryFeatureResolutionV1 {
@@ -233,6 +240,7 @@ export const SolithDefinitionV1Schema = z.object({
   certificationLevel: z.enum(CERTIFICATION_LEVELS).optional(),
   memoryFeatures: z.array(MemoryFeatureV1Schema).max(500).optional(),
   saveEditor: SaveEditorV1Schema.optional(),
+  provenanceNotes: z.array(z.string().min(1).max(2000)).max(200).optional(),
 }) as unknown as z.ZodType<SolithDefinitionV1>;
 
 export function parseSolithDefinitionV1(input: unknown): SolithDefinitionV1 {

@@ -4,8 +4,23 @@ import { TrainerAdapter, ReadValueResult, DryRunResult, BuildOutputResult, Valid
 import { ParsedDocument, ParserDiagnostic } from '../../shared/types';
 import { buildParsedDocument } from '../saves/normalization';
 
-function stripJSONComments(jsonString: string): string {
-  return jsonString.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g) => g ? "" : m);
+/**
+ * PD-05: this used to silently delete `//` and `/* *\/` comments before
+ * parsing, and the file is always rewritten from the parsed object on
+ * write-back — so any comment in a JSONC-style save file was permanently
+ * lost the moment a value was edited through this adapter, with nothing
+ * reported. `discarded` now collects the removed comment text instead of
+ * throwing it away, so callers can surface it as a warning rather than have
+ * it vanish unnoticed.
+ */
+function stripJSONComments(jsonString: string): { clean: string; discarded: string[] } {
+  const discarded: string[] = [];
+  const clean = jsonString.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g) => {
+    if (!g) return m;
+    discarded.push(g);
+    return '';
+  });
+  return { clean, discarded };
 }
 
 export function setDeepValue(obj: any, pathStr: string, val: any) {
@@ -59,10 +74,16 @@ export class JsonAdapter implements TrainerAdapter {
       if (raw.charCodeAt(0) === 0xFEFF) {
         raw = raw.slice(1);
       }
-      const clean = stripJSONComments(raw);
+      const { clean, discarded } = stripJSONComments(raw);
       const parsed = JSON.parse(clean);
       const val = getDeepValue(parsed, pathStr);
-      return { success: true, value: val };
+      return {
+        success: true,
+        value: val,
+        ...(discarded.length > 0
+          ? { warnings: [`${discarded.length} comment(s) present in source JSON are not preserved by this adapter.`] }
+          : {}),
+      };
     } catch (e) {
       return { success: false, value: null, error: String(e) };
     }
@@ -96,9 +117,9 @@ export class JsonAdapter implements TrainerAdapter {
       if (hasBOM) {
         raw = raw.slice(1);
       }
-      const clean = stripJSONComments(raw);
+      const { clean, discarded } = stripJSONComments(raw);
       const parsed = JSON.parse(clean);
-      
+
       const existingValue = getDeepValue(parsed, pathStr);
       if (existingValue === undefined) {
         return { success: false, content: '', error: `Path "${pathStr}" not found in JSON` };
@@ -130,7 +151,17 @@ export class JsonAdapter implements TrainerAdapter {
       if (hasBOM) {
         output = '\uFEFF' + output;
       }
-      return { success: true, content: output };
+      return {
+        success: true,
+        content: output,
+        ...(discarded.length > 0
+          ? {
+              warnings: [
+                `${discarded.length} comment(s) present in the source JSON were not carried into the rewritten file.`,
+              ],
+            }
+          : {}),
+      };
     } catch (e) {
       return { success: false, content: '', error: String(e) };
     }
@@ -138,11 +169,11 @@ export class JsonAdapter implements TrainerAdapter {
 
   async validateContent(content: string, filePath: string): Promise<ValidationResult> {
     try {
-      let clean = content;
-      if (clean.charCodeAt(0) === 0xFEFF) {
-        clean = clean.slice(1);
+      let toClean = content;
+      if (toClean.charCodeAt(0) === 0xFEFF) {
+        toClean = toClean.slice(1);
       }
-      clean = stripJSONComments(clean);
+      const { clean } = stripJSONComments(toClean);
       JSON.parse(clean);
       return { valid: true };
     } catch (e) {
@@ -157,7 +188,13 @@ export class JsonAdapter implements TrainerAdapter {
     if (hasBOM) {
       raw = raw.slice(1);
     }
-    const clean = stripJSONComments(raw);
+    const { clean, discarded } = stripJSONComments(raw);
+    if (discarded.length > 0) {
+      diagnostics.push({
+        severity: 'warning',
+        message: `${discarded.length} comment(s) in this JSON file are not preserved by the JSON adapter.`,
+      });
+    }
     let parsed: any = {};
     try {
       parsed = JSON.parse(clean);
