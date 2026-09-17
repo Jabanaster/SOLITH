@@ -353,6 +353,8 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 - **Catalog-path tooling hazard found and fixed**: `getAppPaths()` (`src/shared/app-paths.ts`) silently fell back to an unseeded per-worktree DB outside Electron/outside a test runtime, with no warning — a real trap (hit once during this reconciliation) that could make an empty-catalog false negative look like a genuine result. Fixed with an additive warning only; no production behavior changed (silent under real Electron and real `npm test` runs, confirmed).
 - Phase 3 overall status: **NOT_COMPLETE** is not being claimed to change here — this note records the Exit Gate's literal text as satisfied with independently-reproduced evidence; the Atomfall/7-curated-titles ambiguity above is recorded for explicit owner resolution before any broader Phase 3 certification statement is made. `Docs/phase3/007`.
 
+**Owner Scope Decision — 2026-09-17.** The Atomfall/7-curated-titles ambiguity above was presented to the owner as two explicit choices (support Xbox/MS Store install discovery in Phase 3 now, vs. treat it as out of scope). Owner selected: **Phase 3 must support Atomfall's Xbox/MS Store install discovery before Phase 3 can certify complete.** Consequence: Phase 3 remains **NOT_COMPLETE**; Mandatory Work above is extended to require Xbox/MS Store install-discovery (this codebase currently has zero such mechanism — no MSIXVC package/`Content/` folder discovery exists anywhere in `install-discovery/`). This is new scope, not implemented by this reconciliation pass — implementation is a separate, dedicated mission/worktree, not performed here.
+
 ---
 
 ### PHASE 4 — Canonical SOLITH Trainer Model & Runtime
