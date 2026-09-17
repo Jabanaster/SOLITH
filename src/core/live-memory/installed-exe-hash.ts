@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { listInstalledGames } from '../install-discovery/store.js';
+import { findInstalledExecutablePath } from '../install-discovery/store.js';
 
 interface CachedExecutableHash {
   size: number;
@@ -56,15 +56,7 @@ export function hashInstalledExecutableForCatalog(
   catalogGameId: string,
   executableName?: string,
 ): string | null {
-  const candidates = listInstalledGames().filter((game) => game.catalogGameId === catalogGameId);
-  const installed = executableName
-    ? candidates.find(
-      (game) =>
-        game.executablePath != null &&
-        path.basename(game.executablePath).toLowerCase() === executableName.toLowerCase(),
-    )
-    : candidates[0];
-  const exePath = installed?.executablePath;
+  const exePath = findInstalledExecutablePath(catalogGameId, executableName);
   if (!exePath) return null;
   return hashExecutableFileSHA256(exePath);
 }

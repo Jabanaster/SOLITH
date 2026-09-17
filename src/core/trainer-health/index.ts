@@ -4,7 +4,7 @@ import { verifyDefinitionFingerprint } from '../definitions/fingerprint-verify.j
 import { loadCatalogDefinition } from '../definitions/load-catalog-definition.js';
 import { getCatalogEntry } from '../trainer-catalog/store.js';
 import { isDefinitionQuarantined } from '../trainer-catalog/definition-quarantine.js';
-import { listInstalledGames } from '../install-discovery/store.js';
+import { findInstalledExecutablePath, listInstalledGames } from '../install-discovery/store.js';
 import { isValidMemoryFeatureResolution, validateSolithDefinitionV1 } from '../definitions/schema.v1.js';
 
 export type TrainerHealthStatus =
@@ -30,11 +30,6 @@ export interface OfflineCertifyResult {
   errors: string[];
 }
 
-function installedExecutableForCatalog(catalogGameId: string): string | undefined {
-  const row = listInstalledGames().find((g) => g.catalogGameId === catalogGameId);
-  return row?.executablePath;
-}
-
 export function computeTrainerHealth(catalogGameId: string): TrainerHealthRecord {
   const checkedAt = new Date().toISOString();
   const entry = getCatalogEntry(catalogGameId);
@@ -57,7 +52,7 @@ export function computeTrainerHealth(catalogGameId: string): TrainerHealthRecord
     return { catalogGameId, status: 'unknown', staleReason: 'no_definition', checkedAt };
   }
 
-  const exePath = installedExecutableForCatalog(catalogGameId);
+  const exePath = findInstalledExecutablePath(catalogGameId);
   const prefixes = definition.executableHashPrefixes ?? [];
 
   if (!exePath) {

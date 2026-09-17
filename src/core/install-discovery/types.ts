@@ -34,6 +34,13 @@ export interface InstallDiscoveryOptions {
    * `[{ "path": "<install>", "exe": "Game.exe", "gameName": "Title" }, ...]`
    */
   gogFixturePath?: string;
+  /**
+   * Path to an Xbox/MS Store fixture JSON array (tests only), each entry
+   * shaped like `Get-AppxPackage`'s own output: `[{ "name": "...",
+   * "packageFamilyName": "...", "packageFullName": "...", "publisher": "...",
+   * "version": "...", "installLocation": "<content root>" }, ...]`.
+   */
+  xboxFixturePath?: string;
   /** Skip live registry / live Epic-default paths (fixture-only scan). */
   offlineRootsOnly?: boolean;
   /** User-selected library roots to inspect shallowly for local installs. */

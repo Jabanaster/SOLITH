@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { searchCatalog } from '../trainer-catalog/store.js';
+import { getFullCatalogForMatching } from '../trainer-catalog/store.js';
 import { setSetting } from '../settings/index.js';
 import { scanEpicInstalls } from './epic.js';
 import { scanGogInstalls } from './gog.js';
 import { countMatchedCatalog, matchInstalledToCatalog } from './match.js';
+import { resolvePrimaryExecutable } from './nested-executable-discovery.js';
 import { scanSteamInstalls } from './steam.js';
+import { scanXboxInstalls } from './xbox.js';
 import { countInstalledGames, getInstalledCatalogGameIds, listInstalledGames, upsertInstalledGames } from './store.js';
 import { runTrainerHealthCheck } from '../trainer-health/index.js';
 import {
@@ -24,8 +26,8 @@ import type {
   InstalledGameRecord,
   RawInstalledGame,
 } from './types.js';
+import type { TrainerCatalogEntry } from '../trainer-catalog/types.js';
 
-const EXECUTABLE_RE = /\.(exe)$/i;
 const NON_GAME_PATH_RE = /(?:common[ _-]?redistributables?|steamworks|redist|redistributable|sdk|engine|plugins?|launcher|editor|tools?|realityscan|source|intermediate|deriveddatacache|marketplace|samples|templates|unreal|ue[_-]?\d|game[ _-]?project|\.git|\.svn)/i;
 const NON_GAME_EXE_RE = /(?:setup|install|uninstall|crashreport|launcher|editor|updat(?:e|er)|bootstrap)/i;
 const SHARED_RUNTIME_RE = /(?:steamworks(?:[ _-](?:common|shared|sdk|redist(?:ributables?)?))?|common[ _-]?redistributables?|directx(?:[ _-]?(?:redist|runtime))?|vc(?:\+\+)?[ _-]?redist|visual[ _-]?c\+\+[ _-]?redistributable|shared[ _-]?(?:launcher[ _-]?)?runtime)/i;
@@ -158,17 +160,63 @@ function commonInstallRoots(): string[] {
   ];
 }
 
-function findFirstExecutable(installPath: string): string | undefined {
-  try {
-    const entries = fs.readdirSync(installPath, { withFileTypes: true });
-    const exe = entries.find((entry) => entry.isFile() && EXECUTABLE_RE.test(entry.name));
-    return exe ? path.resolve(installPath, exe.name) : undefined;
-  } catch {
-    return undefined;
-  }
+/**
+ * Resolves the one playable executable for a shallow-scan candidate
+ * directory. Searches recursively (a game's real executable is often nested
+ * — `bin/x64/`, `Binaries/Win64/`, etc., never assumed to sit at the root)
+ * and fails closed (returns undefined) when the result is genuinely
+ * ambiguous, rather than returning an arbitrary first match in filesystem
+ * enumeration order as the previous implementation did.
+ *
+ * `maxDepth: 0` is used for the top-level "did the user select an
+ * individual game's own folder" check in scanShallowRoot — that check must
+ * stay shallow, because every immediate subdirectory of a selected library
+ * root is independently scanned (recursively) as its own candidate right
+ * below it; without this bound, the root-level check would reach into a
+ * sibling game's nested executable and misreport it as installed at the
+ * library root instead of at that sibling's own folder.
+ */
+function resolveInstallExecutable(
+  installPath: string,
+  options: { maxDepth?: number; knownCatalogExecutables?: string[] } = {},
+): string | undefined {
+  return resolvePrimaryExecutable(installPath, options)?.absolutePath;
 }
 
-function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): RawInstalledGame[] {
+// A folder/display-name match only ever supplies `knownCatalogExecutables` —
+// the same "catalog already validated this executable name for this game"
+// evidence `resolvePrimaryExecutable` already accepts from platform scanners
+// (steam.ts et al). It never establishes game identity itself: executable
+// identity (executable-role.ts's LAUNCHER/TOOL/etc. rejection, the
+// PRIMARY_GAME/Shipping-binary resolution) runs exactly as it does with no
+// hint at all — this only gives it catalog-known names to prefer when the
+// result would otherwise be ambiguous or undiscoverable.
+function normalizeDisplayNameForHint(name: string): string {
+  // entry.displayName is already HTML-entity-decoded by rowToEntry
+  // (trainer-catalog/store.ts) — trimming here only guards against
+  // incidental whitespace, it is not a new decoding/matching heuristic.
+  return name.trim().toLowerCase();
+}
+
+function catalogExecutableHintForFolder(
+  folderName: string,
+  catalog: TrainerCatalogEntry[],
+): string[] | undefined {
+  const normalized = normalizeDisplayNameForHint(folderName);
+  const matches = catalog.filter((entry) => normalizeDisplayNameForHint(entry.displayName) === normalized);
+  // Any duplicate normalized display name is unconditionally ambiguous — no
+  // hint at all, regardless of which duplicate(s) carry executable metadata,
+  // look more "complete", or would otherwise seem preferable. This function
+  // never inspects `executables` or anything else about the candidates until
+  // AFTER this uniqueness check has already decided whether a hint exists.
+  return matches.length === 1 ? matches[0].executables : undefined;
+}
+
+function scanShallowRoot(
+  root: string,
+  failures: InstallDiscoveryFailure[],
+  catalog: TrainerCatalogEntry[],
+): RawInstalledGame[] {
   const resolvedRoot = path.resolve(root);
   const results: RawInstalledGame[] = [];
   try {
@@ -178,7 +226,8 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
       return results;
     }
 
-    const rootExe = findFirstExecutable(resolvedRoot);
+    const rootHint = catalogExecutableHintForFolder(path.basename(resolvedRoot), catalog);
+    const rootExe = resolveInstallExecutable(resolvedRoot, { maxDepth: 0, knownCatalogExecutables: rootHint });
     if (rootExe) {
       const rejected = rejectManualCandidate(resolvedRoot, rootExe);
       if (rejected) { failures.push({ location: resolvedRoot, reason: 'rejected_non_game:' + rejected }); } else results.push({
@@ -193,7 +242,8 @@ function scanShallowRoot(root: string, failures: InstallDiscoveryFailure[]): Raw
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const child = path.join(resolvedRoot, entry.name);
-      const executablePath = findFirstExecutable(child);
+      const childHint = catalogExecutableHintForFolder(entry.name, catalog);
+      const executablePath = resolveInstallExecutable(child, { knownCatalogExecutables: childHint });
       if (!executablePath) continue;
       const rejected = rejectManualCandidate(child, executablePath);
       if (rejected) { failures.push({ location: child, reason: 'rejected_non_game:' + rejected }); continue; }
@@ -230,6 +280,9 @@ export function discoverRawInstalls(
   if (options.gogFixturePath || !options.offlineRootsOnly) {
     run(options.gogFixturePath ?? 'gog:registry', () => scanGogInstalls(options));
   }
+  if (options.xboxFixturePath || !options.offlineRootsOnly) {
+    run(options.xboxFixturePath ?? 'xbox:appx-packages', () => scanXboxInstalls(options));
+  }
   return results;
 }
 export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {}): InstallDiscoveryPreviewResult {
@@ -240,15 +293,22 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     options.steamInstallPath ? path.resolve(options.steamInstallPath) : 'steam:libraries',
     options.epicManifestsPath ? path.resolve(options.epicManifestsPath) : 'epic:manifests',
     options.gogFixturePath ? path.resolve(options.gogFixturePath) : 'gog:registry',
+    options.xboxFixturePath ? path.resolve(options.xboxFixturePath) : 'xbox:appx-packages',
     ...(options.userSelectedRoots ?? []).map((root) => path.resolve(root)),
     ...(options.includeCommonRoots ? commonInstallRoots() : []),
   ]);
 
   const platformRaw = discoverRawInstalls(options, failures);
+  // Fetched once here (rather than only later, as before) so the manual/Xbox
+  // shallow scan below can pass a catalog-executable hint into resolution —
+  // see catalogExecutableHintForFolder's doc comment for why this is safe.
+  // One snapshot for the whole scan call — not re-queried per folder — so
+  // scan semantics never depend on catalog-read timing.
+  const catalogForHints = getFullCatalogForMatching();
   const selectedRootRaw = [
     ...(options.userSelectedRoots ?? []),
     ...(options.includeCommonRoots ? commonInstallRoots() : []),
-  ].flatMap((root) => scanShallowRoot(root, failures));
+  ].flatMap((root) => scanShallowRoot(root, failures, catalogForHints));
 
   const discoveredRaw = [...platformRaw, ...selectedRootRaw];
   const rejected: InstallDiscoveryRejectedCandidate[] = failures
@@ -268,8 +328,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
     });
     return false;
   });
-  const catalog = searchCatalog('', 5000, 0).entries;
-  const matched = deduplicateConcreteInstalls(matchInstalledToCatalog(raw, catalog, scannedAt));
+  const matched = deduplicateConcreteInstalls(matchInstalledToCatalog(raw, catalogForHints, scannedAt));
   const classificationReasons = new Map<string, string>();
   const addable = matched.filter((record) => {
     if (record.catalogGameId || (record.platform !== 'manual' && record.platform !== 'xbox')) return true;
@@ -347,7 +406,7 @@ export function previewInstallDiscoveryScan(options: InstallDiscoveryOptions = {
 
 export function commitInstallDiscoveryRecords(records: InstallDiscoveryCommitSelection[]): { added: number; skipped: number; rejected: number } {
   const committedAt = new Date().toISOString();
-  const catalog = searchCatalog('', 5000, 0).entries;
+  const catalog = getFullCatalogForMatching();
   const validRaw: RawInstalledGame[] = [];
 
   for (const record of records) {

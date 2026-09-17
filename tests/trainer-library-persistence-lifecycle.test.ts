@@ -49,7 +49,7 @@ describe('Solith Blocker 1: Trainer Library Metadata Persistence Lifecycle', () 
       coverUrl: 'solith-asset://local/C%3A%5Ccovers%5Cblocker1_cover.png',
       iconUrl: 'solith-asset://local/C%3A%5Cicons%5Cblocker1_icon.ico',
       verificationStatus: 'community',
-      sources: [{ provider: 'manual', importedAt: '2026-07-27T00:00:00.000Z' }],
+      sources: [{ provider: 'user', url: 'solith://manual-entry', lastSyncedAt: '2026-07-27T00:00:00.000Z' }],
       hasModPack: true,
       modPackId: `${catalogGameId}-pack`,
       cheatCount: 5,
@@ -90,7 +90,11 @@ describe('Solith Blocker 1: Trainer Library Metadata Persistence Lifecycle', () 
       cheatCount: 12,
     };
 
-    upsertCatalogEntry(editedEntry);
+    // headerUrl's clear must be explicit — ordinary upserts never let an
+    // undefined incoming value erase existing artwork (store.ts's
+    // resolveArtworkField), which is what protects curated artwork from a
+    // lower-priority incremental sync that simply doesn't know that field.
+    upsertCatalogEntry(editedEntry, { explicitClearFields: ['headerUrl'] });
 
     // 9. Close the connection again
     await closeDatabaseSafely();

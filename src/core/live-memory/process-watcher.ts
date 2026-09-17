@@ -10,6 +10,7 @@ import {
   verifyDefinitionFingerprint,
   type FingerprintVerifyResult,
 } from '../definitions/fingerprint-verify.js';
+import { classifyExecutableRoles, type ExecutableRole } from '../install-discovery/executable-role.js';
 import type { MemoryFeatureV1, SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { evaluateWriteConsent } from './write-consent.js';
 import type { LiveProcessListEntry } from './native-memory-driver.js';
@@ -76,26 +77,101 @@ export interface ResolvedFeatureAddress {
 }
 
 /**
- * Match running processes against catalog executables (first match wins per poll).
+ * Match running processes against catalog executables. Returns the first
+ * detection only — kept for callers that genuinely want a single result;
+ * prefer matchAllCatalogProcesses() for anything that should not silently
+ * ignore a second concurrently-running catalog game.
  */
 export function matchCatalogProcess(
   processes: LiveProcessListEntry[],
   catalog: CatalogExecutableEntry[],
 ): ProcessWatchDetection | null {
-  for (const proc of processes) {
-    const name = proc.name.toLowerCase();
-    const match = catalog.find((entry) =>
-      entry.executables.some((exe) => exe.toLowerCase() === name),
-    );
-    if (!match) continue;
-    return {
-      catalogGameId: match.catalogGameId,
-      displayName: match.displayName,
-      pid: proc.pid,
-      executable: proc.name,
-    };
+  return matchAllCatalogProcesses(processes, catalog)[0] ?? null;
+}
+
+interface LiveCatalogMatch {
+  proc: LiveProcessListEntry;
+  entry: CatalogExecutableEntry;
+}
+
+/**
+ * Among 2+ concurrently-live processes that all match the same catalog
+ * entry's declared executables (e.g. a Xbox/GDK title's launcher stub plus
+ * its real engine binary, both alive at once — ROADMAP.md Phase 3 P3-8.1),
+ * pick the canonical one by executable role rather than by incidental OS
+ * process-list ordering. `classifyExecutableRoles` ranks a recognized
+ * engine/build-suffixed binary (PRIMARY_GAME) above an unsuffixed sibling
+ * (ALTERNATE_GAME); when role evidence cannot distinguish them (both
+ * UNKNOWN — no title-specific rule is added here), the earliest live match
+ * wins, preserving prior behavior exactly for every catalog entry that never
+ * has 2+ concurrently-live matches in the first place.
+ */
+function pickCanonicalLiveMatch(matches: LiveCatalogMatch[]): LiveCatalogMatch {
+  if (matches.length === 1) return matches[0];
+  const roles = classifyExecutableRoles(matches.map((m) => m.proc.name));
+  const rank = (role: ExecutableRole | undefined): number => {
+    if (role === 'PRIMARY_GAME') return 0;
+    if (role === 'ALTERNATE_GAME') return 1;
+    return 2;
+  };
+  let best = matches[0];
+  let bestRank = rank(roles.get(matches[0].proc.name));
+  for (const candidate of matches.slice(1)) {
+    const candidateRank = rank(roles.get(candidate.proc.name));
+    if (candidateRank < bestRank) {
+      best = candidate;
+      bestRank = candidateRank;
+    }
   }
-  return null;
+  return best;
+}
+
+/**
+ * Match every running process against catalog executables (not just the
+ * first hit). One detection per matched catalogGameId. Every live process
+ * matching that game's declared executables is collected first — not just
+ * the first one encountered — so that when 2+ are alive concurrently,
+ * `pickCanonicalLiveMatch` can prefer the real engine binary over a
+ * launcher/wrapper stub by role instead of by OS process-list ordering
+ * (D-P3-8.1: matching used to stop at the first live hit, which bound Xbox
+ * titles like Atomfall to their launcher process whenever it happened to be
+ * enumerated before the engine). Builds an executable->entry index once so
+ * this stays O(processes + catalog) rather than O(processes * catalog) —
+ * matters now that callers pass the full, unbounded catalog (see D07 fix)
+ * rather than a fixed-size page.
+ */
+export function matchAllCatalogProcesses(
+  processes: LiveProcessListEntry[],
+  catalog: CatalogExecutableEntry[],
+): ProcessWatchDetection[] {
+  const byExecutable = new Map<string, CatalogExecutableEntry>();
+  for (const entry of catalog) {
+    for (const exe of entry.executables) {
+      const key = exe.toLowerCase();
+      if (!byExecutable.has(key)) byExecutable.set(key, entry);
+    }
+  }
+
+  const liveByGame = new Map<string, LiveCatalogMatch[]>();
+  for (const proc of processes) {
+    const match = byExecutable.get(proc.name.toLowerCase());
+    if (!match) continue;
+    const bucket = liveByGame.get(match.catalogGameId);
+    if (bucket) bucket.push({ proc, entry: match });
+    else liveByGame.set(match.catalogGameId, [{ proc, entry: match }]);
+  }
+
+  const detections: ProcessWatchDetection[] = [];
+  for (const matches of liveByGame.values()) {
+    const chosen = pickCanonicalLiveMatch(matches);
+    detections.push({
+      catalogGameId: chosen.entry.catalogGameId,
+      displayName: chosen.entry.displayName,
+      pid: chosen.proc.pid,
+      executable: chosen.proc.name,
+    });
+  }
+  return detections;
 }
 
 export interface BuildAttachPlanInput {
