@@ -89,6 +89,13 @@ describe('Solith Parser Adapters Expansion & Safety Tests', () => {
     const resComm = await adapter.readCurrentValue(commentsPath, 'hp');
     assert.ok(resComm.success);
     assert.strictEqual(resComm.value, 100);
+    // PD-05: discarded comments are reported, not silently dropped.
+    assert.ok(resComm.warnings && resComm.warnings.length > 0, 'expected a warning about discarded comments');
+
+    const buildComm = await adapter.buildOutput(commentsPath, 'hp', 150);
+    assert.ok(buildComm.success);
+    assert.ok(!buildComm.content.includes('//'), 'rewritten JSON is still comment-free');
+    assert.ok(buildComm.warnings && buildComm.warnings.length > 0, 'expected a warning that comments were not carried into the rewritten file');
 
     // Type mismatch prevention
     const outputRes = await adapter.buildOutput(validPath, 'player.hp', 'invalid_string_type');

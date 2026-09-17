@@ -1,5 +1,6 @@
 import { parse as parseYaml } from 'yaml';
 import { parseSolithDefinitionV1, validateSolithDefinitionV1, type SolithDefinitionV1 } from './schema.v1.js';
+import { YAML_EXPORT_BANNER_LINES } from './export-yaml.v1.js';
 
 export interface CompileYamlResult {
   success: true;
@@ -14,11 +15,28 @@ export interface CompileYamlError {
 
 export type CompileYamlOutcome = CompileYamlResult | CompileYamlError;
 
-function stripYamlComments(yamlText: string): string {
-  return yamlText
-    .split('\n')
-    .filter((line) => !line.trim().startsWith('#'))
-    .join('\n');
+const BANNER_COMMENT_TEXTS = new Set<string>(YAML_EXPORT_BANNER_LINES);
+
+/**
+ * Full-line `#` comments carry real evidence in Solith-exported YAML (see
+ * export-yaml.v1.ts: discovery evidence, session-address notes, header
+ * lines). The `yaml` parser already ignores comments per spec — they never
+ * need to be stripped from the text before parsing — so this only exists to
+ * recover them before they are gone. PD-05: this used to be destructive
+ * (comments were deleted, never read); now every non-banner comment line is
+ * captured for provenanceNotes instead of being silently discarded.
+ */
+function extractYamlComments(yamlText: string): string[] {
+  const comments: string[] = [];
+  for (const line of yamlText.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('#')) continue;
+    const text = trimmed.replace(/^#+\s?/, '');
+    if (text && !BANNER_COMMENT_TEXTS.has(text)) {
+      comments.push(text);
+    }
+  }
+  return comments;
 }
 
 function normalizeParsedDefinition(raw: unknown): unknown {
@@ -52,7 +70,7 @@ export function compileYamlToDefinition(yamlText: string): CompileYamlOutcome {
 
   let parsed: unknown;
   try {
-    parsed = parseYaml(stripYamlComments(yamlText));
+    parsed = parseYaml(yamlText);
   } catch (err) {
     return {
       success: false,
@@ -64,7 +82,15 @@ export function compileYamlToDefinition(yamlText: string): CompileYamlOutcome {
     return { success: false, errors: ['YAML root must be a mapping/object.'] };
   }
 
-  const normalized = normalizeParsedDefinition(parsed);
+  const normalized = normalizeParsedDefinition(parsed) as Record<string, unknown>;
+  const discardedComments = extractYamlComments(yamlText);
+  if (discardedComments.length > 0) {
+    const existing = Array.isArray(normalized.provenanceNotes)
+      ? (normalized.provenanceNotes as unknown[]).filter((n): n is string => typeof n === 'string')
+      : [];
+    normalized.provenanceNotes = [...existing, ...discardedComments];
+  }
+
   const validationErrors = validateSolithDefinitionV1(normalized);
   if (validationErrors.length > 0) {
     return { success: false, errors: validationErrors };

@@ -4,6 +4,8 @@ export interface ReadValueResult {
   value: any;
   success: boolean;
   error?: string;
+  /** Set when the adapter discarded non-data content (e.g. comments) while reading; never silent. */
+  warnings?: string[];
 }
 
 export interface DryRunResult {
@@ -15,6 +17,8 @@ export interface BuildOutputResult {
   content: string;
   success: boolean;
   error?: string;
+  /** Set when the written content dropped non-data content (e.g. comments) present in the source file; never silent. */
+  warnings?: string[];
 }
 
 export interface ValidationResult {
