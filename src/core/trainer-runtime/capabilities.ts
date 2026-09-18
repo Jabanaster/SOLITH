@@ -34,6 +34,21 @@ export interface TrainerRuntimeCapabilities {
   detach(): void;
   /** Mirrors LiveMemorySession.verifyAttachedProcessIdentity(): null = OK, string = reason it is not. */
   verifyIdentity(): string | null;
+  /**
+   * P4-10: the identity of the process this capability is currently attached
+   * to, without opening a new handle — the seam `bindExisting()` uses to
+   * cross-check a borrowed session against the caller's claimed target
+   * instead of re-attaching. Mirrors LiveMemorySession.getAttachedIdentity().
+   */
+  getAttachedIdentity(): {
+    pid: number;
+    executableName: string;
+    executablePath: string;
+    startTime: string;
+    volumeSerialNumber?: string;
+    fileIndex?: string;
+    exeSha256?: string;
+  } | null;
   resolveFeature(feature: MemoryFeatureV1): Promise<LiveMemoryAddress>;
   read(address: LiveMemoryAddress, reason?: string): number;
   proposeWrite(address: LiveMemoryAddress, requestedValue: number, options?: WriteCallOptions): LiveWriteProposal;
@@ -69,6 +84,10 @@ export class LiveMemoryCapabilities implements TrainerRuntimeCapabilities {
 
   verifyIdentity(): string | null {
     return this.session.verifyAttachedProcessIdentity();
+  }
+
+  getAttachedIdentity() {
+    return this.session.getAttachedIdentity();
   }
 
   resolveFeature(feature: MemoryFeatureV1): Promise<LiveMemoryAddress> {

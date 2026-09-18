@@ -13,7 +13,13 @@ export const WRITE_CONSENT_TTL_MS = 5 * 60 * 1000;
 export type ConsentOperation =
   | 'live_memory_confirm_write'
   | 'live_memory_freeze_start'
-  | 'injector_confirm_launch';
+  | 'injector_confirm_launch'
+  // P4-10: canonical trainer-feature write/freeze confirms, issued and
+  // consumed through the exact same generic issue/consume machinery below —
+  // distinct operation strings only so a token issued for one confirm path
+  // can never be replayed against the other.
+  | 'trainer_confirm_write_feature'
+  | 'trainer_confirm_freeze_feature';
 
 export interface WriteConsentBinding {
   operation: ConsentOperation;

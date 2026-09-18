@@ -101,6 +101,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trainerHostRollback: (payload: { gameId: string; filePath: string; backupPath: string; field: string }) =>
     ipcRenderer.invoke('trainer-host-rollback', payload),
 
+  // Canonical trainer execution (P4-10) — reuses the already-attached
+  // live-memory session (liveMemoryAttach above) instead of a second attach.
+  // Every call is keyed by trainerId (catalogGameId)/featureId/
+  // transactionId, never a raw address.
+  trainerBindRuntime: (payload: { catalogGameId: string; pid: number; executableName: string; executablePath?: string; executableHashSHA256?: string; driftAcknowledged?: boolean }) =>
+    ipcRenderer.invoke('trainer-bind-runtime', payload),
+  trainerUnbindRuntime: () => ipcRenderer.invoke('trainer-unbind-runtime', {}),
+  trainerGetRuntimeState: () => ipcRenderer.invoke('trainer-get-runtime-state', {}),
+  trainerProposeWriteFeature: (payload: { featureId: string; requestedValue: number }) =>
+    ipcRenderer.invoke('trainer-propose-write-feature', payload),
+  trainerIssueWriteConsent: (payload: { featureId: string; proposalId: string }) =>
+    ipcRenderer.invoke('trainer-issue-write-consent', payload),
+  trainerConfirmWriteFeature: (payload: { featureId: string; proposalId: string; consentToken: string }) =>
+    ipcRenderer.invoke('trainer-confirm-write-feature', payload),
+  trainerProposeFreezeFeature: (payload: { featureId: string; value: number; intervalMs?: number }) =>
+    ipcRenderer.invoke('trainer-propose-freeze-feature', payload),
+  trainerIssueFreezeConsent: (payload: { featureId: string; proposalId: string }) =>
+    ipcRenderer.invoke('trainer-issue-freeze-consent', payload),
+  trainerConfirmFreezeFeature: (payload: { featureId: string; proposalId: string; consentToken: string }) =>
+    ipcRenderer.invoke('trainer-confirm-freeze-feature', payload),
+  trainerDeactivateFeature: (payload: { featureId: string }) =>
+    ipcRenderer.invoke('trainer-deactivate-feature', payload),
+  trainerRollbackFeature: (payload: { featureId: string; proposalId: string }) =>
+    ipcRenderer.invoke('trainer-rollback-feature', payload),
+  trainerExecuteComposite: (payload: {
+    id: string;
+    actions: Array<
+      | { kind: 'write'; featureId: string; requestedValue: number; proposalId: string; consentToken: string; reason?: string }
+      | { kind: 'freeze'; featureId: string; value: number; proposalId: string; consentToken: string; intervalMs?: number }
+    >;
+  }) => ipcRenderer.invoke('trainer-execute-composite', payload),
+  trainerCancelComposite: (payload: { transactionId: string }) =>
+    ipcRenderer.invoke('trainer-cancel-composite', payload),
+  trainerGetTransactionState: (payload: { transactionId: string }) =>
+    ipcRenderer.invoke('trainer-get-transaction-state', payload),
+
   // Live Memory Trainer (V2, feature-flagged off by default, single-player/
   // offline only — see PROJECT_SPEC.md Section 3.1). Standard
   // ReadProcessMemory/WriteProcessMemory only; no injection.

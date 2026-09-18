@@ -1,7 +1,9 @@
 import type { WriteConsentBinding } from '../consent/write-consent.js';
 import type {
+  FreezeProposal,
   FreezeStatus,
   LiveMemoryAddress,
+  LiveWriteProposal,
   LiveWriteManifest,
 } from '../live-memory/types.js';
 import type { WriteCallOptions } from '../live-memory/memory-manager.js';
@@ -113,6 +115,74 @@ export async function dispatchWriteAction(
   return ok(confirm.manifest);
 }
 
+/**
+ * P4-10: propose-only half of a write, split out of `dispatchWriteAction` so
+ * a real consent token can be issued (and later verified) against the exact
+ * proposalId this call creates — the same propose -> issue-consent -> confirm
+ * shape `electron/live-memory-ipc.ts` already uses for raw-address writes.
+ * `dispatchWriteAction` above is unchanged and still used for the
+ * already-approved / composite-transaction / legacy-library paths.
+ */
+export async function proposeWriteAction(
+  capabilities: TrainerRuntimeCapabilities,
+  feature: RuntimeFeatureState,
+  requestedValue: number,
+  reason?: string,
+): Promise<RuntimeResult<LiveWriteProposal>> {
+  if (feature.resolution.state !== 'resolved' || !feature.resolution.address) {
+    const error = runtimeError(
+      'TARGET_RESOLUTION_FAILED',
+      `Feature "${feature.definition.id}" has no resolved target address; resolve it before proposing a write.`,
+    );
+    feature.activation = { state: 'failed', error };
+    return fail(error);
+  }
+  const address = feature.resolution.address;
+  feature.activation = { state: 'activating' };
+
+  try {
+    const proposal = capabilities.proposeWrite(address, requestedValue, {
+      featureId: feature.definition.id,
+      reason,
+      writeIntent: 'stage',
+    });
+    feature.activation = { state: 'activating', proposalId: proposal.proposalId };
+    return ok(proposal);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const error = runtimeError(classifyLiveMemoryErrorString(message), message);
+    feature.activation = { state: 'failed', error };
+    return fail(error);
+  }
+}
+
+/**
+ * P4-10: confirm-only half of a write. `proposalId` must be the one
+ * `proposeWriteAction` returned for this same feature — enforced by the
+ * caller (`TrainerRuntime.confirmWriteFeature`) checking it against
+ * `feature.activation.proposalId` before this is reached.
+ */
+export async function confirmWriteAction(
+  capabilities: TrainerRuntimeCapabilities,
+  feature: RuntimeFeatureState,
+  proposalId: string,
+  approval: WriteApproval,
+  reason?: string,
+): Promise<RuntimeResult<LiveWriteManifest>> {
+  const confirm = await capabilities.confirmWrite(
+    proposalId,
+    writeCallOptions(approval, { featureId: feature.definition.id, reason, writeIntent: 'commit' }),
+  );
+  if (!confirm.success || !confirm.manifest) {
+    const error = runtimeError(classifyLiveMemoryErrorString(confirm.error), confirm.error ?? 'Write confirmation failed.');
+    feature.activation = { state: 'failed', proposalId, error };
+    return fail(error);
+  }
+
+  feature.activation = { state: 'active', proposalId };
+  return ok(confirm.manifest);
+}
+
 /** Dispatches a `freeze` feature: resolve (if needed) -> propose freeze -> start (token-gated, no legacy bypass). */
 export async function startFreezeAction(
   capabilities: TrainerRuntimeCapabilities,
@@ -151,6 +221,65 @@ export async function startFreezeAction(
   if (!start.success) {
     const error = runtimeError(classifyLiveMemoryErrorString(start.error), start.error ?? 'Freeze start failed.');
     feature.activation = { state: 'failed', error };
+    return fail(error);
+  }
+
+  feature.activation = { state: 'active', freezeActive: true };
+  return ok(undefined);
+}
+
+/**
+ * P4-10: propose-only half of a freeze, split out of `startFreezeAction` for
+ * the same real-consent-token reason as `proposeWriteAction`.
+ * `startFreezeAction` above is unchanged.
+ */
+export async function proposeFreezeAction(
+  capabilities: TrainerRuntimeCapabilities,
+  feature: RuntimeFeatureState,
+  value: number,
+  intervalMs?: number,
+): Promise<RuntimeResult<FreezeProposal>> {
+  if (feature.resolution.state !== 'resolved' || !feature.resolution.address) {
+    const error = runtimeError(
+      'TARGET_RESOLUTION_FAILED',
+      `Feature "${feature.definition.id}" has no resolved target address; resolve it before proposing a freeze.`,
+    );
+    feature.activation = { state: 'failed', error };
+    return fail(error);
+  }
+  const address = feature.resolution.address;
+  feature.activation = { state: 'activating' };
+
+  try {
+    const proposal = capabilities.proposeFreeze(address, value, intervalMs);
+    feature.activation = { state: 'activating', proposalId: proposal.proposalId };
+    return ok(proposal);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const error = runtimeError(classifyLiveMemoryErrorString(message), message);
+    feature.activation = { state: 'failed', error };
+    return fail(error);
+  }
+}
+
+/**
+ * P4-10: confirm-only half of a freeze. `proposalId` must be the one
+ * `proposeFreezeAction` returned for this same feature.
+ */
+export async function confirmFreezeAction(
+  capabilities: TrainerRuntimeCapabilities,
+  feature: RuntimeFeatureState,
+  proposalId: string,
+  approval: { consentToken: string; consentBinding: WriteConsentBinding },
+): Promise<RuntimeResult<void>> {
+  const start = await capabilities.freezeStart(proposalId, {
+    consentToken: approval.consentToken,
+    consentBinding: approval.consentBinding,
+    featureId: feature.definition.id,
+  });
+  if (!start.success) {
+    const error = runtimeError(classifyLiveMemoryErrorString(start.error), start.error ?? 'Freeze start failed.');
+    feature.activation = { state: 'failed', proposalId, error };
     return fail(error);
   }
 

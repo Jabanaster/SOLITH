@@ -2612,6 +2612,26 @@ function requireSession(event: IpcMainInvokeEvent): LiveMemorySession {
 }
 
 /**
+ * P4-10: the single accessor `electron/trainer-execution-ipc.ts` uses to
+ * reuse this sender's already-attached session instead of performing its
+ * own attach — the fix for the P4-9 blocker ("TrainerRuntime.bind()
+ * performs its own attach rather than safely reusing the already-authorized
+ * live-memory session"). Deliberately returns only `session`/`manager` (not
+ * the full `SessionBundle`, which also carries this module's own
+ * audit/correlation-watcher internals) and reuses `requireBundle`'s exact
+ * fail-closed behavior (`sender_invalid`/`not_attached`) — no new gate, no
+ * new registry; this per-sender map already IS the "one authoritative
+ * session per execution context" the mission asks for (mission §21).
+ */
+export function requireAuthorizedSessionForExecution(event: IpcMainInvokeEvent): {
+  session: LiveMemorySession;
+  manager: MemoryManager;
+} {
+  const bundle = requireBundle(event);
+  return { session: bundle.session, manager: bundle.manager };
+}
+
+/**
  * Real sender identity validation (Batch B1.1) — used by the 3 handlers this
  * batch targets (freeze propose/issue-consent/confirm, rollback). Beyond
  * `isDestroyed()`, this confirms the sender is a registered Solith window,
