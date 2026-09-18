@@ -45,6 +45,7 @@ import {
   LiveMemoryScanFirstStartSchema,
   LiveMemoryScanAobStartSchema,
   LiveMemoryScanOperationIdSchema,
+  LiveMemoryAdaptiveScanStartSchema,
   ResearchViewSchema,
   ResearchHexSchema,
   StructureDiscoverSchema,
@@ -1492,6 +1493,34 @@ export function registerLiveMemoryIpc(): void {
     }
   });
 
+  // P2-10 adaptive scan planner. Shares `live-memory-scan-cancel`/
+  // `live-memory-scan-poll` below with the other `-start` channels — those
+  // are already generic over `operationId`, so no new cancel/poll channel is
+  // needed, only a new `kind` for `serializeScanOperationResult` to branch on.
+  ipcMain.handle('live-memory-adaptive-scan-start', (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      const parsed = LiveMemoryAdaptiveScanStartSchema.parse(payload);
+      const operationId = session.startAdaptiveScanOperation(parsed.dataType, parsed.targetValue, parsed.mode ?? 'adaptive');
+      return { success: true, operationId };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'adaptive_scan_start_failed') };
+    }
+  });
+
+  ipcMain.handle('live-memory-adaptive-scan-telemetry-get', (event) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
+      const session = requireSession(event);
+      return { success: true, history: session.getAdaptiveScanTelemetryHistory() };
+    } catch (error) {
+      return { success: false, error: sanitize(error, 'adaptive_scan_telemetry_get_failed') };
+    }
+  });
+
   ipcMain.handle('live-memory-scan-cancel', (event, payload: unknown) => {
     try {
       const senderCheck = requireTrustedSender(event);
@@ -2669,9 +2698,31 @@ function serializeScanResult(result: { matches: ScanMatch[]; regionsScanned: num
  * already send (BigInt values as decimal strings, never raw BigInt, never a
  * lossy Number narrowing).
  */
-function serializeScanOperationResult(kind: 'exact' | 'aob' | 'pointerMap', result: unknown) {
+function serializeScanOperationResult(kind: 'exact' | 'aob' | 'pointerMap' | 'adaptiveScan', result: unknown) {
   if (kind === 'pointerMap') {
     return serializePointerMapScanResult(result as PointerMapScanTargetsResult);
+  }
+  if (kind === 'adaptiveScan') {
+    const outcome = result as {
+      plan: unknown;
+      telemetry: unknown;
+      result: { matches: ScanMatch[]; regionsScanned: number; bytesScanned: number; truncated: boolean; isAuthoritativeAbsence: boolean; completeness: CanonicalCompleteness; skippedRegions: CanonicalSkippedRange[] };
+    };
+    // Flattened, not nested under a second `result` key — the caller
+    // (`live-memory-scan-poll`) already wraps this whole return value in its
+    // OWN top-level `result` field, so a nested `result` here would put
+    // `matches`/`completeness` at `pollResponse.result.result.matches`
+    // instead of `pollResponse.result.matches`, silently orphaning them from
+    // every other kind's flat shape (`exact`/`aob`/`pointerMap` all return
+    // their match/coverage fields directly, not nested).
+    return {
+      plan: outcome.plan,
+      telemetry: outcome.telemetry,
+      ...serializeScanResult(outcome.result),
+      isAuthoritativeAbsence: outcome.result.isAuthoritativeAbsence,
+      completeness: serializeCompleteness(outcome.result.completeness),
+      skippedRegions: serializeSkippedRegions(outcome.result.skippedRegions),
+    };
   }
   if (kind === 'exact') {
     const exact = result as {

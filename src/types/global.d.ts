@@ -1055,7 +1055,7 @@ interface Window {
     liveMemoryScanPoll: (payload: { operationId: string }) => Promise<{
       success: boolean;
       status?: 'pending' | 'complete' | 'cancelled' | 'error' | 'not_found';
-      kind?: 'exact' | 'aob';
+      kind?: 'exact' | 'aob' | 'adaptiveScan';
       result?: {
         backend?: 'legacy' | 'native';
         isAuthoritativeAbsence?: boolean;
@@ -1065,7 +1065,65 @@ interface Window {
         truncated?: boolean;
         found?: boolean;
         address?: string;
+        // P2-10 adaptiveScan shape only:
+        plan?: {
+          strategy: string;
+          reasons: string[];
+          regionOrder: 'as_enumerated' | 'module_first' | 'private_first' | 'largest_first';
+          maxRegionBytes: number;
+          maxTotalBytes: number;
+          maxMatches: number;
+        };
+        telemetry?: {
+          strategy: string;
+          regionsConsidered: number;
+          regionsScanned: number;
+          regionsSkipped: number;
+          eligibleBytes: number;
+          scannedBytes: number;
+          elapsedMillis: number;
+          resultCount: number;
+          coverage: 'complete' | 'complete_with_skipped_regions' | 'cancelled' | 'process_exited' | 'resource_limit' | 'failed';
+          partialReads: number;
+          failedReads: number;
+          cancelled: boolean;
+          recordedAt: number;
+        };
+        completeness?: unknown;
+        skippedRegions?: unknown;
       };
+      error?: string;
+    }>;
+    /**
+     * P2-10 — adaptive scan planner start. Shares `liveMemoryScanCancel`/
+     * `liveMemoryScanPoll` above (kind `'adaptiveScan'`) with the other
+     * `-Start` channels; the polled result carries a `plan` (strategy +
+     * structured reasons) and `telemetry` (real measured outcome) alongside
+     * the usual match set.
+     */
+    liveMemoryAdaptiveScanStart: (payload: {
+      dataType: 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64';
+      targetValue: number;
+      mode?: 'adaptive' | 'reference';
+    }) => Promise<{ success: boolean; operationId?: string; error?: string }>;
+    /** P2-10 — bounded, oldest-first telemetry history recorded so far in this attach. */
+    liveMemoryAdaptiveScanTelemetryGet: () => Promise<{
+      success: boolean;
+      history?: Array<{
+        strategy: string;
+        regionsConsidered: number;
+        regionsScanned: number;
+        regionsSkipped: number;
+        eligibleBytes: number;
+        scannedBytes: number;
+        elapsedMillis: number;
+        resultCount: number;
+        coverage: string;
+        partialReads: number;
+        failedReads: number;
+        cancelled: boolean;
+        recordedAt: number;
+      }>;
       error?: string;
     }>;
     /** Phase 9 — typed reinterpret at one address (read-only). */

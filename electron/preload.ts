@@ -482,6 +482,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('live-memory-scan-aob-start', payload),
   liveMemoryScanCancel: (payload: { operationId: string }) => ipcRenderer.invoke('live-memory-scan-cancel', payload),
   liveMemoryScanPoll: (payload: { operationId: string }) => ipcRenderer.invoke('live-memory-scan-poll', payload),
+  // P2-10 — adaptive scan planner. Shares liveMemoryScanCancel/liveMemoryScanPoll
+  // above via the same operationId contract; no separate cancel/poll needed.
+  liveMemoryAdaptiveScanStart: (payload: {
+    dataType: 'byte' | 'int32' | 'uint32' | 'float' | 'double' | 'int64';
+    targetValue: number;
+    mode?: 'adaptive' | 'reference';
+  }) => ipcRenderer.invoke('live-memory-adaptive-scan-start', payload),
+  liveMemoryAdaptiveScanTelemetryGet: () => ipcRenderer.invoke('live-memory-adaptive-scan-telemetry-get'),
 
   // Phase 9 — read-only address/data research tools
   researchView: (payload: { address: string; types: string[] }) =>
