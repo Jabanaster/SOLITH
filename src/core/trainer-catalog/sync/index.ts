@@ -1,3 +1,5 @@
+import { modPackToSolithDefinition } from '../../definitions/mod-pack-adapter.js';
+import { persistTrainerDefinition } from '../../trainer-storage/repository.js';
 import { getEnabledSyncSources } from './sources.js';
 import {
   remoteTrainerToCatalogEntry,
@@ -8,7 +10,6 @@ import {
   logTrainerSync,
   pruneInvalidCommunityCatalogTitles,
   upsertCatalogEntryWithIdentityReview,
-  upsertModPack,
 } from '../store.js';
 
 export interface TrainerCatalogSyncReport {
@@ -26,11 +27,19 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
   for (const source of getEnabledSyncSources()) {
     const result = await syncTrainerSource(source);
     let imported = 0;
+    const errors: string[] = [...result.errors];
 
     for (const trainer of result.trainers) {
       const entry = remoteTrainerToCatalogEntry(trainer, source.id);
+      // remoteTrainerToModPack() stays the scrape-to-transport-shape step —
+      // it is never persisted directly any more (P4-4 §5/§12): the write path
+      // now compiles it through the existing ModPack->schema.v1 adapter and
+      // the canonical repository, so a community-sync row gets the same
+      // validate/transaction/verify-read-back/source-suffixed-packId
+      // guarantees every other write source already has, instead of a raw
+      // JSON.stringify(ModPack) row that only became canonical lazily on read.
       const pack = remoteTrainerToModPack(trainer, source.id);
-      const withPackInfo = { ...entry, hasModPack: true, modPackId: pack.packId, cheatCount: pack.cheats.length };
+      const withPackInfo = { ...entry, hasModPack: true, modPackId: `${entry.catalogGameId}-pack-${source.id}`, cheatCount: pack.cheats.length };
 
       const write = upsertCatalogEntryWithIdentityReview({
         entry: withPackInfo,
@@ -44,17 +53,21 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
       }
 
       const writtenCatalogGameId = write.writtenCatalogGameId ?? pack.catalogGameId;
-      upsertModPack({
-        ...pack,
-        catalogGameId: writtenCatalogGameId,
-        packId: writtenCatalogGameId === entry.catalogGameId ? pack.packId : `${source.id}-${writtenCatalogGameId}`,
+      const definition = modPackToSolithDefinition({ ...pack, catalogGameId: writtenCatalogGameId });
+      const persisted = persistTrainerDefinition(definition, {
+        sourceProvider: source.id,
+        sourceId: trainer.sourceUrl,
       });
+      if (persisted.success === false) {
+        errors.push(`${writtenCatalogGameId}: ${persisted.error.message}`);
+        continue;
+      }
       imported += 1;
     }
 
     totalImported += imported;
-    logTrainerSync(source.id, result.errors.length ? 'partial' : 'success', result.errors.join('; ') || 'ok', imported);
-    providers.push({ provider: source.id, imported, errors: result.errors });
+    logTrainerSync(source.id, errors.length ? 'partial' : 'success', errors.join('; ') || 'ok', imported);
+    providers.push({ provider: source.id, imported, errors });
   }
 
   const prunedInvalidTitles = pruneInvalidCommunityCatalogTitles().length;

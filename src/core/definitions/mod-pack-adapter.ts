@@ -182,6 +182,26 @@ export function solithDefinitionToModPack(definition: SolithDefinitionV1): ModPa
 }
 
 /**
+ * Reports every ModPackCheat field `cheatToMemoryFeature()` cannot represent
+ * in a canonical `MemoryFeatureV1` — the "lossy fields warned" half of the
+ * ModPack adapter's LOSSY_WITH_WARNING classification (P4-4 §16/§21 test 3).
+ * Additive/non-breaking: does not change `modPackToSolithDefinition()`'s
+ * existing signature or any of its established callers.
+ */
+export function modPackConversionLosses(pack: ModPack): string[] {
+  const losses = new Set<string>();
+  for (const cheat of pack.cheats) {
+    if (cheat.description) losses.add('cheats[].description');
+    if (cheat.verified) losses.add('cheats[].verified');
+    if (cheat.tags?.length) losses.add('cheats[].tags');
+  }
+  if (pack.notes?.length) losses.add('notes');
+  if (pack.source.trainerTitle) losses.add('source.trainerTitle');
+  if (pack.platform && pack.platform !== 'unknown') losses.add('platform');
+  return [...losses];
+}
+
+/**
  * Detect schema.v1 definition JSON stored in trainer_mod_packs.payloadJson,
  * as opposed to a legacy ModPack payload (no schemaVersion field). Delegates
  * to the centralized version-detection stage (migrations/version-detect.ts)

@@ -121,7 +121,10 @@ describe('Solith Hub community definition sync', () => {
     assert.equal(stored?.safety.verificationStatus, 'community');
     assert.equal(stored?.safety.requiresApproval, true);
 
-    const metadata = getDefinitionSyncMetadata('hub-record-1');
+    // P4-4: hub writes now go through persistTrainerDefinition's deterministic
+    // `${id}-pack-${sourceProvider}` packId convention, not the opaque hub
+    // record id, so every source uses the same addressable-by-game scheme.
+    const metadata = getDefinitionSyncMetadata('synthetic-game-pack-solith-hub');
     assert.equal(metadata?.certLevel, 'L0_Community');
     assert.equal(metadata?.updatedAt, Date.parse(HUB_UPDATED_AT));
     assert.equal(getCatalogEntry('synthetic-game')?.certLevel, 'L0_Community');
