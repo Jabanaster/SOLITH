@@ -1,5 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import {
   TrainerProposeWriteFeatureSchema,
   TrainerProposeFreezeFeatureSchema,
@@ -65,7 +66,7 @@ describe('P4-13 int64 IPC transport — schema layer', () => {
           requestedValue: 9223372036854775000,
           requestedValueBigint: BEYOND_MAX_SAFE_INTEGER,
           proposalId: 'prop-1',
-          consentToken: '123e4567-e89b-12d3-a456-426614174000',
+          consentToken: randomUUID(),
         },
         {
           kind: 'freeze',
@@ -73,7 +74,7 @@ describe('P4-13 int64 IPC transport — schema layer', () => {
           value: 99,
           valueBigint: '99',
           proposalId: 'prop-2',
-          consentToken: '123e4567-e89b-12d3-a456-426614174001',
+          consentToken: randomUUID(),
         },
       ],
     });
