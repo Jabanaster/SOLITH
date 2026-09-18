@@ -183,6 +183,19 @@ const DiscoveryLab: React.FC<DiscoveryLabProps> = ({ gameId }) => {
     ]);
   };
 
+  /**
+   * P4-13 (mission §16): `Recipe` is legacy/source authoring data scoped to
+   * this game-library entry's own UUID (`gameId` here), a different
+   * identity space from the curated trainer catalog's `catalogGameId` that
+   * canonical `SolithDefinitionV1`/`persistTrainerDefinition` use. It is not
+   * authoritative trainer state and must not be treated as one — see
+   * `src/core/recipes/canonical-adapter.ts` for the one-way
+   * `recipeToSaveFieldFeature()` bridge to the canonical shape, and
+   * `Docs/phase4/009-p4-13-canonical-execution-convergence.md` for why a
+   * full auto-convergence into a canonical definition per user-added game
+   * would require inventing new cross-identity-space infrastructure (a
+   * Phase 6 Trainer Creator concern) rather than a narrow P4-13 fix.
+   */
   const handleCreateRecipe = async () => {
     if (!selectedCandidate || !recipeName || !gameId || !window.electronAPI) return;
     setCreatingRecipe(selectedCandidate.path);

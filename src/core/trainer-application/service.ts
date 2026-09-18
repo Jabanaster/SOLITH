@@ -8,6 +8,7 @@ import {
   type StorageResult,
   type TrainerDefinitionListResult,
 } from '../trainer-storage/index.js';
+import type { LiveMemoryAddress } from '../live-memory/types.js';
 import type { WriteApproval } from '../trainer-runtime/action-executor.js';
 import type { PreBindCompatibilityInput } from '../trainer-runtime/compatibility.js';
 import type { WriteConsentBinding } from '../consent/write-consent.js';
@@ -136,6 +137,11 @@ export const trainerApplicationService = {
 
   deactivateFeature(runtime: TrainerRuntime, featureId: string): RuntimeResult<void> {
     return runtime.deactivateFreezeFeature(featureId);
+  },
+
+  /** Canonical discovery handoff (P4-13) — see TrainerRuntime.seedDiscoveredFeatureAddress. */
+  seedDiscoveredFeature(runtime: TrainerRuntime, featureId: string, address: LiveMemoryAddress): RuntimeResult<void> {
+    return runtime.seedDiscoveredFeatureAddress(featureId, address);
   },
 
   rollbackFeature(runtime: TrainerRuntime, featureId: string, proposalId: string): Promise<RuntimeResult<void>> {

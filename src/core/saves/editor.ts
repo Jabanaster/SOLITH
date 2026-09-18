@@ -12,8 +12,18 @@ import { getGameById } from '../games';
 import { createOperation, transitionOperation } from '../safety/operations';
 import { atomicWrite } from '../safety/atomic-write';
 import { getAdapterForFile } from '../adapters/index';
-import { getRecipeById, validateRecipeSafety } from '../recipes';
 import { getAppPaths } from '../../shared/app-paths.js';
+
+/**
+ * P4-13: this module is pure save-file-edit mechanics (path resolution,
+ * risk assessment, backup/atomic-write, operation state machine) — it has
+ * no knowledge of `Recipe` as a concept. `recipeId` below is an opaque
+ * provenance tag only (carried through to the backup/journal/operation
+ * records for traceability), never validated here. Recipe-safety gating now
+ * happens in the caller (electron/main.ts's `create-proposal-for-edit`/
+ * `apply-proposal` IPC handlers, via `src/core/recipes/recipe-safety-gate.ts`)
+ * before either of these functions is ever invoked — see mission §14.
+ */
 
 export interface SaveEdit {
   path: string;
@@ -88,17 +98,6 @@ export function createProposalForEdit(
     throw new Error('Proposals cannot be created for binary targets (read-only).');
   }
 
-  if (recipeId) {
-    const recipe = getRecipeById(recipeId);
-    if (!recipe) {
-      throw new Error(`Recipe with ID "${recipeId}" not found.`);
-    }
-    const safety = validateRecipeSafety(recipe);
-    if (!safety.valid) {
-      throw new Error(`Recipe safety violation: ${safety.error}`);
-    }
-  }
-
   const risk = assessRisk(pathStr, String(newValue));
   
   const proposal: Omit<Proposal, 'id' | 'createdAt'> = {
@@ -122,17 +121,6 @@ export function createProposalForEdit(
 
 export async function dryRunProposal(proposal: Proposal): Promise<{ success: boolean; error?: string }> {
   try {
-    if (proposal.recipeId) {
-      const recipe = getRecipeById(proposal.recipeId);
-      if (!recipe) {
-        return { success: false, error: `Recipe with ID "${proposal.recipeId}" not found.` };
-      }
-      const safety = validateRecipeSafety(recipe);
-      if (!safety.valid) {
-        return { success: false, error: `Recipe safety violation: ${safety.error}` };
-      }
-    }
-
     const targetFile = proposal.targetFile;
     if (!fs.existsSync(targetFile)) {
       return { success: false, error: 'Target file does not exist' };
@@ -164,16 +152,6 @@ export async function applyProposal(proposal: Proposal): Promise<{ success: bool
   let opCreated = false;
   
   try {
-    if (proposal.recipeId) {
-      const recipe = getRecipeById(proposal.recipeId);
-      if (!recipe) {
-        throw new Error(`Recipe with ID "${proposal.recipeId}" not found.`);
-      }
-      const safety = validateRecipeSafety(recipe);
-      if (!safety.valid) {
-        throw new Error(`Recipe safety violation: ${safety.error}`);
-      }
-    }
     // 1. Create operation
     createOperation({
       id: operationId,

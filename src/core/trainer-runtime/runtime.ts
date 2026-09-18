@@ -1,6 +1,6 @@
 import { migrateTrainerDefinition } from '../definitions/migrations/index.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
-import type { LiveProcessTarget } from '../live-memory/types.js';
+import type { LiveMemoryAddress, LiveProcessTarget } from '../live-memory/types.js';
 import {
   confirmFreezeAction,
   confirmWriteAction,
@@ -76,6 +76,28 @@ function compatibilityFailureReason(decision: CompatibilityDecision): Parameters
   const auth = decision.processAuthorization;
   const isRoleRejection = auth && !auth.allowed && auth.blockedKind !== 'invalid_pid' && auth.blockedKind !== 'no_executable_name';
   return isRoleRejection ? 'EXECUTABLE_ROLE_REJECTED' : 'INCOMPATIBLE_EXECUTABLE';
+}
+
+/**
+ * P4-13 (mission §6): `scan_first`/`scan_unknown` features have no static
+ * resolution strategy (no AOB signature, no baseOffset — see
+ * resolveFeatureAction, which fails them closed on purpose) but ARE
+ * legitimately writable/freezable once a real Phase 2 discovery/scan result
+ * has been handed to the runtime via `seedDiscoveredFeatureAddress()` below,
+ * which is the only thing that can ever move such a feature's
+ * `resolution.state` to 'resolved'. Until seeded, the existing
+ * `if (feature.resolution.state !== 'resolved') resolveFeatureAction(...)`
+ * guard in every action method below still runs and still fails closed
+ * (TARGET_RESOLUTION_FAILED) — so widening these gates does not weaken
+ * `requiresDiscovery` or fabricate a target; it only stops rejecting a
+ * discovery-backed feature before resolution is even attempted.
+ */
+function isWritableFeatureType(type: RuntimeFeatureState['definition']['type']): boolean {
+  return type === 'toggle' || type === 'write_once' || type === 'scan_first' || type === 'scan_unknown';
+}
+
+function isFreezableFeatureType(type: RuntimeFeatureState['definition']['type']): boolean {
+  return type === 'freeze' || type === 'scan_first' || type === 'scan_unknown';
 }
 
 export interface BindTarget extends PreBindCompatibilityInput {
@@ -318,13 +340,42 @@ export class TrainerRuntime {
     return ok(undefined);
   }
 
+  /**
+   * Canonical discovery handoff (P4-13 mission §6): records the address a
+   * legitimate Phase 2 discovery/scan workflow already confirmed, so the
+   * next write/freeze dispatch treats this `scan_first`/`scan_unknown`
+   * feature as resolved instead of requiring a static AOB/pointer path it
+   * was never defined with. Refused for any feature that has its own real
+   * resolution strategy (toggle/write_once/freeze) — those must always
+   * resolve through the real capability, never accept a caller-supplied
+   * override address (a fixed AOB/pointer-backed feature accepting an
+   * arbitrary renderer-chosen address would let a compromised renderer
+   * redirect a canonical write anywhere, which this method exists
+   * specifically to avoid — see mission §18 "no silent fallback" and its
+   * "do not fabricate canonical targets" sibling rule).
+   */
+  seedDiscoveredFeatureAddress(featureId: string, address: LiveMemoryAddress): RuntimeResult<void> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.definition.type !== 'scan_first' && feature.definition.type !== 'scan_unknown') {
+      return this.failClosed(
+        'UNSUPPORTED_ACTION',
+        `Feature "${featureId}" (${feature.definition.type}) resolves via its own static definition and cannot accept a discovered-address override.`,
+      );
+    }
+    feature.resolution = { state: 'resolved', address };
+    return ok(undefined);
+  }
+
   /** READY/ACTIVE -> ACTIVE. Dispatches `toggle`/`write_once`; resolves the feature first if needed. */
   async activateWriteFeature(featureId: string, requestedValue: number, approval: WriteApproval, reason?: string): Promise<RuntimeResult<void>> {
     const guard = this.requireState('READY', 'ACTIVE');
     if (guard) return guard;
     const feature = this.features.get(featureId);
     if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
-    if (feature.definition.type !== 'toggle' && feature.definition.type !== 'write_once') {
+    if (!isWritableFeatureType(feature.definition.type)) {
       return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not a write action.`);
     }
 
@@ -353,7 +404,7 @@ export class TrainerRuntime {
     if (guard) return guard;
     const feature = this.features.get(featureId);
     if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
-    if (feature.definition.type !== 'freeze') {
+    if (!isFreezableFeatureType(feature.definition.type)) {
       return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not freeze.`);
     }
 
@@ -384,7 +435,7 @@ export class TrainerRuntime {
     if (guard) return guard as RuntimeResult<LiveWriteProposal>;
     const feature = this.features.get(featureId);
     if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
-    if (feature.definition.type !== 'toggle' && feature.definition.type !== 'write_once') {
+    if (!isWritableFeatureType(feature.definition.type)) {
       return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not a write action.`);
     }
 
@@ -426,7 +477,7 @@ export class TrainerRuntime {
     if (guard) return guard as RuntimeResult<FreezeProposal>;
     const feature = this.features.get(featureId);
     if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
-    if (feature.definition.type !== 'freeze') {
+    if (!isFreezableFeatureType(feature.definition.type)) {
       return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not freeze.`);
     }
 

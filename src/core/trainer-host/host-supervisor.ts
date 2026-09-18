@@ -22,6 +22,43 @@ import { spawn as nodeSpawn } from 'child_process';
 import { LineFramer, encodeRequest, isRpcResponse, isRpcError } from './protocol';
 import { isPathApproved } from '../saves/locations';
 
+// ── Write RPC boundary validation (P4-13 mission §15) ──────────────────────────
+//
+// `proposeWrite`'s params were previously typed `string` and trusted as-is —
+// safe today only because its one real caller (definition-to-trainer-
+// controls.ts's saveFieldToTrainerControl, via electron/main.ts's IPC
+// handler, which separately validates its own payload shape with
+// TrainerHostProposeWriteSchema) happens to always construct well-formed
+// values. This is a second, independent guard directly at the boundary this
+// supervisor forwards across to the TrainerHost child process's RPC
+// channel — not a duplicate of the IPC-layer schema (electron/ipc-
+// validation.ts is Electron-only; this module is a plain src/core module
+// with no dependency on it), so a future caller cannot reintroduce the same
+// blind-trust gap by construction alone.
+const MAX_FIELD_PATH_LENGTH = 512;
+const MAX_VALUE_LENGTH = 1024;
+
+function validateWriteRpcParams(params: {
+  gameId: string;
+  filePath: string;
+  field: string;
+  currentValue: string;
+  newValue: string;
+}): string | null {
+  if (typeof params.gameId !== 'string' || params.gameId.trim() === '') return 'invalid_write_params: gameId';
+  if (typeof params.filePath !== 'string' || params.filePath.trim() === '') return 'invalid_write_params: filePath';
+  if (typeof params.field !== 'string' || params.field.trim() === '' || params.field.length > MAX_FIELD_PATH_LENGTH) {
+    return 'invalid_write_params: field';
+  }
+  if (typeof params.currentValue !== 'string' || params.currentValue.length > MAX_VALUE_LENGTH) {
+    return 'invalid_write_params: currentValue';
+  }
+  if (typeof params.newValue !== 'string' || params.newValue.length > MAX_VALUE_LENGTH) {
+    return 'invalid_write_params: newValue';
+  }
+  return null;
+}
+
 // ── Injectable interfaces ─────────────────────────────────────────────────────
 
 export interface ChildProcessLike {
@@ -322,6 +359,8 @@ export function createTrainerHostSupervisor(spawnFn?: SpawnFn): TrainerHostSuper
     newValue: string,
   ): Promise<{ success: boolean; proposalId?: string; error?: string }> {
     if (!isRunning()) return { success: false, error: 'not_running' };
+    const paramsError = validateWriteRpcParams({ gameId, filePath, field, currentValue, newValue });
+    if (paramsError) return { success: false, error: paramsError };
     if (!isPathApproved(filePath, gameId)) return { success: false, error: 'path_not_approved' };
 
     try {

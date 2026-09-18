@@ -49,7 +49,12 @@ function migrationFailureToStorageReason(reason: MigrationFailureReason): Traine
   }
 }
 
-function buildProvenance(winner: TrainerModPackRow, conflicts: TrainerModPackRow[], migratedFromLegacy: boolean): TrainerDefinitionProvenance {
+function buildProvenance(
+  winner: TrainerModPackRow,
+  conflicts: TrainerModPackRow[],
+  migratedFromLegacy: boolean,
+  conversionWarnings: string[],
+): TrainerDefinitionProvenance {
   return {
     sourceType: sourceTypeForProvider(winner.sourceProvider),
     sourceProvider: winner.sourceProvider,
@@ -59,10 +64,14 @@ function buildProvenance(winner: TrainerModPackRow, conflicts: TrainerModPackRow
     syncedAt: winner.syncedAt,
     updatedAt: winner.updatedAt,
     conflictingSources: conflicts.map((c) => ({ packId: c.packId, sourceProvider: c.sourceProvider, syncedAt: c.syncedAt })),
+    // Optional field (P4-13 §20): only set when there is something to report,
+    // so every pre-existing caller/fixture that constructs or asserts on a
+    // provenance object without this field keeps working unchanged.
+    ...(conversionWarnings.length > 0 ? { conversionWarnings } : {}),
   };
 }
 
-function migrateRow(row: TrainerModPackRow): StorageResult<{ definition: SolithDefinitionV1; migratedFromLegacy: boolean }> {
+function migrateRow(row: TrainerModPackRow): StorageResult<{ definition: SolithDefinitionV1; migratedFromLegacy: boolean; conversionWarnings: string[] }> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(row.payloadJson);
@@ -81,7 +90,14 @@ function migrateRow(row: TrainerModPackRow): StorageResult<{ definition: SolithD
     );
   }
 
-  return ok({ definition: migration.definition, migratedFromLegacy: migration.sourceVersion === LEGACY_UNVERSIONED });
+  return ok({
+    definition: migration.definition,
+    migratedFromLegacy: migration.sourceVersion === LEGACY_UNVERSIONED,
+    // Re-derived fresh on every read from `migration.warnings` (populated by
+    // migrateLegacyUnversionedToV1 -> modPackConversionLosses() for a legacy
+    // row; `[]` for an already-versioned row — see migrate-trainer-definition.ts).
+    conversionWarnings: migration.warnings,
+  });
 }
 
 /** Resolves the single canonical record for a game from all its persisted rows (mission §6/§7/§21). */
@@ -105,7 +121,7 @@ export function getCanonicalTrainerDefinition(catalogGameId: string): StorageRes
     catalogGameId,
     packId: winner.packId,
     definition: migrated.value.definition,
-    provenance: buildProvenance(winner, conflicts, migrated.value.migratedFromLegacy),
+    provenance: buildProvenance(winner, conflicts, migrated.value.migratedFromLegacy, migrated.value.conversionWarnings),
   });
 }
 
@@ -212,7 +228,24 @@ export function persistTrainerDefinition(rawInput: unknown, input: SaveTrainerDe
     return fail(storageError('STORAGE_WRITE_FAILED', `Failed to persist trainer definition "${definition.id}".`, err));
   }
 
-  return verifyPersistedWrite(definition.id, packId);
+  const written = verifyPersistedWrite(definition.id, packId);
+  if (written.success === false) return written;
+
+  // P4-13 §20: a caller that itself converted a ModPack into `rawInput`
+  // (currently only trainer-catalog/sync/index.ts) may report the fields
+  // that conversion lost. `verifyPersistedWrite()`'s own re-migration
+  // cannot recover this — by the time it re-reads, the stored payload is
+  // already the converted, lossy SolithDefinitionV1 — so it is attached
+  // here instead. See the doc comment on
+  // `SaveTrainerDefinitionInput.conversionWarnings` for why this does not
+  // persist to a later, independent read.
+  if (input.conversionWarnings && input.conversionWarnings.length > 0) {
+    return ok({
+      ...written.value,
+      provenance: { ...written.value.provenance, conversionWarnings: input.conversionWarnings },
+    });
+  }
+  return written;
 }
 
 /** Re-reads the exact row just written (not "whichever row currently wins") and proves it round-trips. */
@@ -239,7 +272,7 @@ function verifyPersistedWrite(catalogGameId: string, packId: string): StorageRes
     catalogGameId,
     packId,
     definition: migrated.value.definition,
-    provenance: buildProvenance(written, conflicts, migrated.value.migratedFromLegacy),
+    provenance: buildProvenance(written, conflicts, migrated.value.migratedFromLegacy, migrated.value.conversionWarnings),
   });
 }
 
