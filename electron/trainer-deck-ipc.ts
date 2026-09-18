@@ -71,7 +71,10 @@ export function registerTrainerDeckIpc(): void {
       const installed = listInstalledGames().find((g) => g.catalogGameId === catalogGameId);
       const demand = listCatalogDemandSorted(500).find((d) => d.catalogGameId === catalogGameId);
 
-      const dual = resolveSaveEditControlsDualRead({ catalogGameId });
+      // P4-9 fix: inject the canonical loader — without `deps`, this call
+      // only ever serves the 3 bundled test definitions (see the matching
+      // fix in trainer-catalog-ipc.ts's trainer-catalog-get-trainer-controls).
+      const dual = resolveSaveEditControlsDualRead({ catalogGameId }, { loadDefinition: loadCatalogDefinition });
 
       return {
         success: true,

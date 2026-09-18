@@ -9,7 +9,6 @@ import {
   searchCatalog,
   countCatalogEntries,
   getCatalogEntryForDisplay,
-  getDefinitionPayload,
   getRecentSyncLogs,
   hasUserAuthoredDefinition,
   listPendingIdentityReviewItems,
@@ -45,6 +44,7 @@ import {
   loadCatalogDefinition,
   catalogDefinitionCapabilities,
 } from '../src/core/definitions/load-catalog-definition.js';
+import { trainerApplicationService } from '../src/core/trainer-application/index.js';
 import { resolveSaveEditControlsDualRead } from '../src/core/definitions/dual-read-save-controls.js';
 import { ensureCatalogGameForSaveAccess } from '../src/core/trainer-catalog/catalog-game-record.js';
 import { addUserSelectedLocation } from '../src/core/saves/locations.js';
@@ -212,13 +212,24 @@ export function registerTrainerCatalogIpc(): void {
   handleGuarded('trainer-catalog-get-definition', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
-      const definition = getDefinitionPayload(parsed.catalogGameId);
-      if (!definition) return { success: false, error: 'no_definition' };
-      const validated = SolithDefinitionV1Schema.parse(definition);
+      // P4-9: was a raw getDefinitionPayload() read (naive "most recently
+      // synced row wins", no migration) — now routes through the canonical
+      // trainer application service (which forwards to the P4-8 repository),
+      // so schema-version migration, deterministic conflict resolution, and
+      // provenance apply here too, same as every other definition-reading
+      // handler. Typed storage errors are preserved in `errorReason` rather
+      // than collapsed to a single string (mission §13); `error` stays a
+      // plain string for existing renderer callers.
+      const result = trainerApplicationService.getTrainer(parsed.catalogGameId);
+      if (result.success === false) {
+        return { success: false, error: result.error.message, errorReason: result.error.reason };
+      }
+      const validated = SolithDefinitionV1Schema.parse(result.value.definition);
       return {
         success: true,
         definition: validated,
         canPublish: hasUserAuthoredDefinition(parsed.catalogGameId),
+        provenance: result.value.provenance,
       };
     } catch (error) {
       return { success: false, error: sanitize(error) };
@@ -268,8 +279,14 @@ export function registerTrainerCatalogIpc(): void {
   handleGuarded('trainer-catalog-get-trainer-controls', async (_event, payload: unknown) => {
     try {
       const parsed = CatalogGameIdSchema.parse(payload);
-      const dual = resolveSaveEditControlsDualRead({ catalogGameId: parsed.catalogGameId });
-      const definition = loadCatalogDefinition(parsed.catalogGameId);
+      // P4-9 fix: resolveSaveEditControlsDualRead()'s default loadDefinition
+      // only ever serves the 3 bundled test definitions — Electron/SQLite
+      // callers must inject the real canonical loader via `deps`, per its own
+      // doc comment. This handler was calling it with no `deps` at all, so
+      // every non-bundled game silently got empty save-edit controls.
+      const dual = resolveSaveEditControlsDualRead({ catalogGameId: parsed.catalogGameId }, { loadDefinition: loadCatalogDefinition });
+      const canonical = trainerApplicationService.getTrainer(parsed.catalogGameId);
+      const definition = canonical.success ? canonical.value.definition : null;
       if (dual.controls.length === 0 && !definition) {
         return { success: false, error: 'no_definition' };
       }
@@ -278,6 +295,7 @@ export function registerTrainerCatalogIpc(): void {
         controls: dual.controls,
         source: dual.source,
         capabilities: definition ? catalogDefinitionCapabilities(definition) : null,
+        provenance: canonical.success ? canonical.value.provenance : undefined,
       };
     } catch (error) {
       return { success: false, error: sanitize(error) };
