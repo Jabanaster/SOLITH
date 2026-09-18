@@ -293,10 +293,10 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 
 **Phase 2 — Advanced Memory Engineering — status summary.** Presentational index only (2026-09-16) — added for at-a-glance navigation; changes no requirement, status, count, or evidence below. The detailed P2-1 through P2-17 execution/certification checkpoints below remain authoritative; this groups them, it does not replace them.
 
-- Current workstream: **P2-B/P2-C — Memory Understanding / Memory Interaction & Control**
-- Current checkpoints: **P2-6, P2-7, P2-8, P2-9 — engine/session/IPC/real-fixture/real-game proof CERTIFIED for all four; each NOT_COMPLETE pending UI e2e (real-process + packaged, 3/3 each); P2-9 additionally pending a dedicated hotkey-specific fixture/packaged proof** (`Docs/phase2/031` through `034`)
-- Completed checkpoints: P2-1, P2-2, P2-3, P2-4 (P2-4.1 final closure), P2-5
-- Phase 2 overall: **NOT_COMPLETE** (P2-6 through P2-9 all have one shared open gate — UI e2e; P2-10 through P2-17 remain untouched)
+- Current workstream: **P2-C — Memory Interaction & Control**
+- Current checkpoint: **P2-9 — Freeze/Write/Revert + Address-Validation/Hotkey Verification (NOT_COMPLETE — one packaged-hotkey-specific Playwright/Electron interaction remains open; engine/session/IPC/real-fixture/real-game/real-process-hotkey-UI proof is otherwise complete, 3/3 each)**
+- Completed checkpoints: P2-1, P2-2, P2-3, P2-4 (P2-4.1 final closure), P2-5, P2-6, P2-7, P2-8
+- Phase 2 overall: **NOT_COMPLETE** (P2-9's one remaining packaged-hotkey item is open; P2-10 through P2-17 remain untouched)
 - Requirements: **28 total** (see "Phase 2 requirement count" note below)
 
 **Phase 2 workstreams** (navigation/grouping only — every P2-x stage listed here is the same authoritative execution checkpoint defined throughout the rest of this section; grouping them does not change their requirements, evidence, or certification status):
@@ -306,13 +306,13 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
   - P2-2 Pointer-map live orchestration — COMPLETE
   - P2-3 Pointer-chain visualization — CERTIFIED COMPLETE
   - P2-4 Pointer stability / real-game restart validation — CERTIFIED COMPLETE (P2-4.1 closed the real-game restart evidence, module-relocation proof, pointer-map Load defect, and CI cancellation-flake gaps the user identified in P2-4's NOT_COMPLETE closure — `Docs/phase2/023` through `027`)
-- **P2-B — Memory Understanding** — IN PROGRESS (engine/session/IPC/real-fixture/real-game proof complete for all 3 checkpoints; UI e2e pending for P2-6/P2-7 — see the "Honest correction" note below)
+- **P2-B — Memory Understanding** — CERTIFIED COMPLETE (3 of 3 checkpoints closed)
   - P2-5 Structure discovery engine — CERTIFIED COMPLETE (`Docs/phase2/030`)
-  - P2-6 Typed memory-view expansion — NOT_COMPLETE (engine/session/IPC/real-fixture/real-game proof complete; UI e2e pending, `Docs/phase2/032`)
-  - P2-7 Value/type inference — NOT_COMPLETE (engine/session/IPC/real-fixture/real-game proof complete; UI e2e pending, `Docs/phase2/032`)
-- **P2-C — Memory Interaction & Control** — IN PROGRESS (0 of 2 checkpoints fully closed)
-  - P2-8 Memory map + watchlists — IN PROGRESS (engine/session/IPC/real-fixture/real-game proof complete; UI e2e pending, `Docs/phase2/033`)
-  - P2-9 Freeze/write/revert + address-validation/hotkey verification — NOT_COMPLETE (`Docs/phase2/034` — write/freeze/revert and address-validation are fully proven including a real-game freeze/write/revert exercise; the one open item is a packaged and dedicated real-fixture hotkey proof for THIS mission's own certification standard, not a missing capability — the underlying hotkey-to-write/freeze routing is real, pre-existing, and traced with citations)
+  - P2-6 Typed memory-view expansion — CERTIFIED COMPLETE (`Docs/phase2/032`; UI e2e 3/3 real-process + 3/3 packaged, `p2-6-7-8-ui-real-process.e2e.test.ts`/`p2-6-7-8-ui-packaged.e2e.test.ts`)
+  - P2-7 Value/type inference — CERTIFIED COMPLETE (`Docs/phase2/032`; UI e2e 3/3 real-process + 3/3 packaged, same files)
+- **P2-C — Memory Interaction & Control** — IN PROGRESS (1 of 2 checkpoints closed)
+  - P2-8 Memory map + watchlists — CERTIFIED COMPLETE (`Docs/phase2/033`; UI e2e 3/3 real-process + 3/3 packaged, same files)
+  - P2-9 Freeze/write/revert + address-validation/hotkey verification — NOT_COMPLETE (`Docs/phase2/034` — write/freeze/revert, address-validation, and now real-process hotkey UI (registration/conflict/broadcast-10x/write/freeze/unfreeze/revert, 3/3) are all fully proven; the one open item is the packaged-hotkey-specific Playwright/Electron interaction, `p2-9-hotkey-packaged.e2e.test.ts`)
 - **P2-D — Adaptive Analysis & Acceleration** — NOT STARTED
   - P2-10 Adaptive Scan Planner
   - P2-11 Zydis integration
@@ -436,6 +436,17 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
   - "Freeze/write/revert" and "address validation" move PARTIAL → COMPLETE on real evidence gathered this stage (real-game freeze/write/revert exercise; end-to-end validation-path audit) — both satisfy their respective ROADMAP mandate bullets in full, independent of P2-9's one remaining open item (packaged hotkey proof).
 - **Phase 2 is NOT certified.** P2-A remains fully, certifiably closed and P2-5 remains fully, certifiably closed (both unchanged by this mission). P2-6, P2-7, P2-8, and P2-9 all have their engine/session/IPC/real-fixture/real-game evidence complete but share one open cross-cutting gate — real-process and packaged UI e2e — plus P2-9's own additional open item (a dedicated hotkey-specific fixture/packaged proof). Do not start P2-10; the next authorized action is closing UI e2e for P2-6/P2-7/P2-8/P2-9 and the P2-9 hotkey proof, not a new checkpoint.
 - Evidence: `Docs/phase2/031` (requirement matrix + ROADMAP-vs-prompt reconciliation), `032` (P2-6/P2-7), `033` (P2-8), `034` (P2-9).
+
+**P2-6 through P2-9 Certification Gap Closure — 2026-09-17 (same branch/worktree).** Closes most of the UI e2e and hotkey gaps the note above disclosed.
+
+- **P2-6/P2-7/P2-8 UI e2e — CLOSED.** `p2-6-7-8-ui-real-process.e2e.test.ts` (one real Electron app, one real attach to a real spawned fixture, driving `TypedMemoryViewPanel`, the P2-7 inference button inside `StructureDiscoveryPanel`, `MemoryMapPanel`, and `WatchlistPanel` in turn) and `p2-6-7-8-ui-packaged.e2e.test.ts` (the same flow from `dist/win-unpacked`) both passed **3/3, first-attempt-clean** every run. **P2-6, P2-7, P2-8 move NOT_COMPLETE → CERTIFIED COMPLETE.**
+- **P2-9 real-process hotkey proof — CLOSED.** `p2-9-hotkey-real-process.e2e.test.ts` proves, against a real Electron main process and a real spawned fixture, nothing mocked below the IPC boundary: real OS-level `globalShortcut` registration (`isRegistered`, the real Electron API), a real OS-level accelerator-conflict rejection, the real main→renderer `trainer-hotkey` broadcast received via the real preload bridge across 10 independent presses, and one full real hotkey-triggered write → verify → freeze → unfreeze → revert cycle through the real two-phase-consent IPC (`SOLITH_TEST_BUILD`/`SOLITH_PRIVILEGED_CONSENT=auto-approve`, this repo's own pre-existing test seam). **3/3 certification, clean.**
+  - **Disclosed scope, unchanged**: a literal OS hardware key press cannot be synthesized by browser/CDP automation against a native `globalShortcut` hook — that one hop (OS key event → Electron's native listener) is Electron's own responsibility, not application code, and is not exercised here; everything downstream of it (registration, conflict handling, broadcast, dispatch, write/freeze/revert) is.
+  - **Real bug found and fixed while closing this gap**: an early draft of this test intermittently failed with "Unable to re-read live process identity." The fixture's own real stderr (`PROCESS_EXITED: ... kill ESRCH`, captured via `electronApp.process().stderr`) revealed the true cause — `fixture.rs`'s stdin loop has a real, deliberate 30-seconds-of-silence bounded-hang-safety self-exit, and this test's own multi-step IPC sequence (attach, ten broadcast presses, propose/consent/confirm chains) sent it no stdin traffic and could exceed that window on a loaded host. Not a production defect; fixed with a periodic stdin keepalive ping for the test's duration — the same root-cause-not-retry discipline this mission has applied throughout, not a flake papered over with more retries.
+- **P2-9 packaged hotkey proof — still open, honestly.** `p2-9-hotkey-packaged.e2e.test.ts` found and fixed two more real issues (a real attach-time identity race against a freshly-spawned process, needing a retry loop; the same fixture-keepalive timeout, needing a faster ping interval) but still intermittently fails with `electronApplication.evaluate: Resulting promise was garbage collected` against the packaged executable, on the very first main-process evaluate call. Not isolated within this stage's time budget. **P2-9 stays NOT_COMPLETE** — the write/freeze/revert/address-validation/hotkey-routing capability itself is fully proven (real fixture, real game, and now real-process hotkey UI, all 3/3); the one remaining item is this one packaged-hotkey-specific Playwright/Electron interaction.
+- Phase 2 requirement count: unchanged at 14 COMPLETE / 3 PARTIAL / 11 ABSENT (the 28-item recount tracks capability existence, not UI-e2e certification depth — see the note above; "hotkeys" was already counted COMPLETE on capability grounds).
+- **Phase 2 is NOT certified.** P2-6, P2-7, and P2-8 are now fully, certifiably closed (engine/session/IPC/real-fixture/real-game proof plus real-process and packaged UI e2e, all 3/3). P2-9 is fully proven at the engine/session/IPC/real-fixture/real-game/real-process-hotkey-UI level; only its packaged-hotkey-specific e2e pass remains open. Do not start P2-10; the next authorized action is isolating and closing that one remaining item.
+- Evidence: `p2-6-7-8-ui-real-process.e2e.test.ts`, `p2-6-7-8-ui-packaged.e2e.test.ts`, `p2-9-hotkey-real-process.e2e.test.ts`, `p2-9-hotkey-packaged.e2e.test.ts`.
 
 ---
 
