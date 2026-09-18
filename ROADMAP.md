@@ -488,6 +488,7 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 - Phase 2 requirement count recomputed: **15 COMPLETE** (14 unchanged **+ Adaptive Scan Planner, PARTIAL → COMPLETE**), **3 PARTIAL** (unchanged: pointer scanning; multi-level pointer scanning; ReClass.NET adoption), **10 ABSENT** (unchanged: AOB/signature engineering with resiliency; symbol/module awareness; instruction-aware analysis; resilient rediscovery; version-aware rediscovery; Zydis; Vectorscan; Ghidra; DynamoRIO; Dear ImGui) — 15 + 3 + 10 = 28.
 - **Adaptive Scan Planner: PARTIAL → COMPLETE.** **P2-10 verdict: CERTIFIED COMPLETE.** **P2-D stays IN_PROGRESS** (P2-11/P2-12 not started — do not begin them). **Phase 2 overall remains NOT_COMPLETE** (P2-11 through P2-17 untouched).
 - Evidence: `Docs/phase2/037` (real-game closeout, 3-pass evidence table).
+- **Canonical integration.** PR #56 (`feature/solith-phase2-p2-10-adaptive-scan-planner` → `master`) merged 2026-09-18, all required checks (TypeScript/architecture, Windows native/Electron gate, fast, scan ×2, scan-pr/osv-scan, verify, scan-full skipping as expected, CodeRabbit) PASS at head `aa71237`. Canonical merge SHA on `master`: `b56988857b6966cf04ac55fa883b936abba2fc47`.
 
 ---
 
