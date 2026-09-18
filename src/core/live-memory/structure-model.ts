@@ -16,7 +16,7 @@ export type CandidateFieldWidth = 1 | 2 | 4 | 8;
 
 /** A single plausible decoding of a field's raw bytes. Never a claim of semantic truth. */
 export interface FieldInterpretation {
-  kind: 'u8' | 'i8' | 'u16' | 'i16' | 'u32' | 'i32' | 'u64' | 'i64' | 'f32' | 'f64' | 'pointer' | 'ascii' | 'utf16';
+  kind: 'u8' | 'i8' | 'u16' | 'i16' | 'u32' | 'i32' | 'u64' | 'i64' | 'f32' | 'f64' | 'pointer' | 'ascii' | 'utf8' | 'utf16';
   /** Decoded value as a display string — numbers as decimal, pointers/bytes as 0x-hex. */
   value: string;
 }

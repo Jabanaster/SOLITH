@@ -17,6 +17,14 @@ export interface MemoryRegionSummary {
   baseAddress: string;
   size: number;
   writable: boolean;
+  /** P2-8 memory map — real Win32 protection/type detail, undefined when the driver doesn't report it (never fabricated). */
+  readable?: boolean;
+  executable?: boolean;
+  guarded?: boolean;
+  rawProtect?: number;
+  regionType?: 'image' | 'mapped' | 'private' | 'unknown';
+  /** The real module this region's base address falls inside, or null when it genuinely isn't part of any known module. */
+  moduleName: string | null;
 }
 
 export interface MemoryRegionList {
@@ -25,8 +33,22 @@ export interface MemoryRegionList {
   totalAvailable: number;
 }
 
+export interface MemoryModuleSummary {
+  name: string;
+  baseAddress: string;
+  size: number;
+  path: string | null;
+}
+
+export interface MemoryModuleList {
+  modules: MemoryModuleSummary[];
+  truncated: boolean;
+  totalAvailable: number;
+}
+
 const STRING_BYTES = 32;
 const DEFAULT_MAX_REGIONS = 256;
+const DEFAULT_MAX_MODULES = 256;
 
 function sizeOf(type: ResearchDataType): number {
   switch (type) {
@@ -59,14 +81,17 @@ export function parseResearchAddress(address: string | number | bigint): bigint 
 export class MemoryViewer {
   private readonly maxBudgetBytes: number;
   private readonly maxRegions: number;
+  private readonly maxModules: number;
 
   constructor(
     private readonly driver: MemoryDriver,
     maxBudgetBytes = 4096,
     maxRegions = DEFAULT_MAX_REGIONS,
+    maxModules = DEFAULT_MAX_MODULES,
   ) {
     this.maxBudgetBytes = Math.max(16, maxBudgetBytes);
     this.maxRegions = Math.max(1, maxRegions);
+    this.maxModules = Math.max(1, maxModules);
   }
 
   /** Bounded committed-region listing (metadata only — no bulk dump). */
@@ -79,12 +104,46 @@ export class MemoryViewer {
     if (options.writableOnly) regions = regions.filter((r) => r.writable);
     const totalAvailable = regions.length;
     const truncated = totalAvailable > cap;
+    // Real module association, spec §7 — never guessed, only when the region's base genuinely falls inside a known module's [base, base+size) span.
+    let modules: import('../types.js').MemoryModule[] = [];
+    try {
+      modules = this.driver.getModules(handle);
+    } catch {
+      /* module enumeration can fail independently of a successful region read — degrade to no known modules, matching structure-discovery.ts's precedent. */
+    }
+    const moduleNameFor = (base: bigint): string | null => {
+      for (const mod of modules) {
+        if (base >= mod.baseAddress && base < mod.baseAddress + BigInt(mod.size)) return mod.name;
+      }
+      return null;
+    };
     const sliced = regions.slice(0, cap).map((r) => ({
       baseAddress: `0x${r.baseAddress.toString(16)}`,
       size: r.size,
       writable: r.writable,
+      readable: r.readable,
+      executable: r.executable,
+      guarded: r.guarded,
+      rawProtect: r.rawProtect,
+      regionType: r.regionType,
+      moduleName: moduleNameFor(r.baseAddress),
     }));
     return { regions: sliced, truncated, totalAvailable };
+  }
+
+  /** Bounded module listing (metadata only — real name/base/size/on-disk path). */
+  listModules(handle: LiveProcessHandle, options: { maxModules?: number } = {}): MemoryModuleList {
+    const cap = Math.min(options.maxModules ?? this.maxModules, this.maxModules);
+    const modules = this.driver.getModules(handle);
+    const totalAvailable = modules.length;
+    const truncated = totalAvailable > cap;
+    const sliced = modules.slice(0, cap).map((m) => ({
+      name: m.name,
+      baseAddress: `0x${m.baseAddress.toString(16)}`,
+      size: m.size,
+      path: m.path ?? null,
+    }));
+    return { modules: sliced, truncated, totalAvailable };
   }
 
   /** Read one or more typed interpretations at the same address (read-only). */

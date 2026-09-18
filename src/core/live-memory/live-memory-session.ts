@@ -62,12 +62,32 @@ import {
 import {
   MAX_DISCOVERED_STRUCTURES_PER_SESSION,
   MAX_SNAPSHOTS_PER_STRUCTURE,
+  type CandidateFieldWidth,
   type DiscoveredField,
   type DiscoveredStructure,
   type StructureDiscoveryRequest,
   type StructureSnapshot,
   type StructureSnapshotDiffResult,
 } from './structure-model.js';
+import {
+  readTypedMemoryView,
+  readTypedMemoryViews,
+  reinterpretRawHex,
+  type TypedMemoryView,
+  type TypedMemoryViewRequest,
+  type TypedInterpretationsByWidth,
+} from './typed-memory-view.js';
+import { inferStructureBehavior, type FieldInferenceResult } from './value-type-inference.js';
+import { MemoryViewer, type MemoryRegionList, type MemoryModuleList } from './research/memory-viewer.js';
+import {
+  createWatchItemId,
+  MAX_WATCH_ITEMS_PER_SESSION,
+  MIN_WATCH_REFRESH_INTERVAL_MS,
+  MAX_WATCH_REFRESH_INTERVAL_MS,
+  DEFAULT_WATCH_REFRESH_INTERVAL_MS,
+  type WatchItem,
+  type WatchAddressSource,
+} from './watchlist-model.js';
 import { LegacyScannerBackend } from './scanner-backend-legacy.js';
 import { NativeScannerBackend } from './scanner-backend-native.js';
 import { ScannerBackendRouter, type ScannerBackendDiagnosticsSnapshot } from './scanner-backend-router.js';
@@ -422,6 +442,7 @@ export class LiveMemorySession {
    * may accumulate many snapshots over time (spec §7/§8).
    */
   private readonly structures = new Map<string, DiscoveredStructure>();
+  private readonly watches = new Map<string, WatchItem>();
   private readonly structureSnapshots = new Map<string, StructureSnapshot>();
 
   constructor(private readonly driver: MemoryDriver) {}
@@ -1628,6 +1649,211 @@ export class LiveMemorySession {
     if (!a) throw new Error(`Structure snapshot "${snapshotAId}" not found.`);
     if (!b) throw new Error(`Structure snapshot "${snapshotBId}" not found.`);
     return compareStructureSnapshots(a, b);
+  }
+
+  /**
+   * P2-6 — typed memory-view expansion. Builds on P2-5's
+   * `FieldInterpretation`/`decodeInterpretations` (typed-memory-view.ts) —
+   * one canonical typed-value read, not a second interpretation engine.
+   * Transient by design (no per-view id/registry): a typed view is a live
+   * snapshot of a few bytes, cheap to re-read, unlike a discovered structure.
+   */
+  readTypedValue(request: TypedMemoryViewRequest): TypedMemoryView {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    return readTypedMemoryView(driver, handle, request);
+  }
+
+  /** Bounded batch of readTypedValue (spec §36 — no unbounded request size; see MAX_TYPED_VIEW_BATCH). */
+  readTypedValues(requests: TypedMemoryViewRequest[]): TypedMemoryView[] {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    return readTypedMemoryViews(driver, handle, requests);
+  }
+
+  /** Live re-read counterpart to reinterpretValue — fetches fresh bytes and recomputes every width's interpretations. */
+  refreshTypedValue(request: TypedMemoryViewRequest): TypedMemoryView {
+    return this.readTypedValue(request);
+  }
+
+  /**
+   * Pure reinterpretation of bytes ALREADY read (spec §6 — "without
+   * rereading or mutating memory unnecessarily") — no I/O, no attach
+   * required. Recomputes every width's `FieldInterpretation[]` from a
+   * previously captured `rawHex` (e.g. from a prior readTypedValue result).
+   */
+  reinterpretValue(rawHex: string): TypedInterpretationsByWidth {
+    return reinterpretRawHex(rawHex);
+  }
+
+  /**
+   * P2-7 — value/type inference. Pure evidence-based behavior inference
+   * (value-type-inference.ts) over a structure's OWN snapshot history
+   * (P2-5's structureCaptureSnapshot/structureListSnapshots — no new
+   * capture mechanism, spec §13). Requires no live read of its own; a
+   * structure with fewer than 2 captured snapshots yields empty candidates
+   * for every field (spec §11 — decodable is never treated as inferred).
+   */
+  inferStructureBehavior(structureId: string): FieldInferenceResult[] {
+    const structure = this.requireStructure(structureId);
+    const snapshots = this.structureListSnapshots(structureId).sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+    return inferStructureBehavior(structure, snapshots);
+  }
+
+  /**
+   * P2-8 — memory map (region/module browser). Reuses the existing
+   * research-subsystem `MemoryViewer` (Phase 9) rather than a second
+   * enumeration path — this only adds the session/IPC/UI wiring that was
+   * missing; `getRegions`/`getModules` and their real protection/type/path
+   * fields already existed.
+   */
+  listMemoryRegions(options: { writableOnly?: boolean; maxRegions?: number } = {}): MemoryRegionList {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    return new MemoryViewer(driver).listRegions(handle, options);
+  }
+
+  listMemoryModules(options: { maxModules?: number } = {}): MemoryModuleList {
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    return new MemoryViewer(driver).listModules(handle, options);
+  }
+
+  /**
+   * P2-8 — resolves a watch item's address SOURCE to a live absolute
+   * address, preserving what kind of provenance produced it (spec §15/§16).
+   * Never collapses to a bare address without also reporting resolveState —
+   * a `module_relative`/`pointer_map_node`/`structure_field` source that
+   * cannot currently resolve is `unresolved`, never silently treated as
+   * `live`.
+   */
+  private resolveWatchAddress(source: WatchAddressSource): { address: bigint; resolveState: 'live' | 'rebound' } | { resolveState: 'unresolved' | 'stale'; reason: string } {
+    switch (source.kind) {
+      case 'absolute':
+        return { address: BigInt(source.address), resolveState: 'live' };
+      case 'module_relative': {
+        const { driver, handle } = this.getMemoryAccessOrThrow();
+        const modules = driver.getModules(handle);
+        const mod = modules.find((m) => m.name.toLowerCase() === source.moduleName.toLowerCase());
+        if (!mod) return { resolveState: 'unresolved', reason: `module "${source.moduleName}" is not currently loaded` };
+        return { address: mod.baseAddress + BigInt(source.offset), resolveState: 'live' };
+      }
+      case 'pointer_map_node': {
+        const map = this.pointerMaps.get(source.mapId);
+        if (!map) return { resolveState: 'unresolved', reason: `pointer map "${source.mapId}" not found` };
+        const node = map.nodes.find((n) => n.id === source.nodeId);
+        if (!node) return { resolveState: 'unresolved', reason: `pointer map node "${source.nodeId}" not found` };
+        if (node.status !== 'resolved' || !node.targetAddress) {
+          return { resolveState: 'unresolved', reason: `pointer map node status is "${node.status}", not yet resolved` };
+        }
+        return { address: BigInt(node.targetAddress), resolveState: 'live' };
+      }
+      case 'structure_field': {
+        const structure = this.structures.get(source.structureId);
+        if (!structure) return { resolveState: 'unresolved', reason: `structure "${source.structureId}" not found` };
+        const field = structure.fields.find((f) => f.offset === source.offset);
+        if (!field) return { resolveState: 'unresolved', reason: `no field at offset ${source.offset} in structure "${source.structureId}"` };
+        return { address: BigInt(structure.baseAddressHex) + BigInt(source.offset), resolveState: 'live' };
+      }
+    }
+  }
+
+  private requireWatch(watchId: string): WatchItem {
+    const watch = this.watches.get(watchId);
+    if (!watch) throw new Error(`Watch item "${watchId}" not found.`);
+    return watch;
+  }
+
+  /** Adds a watch item and performs its first read immediately (never left in a fabricated "unread but live" state). */
+  watchAdd(input: { source: WatchAddressSource; width: CandidateFieldWidth; label?: string | null; refreshIntervalMs?: number }): WatchItem {
+    this.getMemoryAccessOrThrow(); // fail before any registry mutation, matching every other add/discover method's ordering
+    const refreshIntervalMs = Math.min(
+      MAX_WATCH_REFRESH_INTERVAL_MS,
+      Math.max(MIN_WATCH_REFRESH_INTERVAL_MS, input.refreshIntervalMs ?? DEFAULT_WATCH_REFRESH_INTERVAL_MS),
+    );
+    const item: WatchItem = {
+      id: createWatchItemId(),
+      label: input.label ?? null,
+      source: input.source,
+      width: input.width,
+      refreshIntervalMs,
+      resolveState: 'unresolved',
+      resolvedAddressHex: null,
+      currentValue: null,
+      previousValue: null,
+      changeState: 'never_read',
+      createdAt: new Date().toISOString(),
+      lastRefreshedAt: null,
+    };
+    if (this.watches.size >= MAX_WATCH_ITEMS_PER_SESSION) {
+      const oldestId = this.watches.keys().next().value;
+      if (oldestId !== undefined) this.watches.delete(oldestId);
+    }
+    this.watches.set(item.id, item);
+    return this.watchRefresh(item.id);
+  }
+
+  watchList(): WatchItem[] {
+    return Array.from(this.watches.values());
+  }
+
+  watchGet(watchId: string): WatchItem | null {
+    return this.watches.get(watchId) ?? null;
+  }
+
+  watchRemove(watchId: string): boolean {
+    return this.watches.delete(watchId);
+  }
+
+  watchSetLabel(watchId: string, label: string | null): WatchItem {
+    const watch = this.requireWatch(watchId);
+    const updated = { ...watch, label };
+    this.watches.set(watchId, updated);
+    return updated;
+  }
+
+  /** Re-resolves the address (module rebase/pointer/structure aware) and re-reads it — truthful resolveState/readState/changeState every time, never a stale green status. */
+  watchRefresh(watchId: string): WatchItem {
+    const existing = this.requireWatch(watchId);
+    const { driver, handle } = this.getMemoryAccessOrThrow();
+    const resolved = this.resolveWatchAddress(existing.source);
+
+    if ('reason' in resolved) {
+      const updated: WatchItem = {
+        ...existing,
+        resolveState: resolved.resolveState,
+        resolvedAddressHex: null,
+        previousValue: existing.currentValue,
+        currentValue: null,
+        changeState: existing.currentValue ? 'became_unreadable' : 'never_read',
+        lastRefreshedAt: new Date().toISOString(),
+      };
+      this.watches.set(watchId, updated);
+      return updated;
+    }
+
+    const view = readTypedMemoryView(driver, handle, { address: resolved.address, length: existing.width });
+    const rebased = existing.resolvedAddressHex !== null && existing.resolvedAddressHex !== view.addressHex;
+    let changeState: WatchItem['changeState'] = 'unchanged';
+    if (!existing.currentValue || existing.currentValue.readState !== 'complete') {
+      changeState = view.readState === 'complete' ? 'became_readable' : 'never_read';
+    } else if (view.readState !== 'complete') {
+      changeState = 'became_unreadable';
+    } else if (existing.currentValue.rawHex !== view.rawHex) {
+      changeState = 'changed';
+    }
+
+    const updated: WatchItem = {
+      ...existing,
+      resolveState: rebased ? 'rebound' : resolved.resolveState,
+      resolvedAddressHex: view.addressHex,
+      previousValue: existing.currentValue,
+      currentValue: view,
+      changeState,
+      lastRefreshedAt: new Date().toISOString(),
+    };
+    this.watches.set(watchId, updated);
+    return updated;
+  }
+
+  watchRefreshAll(): WatchItem[] {
+    return Array.from(this.watches.keys()).map((id) => this.watchRefresh(id));
   }
 
   /**

@@ -165,6 +165,8 @@ export type {
   MemoryViewEntry,
   MemoryRegionSummary,
   MemoryRegionList,
+  MemoryModuleSummary,
+  MemoryModuleList,
   HexWindow,
   HexRow,
   PointerCandidateReport,
@@ -175,6 +177,35 @@ export type {
   SnapshotModuleBase,
   SessionSnapshotDiff,
 } from './research/index.js';
+export {
+  readTypedMemoryView,
+  readTypedMemoryViews,
+  reinterpretRawHex,
+  TYPED_VIEW_WIDTHS,
+  MAX_TYPED_VIEW_LENGTH,
+  MAX_TYPED_VIEW_BATCH,
+} from './typed-memory-view.js';
+export type {
+  TypedMemoryView,
+  TypedMemoryViewRequest,
+  TypedInterpretationsByWidth,
+  TypedViewReadState,
+} from './typed-memory-view.js';
+export {
+  createWatchItemId,
+  MAX_WATCH_ITEMS_PER_SESSION,
+  MIN_WATCH_REFRESH_INTERVAL_MS,
+  MAX_WATCH_REFRESH_INTERVAL_MS,
+  DEFAULT_WATCH_REFRESH_INTERVAL_MS,
+} from './watchlist-model.js';
+export type { WatchItem, WatchAddressSource, WatchResolveState, WatchChangeState } from './watchlist-model.js';
+export { inferFieldBehavior, inferStructureBehavior } from './value-type-inference.js';
+export type {
+  FieldBehaviorCandidate,
+  FieldBehaviorEvidence,
+  FieldInferenceEvidence,
+  FieldInferenceResult,
+} from './value-type-inference.js';
 export {
   WritePolicyGate,
   defaultTrainerWritePolicyContext,

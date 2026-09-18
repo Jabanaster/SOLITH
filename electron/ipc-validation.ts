@@ -753,6 +753,71 @@ export const StructureCompareSnapshotsSchema = z.object({
   snapshotBId: z.string().min(1).max(80),
 });
 
+/** Phase 2 P2-6 — typed memory-view expansion. Width is one of the four supported scalar widths (typed-memory-view.ts's TYPED_VIEW_WIDTHS), matching MAX_TYPED_VIEW_LENGTH's 8-byte ceiling. */
+const TYPED_VIEW_LENGTH = z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]);
+
+export const TypedViewReadSchema = z.object({
+  address: LIVE_ADDRESS_STRING,
+  length: TYPED_VIEW_LENGTH,
+});
+
+export const TypedViewReadManySchema = z.object({
+  requests: z
+    .array(z.object({ address: LIVE_ADDRESS_STRING, length: TYPED_VIEW_LENGTH }))
+    .min(1)
+    .max(32),
+});
+
+export const TypedViewRefreshSchema = TypedViewReadSchema;
+
+export const TypedViewReinterpretSchema = z.object({
+  // "0x" + up to 16 hex digits (8 bytes, MAX_TYPED_VIEW_LENGTH), even digit count only.
+  rawHex: z
+    .string()
+    .min(4)
+    .max(18)
+    .regex(/^0x([0-9a-fA-F]{2})+$/),
+});
+
+/** Phase 2 P2-7 — value/type inference, over an already-discovered structure's own snapshot history. */
+export const InferStructureBehaviorSchema = z.object({
+  structureId: z.string().min(1).max(80),
+});
+
+/** Phase 2 P2-8 — memory map (region/module browser). */
+export const MemoryMapListRegionsSchema = z.object({
+  writableOnly: z.boolean().optional(),
+  maxRegions: z.number().int().min(1).max(256).optional(),
+});
+
+export const MemoryMapListModulesSchema = z.object({
+  maxModules: z.number().int().min(1).max(256).optional(),
+});
+
+/** Phase 2 P2-8 — watchlists. Address-source provenance is preserved as a discriminated union, never collapsed to a bare address (spec §15). */
+const WATCH_WIDTH = z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]);
+const WatchAddressSourceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('absolute'), address: LIVE_ADDRESS_STRING }),
+  z.object({ kind: z.literal('module_relative'), moduleName: z.string().min(1).max(260), offset: LIVE_ADDRESS_STRING }),
+  z.object({ kind: z.literal('pointer_map_node'), mapId: z.string().min(1).max(80), nodeId: z.string().min(1).max(80) }),
+  z.object({ kind: z.literal('structure_field'), structureId: z.string().min(1).max(80), offset: z.number().int().nonnegative().max(4095) }),
+]);
+
+export const WatchAddSchema = z.object({
+  source: WatchAddressSourceSchema,
+  width: WATCH_WIDTH,
+  label: z.string().max(200).nullable().optional(),
+  refreshIntervalMs: z.number().int().min(200).max(60_000).optional(),
+});
+
+export const WatchListSchema = z.object({});
+
+export const WatchGetSchema = z.object({ watchId: z.string().min(1).max(80) });
+export const WatchRemoveSchema = z.object({ watchId: z.string().min(1).max(80) });
+export const WatchRefreshSchema = z.object({ watchId: z.string().min(1).max(80) });
+export const WatchRefreshAllSchema = z.object({});
+export const WatchSetLabelSchema = z.object({ watchId: z.string().min(1).max(80), label: z.string().max(200).nullable() });
+
 /** Phase 9 — pointer candidate analysis (runs pointer scan then scores). */
 export const ResearchPointerAnalyzeSchema = z.object({
   address: z.string().regex(/^0x[0-9a-fA-F]+$/),

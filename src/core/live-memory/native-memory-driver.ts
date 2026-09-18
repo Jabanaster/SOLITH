@@ -11,6 +11,19 @@ const MEM_COMMIT = 0x1000;
 const PAGE_NOACCESS = 0x01;
 const PAGE_GUARD = 0x100;
 const WRITABLE_PROTECT_FLAGS = 0x04 | 0x08 | 0x40 | 0x80; // PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+// P2-8 memory map — additional real Win32 protection/type flags (readonly reference, MSDN VirtualQuery constants).
+const READABLE_PROTECT_FLAGS = 0x02 | 0x04 | 0x08 | 0x20 | 0x40 | 0x80; // PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+const EXECUTABLE_PROTECT_FLAGS = 0x10 | 0x20 | 0x40 | 0x80; // PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+const MEM_IMAGE = 0x1000000;
+const MEM_MAPPED = 0x40000;
+const MEM_PRIVATE = 0x20000;
+
+function regionTypeLabel(type: number): 'image' | 'mapped' | 'private' | 'unknown' {
+  if (type === MEM_IMAGE) return 'image';
+  if (type === MEM_MAPPED) return 'mapped';
+  if (type === MEM_PRIVATE) return 'private';
+  return 'unknown';
+}
 
 // memoryjs is a CJS native addon; this project is pure ESM ("type": "module"),
 // so a CommonJS-style require is synthesized via createRequire rather than
@@ -60,12 +73,14 @@ interface MemoryjsRegion {
   RegionSize: number;
   State: number;
   Protect: number;
+  Type: number;
 }
 
 interface MemoryjsModuleEntry {
   szModule: string;
   modBaseAddr: number;
   modBaseSize: number;
+  szExePath?: string;
 }
 
 interface MemoryjsModule {
@@ -170,6 +185,43 @@ function validateDataType(dataType: LiveValueType, operation: string): void {
 }
 
 /**
+ * Cheap OS-level liveness probe, sufficient to catch process exit even when
+ * this driver's own Windows HANDLE remains open.
+ *
+ * P2-5 disclosed (and P2-6's cross-cutting audit root-caused) a real
+ * native-driver characteristic: `ReadProcessMemory`/`WriteProcessMemory`
+ * against an already-open HANDLE can keep succeeding for an unbounded time
+ * after the target process has actually terminated. This is not a memoryjs
+ * bug — Windows keeps a process's kernel object, and therefore its
+ * still-mapped virtual address space, alive for as long as any HANDLE
+ * reference to it exists, including this driver's own `openProcess` handle,
+ * and neither `ReadProcessMemory` nor `WriteProcessMemory` re-validates
+ * liveness before walking that address space. `getModules`/`getRegions`
+ * never showed this symptom because memoryjs backs them with a *different*
+ * Win32 API (a toolhelp snapshot / PID-keyed query) that reflects the live
+ * OS process table, not this handle.
+ *
+ * `process.kill(pid, 0)` queries that same live OS process table directly
+ * (Node's documented "signal 0" existence probe, supported on Windows),
+ * so it fails the instant the process is truly gone — independent of
+ * whatever the stale HANDLE itself would still report. This is the cheap
+ * tier only (process-exists); it does not detect PID reuse by an unrelated
+ * process. PID-reuse-safe identity verification remains
+ * `LiveMemorySession.verifyAttachedProcessIdentity()`'s job on the
+ * write/freeze/revert paths that already call it — that check is too
+ * expensive (native process metadata queries) to run before every read.
+ */
+function assertProcessStillAlive(pid: number, operation: string): void {
+  try {
+    process.kill(pid, 0);
+  } catch (err) {
+    throw new Error(
+      `PROCESS_EXITED: process ${pid} is no longer running (${operation}): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
  * memoryjs's native binding reads the address argument as a JS Number
  * (`args[1].As<Napi::Number>().Int64Value()` in lib/memoryjs.cc) — passing a
  * BigInt directly causes a native-side cast failure ("Error in native
@@ -212,6 +264,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   readMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType): number {
     try {
       validateHandle(handle, 'readMemory');
+      assertProcessStillAlive(handle.pid, 'readMemory');
       validateAddress(address, 'readMemory');
       validateDataType(dataType, 'readMemory');
 
@@ -234,6 +287,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   writeMemory(handle: LiveProcessHandle, address: bigint, dataType: LiveValueType, value: number): void {
     try {
       validateHandle(handle, 'writeMemory');
+      assertProcessStillAlive(handle.pid, 'writeMemory');
       validateAddress(address, 'writeMemory');
       validateDataType(dataType, 'writeMemory');
 
@@ -343,6 +397,11 @@ export const nativeMemoryDriver: MemoryDriver = {
           baseAddress: BigInt(region.BaseAddress),
           size: region.RegionSize,
           writable: (region.Protect & WRITABLE_PROTECT_FLAGS) !== 0,
+          readable: (region.Protect & READABLE_PROTECT_FLAGS) !== 0,
+          executable: (region.Protect & EXECUTABLE_PROTECT_FLAGS) !== 0,
+          guarded: (region.Protect & PAGE_GUARD) !== 0,
+          rawProtect: region.Protect,
+          regionType: regionTypeLabel(region.Type),
         });
       }
       return regions;
@@ -356,6 +415,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   readBuffer(handle: LiveProcessHandle, address: bigint, size: number): Buffer {
     try {
       validateHandle(handle, 'readBuffer');
+      assertProcessStillAlive(handle.pid, 'readBuffer');
       validateAddress(address, 'readBuffer');
 
       if (size <= 0 || size > 1048576) {
@@ -382,6 +442,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   writeBuffer(handle: LiveProcessHandle, address: bigint, buffer: Buffer): void {
     try {
       validateHandle(handle, 'writeBuffer');
+      assertProcessStillAlive(handle.pid, 'writeBuffer');
       validateAddress(address, 'writeBuffer');
 
       if (!Buffer.isBuffer(buffer) || buffer.length <= 0 || buffer.length > 1048576) {
@@ -413,6 +474,7 @@ export const nativeMemoryDriver: MemoryDriver = {
         name: String(m.szModule),
         baseAddress: BigInt(m.modBaseAddr),
         size: Number(m.modBaseSize),
+        path: m.szExePath ? String(m.szExePath) : null,
       }));
     } catch (err) {
       throw new Error(
@@ -424,6 +486,7 @@ export const nativeMemoryDriver: MemoryDriver = {
   readPointer(handle: LiveProcessHandle, address: bigint): bigint {
     try {
       validateHandle(handle, 'readPointer');
+      assertProcessStillAlive(handle.pid, 'readPointer');
       validateAddress(address, 'readPointer');
 
       const mem = loadMemoryjs() as unknown as MemoryjsModuleWithBigIntRead;
