@@ -1,0 +1,377 @@
+import { migrateTrainerDefinition } from '../definitions/migrations/index.js';
+import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
+import type { LiveProcessTarget } from '../live-memory/types.js';
+import {
+  dispatchWriteAction,
+  resolveFeatureAction,
+  rollbackAction,
+  startFreezeAction,
+  stopFreezeAction,
+  type WriteApproval,
+} from './action-executor.js';
+import type { TrainerRuntimeCapabilities } from './capabilities.js';
+import { checkPreBindCompatibility, type CompatibilityDecision, type PreBindCompatibilityInput } from './compatibility.js';
+import type { WriteConsentBinding } from '../consent/write-consent.js';
+import { classifyLiveMemoryErrorString, runtimeError, type RuntimeError } from './errors.js';
+import { createRuntimeFeatureState, invalidateAllFeatures, type RuntimeFeatureState } from './feature-runtime.js';
+import { assertTransition, canTransition, type RuntimeLifecycleState } from './state.js';
+import { fail, ok, type RuntimeResult } from './types.js';
+
+/**
+ * Semantic validation, separate from schema validation (which
+ * migrateTrainerDefinition/schema.v1.ts already own). Catches configurations
+ * that are individually schema-valid but cannot be executed:
+ *   - a memory feature with neither an AOB signature nor a baseOffset can
+ *     never resolve (mirrors feature-resolver.ts's own resolution
+ *     requirement, checked here up front instead of only failing later);
+ *   - duplicate feature/save-field IDs, which the schema does not forbid but
+ *     which make per-feature runtime state ambiguous;
+ *   - a save field with no mapping strategy at all is meaningless.
+ * Returns an empty array when the definition is semantically valid.
+ */
+export function validateDefinitionSemantics(definition: SolithDefinitionV1): string[] {
+  const issues: string[] = [];
+  const seenFeatureIds = new Set<string>();
+
+  for (const feature of definition.memoryFeatures ?? []) {
+    if (seenFeatureIds.has(feature.id)) {
+      issues.push(`Duplicate memoryFeatures id "${feature.id}".`);
+    }
+    seenFeatureIds.add(feature.id);
+
+    if (feature.type !== 'scan_first' && feature.type !== 'scan_unknown') {
+      if (!feature.resolution.signature && !feature.resolution.baseOffset) {
+        issues.push(
+          `Feature "${feature.id}" (${feature.type}) has neither an AOB signature nor a baseOffset — it can never resolve.`,
+        );
+      }
+    }
+  }
+
+  const seenFieldIds = new Set<string>();
+  for (const field of definition.saveEditor?.saveFields ?? []) {
+    if (seenFieldIds.has(field.id)) {
+      issues.push(`Duplicate saveEditor.saveFields id "${field.id}".`);
+    }
+    seenFieldIds.add(field.id);
+
+    if (!field.mapping.searchKey && !field.mapping.hexOffset && !field.mapping.query) {
+      issues.push(`Save field "${field.id}" declares no mapping strategy (searchKey/hexOffset/query).`);
+    }
+  }
+
+  return issues;
+}
+
+/** Maps a non-compatible CompatibilityDecision onto the specific typed failure reason it represents. */
+function compatibilityFailureReason(decision: CompatibilityDecision): Parameters<typeof runtimeError>[0] {
+  if (decision.status === 'ambiguous') return 'IDENTITY_AMBIGUOUS';
+  if (decision.status === 'unsupported') return 'INCOMPATIBLE_GAME';
+  const auth = decision.processAuthorization;
+  const isRoleRejection = auth && !auth.allowed && auth.blockedKind !== 'invalid_pid' && auth.blockedKind !== 'no_executable_name';
+  return isRoleRejection ? 'EXECUTABLE_ROLE_REJECTED' : 'INCOMPATIBLE_EXECUTABLE';
+}
+
+export interface BindTarget extends PreBindCompatibilityInput {
+  executablePath?: string | null;
+  startTime?: string;
+  volumeSerialNumber?: string;
+  fileIndex?: string;
+  exeSha256?: string;
+}
+
+/**
+ * Canonical trainer runtime: composes the P4-2 migration pipeline and the
+ * real live-memory capability boundary through an explicit lifecycle. Owns
+ * NO memory scanning/writing/freezing logic of its own — every operation
+ * that touches a process delegates to `TrainerRuntimeCapabilities`.
+ */
+export class TrainerRuntime {
+  private state: RuntimeLifecycleState = 'UNLOADED';
+  private definition: SolithDefinitionV1 | null = null;
+  private compatibility: CompatibilityDecision | null = null;
+  private readonly features = new Map<string, RuntimeFeatureState>();
+  private lastFailure: RuntimeError | null = null;
+
+  constructor(private readonly capabilities: TrainerRuntimeCapabilities) {}
+
+  getState(): RuntimeLifecycleState {
+    return this.state;
+  }
+
+  getDefinition(): SolithDefinitionV1 | null {
+    return this.definition;
+  }
+
+  getCompatibilityDecision(): CompatibilityDecision | null {
+    return this.compatibility;
+  }
+
+  getFeatureState(featureId: string): RuntimeFeatureState | undefined {
+    return this.features.get(featureId);
+  }
+
+  getLastFailure(): RuntimeError | null {
+    return this.lastFailure;
+  }
+
+  private transitionTo(next: RuntimeLifecycleState): void {
+    assertTransition(this.state, next);
+    this.state = next;
+  }
+
+  private failClosed(reason: Parameters<typeof runtimeError>[0], message: string, detail?: unknown): RuntimeResult<never> {
+    const error = runtimeError(reason, message, detail);
+    this.lastFailure = error;
+    if (canTransition(this.state, 'FAILED')) {
+      this.state = 'FAILED';
+    }
+    return fail(error);
+  }
+
+  private requireState(...allowed: RuntimeLifecycleState[]): RuntimeResult<void> | null {
+    if (allowed.includes(this.state)) return null;
+    return this.failClosed(
+      'INVALID_STATE_TRANSITION',
+      `Operation requires state in [${allowed.join(', ')}], but runtime is ${this.state}.`,
+    );
+  }
+
+  /** UNLOADED -> LOADED. Always goes through the P4-2 migration pipeline — never a raw schema.v1 parse. */
+  load(rawInput: unknown): RuntimeResult<SolithDefinitionV1> {
+    const guard = this.requireState('UNLOADED');
+    if (guard) return guard as RuntimeResult<SolithDefinitionV1>;
+
+    const migration = migrateTrainerDefinition(rawInput);
+    if (migration.success === false) {
+      const reason = migration.reason === 'UNKNOWN_FUTURE_VERSION' ? 'INVALID_SCHEMA' : migration.reason === 'SCHEMA_VALIDATION_FAILED' ? 'INVALID_SCHEMA' : 'MIGRATION_FAILED';
+      return this.failClosed(reason, migration.errors.join('; ') || 'Trainer definition migration failed.', migration);
+    }
+
+    this.definition = migration.definition;
+    this.transitionTo('LOADED');
+    return ok(migration.definition);
+  }
+
+  /** LOADED -> VALIDATED. */
+  validate(): RuntimeResult<void> {
+    const guard = this.requireState('LOADED');
+    if (guard) return guard;
+
+    const issues = validateDefinitionSemantics(this.definition!);
+    if (issues.length > 0) {
+      return this.failClosed('SEMANTIC_INVALID', issues.join('; '), issues);
+    }
+
+    this.transitionTo('VALIDATED');
+    return ok(undefined);
+  }
+
+  /**
+   * VALIDATED -> COMPATIBILITY_CHECKED. Fails closed for anything other than
+   * 'compatible' — an ambiguous or unverifiable identity is never treated as
+   * good enough to proceed.
+   */
+  checkCompatibility(input: PreBindCompatibilityInput): RuntimeResult<CompatibilityDecision> {
+    const guard = this.requireState('VALIDATED');
+    if (guard) return guard as RuntimeResult<CompatibilityDecision>;
+
+    const decision = checkPreBindCompatibility(this.definition!, input);
+    this.compatibility = decision;
+    if (decision.status !== 'compatible') {
+      return this.failClosed(compatibilityFailureReason(decision), decision.reason, decision);
+    }
+
+    this.transitionTo('COMPATIBILITY_CHECKED');
+    return ok(decision);
+  }
+
+  /** COMPATIBILITY_CHECKED -> BOUND. Delegates enforcement (incl. protected-target module scan) to the real attach(). */
+  async bind(target: BindTarget, userConfirmedOffline: boolean): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('COMPATIBILITY_CHECKED');
+    if (guard) return guard;
+
+    const processTarget: LiveProcessTarget = {
+      pid: target.pid,
+      executableName: target.executableName,
+      executablePath: target.executablePath ?? undefined,
+      startTime: target.startTime,
+      volumeSerialNumber: target.volumeSerialNumber,
+      fileIndex: target.fileIndex,
+      exeSha256: target.exeSha256,
+    };
+
+    const result = await this.capabilities.attach(processTarget, userConfirmedOffline, {
+      executableHashSHA256: target.executableHashSHA256 ?? undefined,
+      executableHashPrefixes: this.definition!.executableHashPrefixes,
+      targetSHA256: this.definition!.targetSHA256,
+      driftAcknowledged: target.driftAcknowledged,
+      connectionBaseline: this.definition!.connectionBaseline,
+      catalogGameId: this.definition!.id,
+    });
+
+    if (!result.success) {
+      if (!result.guard.allowed) {
+        return this.failClosed('CONSENT_REQUIRED', result.guard.reason, result);
+      }
+      return this.failClosed(classifyLiveMemoryErrorString(result.error), result.error ?? 'Attach failed.', result);
+    }
+
+    for (const feature of this.definition!.memoryFeatures ?? []) {
+      this.features.set(feature.id, createRuntimeFeatureState(feature));
+    }
+    this.transitionTo('BOUND');
+    this.transitionTo('READY');
+    return ok(undefined);
+  }
+
+  /** Resolves a feature's target address on demand (lazy, same as the real session's own cache-on-first-use). */
+  async resolveFeature(featureId: string): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) {
+      return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    }
+    const result = await resolveFeatureAction(this.capabilities, feature);
+    if (result.success === false) return fail(result.error);
+    return ok(undefined);
+  }
+
+  /** READY/ACTIVE -> ACTIVE. Dispatches `toggle`/`write_once`; resolves the feature first if needed. */
+  async activateWriteFeature(featureId: string, requestedValue: number, approval: WriteApproval, reason?: string): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.definition.type !== 'toggle' && feature.definition.type !== 'write_once') {
+      return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not a write action.`);
+    }
+
+    if (feature.resolution.state !== 'resolved') {
+      const resolved = await resolveFeatureAction(this.capabilities, feature);
+      if (resolved.success === false) return fail(resolved.error);
+    }
+
+    const result = await dispatchWriteAction(this.capabilities, feature, requestedValue, approval, reason);
+    if (result.success === false) return fail(result.error);
+    if (this.state === 'READY') this.transitionTo('ACTIVE');
+    return ok(undefined);
+  }
+
+  /** READY/ACTIVE -> ACTIVE. Dispatches `freeze`; token-gated, no legacy-approval bypass (matches MemoryManager.freezeStart). */
+  async activateFreezeFeature(
+    featureId: string,
+    value: number,
+    approval: { consentToken: string; consentBinding: WriteConsentBinding },
+    intervalMs?: number,
+  ): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.definition.type !== 'freeze') {
+      return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not freeze.`);
+    }
+
+    if (feature.resolution.state !== 'resolved') {
+      const resolved = await resolveFeatureAction(this.capabilities, feature);
+      if (resolved.success === false) return fail(resolved.error);
+    }
+
+    const result = await startFreezeAction(this.capabilities, feature, value, approval, intervalMs);
+    if (result.success === false) return fail(result.error);
+    if (this.state === 'READY') this.transitionTo('ACTIVE');
+    return ok(undefined);
+  }
+
+  /** Stops an active freeze feature. ACTIVE -> READY if this was the last active feature. */
+  deactivateFreezeFeature(featureId: string): RuntimeResult<void> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+
+    stopFreezeAction(this.capabilities, feature);
+    this.maybeReturnToReady();
+    return ok(undefined);
+  }
+
+  /** Rolls back a previously-confirmed write on this feature. Available in READY or ACTIVE. */
+  async rollbackFeature(featureId: string, proposalId: string): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+
+    const result = await rollbackAction(this.capabilities, feature, proposalId);
+    if (result.success === false) return fail(result.error);
+    this.maybeReturnToReady();
+    return ok(undefined);
+  }
+
+  private maybeReturnToReady(): void {
+    if (this.state !== 'ACTIVE') return;
+    const stillActive = [...this.features.values()].some((f) => f.activation.state === 'active');
+    if (!stillActive) this.transitionTo('READY');
+  }
+
+  /**
+   * Process loss / identity mismatch: READY/ACTIVE/BOUND -> DEGRADED. Stops
+   * any active freeze and invalidates resolved addresses so no further
+   * action can be dispatched against a stale process without an explicit
+   * rebind + fresh compatibility check.
+   */
+  handleProcessLoss(reason = 'Attached process identity could not be reverified.'): RuntimeResult<void> {
+    const guard = this.requireState('BOUND', 'READY', 'ACTIVE');
+    if (guard) return guard;
+    this.capabilities.stopFreeze();
+    invalidateAllFeatures(this.features);
+    this.lastFailure = runtimeError('PROCESS_LOST', reason);
+    this.transitionTo('DEGRADED');
+    return ok(undefined);
+  }
+
+  /**
+   * Checks whether the bound process is still the one this runtime attached
+   * to. Callers should invoke this before dispatching an action against a
+   * long-lived session; on mismatch this transitions straight to DEGRADED
+   * (see handleProcessLoss) rather than leaving the caller to guess.
+   */
+  verifyProcessStillBound(): RuntimeResult<void> {
+    const guard = this.requireState('BOUND', 'READY', 'ACTIVE');
+    if (guard) return guard;
+    const identityError = this.capabilities.verifyIdentity();
+    if (identityError) {
+      this.handleProcessLoss(identityError);
+      return fail(runtimeError('PROCESS_LOST', identityError));
+    }
+    return ok(undefined);
+  }
+
+  /**
+   * DEGRADED -> VALIDATED -> COMPATIBILITY_CHECKED: re-run compatibility
+   * before any rebind attempt. The definition itself did not change (no
+   * re-validation of its structure is needed), but a rebind must not skip
+   * straight past a fresh compatibility decision just because one was made
+   * before the process was lost.
+   */
+  recheckCompatibilityAfterLoss(input: PreBindCompatibilityInput): RuntimeResult<CompatibilityDecision> {
+    const guard = this.requireState('DEGRADED');
+    if (guard) return guard as RuntimeResult<CompatibilityDecision>;
+    this.transitionTo('VALIDATED');
+    return this.checkCompatibility(input);
+  }
+
+  /** Full teardown from any non-terminal state. Always safe to call. */
+  dispose(): void {
+    if (this.state === 'DISPOSED') return;
+    if (canTransition(this.state, 'DISPOSED')) {
+      if (this.capabilities.isAttached()) {
+        this.capabilities.detach();
+      }
+      this.features.clear();
+      this.state = 'DISPOSED';
+    }
+  }
+}
