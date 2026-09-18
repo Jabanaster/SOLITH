@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { solithDefinitionToModPack } from '../definitions/mod-pack-adapter.js';
-import { upsertCatalogEntry, upsertDefinitionPayload } from '../trainer-catalog/store.js';
+import { upsertCatalogEntry } from '../trainer-catalog/store.js';
 import { buildSearchableText } from '../trainer-catalog/types.js';
+import { persistTrainerDefinition } from '../trainer-storage/index.js';
 import {
   buildDumpspaceImportSummary,
   buildDumpspaceResearchNotes,
@@ -74,14 +75,11 @@ export function importDefinitionDumpspace(input: {
   const modPack = solithDefinitionToModPack(definition);
   modPack.notes = buildDumpspaceResearchNotes(summary);
 
-  upsertDefinitionPayload(
-    modPack.packId,
-    definition.id,
-    JSON.stringify(definition),
-    definition.safety.verificationStatus,
-    'ct-import',
-    modPack.syncedAt,
-  );
+  const persisted = persistTrainerDefinition(definition, { sourceProvider: 'ct-import' });
+  if (persisted.success === false) {
+    return { success: false, errors: [persisted.error.message] };
+  }
+  const packId = persisted.value.packId;
 
   const categories = [...new Set((definition.memoryFeatures ?? []).map((f) => f.category))];
   upsertCatalogEntry({
@@ -92,7 +90,7 @@ export function importDefinitionDumpspace(input: {
     verificationStatus: definition.safety.verificationStatus,
     sources: [{ provider: 'ct-import', url: `local://dumpspace/${root}` }],
     hasModPack: true,
-    modPackId: modPack.packId,
+    modPackId: packId,
     cheatCount: definition.memoryFeatures?.length ?? 0,
     searchableText: buildSearchableText({
       displayName: definition.title,
@@ -104,7 +102,7 @@ export function importDefinitionDumpspace(input: {
   return {
     success: true,
     catalogGameId: definition.id,
-    packId: modPack.packId,
+    packId,
     cheatCount: definition.memoryFeatures?.length ?? 0,
     title: definition.title,
     classCount: summary.classCount,

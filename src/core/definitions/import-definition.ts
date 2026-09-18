@@ -1,9 +1,10 @@
 import type { TrainerCatalogEntry } from '../trainer-catalog/types.js';
 import { buildSearchableText } from '../trainer-catalog/types.js';
-import { upsertCatalogEntry, upsertDefinitionPayload } from '../trainer-catalog/store.js';
+import { upsertCatalogEntry } from '../trainer-catalog/store.js';
 import type { SolithDefinitionV1 } from './schema.v1.js';
 import { compileYamlToDefinition } from './compile-yaml.v1.js';
 import { solithDefinitionToModPack } from './mod-pack-adapter.js';
+import { persistTrainerDefinition } from '../trainer-storage/index.js';
 
 export interface ImportYamlResult {
   success: true;
@@ -21,14 +22,13 @@ export interface ImportYamlFailure {
 
 export type ImportYamlOutcome = ImportYamlResult | ImportYamlFailure;
 
-function catalogEntryFromDefinition(definition: SolithDefinitionV1, cheatCount: number): TrainerCatalogEntry {
+function catalogEntryFromDefinition(definition: SolithDefinitionV1, cheatCount: number, packId: string): TrainerCatalogEntry {
   const categories = [
     ...new Set([
       ...(definition.memoryFeatures ?? []).map((f) => f.category),
       ...(definition.saveEditor?.saveFields ?? []).map((f) => f.category),
     ]),
   ];
-  const packId = `${definition.id}-pack`;
   return {
     catalogGameId: definition.id,
     displayName: definition.title,
@@ -48,8 +48,14 @@ function catalogEntryFromDefinition(definition: SolithDefinitionV1, cheatCount: 
 }
 
 /**
- * Compile YAML, validate schema.v1, and upsert catalog index + definition payload.
- * Stores minified schema.v1 JSON in trainer_mod_packs.payloadJson.
+ * Compile YAML, validate schema.v1, and persist through the canonical
+ * trainer-storage repository (P4-8/P4-9). Previously this wrote directly via
+ * `upsertDefinitionPayload` using the bundled-convention packId
+ * (`${id}-pack`) regardless of source, which meant a user-imported YAML for
+ * a game that already had a bundled definition would silently overwrite it
+ * at the same packId — `persistTrainerDefinition` source-suffixes the packId
+ * for non-bundled providers instead, so the import gets its own row and the
+ * bundled row (if any) is preserved and surfaced via provenance.conflictingSources.
  */
 export function importDefinitionYaml(yamlText: string): ImportYamlOutcome {
   const compiled = compileYamlToDefinition(yamlText);
@@ -60,23 +66,19 @@ export function importDefinitionYaml(yamlText: string): ImportYamlOutcome {
   const { definition, payloadJson } = compiled;
   const modPack = solithDefinitionToModPack(definition);
 
-  upsertDefinitionPayload(
-    modPack.packId,
-    definition.id,
-    payloadJson,
-    definition.safety.verificationStatus,
-    'user',
-    modPack.syncedAt,
-  );
+  const persisted = persistTrainerDefinition(definition, { sourceProvider: 'user' });
+  if (persisted.success === false) {
+    return { success: false, errors: [persisted.error.message] };
+  }
 
-  upsertCatalogEntry(catalogEntryFromDefinition(definition, modPack.cheats.length));
+  upsertCatalogEntry(catalogEntryFromDefinition(definition, modPack.cheats.length, persisted.value.packId));
 
   return {
     success: true,
     definition,
     payloadJson,
     catalogGameId: definition.id,
-    packId: modPack.packId,
+    packId: persisted.value.packId,
     cheatCount: modPack.cheats.length,
   };
 }
