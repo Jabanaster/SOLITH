@@ -1299,6 +1299,13 @@ function applySchema(): void {
       'ALTER TABLE trainer_mod_packs ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0',
     );
   }
+  // P4-8: additive provenance column — a free-text external-source identifier
+  // (CT file sha256, hub sync record id, yaml filename, etc.). NULL for every
+  // pre-existing row and for any write that doesn't know a specific source
+  // id; never backfilled/guessed for old rows.
+  if (!trainerModPackColumnNames.has('sourceId')) {
+    rawDb!.run('ALTER TABLE trainer_mod_packs ADD COLUMN sourceId TEXT');
+  }
 
   rawDb!.run(`
     CREATE TABLE IF NOT EXISTS trainer_sync_log (
