@@ -11,8 +11,10 @@ import {
   exportMemoryFeatureToYaml,
 } from '../src/core/definitions/export-definition.js';
 import { serializeDefinitionToYaml } from '../src/core/definitions/export-yaml.v1.js';
+import { compileYamlToDefinition } from '../src/core/definitions/compile-yaml.v1.js';
 import { parseSolithDefinitionV1 } from '../src/core/definitions/schema.v1.js';
 import type { DiscoveryResult } from '../src/shared/types/index.js';
+import type { SolithTargetMetadataV1 } from '../src/core/definitions/schema.v1.js';
 
 const SAMPLE_CANDIDATE: DiscoveryResult = {
   path: 'SaveGame.player.0.money',
@@ -109,5 +111,53 @@ describe('yaml export', () => {
     const yaml = serializeDefinitionToYaml(definition);
     assert.match(yaml, /verificationStatus: community/);
     parseSolithDefinitionV1(definition);
+  });
+
+  test('fingerprint/certification fields survive a canonical -> YAML -> canonical round trip', () => {
+    const base = memoryContextToDefinition({
+      gameName: 'Fingerprint Demo',
+      executableName: 'FingerprintDemo.exe',
+      featureName: 'Health',
+      dataType: 'int32',
+      sessionAddress: '0x1a2b3c40',
+    });
+    const targetMetadata: SolithTargetMetadataV1[] = [
+      {
+        targetId: 'steam-build',
+        launcher: 'steam',
+        executableName: 'FingerprintDemo.exe',
+        executableSha256: 'a'.repeat(64),
+        executableHashPrefixes: ['a1b2c3d4'],
+        moduleName: 'FingerprintDemo.exe',
+        packaging: 'win32',
+        accessModel: 'standard_user_readonly',
+        certificationLevel: 'L3',
+      },
+    ];
+    const definition = {
+      ...base,
+      targetSHA256: 'b'.repeat(64),
+      executableHashPrefixes: ['b1c2d3e4', 'ffeeddcc'],
+      certificationLevel: 'L2' as const,
+      targetMetadata,
+      memoryFeatures: base.memoryFeatures?.map((feature) => ({
+        ...feature,
+        certificationLevel: 'L1' as const,
+      })),
+    };
+    parseSolithDefinitionV1(definition);
+
+    const yaml = serializeDefinitionToYaml(definition);
+    assert.doesNotMatch(yaml, /executableHashPrefixes: \[\]/);
+
+    const outcome = compileYamlToDefinition(yaml);
+    assert.equal(outcome.success, true);
+    if (!outcome.success) return;
+
+    assert.equal(outcome.definition.targetSHA256, definition.targetSHA256);
+    assert.deepEqual(outcome.definition.executableHashPrefixes, definition.executableHashPrefixes);
+    assert.equal(outcome.definition.certificationLevel, definition.certificationLevel);
+    assert.deepEqual(outcome.definition.targetMetadata, definition.targetMetadata);
+    assert.equal(outcome.definition.memoryFeatures?.[0]?.certificationLevel, 'L1');
   });
 });
