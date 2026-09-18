@@ -125,6 +125,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('trainer-deactivate-feature', payload),
   trainerRollbackFeature: (payload: { featureId: string; proposalId: string }) =>
     ipcRenderer.invoke('trainer-rollback-feature', payload),
+  trainerSeedDiscoveredFeature: (payload: { featureId: string; address: string; dataType: string }) =>
+    ipcRenderer.invoke('trainer-seed-discovered-feature', payload),
   trainerExecuteComposite: (payload: {
     id: string;
     actions: Array<

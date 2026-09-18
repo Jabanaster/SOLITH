@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { bundledDefinitionsForTests } from '../src/core/trainer-catalog/bundled-definition-seed.js';
 import { BUNDLED_COMMUNITY_GAME_COUNT } from '../src/core/trainer-catalog/bundled-community-games.js';
 import { parseSolithDefinitionV1 } from '../src/core/definitions/schema.v1.js';
+import { ALL_GAMES } from '../src/core/cheat-system/games.js';
 
 const CURATED_IDS = [
   'atomfall',
@@ -35,9 +36,19 @@ test('stardew ships save-field controls only', () => {
   assert.equal(stardew?.memoryFeatures?.length ?? 0, 0);
 });
 
-test('memory games ship pinned scan_unknown features', () => {
+// P4-13 (mission §7): every memory-backed CheatDefinition gets a canonical
+// scan_unknown feature now — not just a pinned subset (P4-12 found only
+// ~16/156 curated cheats had any canonical backing at all). "Pinned" no
+// longer means "the only ones with canonical coverage"; it's full coverage.
+test('memory games ship every memory-backed cheat as a scan_unknown feature (full coverage, not a pinned subset)', () => {
+  const palworldGame = ALL_GAMES.find((g) => g.gameId === 'palworld');
+  assert.ok(palworldGame);
+  const expectedIds = palworldGame!.cheats.filter((c) => c.valueType !== 'string').map((c) => c.id).sort();
+
   const palworld = bundledDefinitionsForTests().find((d) => d.id === 'palworld');
-  assert.equal(palworld?.memoryFeatures?.length, 3);
+  const actualIds = (palworld?.memoryFeatures ?? []).map((f) => f.id).sort();
+  assert.deepEqual(actualIds, expectedIds);
+  assert.ok((palworld?.memoryFeatures?.length ?? 0) > 3, 'full coverage must exceed the old pinned-3 subset');
   assert.equal(palworld?.memoryFeatures?.[0]?.type, 'scan_unknown');
   assert.equal(palworld?.connectionBaseline, 4);
 });

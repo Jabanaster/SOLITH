@@ -1,5 +1,5 @@
 import type { ModPack } from '../../trainer-catalog/types.js';
-import { modPackToSolithDefinition } from '../mod-pack-adapter.js';
+import { modPackConversionLosses, modPackToSolithDefinition } from '../mod-pack-adapter.js';
 import type { SolithDefinitionV1 } from '../schema.v1.js';
 
 const VERIFICATION_STATUSES = new Set(['verified', 'community', 'metadata-only', 'unverified']);
@@ -55,6 +55,13 @@ export function migrateLegacyUnversionedToV1(input: unknown): LegacyMigrationOut
     return { success: false, errors: shapeErrors };
   }
 
-  const definition = modPackToSolithDefinition(record as unknown as ModPack);
-  return { success: true, definition, warnings: [] };
+  const legacyPack = record as unknown as ModPack;
+  const definition = modPackToSolithDefinition(legacyPack);
+  // P4-13 §20: report every ModPack field the conversion above could not
+  // represent, instead of the previously-hardcoded `[]`. This is computed
+  // fresh from `legacyPack` (the still-raw, unconverted stored payload) on
+  // every call, so it stays correct on every future re-migration of the
+  // same stored row too — no persistence gap for this path (contrast with
+  // the sync-write call site; see `SaveTrainerDefinitionInput.conversionWarnings`).
+  return { success: true, definition, warnings: modPackConversionLosses(legacyPack) };
 }

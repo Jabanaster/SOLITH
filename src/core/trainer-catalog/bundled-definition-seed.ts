@@ -51,13 +51,18 @@ function cheatToMemoryFeature(cheat: CheatDefinition, moduleName: string): Memor
   };
 }
 
-function pinnedCheatsForGame(game: GameConfig): CheatDefinition[] {
-  if (game.pinnedCheatIds?.length) {
-    return game.pinnedCheatIds
-      .map((id) => game.cheats.find((c) => c.id === id))
-      .filter((c): c is CheatDefinition => Boolean(c));
-  }
-  return game.cheats.slice(0, 12);
+/**
+ * P4-13 (mission §6/§7): every memory-backed cheat in a memory-scan/hybrid
+ * game gets a canonical MemoryFeatureV1 — not just the pinned/first-12
+ * subset P4-12 found only covered ~16/156 curated cheats. `valueType ===
+ * 'string'` cheats are excluded: those are console-command-only (no memory
+ * address at all — see useGameCheatSession's own resolveMemoryDataType),
+ * and giving them a fabricated int32 MemoryFeatureV1 would misrepresent
+ * what they actually are (mission §6: "Do NOT fabricate canonical
+ * targets").
+ */
+function memoryBackedCheatsForGame(game: GameConfig): CheatDefinition[] {
+  return game.cheats.filter((cheat) => cheat.valueType !== 'string');
 }
 
 function memoryDefinitionFromGame(game: GameConfig): SolithDefinitionV1 {
@@ -82,7 +87,7 @@ function memoryDefinitionFromGame(game: GameConfig): SolithDefinitionV1 {
       arch: 'x64',
     },
     connectionBaseline: game.connectionBaseline > 0 ? game.connectionBaseline : undefined,
-    memoryFeatures: pinnedCheatsForGame(game).map((cheat) =>
+    memoryFeatures: memoryBackedCheatsForGame(game).map((cheat) =>
       cheatToMemoryFeature(cheat, game.executable),
     ),
   };

@@ -51,8 +51,19 @@ const UNKNOWN_SCAN_DATA_TYPES = ['float', 'int32', 'double'];
  * 'bool' cheats are represented as int32 flags in real game memory (0/1);
  * 'string' cheats (Stardew-style console commands) have no memory address
  * at all and are handled by a separate command executor, not this hook.
+ *
+ * `tags.includes('command')`: some console-command cheats (Stardew's
+ * `set-money`/`set-max-energy`/`set-health`/`set-friendship`/`freeze-time`
+ * — see games.ts) are tagged numeric/bool `valueType`s for UI input-widget
+ * purposes even though they execute via a console command, not a memory
+ * address — `valueType !== 'string'` alone under-detects them. P4-13: this
+ * matters more now than it did pre-cutover, since a non-memory-backed
+ * "confirmed address" would otherwise reach `trainerSeedDiscoveredFeature`
+ * for a feature id with no canonical MemoryFeatureV1 backing at all and
+ * fail closed with a confusing error instead of never being attempted.
  */
 function resolveMemoryDataType(cheat: CheatDefinition): string | null {
+  if (cheat.tags?.includes('command')) return null;
   if (cheat.valueType === 'bool') return 'int32';
   if (cheat.valueType === 'string') return null;
   return cheat.valueType;
@@ -60,8 +71,19 @@ function resolveMemoryDataType(cheat: CheatDefinition): string | null {
 
 /**
  * Manages live memory discovery/write/freeze for every cheat of one game,
- * entirely through the electronAPI IPC bridge (window.electronAPI.liveMemory*)
- * exposed by electron/preload.ts.
+ * entirely through the electronAPI IPC bridge exposed by electron/preload.ts.
+ *
+ * P4-13: attach and address discovery/scanning (Phase 2, untouched) still go
+ * through the legacy `window.electronAPI.liveMemory*` channels — this hook is
+ * not the place to relitigate scanning/AOB/pointer resolution. Real
+ * mutation — write, freeze, and rollback — is canonical-only, through
+ * `window.electronAPI.trainer*` (trainer-execution-ipc.ts ->
+ * TrainerApplicationService -> TrainerRuntime), reusing the same attached
+ * session via `trainerBindRuntime`. For `scan_first`/`scan_unknown`
+ * features (every discovery-required cheat — see games.ts), the address
+ * this hook's own discovery flow confirms is handed to the runtime via
+ * `trainerSeedDiscoveredFeature` before every write/freeze — never a second,
+ * independent execution path (mission §18: no silent legacy fallback).
  *
  * This MUST NOT import anything from src/core/live-memory directly — those
  * modules use Node built-ins (createRequire, native addons) that only exist
@@ -91,6 +113,26 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   const frozenCheatIdRef = useRef<string | null>(null);
   const reappliedRef = useRef(false);
   const featureHintsRef = useRef<Record<string, string>>({});
+  /**
+   * P4-13: whether `trainerBindRuntime` succeeded for the currently attached
+   * session, and why not when it failed. Real mutation (write/freeze) is
+   * canonical-only from here on (mission §18 "no silent fallback") — a bind
+   * failure surfaces as an explicit error on the next write/freeze attempt
+   * rather than silently reverting to a raw-address legacy write.
+   */
+  const runtimeBoundRef = useRef(false);
+  const runtimeBindErrorRef = useRef<string | null>(null);
+  /** Tracks each cheat's last confirmed write proposalId, so toggling off can roll it back for real instead of just forgetting local state. */
+  const writeProposalIdRef = useRef<Record<string, string>>({});
+  /**
+   * P4-13: bumped synchronously the instant a cheat is toggled off, so an
+   * in-flight `writeValue` call for that same cheat (e.g. still awaiting the
+   * user's consent-dialog response) can tell, after it finally confirms,
+   * whether it's still the current intent or was superseded by a toggle-off
+   * that happened while it was pending — and roll itself back immediately
+   * instead of leaving a write active that the user already asked to undo.
+   */
+  const writeGenerationRef = useRef<Record<string, number>>({});
   const getStateRef = useRef<(cheatId: string) => CheatSessionState>(() => IDLE_STATE);
   const toggleCheatRef = useRef<(cheat: CheatDefinition, enable: boolean) => void | Promise<void>>(
     () => undefined,
@@ -206,6 +248,34 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
     [game.cheats],
   );
 
+  /**
+   * P4-13: binds the canonical TrainerRuntime onto the SAME already-attached
+   * live-memory session (trainer-bind-runtime reuses it via bindExisting —
+   * see trainer-execution-ipc.ts) instead of a second attach. Failure here
+   * does not throw — discovery/scan (Phase 2, untouched) still works without
+   * a canonical bind — but is recorded so writeValue/startFreeze can fail
+   * explicitly instead of silently falling back to a legacy raw write.
+   */
+  const bindCanonicalRuntime = useCallback(async (pid: number, executableName: string): Promise<void> => {
+    try {
+      const result = await window.electronAPI.trainerBindRuntime({
+        catalogGameId: game.gameId,
+        pid,
+        executableName,
+      });
+      if (result?.success) {
+        runtimeBoundRef.current = true;
+        runtimeBindErrorRef.current = null;
+      } else {
+        runtimeBoundRef.current = false;
+        runtimeBindErrorRef.current = result?.error?.message ?? 'Canonical trainer runtime bind failed.';
+      }
+    } catch (err) {
+      runtimeBoundRef.current = false;
+      runtimeBindErrorRef.current = err instanceof Error ? err.message : String(err);
+    }
+  }, [game.gameId]);
+
   const ensureAttached = useCallback(async (): Promise<void> => {
     if (attachedRef.current) return;
 
@@ -257,6 +327,7 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
 
       if (prepareResult.success) {
         attachedRef.current = true;
+        await bindCanonicalRuntime(match.pid, match.name);
         if (prepareResult.featureHints) {
           featureHintsRef.current = prepareResult.featureHints as Record<string, string>;
         }
@@ -304,12 +375,15 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       throw new Error(attachResult.guard?.reason ?? attachResult.error ?? 'Failed to attach to process');
     }
     attachedRef.current = true;
+    await bindCanonicalRuntime(match.pid, match.name);
     setZeroInputStatus({ phase: 'ready', message: 'Attached (classic path)' });
-  }, [game, waitForDriftAck, hydrateFromZeroInputFeatures]);
+  }, [game, waitForDriftAck, hydrateFromZeroInputFeatures, bindCanonicalRuntime]);
 
   const stopFreeze = useCallback(async (cheatId: string) => {
     if (frozenCheatIdRef.current !== cheatId) return;
-    await window.electronAPI.liveMemoryFreezeStop();
+    // P4-13: stops via the canonical runtime's own per-feature freeze bookkeeping
+    // instead of the legacy session-wide liveMemoryFreezeStop.
+    await window.electronAPI.trainerDeactivateFeature({ featureId: cheatId });
     frozenCheatIdRef.current = null;
     setStates((prev) => {
       const existing = prev[cheatId];
@@ -323,6 +397,10 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
 
   const writeValue = useCallback(
     async (cheat: CheatDefinition, value: number): Promise<{ allowed: boolean; reason: string }> => {
+      // Snapshot before any await — compared against the live ref after confirmation to
+      // detect a toggle-off that happened while this write was in flight (mission: no
+      // stale write left active after the user's toggle-off intent).
+      const generation = writeGenerationRef.current[cheat.id] ?? 0;
       const current = getState(cheat.id);
       const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
 
@@ -339,37 +417,68 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         // attached session regardless of how it got its address, so attach here too.
         await ensureAttached();
 
-        const proposeResult = await window.electronAPI.liveMemoryProposeWrite({
+        // P4-13: real mutation is canonical-only — no legacy liveMemoryProposeWrite fallback
+        // (mission §18). A bind failure fails explicitly here instead of silently reverting.
+        if (!runtimeBoundRef.current) {
+          const reason = runtimeBindErrorRef.current ?? 'Canonical trainer runtime is not bound.';
+          patchState(cheat.id, { status: 'error', error: reason });
+          return { allowed: false, reason };
+        }
+
+        // Hands the runtime the address this session's own discovery/resolve flow already
+        // confirmed (never a fabricated one — see TrainerRuntime.seedDiscoveredFeatureAddress).
+        const seedResult = await window.electronAPI.trainerSeedDiscoveredFeature({
+          featureId: cheat.id,
           address: current.confirmedAddress,
           dataType,
+        });
+        if (!seedResult.success) {
+          const reason = seedResult.error?.message ?? 'Could not hand the discovered address to the canonical trainer runtime';
+          patchState(cheat.id, { status: 'error', error: reason });
+          return { allowed: false, reason };
+        }
+
+        const proposeResult = await window.electronAPI.trainerProposeWriteFeature({
+          featureId: cheat.id,
           requestedValue: value,
         });
         if (!proposeResult.success) {
-          const reason = proposeResult.error ?? 'Propose failed';
+          const reason = proposeResult.error?.message ?? 'Propose failed';
           patchState(cheat.id, { status: 'error', error: reason });
           return { allowed: false, reason };
         }
+        const proposalId: string = proposeResult.value.proposalId;
 
-        const consentResult = await window.electronAPI.liveMemoryIssueWriteConsent({
-          proposalId: proposeResult.proposal.proposalId,
-          userConfirmed: true,
+        const consentResult = await window.electronAPI.trainerIssueWriteConsent({
+          featureId: cheat.id,
+          proposalId,
         });
-        if (!consentResult.success || !consentResult.consent?.tokenId) {
-          const reason = consentResult.error ?? 'Consent failed';
+        if (!consentResult.success || !consentResult.value?.consentToken) {
+          const reason = consentResult.error?.message ?? 'Consent failed';
           patchState(cheat.id, { status: 'error', error: reason });
           return { allowed: false, reason };
         }
 
-        const confirmResult = await window.electronAPI.liveMemoryConfirmWrite({
-          proposalId: proposeResult.proposal.proposalId,
-          consentToken: consentResult.consent.tokenId,
+        const confirmResult = await window.electronAPI.trainerConfirmWriteFeature({
+          featureId: cheat.id,
+          proposalId,
+          consentToken: consentResult.value.consentToken,
         });
         if (!confirmResult.success) {
-          const reason = confirmResult.guard?.reason ?? confirmResult.error ?? 'Write blocked';
+          const reason = confirmResult.error?.message ?? 'Write blocked';
           patchState(cheat.id, { status: 'error', error: reason });
           return { allowed: false, reason };
         }
 
+        // The user toggled this cheat off while the consent dialog (or any other await
+        // above) was pending — this write is no longer wanted. Roll it back immediately
+        // rather than recording it as the active proposal or leaving it live in memory.
+        if ((writeGenerationRef.current[cheat.id] ?? 0) !== generation) {
+          void window.electronAPI.trainerRollbackFeature({ featureId: cheat.id, proposalId });
+          return { allowed: false, reason: 'Cheat was disabled while this write was pending — rolled back.' };
+        }
+
+        writeProposalIdRef.current[cheat.id] = proposalId;
         patchState(cheat.id, { liveValue: value });
         setRatingPrompt({ cheatId: cheat.id });
         return { allowed: true, reason: `Wrote ${value}` };
@@ -722,19 +831,39 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   const toggleCheat = useCallback(
     async (cheat: CheatDefinition, enabled: boolean) => {
       if (!enabled) {
+        // Bumped synchronously, before any await below, so an in-flight writeValue()
+        // call for this cheat (e.g. still awaiting consent) detects it was superseded
+        // the moment it next checks — see writeGenerationRef's own doc comment.
+        writeGenerationRef.current[cheat.id] = (writeGenerationRef.current[cheat.id] ?? 0) + 1;
         void stopFreeze(cheat.id);
+        // P4-13: a real confirmed write this session gets genuinely rolled back through the
+        // canonical runtime (restoring the pre-write value) instead of just forgetting local
+        // state and leaving the last written value sitting in game memory. Awaited (not
+        // fire-and-forget) so a rollback failure is surfaced rather than silently discarded
+        // while the written value remains live in the process.
+        const pendingProposalId = writeProposalIdRef.current[cheat.id];
+        let rollbackError: string | null = null;
+        if (pendingProposalId) {
+          delete writeProposalIdRef.current[cheat.id];
+          const rollbackResult = await window.electronAPI.trainerRollbackFeature({ featureId: cheat.id, proposalId: pendingProposalId });
+          if (!rollbackResult.success) {
+            rollbackError = rollbackResult.error?.message ?? 'Rollback failed — the written value may still be live in the process.';
+          }
+        }
         // Toggling off is the explicit "forget this" action — clear the confirmed address too,
         // not just the enabled flag. Otherwise the next toggle-on reuses a stale (possibly
         // wrong) address instead of starting fresh discovery, which is silently useless if that
-        // address turns out to be a false positive.
+        // address turns out to be a false positive. A rollback failure still disables the cheat
+        // (the user's toggle-off intent is honored) but keeps the error visible instead of
+        // clearing it, so the user knows the underlying write may not have been undone.
         patchState(cheat.id, {
           enabled: false,
-          status: 'idle',
+          status: rollbackError ? 'error' : 'idle',
           confirmedAddress: null,
           confirmedDataType: null,
           candidates: [],
           liveValue: null,
-          error: null,
+          error: rollbackError,
           unknownScanActive: false,
         });
         clearPersisted(cheat.id);
@@ -794,30 +923,51 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
         await stopFreeze(frozenCheatIdRef.current);
       }
 
-      const value = Number(cheat.infiniteValue ?? 1);
-      const proposeResult = await window.electronAPI.liveMemoryFreezePropose({
+      // P4-13: real mutation is canonical-only — no legacy liveMemoryFreeze* fallback (mission §18).
+      if (!runtimeBoundRef.current) {
+        patchState(cheat.id, { status: 'error', error: runtimeBindErrorRef.current ?? 'Canonical trainer runtime is not bound.' });
+        return;
+      }
+
+      const seedResult = await window.electronAPI.trainerSeedDiscoveredFeature({
+        featureId: cheat.id,
         address: current.confirmedAddress,
         dataType,
+      });
+      if (!seedResult.success) {
+        patchState(cheat.id, {
+          status: 'error',
+          error: seedResult.error?.message ?? 'Could not hand the discovered address to the canonical trainer runtime',
+        });
+        return;
+      }
+
+      const value = Number(cheat.infiniteValue ?? 1);
+      const proposeResult = await window.electronAPI.trainerProposeFreezeFeature({
+        featureId: cheat.id,
         value,
         intervalMs: 200,
       });
-      if (!proposeResult.success || !proposeResult.proposal?.proposalId) {
-        patchState(cheat.id, { status: 'error', error: proposeResult.error ?? 'Freeze proposal failed' });
+      if (!proposeResult.success || !proposeResult.value?.proposalId) {
+        patchState(cheat.id, { status: 'error', error: proposeResult.error?.message ?? 'Freeze proposal failed' });
         return;
       }
-      const consentResult = await window.electronAPI.liveMemoryFreezeRequestConsent({
-        proposalId: proposeResult.proposal.proposalId,
+      const proposalId: string = proposeResult.value.proposalId;
+      const consentResult = await window.electronAPI.trainerIssueFreezeConsent({
+        featureId: cheat.id,
+        proposalId,
       });
-      if (!consentResult.success || !consentResult.consent?.tokenId) {
-        patchState(cheat.id, { status: 'error', error: consentResult.error ?? 'Freeze consent failed' });
+      if (!consentResult.success || !consentResult.value?.consentToken) {
+        patchState(cheat.id, { status: 'error', error: consentResult.error?.message ?? 'Freeze consent failed' });
         return;
       }
-      const result = await window.electronAPI.liveMemoryFreezeStart({
-        proposalId: proposeResult.proposal.proposalId,
-        consentToken: consentResult.consent.tokenId,
+      const result = await window.electronAPI.trainerConfirmFreezeFeature({
+        featureId: cheat.id,
+        proposalId,
+        consentToken: consentResult.value.consentToken,
       });
       if (!result.success) {
-        patchState(cheat.id, { status: 'error', error: result.error ?? 'Freeze failed to start' });
+        patchState(cheat.id, { status: 'error', error: result.error?.message ?? 'Freeze failed to start' });
         return;
       }
       frozenCheatIdRef.current = cheat.id;
@@ -924,6 +1074,8 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   useEffect(() => {
     return () => {
       if (attachedRef.current) {
+        void window.electronAPI.trainerUnbindRuntime();
+        runtimeBoundRef.current = false;
         void window.electronAPI.liveMemoryDetach();
         attachedRef.current = false;
       }
@@ -953,6 +1105,8 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
       setZeroInputStatus({ phase: 'idle' });
       if (attachedRef.current) {
         attachedRef.current = false;
+        void window.electronAPI.trainerUnbindRuntime?.();
+        runtimeBoundRef.current = false;
         void window.electronAPI.liveMemoryDetach?.();
       }
       return;

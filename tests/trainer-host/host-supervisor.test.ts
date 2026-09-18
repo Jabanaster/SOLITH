@@ -118,6 +118,48 @@ describe('createTrainerHostSupervisor — approved-path gate', () => {
   });
 });
 
+// P4-13 mission §15 — TrainerHost write RPC boundary must not blindly trust
+// its caller's construction; malformed write params are rejected before the
+// approved-path check and before anything is sent to the child process.
+describe('createTrainerHostSupervisor — write RPC param validation', () => {
+  async function startedSupervisor() {
+    const { proc, writtenLines } = makeFakeChild(process.pid);
+    const sup = createTrainerHostSupervisor(() => proc as any);
+    const startP = sup.start();
+    proc.triggerData(encodeResponse('handshake', { protocolVersion: 1, capabilities: ['proposeWriteField'] }));
+    await startP;
+    return { sup, writtenLines };
+  }
+
+  test('rejects an empty field path without sending a child RPC', async () => {
+    const { sup, writtenLines } = await startedSupervisor();
+    const result = await sup.proposeWrite('demo-game-quest-id-000000000000', 'C:/save.json', '', '5000', '9999');
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /invalid_write_params/);
+    assert.equal(writtenLines().find((l) => l.includes('"proposeWriteField"')), undefined);
+  });
+
+  test('rejects an empty gameId', async () => {
+    const { sup } = await startedSupervisor();
+    const result = await sup.proposeWrite('', 'C:/save.json', 'SaveGame.player.0.money', '5000', '9999');
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /invalid_write_params/);
+  });
+
+  test('rejects an oversized field path', async () => {
+    const { sup } = await startedSupervisor();
+    const result = await sup.proposeWrite(
+      'demo-game-quest-id-000000000000',
+      'C:/save.json',
+      'x'.repeat(600),
+      '5000',
+      '9999',
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /invalid_write_params/);
+  });
+});
+
 describe('createTrainerHostSupervisor — rollback backup ownership gate', () => {
   async function createOwnedBackupScenario() {
     await initDatabase();

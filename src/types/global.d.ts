@@ -194,6 +194,33 @@ interface Window {
     // Compatibility profiles
     getCompatibilityProfile: (gameId: string) => Promise<any | null>;
     getAllProfiles: () => Promise<any[]>;
+    // Canonical trainer execution (P4-10/P4-13) — reuses the already-attached
+    // live-memory session (liveMemoryAttach below) instead of a second attach.
+    // Every call is keyed by trainerId (catalogGameId)/featureId/
+    // transactionId, never a raw address (trainer-seed-discovered-feature is
+    // address-carrying but only ever seeds a scan_first/scan_unknown
+    // feature's already-discovered target — see runtime.ts).
+    trainerBindRuntime: (payload: { catalogGameId: string; pid: number; executableName: string; executablePath?: string; executableHashSHA256?: string; driftAcknowledged?: boolean }) => Promise<any>;
+    trainerUnbindRuntime: () => Promise<any>;
+    trainerGetRuntimeState: () => Promise<any>;
+    trainerProposeWriteFeature: (payload: { featureId: string; requestedValue: number }) => Promise<any>;
+    trainerIssueWriteConsent: (payload: { featureId: string; proposalId: string }) => Promise<any>;
+    trainerConfirmWriteFeature: (payload: { featureId: string; proposalId: string; consentToken: string }) => Promise<any>;
+    trainerProposeFreezeFeature: (payload: { featureId: string; value: number; intervalMs?: number }) => Promise<any>;
+    trainerIssueFreezeConsent: (payload: { featureId: string; proposalId: string }) => Promise<any>;
+    trainerConfirmFreezeFeature: (payload: { featureId: string; proposalId: string; consentToken: string }) => Promise<any>;
+    trainerDeactivateFeature: (payload: { featureId: string }) => Promise<any>;
+    trainerRollbackFeature: (payload: { featureId: string; proposalId: string }) => Promise<any>;
+    trainerSeedDiscoveredFeature: (payload: { featureId: string; address: string; dataType: string }) => Promise<any>;
+    trainerExecuteComposite: (payload: {
+      id: string;
+      actions: Array<
+        | { kind: 'write'; featureId: string; requestedValue: number; proposalId: string; consentToken: string; reason?: string }
+        | { kind: 'freeze'; featureId: string; value: number; proposalId: string; consentToken: string; intervalMs?: number }
+      >;
+    }) => Promise<any>;
+    trainerCancelComposite: (payload: { transactionId: string }) => Promise<any>;
+    trainerGetTransactionState: (payload: { transactionId: string }) => Promise<any>;
     // Live Memory Trainer (V2, feature-flagged off by default, single-player/
     // offline only — see PROJECT_SPEC.md Section 3.1)
     liveMemoryListProcesses: () => Promise<{ success: boolean; processes?: { pid: number; name: string; executablePath?: string; parentPid?: number; parentProcessName?: string; startTime?: string }[]; error?: string }>;

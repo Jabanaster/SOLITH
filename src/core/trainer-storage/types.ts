@@ -49,6 +49,19 @@ export interface TrainerDefinitionProvenance {
   updatedAt: string;
   /** Other trainer_mod_packs rows that exist for the same catalog game but were NOT selected (mission §21: no silent overwrite/hide). */
   conflictingSources: ConflictingTrainerSource[];
+  /**
+   * ModPack fields `modPackConversionLosses()` (mod-pack-adapter.ts) found no
+   * canonical `MemoryFeatureV1`/`SolithDefinitionV1` equivalent for, when this
+   * record's content originated from a ModPack conversion (P4-13 §20 — the
+   * "lossy fields warned" half of LOSSY_WITH_WARNING must actually reach
+   * callers, not just be computable in isolation). Optional and additive:
+   * absent whenever the record's provenance isn't ModPack-derived, or when
+   * the conversion happened far enough upstream of this read that the
+   * original ModPack shape is no longer available to re-derive it from (see
+   * the persistTrainerDefinition doc comment on `SaveTrainerDefinitionInput`
+   * for the one call site where that gap still exists).
+   */
+  conversionWarnings?: string[];
 }
 
 export interface CanonicalTrainerRecord {
@@ -79,4 +92,22 @@ export interface SaveTrainerDefinitionInput {
   syncedAt?: string;
   certLevel?: HubCertificationLevel;
   remoteUpdatedAt?: number;
+  /**
+   * Caller-computed `modPackConversionLosses()` output (P4-13 §20), for a
+   * caller that is converting a ModPack to `rawInput` itself before calling
+   * `persistTrainerDefinition()` (currently only trainer-catalog/sync/index.ts).
+   * `persistTrainerDefinition()` stores `JSON.stringify(rawInput)` after
+   * migration/validation — the original ModPack shape is gone from the
+   * persisted row the moment this call returns. So this value is attached
+   * to THIS call's own returned `CanonicalTrainerRecord.provenance` only; it
+   * is NOT persisted, and a later independent read of the same
+   * catalogGameId (`getCanonicalTrainerDefinition`, after this process
+   * exits or from another call) will not see it. Making it durable would
+   * need a new trainer_mod_packs column plus a schema migration, which is
+   * out of scope here (see P4-13 §20 final-report disposition note). This
+   * gap does not apply to the legacy-unversioned migration path
+   * (`legacy-unversioned-migration.ts`), which re-derives conversionWarnings
+   * fresh from the still-raw stored ModPack JSON on every single read.
+   */
+  conversionWarnings?: string[];
 }

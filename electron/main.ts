@@ -1060,7 +1060,10 @@ handleGuarded('create-proposal-for-edit', async (event, gameId: string, filePath
 
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
-    
+
+    const { assertRecipeSafeForProposal } = await import('../src/core/recipes/recipe-safety-gate.js');
+    assertRecipeSafeForProposal(parsed.recipeId);
+
     const editorModule = await import('../src/core/saves/editor.js');
     const proposal = editorModule.createProposalForEdit(
       parsed.gameId,
@@ -1087,7 +1090,10 @@ handleGuarded('apply-proposal', async (event, proposal: any) => {
 
     const dbModule = await import('../src/core/database/index.js');
     await dbModule.initDatabase();
-    
+
+    const { assertRecipeSafeForProposal } = await import('../src/core/recipes/recipe-safety-gate.js');
+    assertRecipeSafeForProposal(parsed.recipeId);
+
     const editorModule = await import('../src/core/saves/editor.js');
     const dryRunRes = await editorModule.dryRunProposal(parsed as any);
     if (!dryRunRes.success) {

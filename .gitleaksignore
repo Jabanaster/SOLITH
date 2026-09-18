@@ -3,3 +3,12 @@
 c5d4800434693d4fe029c9fe60c8c00cd9348c58:tests/catalog-updates-apply.test.ts:private-key:12
 c5d4800434693d4fe029c9fe60c8c00cd9348c58:tests/catalog-updates-rollback.test.ts:private-key:12
 c5d4800434693d4fe029c9fe60c8c00cd9348c58:tests/catalog-updates-signing.test.ts:private-key:12
+
+# Exact historical false positive from f479176 (PR #59, superseded by c6f7b46,
+# which replaced these literal UUID-shaped consentToken fixtures with
+# randomUUID() calls). gitleaks scans the whole f479176^..HEAD range on every
+# push, so this commit's own historical patch keeps re-matching even though
+# the current file content no longer contains it. No real secret — these were
+# always hardcoded example UUIDs for IPC schema round-trip tests.
+f479176233748734720f74994f74157b5ac6618b:tests/p4-13-trainer-execution-int64.test.ts:generic-api-key:68
+f479176233748734720f74994f74157b5ac6618b:tests/p4-13-trainer-execution-int64.test.ts:generic-api-key:76

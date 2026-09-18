@@ -7,7 +7,7 @@ import { resetForTesting, closeDatabaseSafely, flushPersistence } from '../src/c
 import { persistTrainerDefinition, getCanonicalTrainerDefinition } from '../src/core/trainer-storage/repository.js';
 import { remoteTrainerToModPack } from '../src/core/trainer-catalog/sync/remote-sync.js';
 import { modPackToSolithDefinition, modPackConversionLosses } from '../src/core/definitions/mod-pack-adapter.js';
-import { getModPackForGame, upsertDefinitionPayload } from '../src/core/trainer-catalog/store.js';
+import { getModPackForGame, upsertDefinitionPayload, upsertModPack } from '../src/core/trainer-catalog/store.js';
 import { ALL_GAMES } from '../src/core/cheat-system/games.js';
 import { cheatsForHotkeySlots } from '../src/core/cheat-system/cheat-hotkey-slots.js';
 import { bundledDefinitionsForTests } from '../src/core/trainer-catalog/bundled-definition-seed.js';
@@ -80,6 +80,52 @@ describe('P4-4: legacy adapter convergence', () => {
       // and requiresDiscovery — description has no MemoryFeatureV1 field.
       const losses = modPackConversionLosses(pack);
       assert.ok(losses.includes('cheats[].description'));
+    });
+
+    test('P4-13 §20: lossy ModPack fields reach provenance.conversionWarnings through the real conversion+persistence path, not just modPackConversionLosses() in isolation', () => {
+      const id = gameId('lossy-persisted');
+      const trainer: ParsedRemoteTrainer = { title: 'Lossy Persisted Trainer', gameName: id, sourceUrl: 'https://example.test/lossy-persisted' };
+      const pack = remoteTrainerToModPack(trainer, 'fling');
+      const definition = modPackToSolithDefinition({ ...pack, catalogGameId: id });
+      const conversionWarnings = modPackConversionLosses(pack);
+      assert.ok(conversionWarnings.includes('cheats[].description'));
+
+      // Real conversion (modPackToSolithDefinition) + real persistence
+      // (persistTrainerDefinition), exactly as trainer-catalog/sync/index.ts
+      // does it — this is the write-path half of the P4-13 §20 fix.
+      const persisted = persistTrainerDefinition(definition, {
+        sourceProvider: 'fling',
+        sourceId: trainer.sourceUrl,
+        conversionWarnings,
+      });
+      assert.equal(persisted.success, true);
+      if (!persisted.success) return;
+      assert.ok(persisted.value.provenance.conversionWarnings?.includes('cheats[].description'));
+    });
+
+    test('P4-13 §20: legacy-unversioned rows re-derive conversionWarnings on every read (no persistence gap)', () => {
+      const id = gameId('lossy-legacy');
+      const trainer: ParsedRemoteTrainer = { title: 'Lossy Legacy Trainer', gameName: id, sourceUrl: 'https://example.test/lossy-legacy' };
+      const pack = { ...remoteTrainerToModPack(trainer, 'mrantifun'), catalogGameId: id };
+
+      // Bypasses the canonical schema.v1 conversion entirely — a raw,
+      // unversioned ModPack row, exactly like a historical
+      // pre-P4-2 write (store.ts's upsertModPack()).
+      upsertModPack(pack);
+
+      const canonical = getCanonicalTrainerDefinition(id);
+      assert.equal(canonical.success, true);
+      if (!canonical.success) return;
+      assert.equal(canonical.value.provenance.migratedFromLegacy, true);
+      assert.ok(canonical.value.provenance.conversionWarnings?.includes('cheats[].description'));
+
+      // Read it a second, fully independent time — proves this is
+      // recomputed fresh from the still-raw stored JSON every read, not a
+      // one-shot value that only survived because it was the same call.
+      const canonicalAgain = getCanonicalTrainerDefinition(id);
+      assert.equal(canonicalAgain.success, true);
+      if (!canonicalAgain.success) return;
+      assert.ok(canonicalAgain.value.provenance.conversionWarnings?.includes('cheats[].description'));
     });
 
     test('canonical -> ModPack compatibility export remains functional (mission §21 test 5)', () => {

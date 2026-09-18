@@ -1071,9 +1071,37 @@ export const TrainerBindRuntimeSchema = z.object({
 export const TrainerUnbindRuntimeSchema = z.object({}).strict();
 export const TrainerGetRuntimeStateSchema = z.object({}).strict();
 
+// P4-13 §19: `requestedValue`/`value` below stay plain `number` for every
+// caller — that is the same lossy-beyond-Number.MAX_SAFE_INTEGER
+// representation `MemoryManager.proposeWrite`/`proposeFreeze` and
+// `LiveWriteProposal`/`FreezeProposal` (src/core/live-memory/types.ts) have
+// always used, all the way down to the native write call. Making an int64
+// write/freeze value transport EXACTLY (not just displayably) would require
+// changing those Phase 2 types/signatures too — out of this stage's scope
+// (Phase 2 discovery/scan/write primitives are explicitly untouched by
+// P4-13; the same boundary every other file in this stage respects). The
+// optional decimal-string sibling below (mirroring
+// `LiveMemoryScanFirstSchema.targetValueBigint`'s established convention)
+// is validated and round-trips exactly through this schema layer, so a
+// future caller wiring real int64 write support has an already-correct,
+// tested transport to build on — but it is NOT yet threaded into the
+// runtime dispatch call, which still narrows to `number` at
+// `TrainerRuntime.proposeWriteFeature`/`proposeFreezeFeature`.
+const INT64_MIN = -9223372036854775808n;
+const INT64_MAX = 9223372036854775807n;
+const VALUE_BIGINT = z
+  .string()
+  .regex(/^-?\d{1,20}$/)
+  .refine((v) => {
+    const n = BigInt(v);
+    return n >= INT64_MIN && n <= INT64_MAX;
+  }, 'value must fit in a signed 64-bit integer')
+  .optional();
+
 export const TrainerProposeWriteFeatureSchema = z.object({
   featureId: z.string().min(1).max(128),
   requestedValue: z.number().finite(),
+  requestedValueBigint: VALUE_BIGINT,
 }).strict();
 
 export const TrainerIssueWriteConsentSchema = z.object({
@@ -1090,6 +1118,7 @@ export const TrainerConfirmWriteFeatureSchema = z.object({
 export const TrainerProposeFreezeFeatureSchema = z.object({
   featureId: z.string().min(1).max(128),
   value: z.number().finite(),
+  valueBigint: VALUE_BIGINT,
   intervalMs: z.number().int().positive().max(60_000).optional(),
 }).strict();
 
@@ -1113,6 +1142,30 @@ export const TrainerRollbackFeatureSchema = z.object({
   proposalId: z.string().min(1).max(128),
 }).strict();
 
+/**
+ * P4-13 canonical discovery handoff: hands the runtime an address a
+ * legitimate Phase 2 discovery/scan flow (unchanged by this stage) already
+ * confirmed, for a `scan_first`/`scan_unknown` feature only — the handler
+ * (electron/trainer-execution-ipc.ts) and TrainerRuntime itself both refuse
+ * any other feature type, so this can never override a real AOB/pointer
+ * resolution. `address` is a hex string, never a bare Number, matching every
+ * other address-carrying schema in this file.
+ */
+export const TrainerSeedDiscoveredFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  // Rejects the null/never-resolved sentinel (0x0) a scan can legitimately
+  // report as "not found" — mirrors the same 0x0 rejection
+  // hydrateFromZeroInputFeatures already applies to Zero-Input results
+  // before treating an address as confirmed. This is a basic sanity floor,
+  // not a full provenance check: the real security boundary for any write
+  // this seeded address eventually enables remains the human-approved
+  // consent dialog in trainer-issue-write-consent/trainer-issue-freeze-
+  // consent, exactly as it already is for the legacy liveMemoryProposeWrite
+  // channel this seed handoff exists to replace.
+  address: z.string().regex(/^0x[0-9a-fA-F]+$/, 'address must be 0x-prefixed hex').refine((v) => BigInt(v) !== 0n, 'address must not be the null/unresolved sentinel (0x0)'),
+  dataType: z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']),
+}).strict();
+
 // Each action requires a proposalId+consentToken pair already obtained via
 // the normal trainer-propose-*/trainer-issue-*-consent flow for that
 // feature (mission §16: no transaction-wide consent bypass) — the handler
@@ -1122,6 +1175,7 @@ const TRAINER_TRANSACTION_WRITE_ACTION = z.object({
   kind: z.literal('write'),
   featureId: z.string().min(1).max(128),
   requestedValue: z.number().finite(),
+  requestedValueBigint: VALUE_BIGINT,
   proposalId: z.string().min(1).max(128),
   consentToken: z.string().uuid(),
   reason: z.string().max(256).optional(),
@@ -1131,6 +1185,7 @@ const TRAINER_TRANSACTION_FREEZE_ACTION = z.object({
   kind: z.literal('freeze'),
   featureId: z.string().min(1).max(128),
   value: z.number().finite(),
+  valueBigint: VALUE_BIGINT,
   proposalId: z.string().min(1).max(128),
   consentToken: z.string().uuid(),
   intervalMs: z.number().int().positive().max(60_000).optional(),

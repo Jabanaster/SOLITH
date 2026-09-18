@@ -12,6 +12,7 @@ import {
   TrainerProposeFreezeFeatureSchema,
   TrainerProposeWriteFeatureSchema,
   TrainerRollbackFeatureSchema,
+  TrainerSeedDiscoveredFeatureSchema,
   TrainerTransactionIdSchema,
   TrainerUnbindRuntimeSchema,
   TrainerGetRuntimeStateSchema,
@@ -468,6 +469,22 @@ export function registerTrainerExecutionIpc(): void {
       const parsed = TrainerDeactivateFeatureSchema.parse(payload);
       const { entry } = requireExecutionEntry(event);
       const result = trainerApplicationService.deactivateFeature(entry.runtime, parsed.featureId);
+      return serializeRuntimeResult(result);
+    } catch (error) {
+      return errorResult('CAPABILITY_UNAVAILABLE', catchMessage(error));
+    }
+  });
+
+  ipcMain.handle('trainer-seed-discovered-feature', async (event, payload: unknown) => {
+    try {
+      const senderCheck = requireTrustedSender(event);
+      if (senderCheck.ok === false) return errorResult('AUTHORIZATION_FAILED', `sender_rejected:${senderCheck.reason}`);
+      const parsed = TrainerSeedDiscoveredFeatureSchema.parse(payload);
+      const { entry } = requireExecutionEntry(event);
+      const result = trainerApplicationService.seedDiscoveredFeature(entry.runtime, parsed.featureId, {
+        address: BigInt(parsed.address),
+        dataType: parsed.dataType,
+      });
       return serializeRuntimeResult(result);
     } catch (error) {
       return errorResult('CAPABILITY_UNAVAILABLE', catchMessage(error));
