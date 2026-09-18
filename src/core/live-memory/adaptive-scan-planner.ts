@@ -120,7 +120,6 @@ export interface ScanTelemetry {
 export type ScanStrategy =
   | 'REFERENCE_FULL'
   | 'BROAD_FULL'
-  | 'MODULE_DEFERRED'
   | 'PRIVATE_FIRST'
   | 'LARGEST_FIRST'
   | 'NARROWED_BY_PRIOR_CANDIDATES';
