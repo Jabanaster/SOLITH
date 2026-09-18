@@ -1043,3 +1043,97 @@ export function validateSaveDataFileAccess(gameId: string, filePath: string): Ip
 export const ArtworkCacheRefreshSchema = z.object({
   catalogGameIds: z.array(z.string().min(1).max(120)).max(POPULAR_TRAINER_LIMIT).optional(),
 });
+
+// ── P4-10: canonical trainer execution IPC ──────────────────────────────────
+// Every payload here is keyed by trainerId (catalogGameId)/featureId/
+// transactionId — never a raw memory address (mission §17). The bound
+// process identity comes from the caller's ALREADY-authorized live-memory
+// session (electron/live-memory-ipc.ts's per-sender bundle); these schemas
+// only carry what's needed to re-run checkPreBindCompatibility against it
+// and cross-verify identity, not to author a fresh attach.
+
+export const TrainerBindRuntimeSchema = z.object({
+  catalogGameId: z.string().min(1).max(128),
+  pid: z.number().int().positive(),
+  executableName: z.string().min(1).max(260),
+  executablePath: z.string().min(1).max(1024).optional(),
+  executableHashSHA256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  driftAcknowledged: z.boolean().optional(),
+}).strict();
+
+export const TrainerUnbindRuntimeSchema = z.object({}).strict();
+export const TrainerGetRuntimeStateSchema = z.object({}).strict();
+
+export const TrainerProposeWriteFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  requestedValue: z.number().finite(),
+}).strict();
+
+export const TrainerIssueWriteConsentSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  proposalId: z.string().min(1).max(128),
+}).strict();
+
+export const TrainerConfirmWriteFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  proposalId: z.string().min(1).max(128),
+  consentToken: z.string().uuid(),
+}).strict();
+
+export const TrainerProposeFreezeFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  value: z.number().finite(),
+  intervalMs: z.number().int().positive().max(60_000).optional(),
+}).strict();
+
+export const TrainerIssueFreezeConsentSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  proposalId: z.string().min(1).max(128),
+}).strict();
+
+export const TrainerConfirmFreezeFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  proposalId: z.string().min(1).max(128),
+  consentToken: z.string().uuid(),
+}).strict();
+
+export const TrainerDeactivateFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+}).strict();
+
+export const TrainerRollbackFeatureSchema = z.object({
+  featureId: z.string().min(1).max(128),
+  proposalId: z.string().min(1).max(128),
+}).strict();
+
+// Each action requires a proposalId+consentToken pair already obtained via
+// the normal trainer-propose-*/trainer-issue-*-consent flow for that
+// feature (mission §16: no transaction-wide consent bypass) — the handler
+// cross-checks proposalId against the feature's current pending proposal
+// before trusting the token, exactly like the single-action confirm path.
+const TRAINER_TRANSACTION_WRITE_ACTION = z.object({
+  kind: z.literal('write'),
+  featureId: z.string().min(1).max(128),
+  requestedValue: z.number().finite(),
+  proposalId: z.string().min(1).max(128),
+  consentToken: z.string().uuid(),
+  reason: z.string().max(256).optional(),
+});
+
+const TRAINER_TRANSACTION_FREEZE_ACTION = z.object({
+  kind: z.literal('freeze'),
+  featureId: z.string().min(1).max(128),
+  value: z.number().finite(),
+  proposalId: z.string().min(1).max(128),
+  consentToken: z.string().uuid(),
+  intervalMs: z.number().int().positive().max(60_000).optional(),
+});
+
+export const TrainerExecuteCompositeSchema = z.object({
+  id: z.string().min(1).max(128),
+  actions: z.array(z.union([TRAINER_TRANSACTION_WRITE_ACTION, TRAINER_TRANSACTION_FREEZE_ACTION])).min(1).max(16),
+}).strict();
+
+export const TrainerTransactionIdSchema = z.object({
+  transactionId: z.string().min(1).max(128),
+}).strict();

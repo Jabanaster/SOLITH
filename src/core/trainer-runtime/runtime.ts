@@ -2,18 +2,24 @@ import { migrateTrainerDefinition } from '../definitions/migrations/index.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import type { LiveProcessTarget } from '../live-memory/types.js';
 import {
+  confirmFreezeAction,
+  confirmWriteAction,
   dispatchWriteAction,
+  proposeFreezeAction,
+  proposeWriteAction,
   resolveFeatureAction,
   rollbackAction,
   startFreezeAction,
   stopFreezeAction,
   type WriteApproval,
 } from './action-executor.js';
+import type { FreezeProposal, LiveWriteProposal } from '../live-memory/types.js';
 import type { TrainerRuntimeCapabilities } from './capabilities.js';
 import { checkPreBindCompatibility, type CompatibilityDecision, type PreBindCompatibilityInput } from './compatibility.js';
 import type { WriteConsentBinding } from '../consent/write-consent.js';
 import { classifyLiveMemoryErrorString, runtimeError, type RuntimeError } from './errors.js';
 import { createRuntimeFeatureState, invalidateAllFeatures, type RuntimeFeatureState } from './feature-runtime.js';
+import type { SessionOwnership } from './ownership.js';
 import { assertTransition, canTransition, type RuntimeLifecycleState } from './state.js';
 import { fail, ok, type RuntimeResult } from './types.js';
 
@@ -92,6 +98,8 @@ export class TrainerRuntime {
   private compatibility: CompatibilityDecision | null = null;
   private readonly features = new Map<string, RuntimeFeatureState>();
   private lastFailure: RuntimeError | null = null;
+  /** Set explicitly by bind()/bindExisting() — never implicit. See ownership.ts. */
+  private ownership: SessionOwnership | null = null;
 
   constructor(private readonly capabilities: TrainerRuntimeCapabilities) {}
 
@@ -111,8 +119,24 @@ export class TrainerRuntime {
     return this.features.get(featureId);
   }
 
+  /** Renderer-safe: which feature ids are currently ACTIVE (write-committed or freeze-running). */
+  getActiveFeatureIds(): string[] {
+    return [...this.features.entries()].filter(([, f]) => f.activation.state === 'active').map(([id]) => id);
+  }
+
+  /** Renderer-safe process identity summary — no raw handles. Null when not bound. */
+  getAttachedIdentitySummary(): { pid: number; executableName: string } | null {
+    const identity = this.capabilities.getAttachedIdentity();
+    return identity ? { pid: identity.pid, executableName: identity.executableName } : null;
+  }
+
   getLastFailure(): RuntimeError | null {
     return this.lastFailure;
+  }
+
+  /** Null before any bind attempt. See ownership.ts for OWNED/BORROWED semantics. */
+  getOwnership(): SessionOwnership | null {
+    return this.ownership;
   }
 
   private transitionTo(next: RuntimeLifecycleState): void {
@@ -220,6 +244,62 @@ export class TrainerRuntime {
     for (const feature of this.definition!.memoryFeatures ?? []) {
       this.features.set(feature.id, createRuntimeFeatureState(feature));
     }
+    this.ownership = 'OWNED';
+    this.transitionTo('BOUND');
+    this.transitionTo('READY');
+    return ok(undefined);
+  }
+
+  /**
+   * COMPATIBILITY_CHECKED -> BOUND, reusing an already-attached session
+   * instead of performing a second `attach()` (the P4-10 fix for the P4-9
+   * blocker: `bind()` used to be the only entry point, and it always
+   * attached itself).
+   *
+   * Preconditions the caller is responsible for: `checkCompatibility()` has
+   * already re-run target-authorization + executable-fingerprint checks
+   * against `target` (identical to what `bind()` runs pre-attach — same
+   * `checkPreBindCompatibility` call, just fed from the borrowed session's
+   * own known identity instead of a fresh process-picker selection). The one
+   * gate `bind()` gets that this method cannot re-run is the driver-level
+   * protected-target module scan, which is inherently bind-time-only (see
+   * compatibility.ts) — it is preserved BY CONSTRUCTION here, not skipped:
+   * `verifyIdentity()` below proves the live process is still the exact
+   * (pid, executableName, path, startTime) tuple that already passed
+   * protected-target at the session's own original attach(), and the
+   * pid/executableName cross-check against `target` refuses to bind onto a
+   * session whose live identity doesn't match what was just compatibility
+   * checked.
+   */
+  async bindExisting(target: Pick<BindTarget, 'pid' | 'executableName'>): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('COMPATIBILITY_CHECKED');
+    if (guard) return guard;
+
+    if (!this.capabilities.isAttached()) {
+      return this.failClosed('CAPABILITY_UNAVAILABLE', 'No existing attached session available to borrow.');
+    }
+
+    const identityError = this.capabilities.verifyIdentity();
+    if (identityError) {
+      return this.failClosed('PROCESS_LOST', identityError);
+    }
+
+    const attached = this.capabilities.getAttachedIdentity();
+    if (
+      !attached ||
+      attached.pid !== target.pid ||
+      attached.executableName.toLowerCase() !== target.executableName.toLowerCase()
+    ) {
+      return this.failClosed(
+        'AUTHORIZATION_FAILED',
+        'Borrowed session identity does not match the compatibility-checked target; refusing to bind.',
+      );
+    }
+
+    for (const feature of this.definition!.memoryFeatures ?? []) {
+      this.features.set(feature.id, createRuntimeFeatureState(feature));
+    }
+    this.ownership = 'BORROWED';
     this.transitionTo('BOUND');
     this.transitionTo('READY');
     return ok(undefined);
@@ -254,7 +334,10 @@ export class TrainerRuntime {
     }
 
     const result = await dispatchWriteAction(this.capabilities, feature, requestedValue, approval, reason);
-    if (result.success === false) return fail(result.error);
+    if (result.success === false) {
+      this.degradeOnProcessLoss(result.error);
+      return fail(result.error);
+    }
     if (this.state === 'READY') this.transitionTo('ACTIVE');
     return ok(undefined);
   }
@@ -280,7 +363,100 @@ export class TrainerRuntime {
     }
 
     const result = await startFreezeAction(this.capabilities, feature, value, approval, intervalMs);
-    if (result.success === false) return fail(result.error);
+    if (result.success === false) {
+      this.degradeOnProcessLoss(result.error);
+      return fail(result.error);
+    }
+    if (this.state === 'READY') this.transitionTo('ACTIVE');
+    return ok(undefined);
+  }
+
+  /**
+   * READY/ACTIVE -> READY/ACTIVE (no state change on its own). Propose-only
+   * half of a write (P4-10) — resolves the feature if needed, stages a real
+   * proposal, and returns it so the caller (IPC layer) can request a consent
+   * token bound to this exact proposalId/address/value before calling
+   * `confirmWriteFeature`. Mirrors the existing Phase 2
+   * propose -> issue-consent -> confirm shape instead of inventing a new one.
+   */
+  async proposeWriteFeature(featureId: string, requestedValue: number, reason?: string): Promise<RuntimeResult<LiveWriteProposal>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard as RuntimeResult<LiveWriteProposal>;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.definition.type !== 'toggle' && feature.definition.type !== 'write_once') {
+      return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not a write action.`);
+    }
+
+    if (feature.resolution.state !== 'resolved') {
+      const resolved = await resolveFeatureAction(this.capabilities, feature);
+      if (resolved.success === false) return fail(resolved.error);
+    }
+
+    return proposeWriteAction(this.capabilities, feature, requestedValue, reason);
+  }
+
+  /**
+   * Confirm-only half of a write (P4-10). `proposalId` must match the one
+   * `proposeWriteFeature` returned for this feature — refused otherwise,
+   * fail-closed, so a caller can never confirm an unrelated/stale proposal
+   * under a different feature's identity.
+   */
+  async confirmWriteFeature(featureId: string, proposalId: string, approval: WriteApproval, reason?: string): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.activation.proposalId !== proposalId) {
+      return this.failClosed('INVALID_STATE_TRANSITION', `Proposal "${proposalId}" does not match the pending proposal for feature "${featureId}".`);
+    }
+
+    const result = await confirmWriteAction(this.capabilities, feature, proposalId, approval, reason);
+    if (result.success === false) {
+      this.degradeOnProcessLoss(result.error);
+      return fail(result.error);
+    }
+    if (this.state === 'READY') this.transitionTo('ACTIVE');
+    return ok(undefined);
+  }
+
+  /** Propose-only half of a freeze (P4-10). See `proposeWriteFeature` for the consent-token rationale. */
+  async proposeFreezeFeature(featureId: string, value: number, intervalMs?: number): Promise<RuntimeResult<FreezeProposal>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard as RuntimeResult<FreezeProposal>;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.definition.type !== 'freeze') {
+      return this.failClosed('UNSUPPORTED_ACTION', `Feature "${featureId}" is type "${feature.definition.type}", not freeze.`);
+    }
+
+    if (feature.resolution.state !== 'resolved') {
+      const resolved = await resolveFeatureAction(this.capabilities, feature);
+      if (resolved.success === false) return fail(resolved.error);
+    }
+
+    return proposeFreezeAction(this.capabilities, feature, value, intervalMs);
+  }
+
+  /** Confirm-only half of a freeze (P4-10). Same proposalId cross-check as `confirmWriteFeature`. */
+  async confirmFreezeFeature(
+    featureId: string,
+    proposalId: string,
+    approval: { consentToken: string; consentBinding: WriteConsentBinding },
+  ): Promise<RuntimeResult<void>> {
+    const guard = this.requireState('READY', 'ACTIVE');
+    if (guard) return guard;
+    const feature = this.features.get(featureId);
+    if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
+    if (feature.activation.proposalId !== proposalId) {
+      return this.failClosed('INVALID_STATE_TRANSITION', `Proposal "${proposalId}" does not match the pending proposal for feature "${featureId}".`);
+    }
+
+    const result = await confirmFreezeAction(this.capabilities, feature, proposalId, approval);
+    if (result.success === false) {
+      this.degradeOnProcessLoss(result.error);
+      return fail(result.error);
+    }
     if (this.state === 'READY') this.transitionTo('ACTIVE');
     return ok(undefined);
   }
@@ -305,9 +481,29 @@ export class TrainerRuntime {
     if (!feature) return this.failClosed('SEMANTIC_INVALID', `Unknown feature id "${featureId}".`);
 
     const result = await rollbackAction(this.capabilities, feature, proposalId);
-    if (result.success === false) return fail(result.error);
+    if (result.success === false) {
+      this.degradeOnProcessLoss(result.error);
+      return fail(result.error);
+    }
     this.maybeReturnToReady();
     return ok(undefined);
+  }
+
+  /**
+   * P4-10 (mission §12): a single-action failure whose reason is
+   * PROCESS_LOST means the same thing a composite transaction's own
+   * `degradeRuntime()` already treats it as — the attached process is gone.
+   * Before this, only the composite-transaction path degraded the runtime on
+   * process loss; a single write/freeze/rollback could fail with
+   * PROCESS_LOST and leave the runtime reporting READY/ACTIVE, contradicting
+   * the live session underneath. No-op for any other failure reason —
+   * per-operation failures that aren't about the process being gone do not
+   * force a state transition (see state.ts's own documented philosophy).
+   */
+  private degradeOnProcessLoss(error: RuntimeError): void {
+    if (error.reason !== 'PROCESS_LOST') return;
+    if (this.state !== 'BOUND' && this.state !== 'READY' && this.state !== 'ACTIVE') return;
+    this.handleProcessLoss(error.message, error);
   }
 
   private maybeReturnToReady(): void {
@@ -322,12 +518,15 @@ export class TrainerRuntime {
    * action can be dispatched against a stale process without an explicit
    * rebind + fresh compatibility check.
    */
-  handleProcessLoss(reason = 'Attached process identity could not be reverified.'): RuntimeResult<void> {
+  handleProcessLoss(
+    reason = 'Attached process identity could not be reverified.',
+    errorOverride?: RuntimeError,
+  ): RuntimeResult<void> {
     const guard = this.requireState('BOUND', 'READY', 'ACTIVE');
     if (guard) return guard;
     this.capabilities.stopFreeze();
     invalidateAllFeatures(this.features);
-    this.lastFailure = runtimeError('PROCESS_LOST', reason);
+    this.lastFailure = errorOverride ?? runtimeError('PROCESS_LOST', reason);
     this.transitionTo('DEGRADED');
     return ok(undefined);
   }
@@ -363,12 +562,26 @@ export class TrainerRuntime {
     return this.checkCompatibility(input);
   }
 
-  /** Full teardown from any non-terminal state. Always safe to call. */
+  /**
+   * Full teardown from any non-terminal state. Always safe to call.
+   *
+   * Ownership-aware (P4-10 mission §7/§13): an OWNED runtime detaches the
+   * session it attached itself. A BORROWED runtime must never destroy a
+   * session it does not own — the session bundle that lent it out (P4-10's
+   * per-sender session in electron/live-memory-ipc.ts) remains responsible
+   * for that. A borrowed runtime does stop any freeze IT started, so
+   * disposing this runtime instance never leaves an orphan freeze tied to
+   * app state nothing tracks anymore, without touching the session itself.
+   */
   dispose(): void {
     if (this.state === 'DISPOSED') return;
     if (canTransition(this.state, 'DISPOSED')) {
       if (this.capabilities.isAttached()) {
-        this.capabilities.detach();
+        if (this.ownership === 'OWNED') {
+          this.capabilities.detach();
+        } else {
+          this.capabilities.stopFreeze();
+        }
       }
       this.features.clear();
       this.state = 'DISPOSED';

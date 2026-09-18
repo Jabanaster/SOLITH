@@ -30,12 +30,18 @@ import type { TrainerRuntimeCapabilities } from '../../src/core/trainer-runtime/
  * Defaults behave like a working system (happy path needs no scripting);
  * set the `next*` fields to inject a specific failure for the next call.
  */
+type AttachedIdentity = NonNullable<ReturnType<TrainerRuntimeCapabilities['getAttachedIdentity']>>;
+
 export class FakeTrainerRuntimeCapabilities implements TrainerRuntimeCapabilities {
   private attached = false;
+  private lastAttachedTarget: LiveProcessTarget | null = null;
   private readonly pendingWrites = new Map<string, LiveWriteProposal>();
   private readonly confirmedWrites = new Map<string, LiveWriteManifest>();
   private freeze: { address: LiveMemoryAddress; value: number; active: boolean } | null = null;
   private pendingFreeze: FreezeProposal | null = null;
+
+  /** P4-10: overrides getAttachedIdentity()'s derived-from-target default, for mismatch tests. */
+  attachedIdentityOverride: AttachedIdentity | null = null;
 
   /** Address resolveFeature() returns for a given feature id, or a specific error message to throw instead. */
   resolvedAddresses = new Map<string, LiveMemoryAddress>();
@@ -60,27 +66,53 @@ export class FakeTrainerRuntimeCapabilities implements TrainerRuntimeCapabilitie
     return this.attached;
   }
 
-  async attach(_target: LiveProcessTarget, userConfirmedOffline: boolean, _fingerprint?: AttachFingerprintOptions): Promise<AttachResult> {
+  async attach(target: LiveProcessTarget, userConfirmedOffline: boolean, _fingerprint?: AttachFingerprintOptions): Promise<AttachResult> {
     if (this.nextAttachResult) {
       const result = this.nextAttachResult;
       this.nextAttachResult = null;
-      if (result.success) this.attached = true;
+      if (result.success) {
+        this.attached = true;
+        this.lastAttachedTarget = target;
+      }
       return result;
     }
     this.attached = true;
+    this.lastAttachedTarget = target;
     return { success: true, guard: { allowed: userConfirmedOffline, reason: userConfirmedOffline ? 'ok' : 'waiver required' } };
   }
 
   detach(): void {
     this.attached = false;
+    this.lastAttachedTarget = null;
     this.pendingWrites.clear();
     this.confirmedWrites.clear();
     this.freeze = null;
     this.pendingFreeze = null;
   }
 
+  /** P4-10 test seam: simulates an attach that happened outside this fake instance (session-reuse tests). */
+  simulateAlreadyAttached(target: LiveProcessTarget): void {
+    this.attached = true;
+    this.lastAttachedTarget = target;
+  }
+
   verifyIdentity(): string | null {
     return this.identityError;
+  }
+
+  getAttachedIdentity(): AttachedIdentity | null {
+    if (this.attachedIdentityOverride) return this.attachedIdentityOverride;
+    if (!this.attached || !this.lastAttachedTarget) return null;
+    const t = this.lastAttachedTarget;
+    return {
+      pid: t.pid,
+      executableName: t.executableName,
+      executablePath: t.executablePath ?? 'C:\\unknown.exe',
+      startTime: t.startTime ?? new Date(0).toISOString(),
+      volumeSerialNumber: t.volumeSerialNumber,
+      fileIndex: t.fileIndex,
+      exeSha256: t.exeSha256,
+    };
   }
 
   async resolveFeature(feature: MemoryFeatureV1): Promise<LiveMemoryAddress> {

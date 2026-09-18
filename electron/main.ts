@@ -44,6 +44,7 @@ import {
 } from './ipc-validation.js';
 import type { TrainerHostSupervisor } from '../src/core/trainer-host/index.js';
 import { registerLiveMemoryIpc, disposeAllLiveMemorySessions, disposeLiveMemorySessionForOwner } from './live-memory-ipc.js';
+import { registerTrainerExecutionIpc } from './trainer-execution-ipc.js';
 import { isPrivilegedConsentEnvOverrideAllowed } from './privileged-consent-dialog.js';
 import { registerAuthorityIpc } from './authority-ipc.js';
 import { buildIpcAuthorityRequest, evaluateAuthority } from './authority-bridge.js';
@@ -101,6 +102,7 @@ protocol.registerSchemesAsPrivileged([
 // Registered once at module level, same as the other IPC handlers below, so
 // it is never duplicated on window recreation.
 registerLiveMemoryIpc();
+registerTrainerExecutionIpc();
 registerCheatToggleIpc();
 registerTrainerHotkeyIpc();
 registerAuthorityIpc();
