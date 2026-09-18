@@ -460,6 +460,7 @@ Every phase must close at **100%** — no known in-scope failure accepted, no fa
 - Phase 2 requirement count: **unchanged at 14 COMPLETE / 3 PARTIAL / 11 ABSENT.** The 28-item recount tracks capability existence, not UI-e2e certification depth (see the note two sections above); "hotkeys" and "freeze/write/revert" were already counted COMPLETE on capability grounds before this closure.
 - **P2-9 moves NOT_COMPLETE → CERTIFIED COMPLETE.** **P2-C moves IN PROGRESS → CERTIFIED COMPLETE (2 of 2 checkpoints closed).** **P2-6 through P2-9 closeout: COMPLETE.**
 - Evidence: this note; `p2-9-hotkey-packaged.e2e.test.ts`, `p2-9-hotkey-real-process.e2e.test.ts`, `p2-6-7-8-ui-packaged.e2e.test.ts`; commit `1dff3d6`.
+- **Canonical integration.** PR #49 (`feature/solith-phase2-p2-6-through-p2-9` → `master`) merged 2026-09-18, all required checks (TypeScript/architecture, Windows native/Electron gate, CI Fast, Gitleaks×2, OSV-Scanner) PASS at head `03bb135`. Canonical merge SHA on `master`: `acc0a708ab55c9e0bd7ea5cbc6cad0aceeb76833`. Post-merge sanity (typecheck renderer/electron PASS, `test:live-memory` 0 fail) confirmed clean; a file-scoped diff against the concurrently-merged Phase 4 work (P4-8, same PR-adjacent timeframe) confirmed zero drift in every file this mission touched.
 
 ---
 
