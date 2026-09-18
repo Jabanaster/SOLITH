@@ -238,6 +238,16 @@ export interface ScanBounds {
    * does not.
    */
   signal?: { aborted: boolean };
+  /**
+   * P2-10 adaptive scan planner hook: reorders the eligible region list before
+   * scanning starts. Never drops or adds regions — `undefined`/`'as_enumerated'`
+   * keeps the OS enumeration order exactly as every pre-existing caller already
+   * relies on. The other orders only change which eligible regions are examined
+   * first, which changes elapsed time and, under a byte/match cap, which
+   * regions end up truncated — never which regions are eligible in the first
+   * place (a full, unbounded scan still covers every eligible region).
+   */
+  regionOrder?: 'as_enumerated' | 'module_first' | 'private_first' | 'largest_first';
 }
 
 // ── Freeze (continuous re-write, mirrors mainstream "Infinite X" toggles) ──

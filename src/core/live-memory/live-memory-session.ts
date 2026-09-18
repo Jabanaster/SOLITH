@@ -20,6 +20,9 @@ import type {
   TypedScanResult,
   UnknownScanSnapshot,
 } from './memory-scanner.js';
+import { runPlannedScan } from './adaptive-scan-orchestration.js';
+import { AdaptiveScanTelemetryStore } from './adaptive-scan-telemetry-store.js';
+import type { ScanTelemetry } from './adaptive-scan-planner.js';
 import { resolvePointerPath } from './pointer-resolver.js';
 import { scanForPointerPath, type PointerScanBounds, type PointerPathCandidate } from './pointer-scanner.js';
 import {
@@ -296,7 +299,7 @@ export function byteWidthForType(dataType: LiveValueType): number {
 export type ScanOperationStatus = 'pending' | 'complete' | 'cancelled' | 'error';
 
 export interface ScanOperationEntry {
-  readonly kind: 'exact' | 'aob' | 'pointerMap';
+  readonly kind: 'exact' | 'aob' | 'pointerMap' | 'adaptiveScan';
   readonly controller: AbortController;
   status: ScanOperationStatus;
   result?: unknown;
@@ -312,7 +315,7 @@ export interface ScanOperationCancelResult {
 
 export interface ScanOperationStatusResult {
   status: ScanOperationStatus;
-  kind: 'exact' | 'aob' | 'pointerMap';
+  kind: 'exact' | 'aob' | 'pointerMap' | 'adaptiveScan';
   result?: unknown;
   error?: string;
 }
@@ -444,6 +447,18 @@ export class LiveMemorySession {
   private readonly structures = new Map<string, DiscoveredStructure>();
   private readonly watches = new Map<string, WatchItem>();
   private readonly structureSnapshots = new Map<string, StructureSnapshot>();
+
+  /**
+   * P2-10 — bounded telemetry history for the adaptive scan planner. Needs no
+   * detach()/re-attach clearing of its own: this field lives on the
+   * `LiveMemorySession` instance itself, and `electron/live-memory-ipc.ts`
+   * already constructs a brand-new `LiveMemorySession` per attach (never
+   * reuses one across detach/re-attach) — so a fresh attach always starts
+   * with a fresh, empty store, which is exactly the §16 restart-invalidation
+   * requirement, satisfied by an existing architectural invariant rather than
+   * a new identity-keyed cache.
+   */
+  private readonly adaptiveScanTelemetry = new AdaptiveScanTelemetryStore();
 
   constructor(private readonly driver: MemoryDriver) {}
 
@@ -1114,6 +1129,50 @@ export class LiveMemorySession {
         entry.error = err instanceof Error ? err.message : String(err);
       });
     return operationId;
+  }
+
+  /**
+   * P2-10 — starts a planner-driven scan (adaptive or reference) and returns
+   * its `operationId` synchronously, before any region has been read. Follows
+   * the same `AbortController` + `scanOperations` registry convention as
+   * `startExactScanOperation`/`startAobScanOperation`/pointer-map scans —
+   * `cancelScanOperation`/`getScanOperationStatus` work on this operation
+   * exactly as they do on those, no separate cancel/poll API needed.
+   *
+   * Unlike the legacy `scanFirst`-backed operations (pre-flight-check-only
+   * cancellation), the adaptive scan orchestration yields between regions
+   * (see `adaptive-scan-orchestration.ts`), so a cancel requested after this
+   * call returns can genuinely interrupt a scan already in progress, not just
+   * one still queued.
+   */
+  startAdaptiveScanOperation(dataType: LiveValueType, targetValue: number, mode: 'adaptive' | 'reference' = 'adaptive'): string {
+    if (!this.handle) throw new Error('No process attached.');
+    const operationId = randomUUID();
+    const controller = new AbortController();
+    const entry: ScanOperationEntry = { kind: 'adaptiveScan', controller, status: 'pending' };
+    this.scanOperations.set(operationId, entry);
+    void runPlannedScan(this.driver, this.handle, dataType, targetValue, this.adaptiveScanTelemetry, {
+      mode,
+      signal: controller.signal,
+    })
+      .then((outcome) => {
+        entry.status = outcome.result.completeness.state === 'cancelled' ? 'cancelled' : 'complete';
+        entry.result = outcome;
+      })
+      .catch((err) => {
+        entry.status = 'error';
+        entry.error = err instanceof Error ? err.message : String(err);
+      });
+    return operationId;
+  }
+
+  /**
+   * P2-10 diagnostic/UI surface — bounded, oldest-first telemetry recorded
+   * from planner-driven scans in this attach so far (never mutated by the
+   * caller; `AdaptiveScanTelemetryStore.list()` returns a defensive copy).
+   */
+  getAdaptiveScanTelemetryHistory(): ScanTelemetry[] {
+    return this.adaptiveScanTelemetry.list();
   }
 
   /**
@@ -2376,5 +2435,9 @@ export class LiveMemorySession {
       if (entry.status === 'pending') entry.controller.abort();
     }
     this.scanOperations.clear();
+    // Defense-in-depth alongside the "new LiveMemorySession per attach"
+    // invariant (see the field doc on `adaptiveScanTelemetry`) — a detached
+    // session's planner history is never valid for whatever attaches next.
+    this.adaptiveScanTelemetry.clear();
   }
 }
