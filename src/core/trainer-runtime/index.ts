@@ -19,3 +19,20 @@ export {
   stopFreezeAction,
   rollbackAction,
 } from './action-executor.js';
+export type { TransactionLifecycleState as CompositeTransactionLifecycleState } from './transaction-state.js';
+export {
+  canTransitionTransaction,
+  assertTransitionTransaction,
+  TRANSACTION_TERMINAL_STATES,
+} from './transaction-state.js';
+export type {
+  TransactionAction,
+  WriteTransactionAction,
+  FreezeTransactionAction,
+  TransactionMode,
+  CompositeTransactionPlan,
+  TransactionActionOutcome,
+  TransactionActionRecord,
+  CompositeTransactionResult,
+} from './transaction.js';
+export { CompositeTransactionRuntime } from './transaction.js';
