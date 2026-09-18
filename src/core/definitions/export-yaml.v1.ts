@@ -2,6 +2,7 @@ import type {
   MemoryFeatureV1,
   SaveFieldFeatureV1,
   SolithDefinitionV1,
+  SolithTargetMetadataV1,
 } from './schema.v1.js';
 
 /**
@@ -42,6 +43,40 @@ function yamlBool(value: boolean): string {
 function indentBlock(lines: string[], spaces: number): string[] {
   const pad = ' '.repeat(spaces);
   return lines.map((line) => (line.length > 0 ? `${pad}${line}` : line));
+}
+
+/** Renders a string-list field either inline-empty (`key: []`) or as a block list. */
+function renderStringArray(key: string, values: string[], spaces: number): string[] {
+  if (values.length === 0) {
+    return [`${key}: []`];
+  }
+  return [`${key}:`, ...indentBlock(values.map((v) => `- ${yamlString(v)}`), spaces)];
+}
+
+function renderTargetMetadataEntry(entry: SolithTargetMetadataV1): string[] {
+  const lines = [
+    `- targetId: ${yamlString(entry.targetId)}`,
+    `  launcher: ${yamlString(entry.launcher)}`,
+    `  executableName: ${yamlString(entry.executableName)}`,
+  ];
+  if (entry.executableSha256) {
+    lines.push(`  executableSha256: ${yamlString(entry.executableSha256)}`);
+  }
+  if (entry.executableHashPrefixes && entry.executableHashPrefixes.length > 0) {
+    lines.push(
+      '  executableHashPrefixes:',
+      ...indentBlock(entry.executableHashPrefixes.map((v) => `- ${yamlString(v)}`), 4),
+    );
+  }
+  lines.push(
+    `  moduleName: ${yamlString(entry.moduleName)}`,
+    `  packaging: ${yamlString(entry.packaging)}`,
+    `  accessModel: ${yamlString(entry.accessModel)}`,
+  );
+  if (entry.certificationLevel) {
+    lines.push(`  certificationLevel: ${yamlString(entry.certificationLevel)}`);
+  }
+  return lines;
 }
 
 function renderSaveField(field: SaveFieldFeatureV1, evidence?: string): string[] {
@@ -91,6 +126,9 @@ function renderMemoryFeature(feature: MemoryFeatureV1, sessionNote?: string): st
   if (feature.resolution.pointerChain && feature.resolution.pointerChain.length > 0) {
     lines.push(`    pointerChain: [${feature.resolution.pointerChain.join(', ')}]`);
   }
+  if (feature.certificationLevel) {
+    lines.push(`  certificationLevel: ${yamlString(feature.certificationLevel)}`);
+  }
   if (sessionNote) {
     lines.push(`  # session-only address captured during export: ${sessionNote}`);
     lines.push('  # Replace with restart-stable pointer chain or AOB before distributing this definition.');
@@ -115,8 +153,12 @@ export function serializeDefinitionToYaml(
     `id: ${yamlString(definition.id)}`,
     `title: ${yamlString(definition.title)}`,
     `gameVersion: ${yamlString(definition.gameVersion)}`,
-    'executableHashPrefixes: []',
+    ...(definition.targetSHA256 ? [`targetSHA256: ${yamlString(definition.targetSHA256)}`] : []),
+    ...renderStringArray('executableHashPrefixes', definition.executableHashPrefixes ?? [], 2),
     `author: ${yamlString(definition.author)}`,
+    ...(definition.certificationLevel
+      ? [`certificationLevel: ${yamlString(definition.certificationLevel)}`]
+      : []),
     '',
     'safety:',
     `  requiresApproval: ${yamlBool(definition.safety.requiresApproval)}`,
@@ -128,6 +170,13 @@ export function serializeDefinitionToYaml(
     ...definition.target.executables.map((exe) => `    - ${yamlString(exe)}`),
     `  arch: ${yamlString(definition.target.arch)}`,
   ];
+
+  if (definition.targetMetadata && definition.targetMetadata.length > 0) {
+    lines.push('', 'targetMetadata:');
+    for (const entry of definition.targetMetadata) {
+      lines.push(...indentBlock(renderTargetMetadataEntry(entry), 2));
+    }
+  }
 
   if (definition.connectionBaseline !== undefined) {
     lines.push(`connectionBaseline: ${definition.connectionBaseline}`);

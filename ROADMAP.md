@@ -126,7 +126,7 @@ Reproduced from `36-step-0.13.5-capability-state-matrix.md` (re-certified fresh 
 | CT parsing/ingest | CERTIFIED | 23,953 files / 713,349 cheats / 442,602 pointers / 150,502 scripts / 120,245 AOBs, live-verified | — (already closed) |
 | CT execution (CT→native) | PARTIAL | Dead for 91.7% of catalog via identity-window root cause | 3, 5 |
 | CT export | PARTIAL | Export real and tested; YAML round-trip destroys evidence comments | 5 |
-| Native trainer representation | PARTIAL | 21 competing representations, no canon, no migration | 4 |
+| Native trainer representation | PARTIAL | Canonical schema/persistence/runtime/application-service/execution-IPC backend complete and tested (P4-2/5/7/8/9/10); live app still executes real trainer cheats/save-edits via two independent legacy authorities (`GameConfig`/`useGameCheatSession`, `Recipe`/`saves/editor.ts`) and the new canonical execution IPC has no renderer consumer yet — see `Docs/phase4/008` | 4 |
 | Trainer Creator | ABSENT | Only a legacy `Recipe`-writing surface exists | 6 |
 | Automatic discovery capture | ABSENT | No code path persists a scan/correlation result | 6 |
 | Community backend/client | PARTIAL | Client sync real; deployed backend provenance unverifiable (~7 weeks stale) | 7 |
@@ -168,7 +168,7 @@ All defects classified `ROADMAP_PHASE_REQUIRED` in Step 0.13.5 (`28-step-0.13.5-
 | D05 | Pointer-scan depth truncation/misreporting (`levelsSearched:1` vs `maxDepth:3`, `truncated:false`) | Audit 2 §16 S4 | 1 |
 | D06 | int64 mismatch — lossy above 2^53 at the IPC boundary; `readMemory(...,'int64')` always throws in production | Audit 2 §16 S5/S7 | 1 |
 | D07 | CT/catalog hardcoded lookup windows (200-row / 500-row over a 6,028-row catalog); Stardew Valley and Palworld cannot bind | Audit 2 §20 | 3 |
-| D08 | Trainer representation fragmentation — 21 competing representations, no canon, no migration path | Audit 2 §19 | 4 |
+| D08 | Trainer representation fragmentation — canonical backend now built and certified (P4-2/5/7/8/9/10), but real trainer execution in the shipped app still runs through two independent legacy authorities (`GameConfig`/`useGameCheatSession` live-scan cheats, `Recipe`/`saves/editor.ts` save-edits) instead of the canonical runtime/execution IPC | Audit 2 §19; `Docs/phase4/008-p4-12-final-whole-phase-audit.md` | 4 |
 | D09 | Community fail-open certificate behavior (`cert_level` defaults `L3_Certified`) | Audit 2 §22 | 7 |
 | D10 | Community cursor/pagination defects (poisoned sync cursor permanently disables sync; keyset pagination breaks on ≥100 same-timestamp rows) | Audit 2 §22 | 7 |
 | D11 | Save backup single-slot defect — TrainerHost `.trainer-backup`, 4 sites; a second write destroys the pristine original | Audit 2 §24 | 8 |
@@ -533,7 +533,7 @@ Separately, an audit found Gap 2's production rule (`executable-role.ts`'s `SDK_
 
 **Why This Phase Exists.** Audit 2: "a v2 of the format is unshippable" as it stands — zero migration path exists (`schemaVersion: z.literal(1)`, zero `migrat*` hits) and the existing `SolithDefinitionV1 ⇄ ModPack` round-trip is lossy.
 
-**Current State.** Native trainer representation PARTIAL (D08).
+**Current State.** PARTIAL. The canonical backend is real, singular, and certified: `SolithDefinitionV1` schema/versioning/migration (P4-2), canonical persistence repository (P4-8), canonical `TrainerRuntime`/composite-transaction runtime (P4-5/P4-7), canonical `TrainerApplicationService` and execution IPC backend (P4-9/P4-10) — all independently re-verified current at P4-12. Not yet true: the live application does not yet route real trainer execution through that canonical runtime end-to-end. Two legacy surfaces still hold genuine, independent, live definition-and-execution authority — `GameConfig`/`CheatDefinition`/`useGameCheatSession.ts` (live-scan address discovery, not canonical resolution, for ~90% of the curated cheat catalog) and `Recipe`/`src/core/saves/editor.ts` (own schema, own table, own live save-write execution stack; a built adapter to canonical `SaveFieldFeatureV1` exists but is wired into zero production UI) — and the new P4-10 canonical execution IPC itself has zero renderer call sites yet. See `Docs/phase4/008-p4-12-final-whole-phase-audit.md` for full evidence. D08 remains open (updated below).
 
 **Mandatory Work.** The canonical model must represent, at minimum: trainer identity, game identity, supported versions, cheats, values, pointers, AOB locators, scripts/actions, dependencies, entry groups, value types, dropdowns, hotkeys, activation rules, safety requirements, provenance, authorship, verification maturity, compatibility, migrations, rollback/revert behavior. Define canonical serialization, schema versioning, migration policy, and runtime execution semantics. The native SOLITH format is canonical; CT is interoperability (Phase 5), not the internal model.
 
