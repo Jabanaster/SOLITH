@@ -1,12 +1,12 @@
 import type { SolithDefinitionV1 } from './schema.v1.js';
 import { definitionExportFilename } from './discovery-export.js';
 import { serializeDefinitionToYaml } from './export-yaml.v1.js';
-import { getDefinitionPayload } from '../trainer-catalog/store.js';
+import { loadCatalogDefinition } from './load-catalog-definition.js';
 import type { DefinitionYamlBundle } from './export-definition.js';
 
-/** Export a catalog-stored schema.v1 definition as a shareable YAML community pack. */
+/** Export a catalog-stored schema.v1 definition as a shareable YAML community pack. Routes through the canonical repository (P4-9) instead of the naive syncedAt-only read. */
 export function exportCatalogDefinitionToYaml(catalogGameId: string): DefinitionYamlBundle | null {
-  const definition = getDefinitionPayload(catalogGameId);
+  const definition = loadCatalogDefinition(catalogGameId);
   if (!definition) return null;
 
   const yaml = serializeDefinitionToYaml(definition, {

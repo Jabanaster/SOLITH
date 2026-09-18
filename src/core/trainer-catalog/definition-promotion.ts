@@ -1,7 +1,9 @@
 import type { CertificationLevel } from '../definitions/schema.v1.js';
 import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { getDefinitionFeedbackSummary } from './definition-feedback-store.js';
-import { getCatalogEntry, upsertCatalogEntry, upsertDefinitionPayload } from './store.js';
+import { getCatalogEntry, upsertCatalogEntry } from './store.js';
+import type { ModPackSourceProvider } from './types.js';
+import { getCanonicalTrainerDefinition, persistTrainerDefinition } from '../trainer-storage/index.js';
 
 const MIN_COMMUNITY_POSITIVE_FOR_PROMOTION = 3;
 
@@ -55,6 +57,18 @@ function compareCertLevel(a: CertificationLevel, b: CertificationLevel): number 
   return LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b);
 }
 
+/**
+ * Promotes a definition to 'verified'. P4-9: previously wrote directly via
+ * `upsertDefinitionPayload` with a hardcoded `${id}-pack` packId and a
+ * `sourceProvider: 'promotion'` that is not a real `ModPackSourceProvider`
+ * (unranked by source-priority.ts, so it could silently lose every future
+ * conflict-resolution read) — and would create a SEPARATE row instead of
+ * updating the actual source row when the canonical definition came from
+ * anywhere other than the original bundled convention. This now re-reads the
+ * canonical winning row's own source, so the promoted payload lands back on
+ * that same row (same packId, real sourceProvider) via the repository's
+ * validate -> transaction -> verify-readback write path.
+ */
 export function promoteDefinitionToVerified(definition: SolithDefinitionV1): SolithDefinitionV1 {
   const eligibility = evaluatePromotionEligibility(definition);
   if (!eligibility.eligible) {
@@ -66,19 +80,21 @@ export function promoteDefinitionToVerified(definition: SolithDefinitionV1): Sol
     safety: { ...definition.safety, verificationStatus: 'verified' },
   };
 
-  const payloadJson = JSON.stringify(promoted);
-  upsertDefinitionPayload(
-    `${definition.id}-pack`,
-    definition.id,
-    payloadJson,
-    'verified',
-    'promotion',
-    new Date().toISOString(),
-  );
+  const canonical = getCanonicalTrainerDefinition(definition.id);
+  const sourceProvider = canonical.success ? canonical.value.provenance.sourceProvider : 'user';
+  const sourceId = canonical.success ? canonical.value.provenance.sourceId : null;
+
+  const persisted = persistTrainerDefinition(promoted, {
+    sourceProvider: sourceProvider as ModPackSourceProvider,
+    sourceId,
+  });
+  if (persisted.success === false) {
+    throw new Error(`promotion_write_failed: ${persisted.error.message}`);
+  }
 
   const entry = getCatalogEntry(definition.id);
   if (entry) {
-    upsertCatalogEntry({ ...entry, verificationStatus: 'verified' });
+    upsertCatalogEntry({ ...entry, verificationStatus: 'verified', modPackId: persisted.value.packId });
   }
 
   return promoted;

@@ -517,7 +517,9 @@ interface Window {
       success: boolean;
       definition?: import('../core/definitions/schema.v1.js').SolithDefinitionV1;
       canPublish?: boolean;
+      provenance?: import('../core/trainer-storage/types.js').TrainerDefinitionProvenance;
       error?: string;
+      errorReason?: string;
     }>;
     publishToCommunity: (payload: {
       definition: unknown;
@@ -547,6 +549,7 @@ interface Window {
       success: boolean;
       controls?: import('../core/trainer-host/trainer-control-schema.js').TrainerControl[];
       capabilities?: import('../core/definitions/load-catalog-definition.js').CatalogDefinitionCapabilities | null;
+      provenance?: import('../core/trainer-storage/types.js').TrainerDefinitionProvenance;
       error?: string;
     }>;
     trainerCatalogApproveSavePath: (payload: { catalogGameId: string; saveFilePath: string }) => Promise<{

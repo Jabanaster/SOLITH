@@ -1,11 +1,13 @@
 import type { TrainerCatalogEntry } from '../trainer-catalog/types.js';
 import { buildSearchableText } from '../trainer-catalog/types.js';
-import { upsertCatalogEntry, upsertDefinitionPayload } from '../trainer-catalog/store.js';
+import { upsertCatalogEntry } from '../trainer-catalog/store.js';
 import { parseCheatTableXml, type CtImportResult } from './ct-import.js';
 import { parseCheatTableMetadata } from './ct-metadata.js';
 import { analyzeCheatTableScripts, buildScriptResearchNotes } from '../script-research/ct-script-research.js';
 import { solithDefinitionToModPack } from './mod-pack-adapter.js';
 import { validateXmlSafety } from '../adapters/xml.js';
+import { persistTrainerDefinition } from '../trainer-storage/index.js';
+import type { SolithDefinitionV1 } from './schema.v1.js';
 
 export interface ImportCtOutcome {
   success: true;
@@ -32,10 +34,9 @@ export interface PreviewCtOutcome extends ImportCtOutcome {
   previewOnly: true;
 }
 
-function catalogEntryFromImport(result: CtImportResult): TrainerCatalogEntry {
+function catalogEntryFromImport(result: CtImportResult, packId: string): TrainerCatalogEntry {
   const definition = result.definition;
   const categories = [...new Set((definition.memoryFeatures ?? []).map((f) => f.category))];
-  const packId = `${definition.id}-pack`;
   return {
     catalogGameId: definition.id,
     displayName: definition.title,
@@ -93,19 +94,15 @@ export async function importDefinitionCt(xmlText: string, options: { title?: str
       title: definition.title,
       executable: definition.target.executables[0],
     });
-    const payloadJson = JSON.stringify(definition);
     const modPack = solithDefinitionToModPack(definition);
     modPack.notes = buildScriptResearchNotes(scriptReport);
     const categories = [...new Set((definition.memoryFeatures ?? []).map((f) => f.category))];
 
-    upsertDefinitionPayload(
-      modPack.packId,
-      definition.id,
-      payloadJson,
-      definition.safety.verificationStatus,
-      'ct-import',
-      modPack.syncedAt,
-    );
+    const persisted = persistTrainerDefinition(definition, { sourceProvider: 'ct-import' });
+    if (persisted.success === false) {
+      return { success: false, errors: [persisted.error.message] };
+    }
+    const packId = persisted.value.packId;
     upsertCatalogEntry({
       catalogGameId: definition.id,
       displayName: definition.title,
@@ -114,7 +111,7 @@ export async function importDefinitionCt(xmlText: string, options: { title?: str
       verificationStatus: definition.safety.verificationStatus,
       sources: [{ provider: 'ct-import', url: 'local://imported-ct-metadata' }],
       hasModPack: true,
-      modPackId: modPack.packId,
+      modPackId: packId,
       cheatCount: definition.memoryFeatures?.length ?? 0,
       searchableText: buildSearchableText({
         displayName: definition.title,
@@ -126,7 +123,7 @@ export async function importDefinitionCt(xmlText: string, options: { title?: str
     return {
       success: true,
       catalogGameId: definition.id,
-      packId: modPack.packId,
+      packId,
       cheatCount: modPack.cheats.length,
       title: definition.title,
       acceptedCount: 0,
@@ -144,24 +141,20 @@ export async function importDefinitionCt(xmlText: string, options: { title?: str
     executable: parsed.definition.target.executables[0],
   });
   const { definition } = parsed;
-  const payloadJson = JSON.stringify(definition);
   const modPack = solithDefinitionToModPack(definition);
   modPack.notes = buildScriptResearchNotes(scriptReport);
 
-  upsertDefinitionPayload(
-    modPack.packId,
-    definition.id,
-    payloadJson,
-    definition.safety.verificationStatus,
-    'ct-import',
-    modPack.syncedAt,
-  );
-  upsertCatalogEntry(catalogEntryFromImport(parsed));
+  const persisted = persistTrainerDefinition(definition as SolithDefinitionV1, { sourceProvider: 'ct-import' });
+  if (persisted.success === false) {
+    return { success: false, errors: [persisted.error.message] };
+  }
+  const packId = persisted.value.packId;
+  upsertCatalogEntry(catalogEntryFromImport(parsed, packId));
 
   return {
     success: true,
     catalogGameId: definition.id,
-    packId: modPack.packId,
+    packId,
     cheatCount: modPack.cheats.length,
     title: definition.title,
     acceptedCount: parsed.accepted.length,

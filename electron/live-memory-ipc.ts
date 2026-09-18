@@ -195,16 +195,14 @@ export function registerLiveMemoryIpc(): void {
       }
 
       if (parsed.catalogGameId) {
-        const { getModPackForGame, getDefinitionPayload } = await import('../src/core/trainer-catalog/store.js');
-        const { modPackToSolithDefinition, definitionFingerprintFields } = await import(
-          '../src/core/definitions/mod-pack-adapter.js'
-        );
-        const definition =
-          getDefinitionPayload(parsed.catalogGameId) ??
-          (() => {
-            const pack = getModPackForGame(parsed.catalogGameId!);
-            return pack ? modPackToSolithDefinition(pack) : null;
-          })();
+        // P4-9: was a duplicated inline getDefinitionPayload/getModPackForGame
+        // read (no migration, naive syncedAt-only conflict resolution) — now
+        // shares the same canonical repository-backed loader every other
+        // definition-reading IPC handler uses (see live-memory-resolve-
+        // definition-feature, converged in P4-8).
+        const { loadCatalogDefinition } = await import('../src/core/definitions/load-catalog-definition.js');
+        const { definitionFingerprintFields } = await import('../src/core/definitions/mod-pack-adapter.js');
+        const definition = loadCatalogDefinition(parsed.catalogGameId);
         if (definition) {
           const fields = definitionFingerprintFields(definition);
           fingerprint = {
