@@ -1080,7 +1080,16 @@ export const TrainerGetRuntimeStateSchema = z.object({}).strict();
 // tested transport to build on — but it is NOT yet threaded into the
 // runtime dispatch call, which still narrows to `number` at
 // `TrainerRuntime.proposeWriteFeature`/`proposeFreezeFeature`.
-const VALUE_BIGINT = z.string().regex(/^-?\d{1,20}$/).optional();
+const INT64_MIN = -9223372036854775808n;
+const INT64_MAX = 9223372036854775807n;
+const VALUE_BIGINT = z
+  .string()
+  .regex(/^-?\d{1,20}$/)
+  .refine((v) => {
+    const n = BigInt(v);
+    return n >= INT64_MIN && n <= INT64_MAX;
+  }, 'value must fit in a signed 64-bit integer')
+  .optional();
 
 export const TrainerProposeWriteFeatureSchema = z.object({
   featureId: z.string().min(1).max(128),
@@ -1137,7 +1146,16 @@ export const TrainerRollbackFeatureSchema = z.object({
  */
 export const TrainerSeedDiscoveredFeatureSchema = z.object({
   featureId: z.string().min(1).max(128),
-  address: z.string().regex(/^0x[0-9a-fA-F]+$/, 'address must be 0x-prefixed hex'),
+  // Rejects the null/never-resolved sentinel (0x0) a scan can legitimately
+  // report as "not found" — mirrors the same 0x0 rejection
+  // hydrateFromZeroInputFeatures already applies to Zero-Input results
+  // before treating an address as confirmed. This is a basic sanity floor,
+  // not a full provenance check: the real security boundary for any write
+  // this seeded address eventually enables remains the human-approved
+  // consent dialog in trainer-issue-write-consent/trainer-issue-freeze-
+  // consent, exactly as it already is for the legacy liveMemoryProposeWrite
+  // channel this seed handoff exists to replace.
+  address: z.string().regex(/^0x[0-9a-fA-F]+$/, 'address must be 0x-prefixed hex').refine((v) => BigInt(v) !== 0n, 'address must not be the null/unresolved sentinel (0x0)'),
   dataType: z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']),
 }).strict();
 

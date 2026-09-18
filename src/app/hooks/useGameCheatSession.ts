@@ -51,8 +51,19 @@ const UNKNOWN_SCAN_DATA_TYPES = ['float', 'int32', 'double'];
  * 'bool' cheats are represented as int32 flags in real game memory (0/1);
  * 'string' cheats (Stardew-style console commands) have no memory address
  * at all and are handled by a separate command executor, not this hook.
+ *
+ * `tags.includes('command')`: some console-command cheats (Stardew's
+ * `set-money`/`set-max-energy`/`set-health`/`set-friendship`/`freeze-time`
+ * — see games.ts) are tagged numeric/bool `valueType`s for UI input-widget
+ * purposes even though they execute via a console command, not a memory
+ * address — `valueType !== 'string'` alone under-detects them. P4-13: this
+ * matters more now than it did pre-cutover, since a non-memory-backed
+ * "confirmed address" would otherwise reach `trainerSeedDiscoveredFeature`
+ * for a feature id with no canonical MemoryFeatureV1 backing at all and
+ * fail closed with a confusing error instead of never being attempted.
  */
 function resolveMemoryDataType(cheat: CheatDefinition): string | null {
+  if (cheat.tags?.includes('command')) return null;
   if (cheat.valueType === 'bool') return 'int32';
   if (cheat.valueType === 'string') return null;
   return cheat.valueType;
@@ -113,6 +124,15 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   const runtimeBindErrorRef = useRef<string | null>(null);
   /** Tracks each cheat's last confirmed write proposalId, so toggling off can roll it back for real instead of just forgetting local state. */
   const writeProposalIdRef = useRef<Record<string, string>>({});
+  /**
+   * P4-13: bumped synchronously the instant a cheat is toggled off, so an
+   * in-flight `writeValue` call for that same cheat (e.g. still awaiting the
+   * user's consent-dialog response) can tell, after it finally confirms,
+   * whether it's still the current intent or was superseded by a toggle-off
+   * that happened while it was pending — and roll itself back immediately
+   * instead of leaving a write active that the user already asked to undo.
+   */
+  const writeGenerationRef = useRef<Record<string, number>>({});
   const getStateRef = useRef<(cheatId: string) => CheatSessionState>(() => IDLE_STATE);
   const toggleCheatRef = useRef<(cheat: CheatDefinition, enable: boolean) => void | Promise<void>>(
     () => undefined,
@@ -377,6 +397,10 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
 
   const writeValue = useCallback(
     async (cheat: CheatDefinition, value: number): Promise<{ allowed: boolean; reason: string }> => {
+      // Snapshot before any await — compared against the live ref after confirmation to
+      // detect a toggle-off that happened while this write was in flight (mission: no
+      // stale write left active after the user's toggle-off intent).
+      const generation = writeGenerationRef.current[cheat.id] ?? 0;
       const current = getState(cheat.id);
       const dataType = current.confirmedDataType ?? resolveMemoryDataType(cheat);
 
@@ -444,6 +468,14 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
           const reason = confirmResult.error?.message ?? 'Write blocked';
           patchState(cheat.id, { status: 'error', error: reason });
           return { allowed: false, reason };
+        }
+
+        // The user toggled this cheat off while the consent dialog (or any other await
+        // above) was pending — this write is no longer wanted. Roll it back immediately
+        // rather than recording it as the active proposal or leaving it live in memory.
+        if ((writeGenerationRef.current[cheat.id] ?? 0) !== generation) {
+          void window.electronAPI.trainerRollbackFeature({ featureId: cheat.id, proposalId });
+          return { allowed: false, reason: 'Cheat was disabled while this write was pending — rolled back.' };
         }
 
         writeProposalIdRef.current[cheat.id] = proposalId;
@@ -799,27 +831,39 @@ export function useGameCheatSession(game: GameConfig, userConfirmedOffline: bool
   const toggleCheat = useCallback(
     async (cheat: CheatDefinition, enabled: boolean) => {
       if (!enabled) {
+        // Bumped synchronously, before any await below, so an in-flight writeValue()
+        // call for this cheat (e.g. still awaiting consent) detects it was superseded
+        // the moment it next checks — see writeGenerationRef's own doc comment.
+        writeGenerationRef.current[cheat.id] = (writeGenerationRef.current[cheat.id] ?? 0) + 1;
         void stopFreeze(cheat.id);
         // P4-13: a real confirmed write this session gets genuinely rolled back through the
         // canonical runtime (restoring the pre-write value) instead of just forgetting local
-        // state and leaving the last written value sitting in game memory.
+        // state and leaving the last written value sitting in game memory. Awaited (not
+        // fire-and-forget) so a rollback failure is surfaced rather than silently discarded
+        // while the written value remains live in the process.
         const pendingProposalId = writeProposalIdRef.current[cheat.id];
+        let rollbackError: string | null = null;
         if (pendingProposalId) {
           delete writeProposalIdRef.current[cheat.id];
-          void window.electronAPI.trainerRollbackFeature({ featureId: cheat.id, proposalId: pendingProposalId });
+          const rollbackResult = await window.electronAPI.trainerRollbackFeature({ featureId: cheat.id, proposalId: pendingProposalId });
+          if (!rollbackResult.success) {
+            rollbackError = rollbackResult.error?.message ?? 'Rollback failed — the written value may still be live in the process.';
+          }
         }
         // Toggling off is the explicit "forget this" action — clear the confirmed address too,
         // not just the enabled flag. Otherwise the next toggle-on reuses a stale (possibly
         // wrong) address instead of starting fresh discovery, which is silently useless if that
-        // address turns out to be a false positive.
+        // address turns out to be a false positive. A rollback failure still disables the cheat
+        // (the user's toggle-off intent is honored) but keeps the error visible instead of
+        // clearing it, so the user knows the underlying write may not have been undone.
         patchState(cheat.id, {
           enabled: false,
-          status: 'idle',
+          status: rollbackError ? 'error' : 'idle',
           confirmedAddress: null,
           confirmedDataType: null,
           candidates: [],
           liveValue: null,
-          error: null,
+          error: rollbackError,
           unknownScanActive: false,
         });
         clearPersisted(cheat.id);

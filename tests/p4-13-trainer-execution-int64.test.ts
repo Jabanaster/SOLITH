@@ -5,6 +5,7 @@ import {
   TrainerProposeWriteFeatureSchema,
   TrainerProposeFreezeFeatureSchema,
   TrainerExecuteCompositeSchema,
+  TrainerSeedDiscoveredFeatureSchema,
 } from '../electron/ipc-validation.js';
 
 /**
@@ -81,6 +82,31 @@ describe('P4-13 int64 IPC transport — schema layer', () => {
     assert.equal((parsed.actions[0] as { requestedValueBigint?: string }).requestedValueBigint, BEYOND_MAX_SAFE_INTEGER);
   });
 
+  test('TrainerProposeWriteFeatureSchema rejects a decimal string outside the signed int64 range', () => {
+    assert.throws(() =>
+      TrainerProposeWriteFeatureSchema.parse({
+        featureId: 'gold',
+        requestedValue: 5000,
+        requestedValueBigint: '99999999999999999999', // 20 nines — regex-valid, exceeds int64 max
+      }),
+    );
+  });
+
+  test('TrainerProposeWriteFeatureSchema accepts the exact int64 boundary values', () => {
+    const max = TrainerProposeWriteFeatureSchema.parse({
+      featureId: 'gold',
+      requestedValue: 5000,
+      requestedValueBigint: '9223372036854775807',
+    });
+    assert.equal(max.requestedValueBigint, '9223372036854775807');
+    const min = TrainerProposeWriteFeatureSchema.parse({
+      featureId: 'gold',
+      requestedValue: 5000,
+      requestedValueBigint: '-9223372036854775808',
+    });
+    assert.equal(min.requestedValueBigint, '-9223372036854775808');
+  });
+
   test('a negative int64 decimal string round-trips exactly', () => {
     const NEGATIVE = '-9223372036854775000';
     const parsed = TrainerProposeWriteFeatureSchema.parse({
@@ -89,5 +115,22 @@ describe('P4-13 int64 IPC transport — schema layer', () => {
       requestedValueBigint: NEGATIVE,
     });
     assert.equal(BigInt(parsed.requestedValueBigint!).toString(), NEGATIVE);
+  });
+});
+
+// P4-13 review fix — TrainerSeedDiscoveredFeatureSchema must reject the
+// null/never-resolved 0x0 sentinel, not just malformed hex.
+describe('P4-13 canonical discovery seed — address sanity floor', () => {
+  test('accepts a real non-zero address', () => {
+    const parsed = TrainerSeedDiscoveredFeatureSchema.parse({ featureId: 'gold', address: '0x1a2b3c', dataType: 'int32' });
+    assert.equal(parsed.address, '0x1a2b3c');
+  });
+
+  test('rejects the 0x0 null sentinel', () => {
+    assert.throws(() => TrainerSeedDiscoveredFeatureSchema.parse({ featureId: 'gold', address: '0x0', dataType: 'int32' }));
+  });
+
+  test('rejects 0x0 written with extra leading zeros', () => {
+    assert.throws(() => TrainerSeedDiscoveredFeatureSchema.parse({ featureId: 'gold', address: '0x0000', dataType: 'int32' }));
   });
 });

@@ -7,6 +7,7 @@ import {
   syncTrainerSource,
 } from './remote-sync.js';
 import {
+  getCatalogEntry,
   logTrainerSync,
   pruneInvalidCommunityCatalogTitles,
   upsertCatalogEntry,
@@ -52,6 +53,15 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
       // would silently trust. hasModPack only becomes true on the
       // follow-up upsertCatalogEntry() call below, once persistence has
       // actually succeeded.
+      // Best-effort snapshot of this catalog game's pre-sync state, so a failed
+      // re-sync below can restore it instead of leaving a previously-working
+      // entry downgraded to hasModPack:false (P4-13 review fix). Keyed by the
+      // pre-identity-review candidate id — in the common case (no identity
+      // merge) this is the same id the write below lands on; the rarer
+      // identity-merge case is a pre-existing edge this fix does not attempt
+      // to generalize further.
+      const existingBefore = getCatalogEntry(entry.catalogGameId);
+
       const pendingEntry = { ...entry, hasModPack: false, modPackId: undefined, cheatCount: 0 };
 
       const write = upsertCatalogEntryWithIdentityReview({
@@ -80,6 +90,18 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
       });
       if (persisted.success === false) {
         errors.push(`${writtenCatalogGameId}: ${persisted.error.message}`);
+        // Restore the previously-good capability metadata this sync attempt just
+        // cleared — a transient failure on a re-sync must not hide an existing,
+        // still-valid trainer_mod_packs row from a prior successful sync.
+        if (existingBefore?.hasModPack && existingBefore.catalogGameId === writtenCatalogGameId) {
+          upsertCatalogEntry({
+            ...entry,
+            catalogGameId: writtenCatalogGameId,
+            hasModPack: true,
+            modPackId: existingBefore.modPackId,
+            cheatCount: existingBefore.cheatCount,
+          });
+        }
         continue;
       }
 
