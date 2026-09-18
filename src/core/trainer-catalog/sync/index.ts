@@ -16,7 +16,7 @@ import {
 
 export interface TrainerCatalogSyncReport {
   totalImported: number;
-  providers: Array<{ provider: string; imported: number; errors: string[] }>;
+  providers: Array<{ provider: string; imported: number; errors: string[]; conversionWarnings: string[] }>;
   prunedInvalidTitles: number;
   deferredForIdentityReview: number;
 }
@@ -30,6 +30,7 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
     const result = await syncTrainerSource(source);
     let imported = 0;
     const errors: string[] = [...result.errors];
+    const conversionWarningsForProvider: string[] = [];
 
     for (const trainer of result.trainers) {
       const entry = remoteTrainerToCatalogEntry(trainer, source.id);
@@ -83,6 +84,11 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
       // see SaveTrainerDefinitionInput.conversionWarnings for the
       // durability caveat on this specific call site).
       const conversionWarnings = modPackConversionLosses(packForConversion);
+      if (conversionWarnings.length > 0) {
+        conversionWarningsForProvider.push(
+          ...conversionWarnings.map((warning) => `${writtenCatalogGameId}: ${warning}`),
+        );
+      }
       const persisted = persistTrainerDefinition(definition, {
         sourceProvider: source.id,
         sourceId: trainer.sourceUrl,
@@ -120,7 +126,7 @@ export async function syncAllTrainerSources(): Promise<TrainerCatalogSyncReport>
 
     totalImported += imported;
     logTrainerSync(source.id, errors.length ? 'partial' : 'success', errors.join('; ') || 'ok', imported);
-    providers.push({ provider: source.id, imported, errors });
+    providers.push({ provider: source.id, imported, errors, conversionWarnings: conversionWarningsForProvider });
   }
 
   const prunedInvalidTitles = pruneInvalidCommunityCatalogTitles().length;

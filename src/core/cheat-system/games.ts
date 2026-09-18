@@ -963,7 +963,7 @@ const stardewValleyCheats: CheatDefinition[] = [
     valueType: 'bool',
     infiniteValue: 1,
     requiresDiscovery: false,
-    tags: ['toggle'],
+    tags: ['command', 'toggle'],
     source: COMMON_SOURCES.smapi(),
     notes: 'CJB Cheats Menu: Time Freezer',
   }),

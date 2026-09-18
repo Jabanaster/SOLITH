@@ -101,6 +101,13 @@ export default function CatalogTrainerControlsPage({
           ) : null}
         </p>
       )}
+      {provenance?.conversionWarnings && provenance.conversionWarnings.length > 0 && (
+        <p className="catalog-controls-conversion-warnings" role="note">
+          Converted from a legacy format with {provenance.conversionWarnings.length} known
+          {provenance.conversionWarnings.length === 1 ? ' limitation' : ' limitations'}:{' '}
+          {provenance.conversionWarnings.join('; ')}
+        </p>
+      )}
       {message && <p className="catalog-controls-message">{message}</p>}
       <TrainerControlPanel
         autoStart
