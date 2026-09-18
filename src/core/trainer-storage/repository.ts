@@ -170,7 +170,18 @@ export function persistTrainerDefinition(rawInput: unknown, input: SaveTrainerDe
   // and surface every other one via provenance.conflictingSources.
   const packId = input.sourceProvider === 'bundled' ? `${definition.id}-pack` : `${definition.id}-pack-${input.sourceProvider}`;
   const payloadJson = JSON.stringify(definition);
-  const syncedAt = new Date().toISOString();
+  const syncedAt = input.syncedAt ?? new Date().toISOString();
+  // Remote-authoritative sync metadata (hub convergence, mission §12): only
+  // built when a caller actually supplies it, so every other source keeps
+  // upsertDefinitionPayload's existing default (certLevel inferred from
+  // sourceProvider, updatedAt 0) byte-for-byte.
+  const syncMetadata =
+    input.certLevel !== undefined || input.remoteUpdatedAt !== undefined
+      ? {
+          certLevel: input.certLevel ?? (input.sourceProvider === 'bundled' ? 'L3_Certified' as const : 'L0_Community' as const),
+          updatedAt: input.remoteUpdatedAt ?? 0,
+        }
+      : undefined;
 
   try {
     db.run('BEGIN IMMEDIATE TRANSACTION');
@@ -186,7 +197,7 @@ export function persistTrainerDefinition(rawInput: unknown, input: SaveTrainerDe
       definition.safety.verificationStatus,
       input.sourceProvider,
       syncedAt,
-      undefined,
+      syncMetadata,
       input.sourceId ?? null,
     );
     db.run('COMMIT');

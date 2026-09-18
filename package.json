@@ -33,6 +33,7 @@
     "test:trainer-transaction": "tsx --test tests/trainer-transaction.test.ts tests/trainer-transaction-integration.test.ts",
     "test:trainer-storage": "tsx --test tests/trainer-storage.test.ts",
     "test:trainer-application": "tsx --test tests/trainer-application-ipc-convergence.test.ts",
+    "test:p4-4-legacy-adapters": "tsx --test tests/p4-4-legacy-adapter-convergence.test.ts",
     "test:command-runner": "tsx --test tests/command-runner.test.ts",
     "test:lifecycle-wiring": "tsx --test tests/v2-lifecycle-wiring.test.ts",
     "pretest:trainer-host": "npm run build:electron",

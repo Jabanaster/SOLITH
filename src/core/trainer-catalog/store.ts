@@ -21,6 +21,7 @@ import type { SolithDefinitionV1 } from '../definitions/schema.v1.js';
 import { filterEligibleForTrainerLibrary } from './eligibility-classification.js';
 import { decodeHtmlEntities } from './sync/decode-html-entities.js';
 import { isPlaceholderTitle, placeholderTitleLiterals } from './sync/placeholder-titles.js';
+import { pickPreferredRow } from '../trainer-storage/source-priority.js';
 
 export type HubCertificationLevel = 'L0_Community' | 'L3_Certified';
 
@@ -568,12 +569,18 @@ export function getModPack(packId: string): ModPack | null {
   return parseModPackPayload(row.payloadJson);
 }
 
+/**
+ * Resolves the single ModPack-shaped view of a game's best persisted
+ * definition row, using the same source-priority conflict resolution the
+ * canonical repository uses (P4-4 §5) instead of "whichever row happened to
+ * sync most recently" — a stale community-listing sync could otherwise
+ * outrank a user's own import just by re-syncing later.
+ */
 export function getModPackForGame(catalogGameId: string): ModPack | null {
-  const row = db
-    .prepare('SELECT payloadJson FROM trainer_mod_packs WHERE catalogGameId = ? ORDER BY syncedAt DESC LIMIT 1')
-    .get(catalogGameId) as { payloadJson: string } | undefined;
-  if (!row) return null;
-  return parseModPackPayload(row.payloadJson);
+  const rows = listModPackRowsForGame(catalogGameId);
+  if (rows.length === 0) return null;
+  const { winner } = pickPreferredRow(rows);
+  return parseModPackPayload(winner.payloadJson);
 }
 
 export interface CatalogSearchFilters {

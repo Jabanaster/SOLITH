@@ -67,4 +67,16 @@ export interface TrainerDefinitionListResult {
 export interface SaveTrainerDefinitionInput {
   sourceProvider: ModPackSourceProvider;
   sourceId?: string | null;
+  /**
+   * Remote-authoritative sync metadata (P4-4 hub convergence). Omit for any
+   * locally-originated write — defaults stay exactly as before (local write
+   * time as syncedAt, certLevel inferred from sourceProvider, updatedAt 0).
+   * A caller that owns a remote source of truth (currently only the Solith
+   * Hub sync client) supplies these so `TrainerDefinitionProvenance` reflects
+   * the remote record's own timestamps/certification instead of the moment
+   * this process happened to write it.
+   */
+  syncedAt?: string;
+  certLevel?: HubCertificationLevel;
+  remoteUpdatedAt?: number;
 }

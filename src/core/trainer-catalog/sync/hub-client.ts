@@ -1,14 +1,13 @@
 import { z } from 'zod';
-import db from '../../database/index.js';
 import { SolithDefinitionV1Schema, type SolithDefinitionV1 } from '../../definitions/schema.v1.js';
 import { getSetting } from '../../settings/index.js';
+import { persistTrainerDefinition } from '../../trainer-storage/repository.js';
 import {
   getCatalogEntry,
   getMaxHubDefinitionUpdatedAt,
   hasUserAuthoredDefinition,
   logTrainerSync,
   upsertCatalogEntry,
-  upsertDefinitionPayload,
   type HubCertificationLevel,
 } from '../store.js';
 import { buildSearchableText } from '../types.js';
@@ -244,6 +243,23 @@ function categories(definition: SolithDefinitionV1): string[] {
   ])];
 }
 
+/**
+ * Routes hub-synced definitions through the canonical repository (P4-4 §12)
+ * instead of a hand-rolled transaction + `upsertDefinitionPayload` call. The
+ * remote hub record is the source of truth for certification/timestamps, so
+ * those are passed through explicitly (`SaveTrainerDefinitionInput`'s
+ * `syncedAt`/`certLevel`/`remoteUpdatedAt`) rather than letting
+ * `persistTrainerDefinition` stamp local write time / infer a default tier —
+ * `trustHubCertification()` already forces `requiresApproval`/
+ * `requiresOfflineConfirm` regardless of what the remote record claims, so
+ * this never inflates certification (mission §13).
+ *
+ * The catalog-entry upsert stays a second, non-transactional step — the same
+ * pattern every other P4-9-converged writer (import-definition.ts et al.)
+ * already uses, so a definition write can succeed with the catalog entry
+ * upsert failing separately; that gap pre-dates this convergence and is not
+ * widened by it.
+ */
 function writeHubDefinition(record: z.infer<typeof HubDefinitionSchema>): void {
   const definition = trustHubCertification(
     record.definition_payload,
@@ -254,61 +270,52 @@ function writeHubDefinition(record: z.infer<typeof HubDefinitionSchema>): void {
     throw new Error(`Hub definition game_id mismatch for ${record.id}`);
   }
 
-  db.run('BEGIN');
-  try {
-    const updatedAt = Date.parse(record.updated_at);
-    const verificationStatus =
-      record.cert_level === 'L3_Certified' ? 'verified' : 'community';
-    upsertDefinitionPayload(
-      record.id,
-      record.game_id,
-      JSON.stringify(definition),
-      verificationStatus,
-      'solith-hub',
-      record.updated_at,
-      { certLevel: record.cert_level, updatedAt },
-    );
+  const persisted = persistTrainerDefinition(definition, {
+    sourceProvider: 'solith-hub',
+    sourceId: record.id,
+    syncedAt: record.updated_at,
+    certLevel: record.cert_level,
+    remoteUpdatedAt: Date.parse(record.updated_at),
+  });
+  if (persisted.success === false) {
+    throw new Error(`hub_write_failed: ${persisted.error.message}`);
+  }
 
-    const existing = getCatalogEntry(record.game_id);
-    const definitionCategories = categories(definition);
-    const entryCategories = definitionCategories.length > 0
-      ? definitionCategories
-      : existing?.categories ?? [];
-    const sources = [
-      ...(existing?.sources.filter((source) => source.provider !== 'solith-hub') ?? []),
-      {
-        provider: 'solith-hub' as const,
-        url: `${SOLITH_HUB_BASE_URL}/catalog/sync`,
-        lastSyncedAt: record.updated_at,
-      },
-    ];
+  const verificationStatus = persisted.value.definition.safety.verificationStatus;
+  const existing = getCatalogEntry(record.game_id);
+  const definitionCategories = categories(definition);
+  const entryCategories = definitionCategories.length > 0
+    ? definitionCategories
+    : existing?.categories ?? [];
+  const sources = [
+    ...(existing?.sources.filter((source) => source.provider !== 'solith-hub') ?? []),
+    {
+      provider: 'solith-hub' as const,
+      url: `${SOLITH_HUB_BASE_URL}/catalog/sync`,
+      lastSyncedAt: record.updated_at,
+    },
+  ];
 
-    upsertCatalogEntry({
-      catalogGameId: record.game_id,
+  upsertCatalogEntry({
+    catalogGameId: record.game_id,
+    displayName: definition.title,
+    steamAppId: existing?.steamAppId,
+    executables: definition.target.executables,
+    categories: entryCategories,
+    headerUrl: existing?.headerUrl,
+    coverUrl: existing?.coverUrl,
+    iconUrl: existing?.iconUrl,
+    verificationStatus,
+    sources,
+    hasModPack: true,
+    modPackId: persisted.value.packId,
+    cheatCount: cheatCount(definition),
+    searchableText: buildSearchableText({
       displayName: definition.title,
-      steamAppId: existing?.steamAppId,
       executables: definition.target.executables,
       categories: entryCategories,
-      headerUrl: existing?.headerUrl,
-      coverUrl: existing?.coverUrl,
-      iconUrl: existing?.iconUrl,
-      verificationStatus,
-      sources,
-      hasModPack: true,
-      modPackId: record.id,
-      cheatCount: cheatCount(definition),
-      searchableText: buildSearchableText({
-        displayName: definition.title,
-        executables: definition.target.executables,
-        categories: entryCategories,
-      }),
-    });
-    db.run('COMMIT');
-    void db.schedulePersistence();
-  } catch (error) {
-    db.run('ROLLBACK');
-    throw error;
-  }
+    }),
+  });
 }
 
 function timestampToSince(timestamp: number): string {
