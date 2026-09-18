@@ -30,6 +30,7 @@
     "test:v1": "tsx --test tests/core.test.ts tests/parsers.test.ts tests/save-format.test.ts tests/json-save-field.test.ts tests/ini-save-field.test.ts tests/discovery.test.ts tests/safety-integration.test.ts tests/electron-boundary-static.test.ts tests/failure-injection.test.ts tests/delete-game.test.ts tests/profiles.test.ts tests/process.test.ts tests/trainer-ui.test.ts tests/pilot-intake.test.ts tests/drill-core-settings.test.ts tests/game-profile-catalog.test.ts tests/game-profile-review.test.ts tests/game-profile-support-matrix.test.ts tests/v2-safe-workflow-copy.test.ts && tsx --test tests/sql-parameter-binding.test.ts",
     "test:v2-lifecycle": "tsx --test tests/v2-lifecycle.test.ts",
     "test:trainer-runtime": "tsx --test tests/trainer-runtime.test.ts tests/trainer-runtime-integration.test.ts",
+    "test:trainer-transaction": "tsx --test tests/trainer-transaction.test.ts tests/trainer-transaction-integration.test.ts",
     "test:command-runner": "tsx --test tests/command-runner.test.ts",
     "test:lifecycle-wiring": "tsx --test tests/v2-lifecycle-wiring.test.ts",
     "pretest:trainer-host": "npm run build:electron",

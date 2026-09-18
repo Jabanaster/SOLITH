@@ -22,7 +22,16 @@ export type RuntimeFailureReason =
   | 'PROCESS_LOST'
   | 'INVALID_STATE_TRANSITION'
   | 'DISPOSED'
-  | 'UNSUPPORTED_ACTION';
+  | 'UNSUPPORTED_ACTION'
+  // P4-7: composite/multi-action transaction reasons. Per-action failures
+  // still surface their own precise reason above (WRITE_FAILED, FREEZE_FAILED,
+  // PROCESS_LOST, etc.) inside a transaction's actionRecords — these five are
+  // transaction-level outcomes with no existing equivalent.
+  | 'TRANSACTION_VALIDATION_FAILED'
+  | 'PARTIAL_ROLLBACK_FAILURE'
+  | 'TRANSACTION_CONFLICT'
+  | 'TRANSACTION_CANCELLED'
+  | 'NESTED_TRANSACTION_UNSUPPORTED';
 
 export interface RuntimeError {
   reason: RuntimeFailureReason;
