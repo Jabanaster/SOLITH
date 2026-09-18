@@ -1004,15 +1004,12 @@ export function registerLiveMemoryIpc(): void {
       if (senderCheck.ok === false) return { success: false, error: `sender_rejected:${senderCheck.reason}` };
       const session = requireSession(event);
       const parsed = LiveMemoryResolveDefinitionFeatureSchema.parse(payload);
-      const { getModPackForGame, getDefinitionPayload } = await import('../src/core/trainer-catalog/store.js');
-      const { modPackToSolithDefinition } = await import('../src/core/definitions/mod-pack-adapter.js');
-
-      const definition =
-        getDefinitionPayload(parsed.catalogGameId) ??
-        (() => {
-          const pack = getModPackForGame(parsed.catalogGameId);
-          return pack ? modPackToSolithDefinition(pack) : null;
-        })();
+      // P4-8: was a duplicated inline getDefinitionPayload/getModPackForGame
+      // read (no migration, no conflict resolution) — now shares the same
+      // canonical repository-backed loader every other definition-reading
+      // IPC handler uses.
+      const { loadCatalogDefinition } = await import('../src/core/definitions/load-catalog-definition.js');
+      const definition = loadCatalogDefinition(parsed.catalogGameId);
       if (!definition) return { success: false, error: 'no_definition' };
 
       const feature = definition.memoryFeatures?.find((f) => f.id === parsed.featureId);

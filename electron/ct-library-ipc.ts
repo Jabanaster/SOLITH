@@ -2,7 +2,6 @@ import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electro
 import { validateIpcSender } from './sender-validation.js';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { compileCtZipArchive } from '../src/core/registry/compile-ct-zip.js';
 import { compileCtLibraryArchive } from '../src/core/ct-library/write-library.js';
@@ -12,12 +11,35 @@ import {
   getCtLibraryGameDetail,
   loadCtLibrarySummary,
   searchCtLibrary,
+  type CtLibraryPaths,
 } from '../src/core/ct-library/search.js';
+import { getAppPaths } from '../src/shared/app-paths.js';
 
-const moduleFilename = fileURLToPath(import.meta.url);
-const moduleDirectory = path.dirname(moduleFilename);
-const projectRoot = path.resolve(moduleDirectory, '..');
-const paths = defaultCtLibraryPaths(projectRoot);
+/**
+ * P4-8 fix: personal CT-library reads/writes previously resolved against the
+ * compiled module's own directory (effectively the app install/resources
+ * tree in a packaged build) rather than Electron's per-user userData
+ * directory — not writable by a standard user in a normal install, and wiped
+ * by reinstall/update even where it was writable. `getAppPaths()` is the
+ * same resolver already used for the SQLite DB path (src/shared/app-paths.ts),
+ * with dev/test env-var fallbacks so this works outside Electron too.
+ * Memoized because the resolved root never changes for the process lifetime.
+ *
+ * Not covered by this fix: automatically migrating a personal library
+ * previously written under the OLD install-dir path. That is recorded as a
+ * known follow-up rather than attempted here, to keep this fix narrow
+ * (mission: "if fixing it would spill into broad CT work, do not expand
+ * scope — record and defer").
+ */
+let cachedCtLibraryPaths: CtLibraryPaths | null = null;
+async function getCtLibraryPaths(): Promise<CtLibraryPaths> {
+  if (!cachedCtLibraryPaths) {
+    const { userDataRoot } = await getAppPaths();
+    cachedCtLibraryPaths = defaultCtLibraryPaths(userDataRoot);
+  }
+  return cachedCtLibraryPaths;
+}
+
 const activeImports = new Map<string, AbortController>();
 const pickerBridge = createCtZipPickerBridge({});
 
@@ -105,7 +127,7 @@ export function registerCtLibraryIpc(): void {
 
   guardedHandle('ct-library-summary', async () => {
     try {
-      const summary = await loadCtLibrarySummary(paths);
+      const summary = await loadCtLibrarySummary(await getCtLibraryPaths());
       return {
         success: true,
         available: Boolean(summary),
@@ -119,7 +141,7 @@ export function registerCtLibraryIpc(): void {
   guardedHandle('ct-library-search', async (_event, payload: unknown) => {
     try {
       const parsed = SearchSchema.parse(payload ?? {});
-      return { success: true, ...(await searchCtLibrary(paths, parsed)) };
+      return { success: true, ...(await searchCtLibrary(await getCtLibraryPaths(), parsed)) };
     } catch (error) {
       return { success: false, available: false, total: 0, results: [], error: sanitize(error) };
     }
@@ -128,7 +150,7 @@ export function registerCtLibraryIpc(): void {
   guardedHandle('ct-library-game-detail', async (_event, payload: unknown) => {
     try {
       const parsed = GameDetailSchema.parse(payload);
-      return { success: true, ...(await getCtLibraryGameDetail(paths, parsed.gameId)) };
+      return { success: true, ...(await getCtLibraryGameDetail(await getCtLibraryPaths(), parsed.gameId)) };
     } catch (error) {
       return { success: false, available: false, tables: [], error: sanitize(error) };
     }
@@ -211,8 +233,9 @@ export function registerCtLibraryIpc(): void {
 
     const controller = new AbortController();
     activeImports.set(jobId, controller);
+    const paths = await getCtLibraryPaths();
     const libraryDirectory = path.dirname(paths.summaryPath);
-    const registryDirectory = path.join(projectRoot, 'data', 'registry');
+    const registryDirectory = path.join(libraryDirectory, '..', 'registry');
 
     try {
       console.info(`[ct-library] confirmed import started: ${path.basename(archivePath)}`);

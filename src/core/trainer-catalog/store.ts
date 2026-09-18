@@ -409,6 +409,7 @@ export function upsertDefinitionPayload(
   sourceProvider: string,
   syncedAt: string,
   syncMetadata?: DefinitionSyncMetadata,
+  sourceId?: string | null,
 ): void {
   const certLevel =
     syncMetadata?.certLevel ??
@@ -417,9 +418,9 @@ export function upsertDefinitionPayload(
   db.prepare(
     `INSERT INTO trainer_mod_packs (
        packId, catalogGameId, payloadJson, verificationStatus, sourceProvider,
-       syncedAt, cert_level, updated_at, updatedAt
+       syncedAt, cert_level, updated_at, updatedAt, sourceId
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
      ON CONFLICT(packId) DO UPDATE SET
        catalogGameId = excluded.catalogGameId,
        payloadJson = excluded.payloadJson,
@@ -428,7 +429,8 @@ export function upsertDefinitionPayload(
        syncedAt = excluded.syncedAt,
        cert_level = excluded.cert_level,
        updated_at = excluded.updated_at,
-       updatedAt = datetime('now')`,
+       updatedAt = datetime('now'),
+       sourceId = excluded.sourceId`,
   ).run(
     packId,
     catalogGameId,
@@ -438,7 +440,77 @@ export function upsertDefinitionPayload(
     syncedAt,
     certLevel,
     updatedAt,
+    sourceId ?? null,
   );
+}
+
+export interface TrainerModPackRow {
+  packId: string;
+  catalogGameId: string;
+  payloadJson: string;
+  verificationStatus: VerificationStatus;
+  sourceProvider: string;
+  syncedAt: string;
+  certLevel: HubCertificationLevel;
+  updatedAt: string;
+  sourceId: string | null;
+}
+
+/**
+ * All trainer_mod_packs rows for a game, newest-synced first — unlike
+ * getModPackForGame/getDefinitionPayload, does NOT collapse to a single
+ * row via LIMIT 1. P4-8's canonical repository uses this to detect and
+ * deterministically resolve multiple competing definition sources for the
+ * same catalog game instead of silently trusting whichever synced last.
+ */
+export function listModPackRowsForGame(catalogGameId: string): TrainerModPackRow[] {
+  const rows = db
+    .prepare(
+      `SELECT packId, catalogGameId, payloadJson, verificationStatus, sourceProvider,
+              syncedAt, cert_level, updatedAt, sourceId
+         FROM trainer_mod_packs
+        WHERE catalogGameId = ?
+        ORDER BY syncedAt DESC`,
+    )
+    .all(catalogGameId) as Array<{
+    packId: string;
+    catalogGameId: string;
+    payloadJson: string;
+    verificationStatus: VerificationStatus;
+    sourceProvider: string;
+    syncedAt: string;
+    cert_level: HubCertificationLevel;
+    updatedAt: string;
+    sourceId: string | null;
+  }>;
+  return rows.map((row) => ({
+    packId: row.packId,
+    catalogGameId: row.catalogGameId,
+    payloadJson: row.payloadJson,
+    verificationStatus: row.verificationStatus,
+    sourceProvider: row.sourceProvider,
+    syncedAt: row.syncedAt,
+    certLevel: row.cert_level,
+    updatedAt: row.updatedAt,
+    sourceId: row.sourceId ?? null,
+  }));
+}
+
+/** Distinct catalogGameIds that have at least one persisted trainer_mod_packs row. */
+export function listCatalogGameIdsWithDefinitions(): string[] {
+  const rows = db
+    .prepare('SELECT DISTINCT catalogGameId FROM trainer_mod_packs ORDER BY catalogGameId ASC')
+    .all() as Array<{ catalogGameId: string }>;
+  return rows.map((row) => row.catalogGameId);
+}
+
+/** Removes every trainer_mod_packs row for a catalog game. Does not touch trainer_catalog_games metadata. */
+export function removeDefinitionsForGame(catalogGameId: string): number {
+  const before = db
+    .prepare('SELECT COUNT(*) AS count FROM trainer_mod_packs WHERE catalogGameId = ?')
+    .get(catalogGameId) as { count: number };
+  db.prepare('DELETE FROM trainer_mod_packs WHERE catalogGameId = ?').run(catalogGameId);
+  return Number(before.count) || 0;
 }
 
 export function getDefinitionSyncMetadata(packId: string): DefinitionSyncMetadata | null {
