@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import TrainerControlPanel from './TrainerControlPanel.js';
 import type { TrainerControl } from '../../core/trainer-host/trainer-control-schema.js';
 import type { CatalogDefinitionCapabilities } from '../../core/definitions/catalog-definition-capabilities.js';
+import type { TrainerDefinitionProvenance } from '../../core/trainer-storage/types.js';
 
 export default function CatalogTrainerControlsPage({
   catalogGameId,
@@ -12,6 +13,7 @@ export default function CatalogTrainerControlsPage({
 }) {
   const [controls, setControls] = useState<TrainerControl[]>([]);
   const [capabilities, setCapabilities] = useState<CatalogDefinitionCapabilities | null>(null);
+  const [provenance, setProvenance] = useState<TrainerDefinitionProvenance | null>(null);
   const [saveFilePath, setSaveFilePath] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -31,6 +33,7 @@ export default function CatalogTrainerControlsPage({
         }
         setControls(result.controls as TrainerControl[]);
         setCapabilities((result.capabilities as CatalogDefinitionCapabilities | undefined) ?? null);
+        setProvenance(result.provenance ?? null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -82,6 +85,20 @@ export default function CatalogTrainerControlsPage({
         <p className="catalog-controls-format-note" role="note">
           JSON save format: edits use the JSON save-field router. Approve a concrete save file path before writing;
           binary or hex-only fields in this definition are not routed to TrainerHost.
+        </p>
+      )}
+      {provenance && (
+        <p className="catalog-controls-provenance" role="note">
+          Source: <strong>{provenance.sourceProvider}</strong> ({provenance.certLevel})
+          {provenance.migratedFromLegacy ? ' — migrated from legacy format' : ''}
+          {provenance.conflictingSources.length > 0 ? (
+            <>
+              {' — '}
+              {provenance.conflictingSources.length} other version
+              {provenance.conflictingSources.length === 1 ? '' : 's'} of this trainer exist and were not used
+              ({provenance.conflictingSources.map((c) => c.sourceProvider).join(', ')})
+            </>
+          ) : null}
         </p>
       )}
       {message && <p className="catalog-controls-message">{message}</p>}

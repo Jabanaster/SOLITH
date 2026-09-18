@@ -32,6 +32,7 @@
     "test:trainer-runtime": "tsx --test tests/trainer-runtime.test.ts tests/trainer-runtime-integration.test.ts",
     "test:trainer-transaction": "tsx --test tests/trainer-transaction.test.ts tests/trainer-transaction-integration.test.ts",
     "test:trainer-storage": "tsx --test tests/trainer-storage.test.ts",
+    "test:trainer-application": "tsx --test tests/trainer-application-ipc-convergence.test.ts",
     "test:command-runner": "tsx --test tests/command-runner.test.ts",
     "test:lifecycle-wiring": "tsx --test tests/v2-lifecycle-wiring.test.ts",
     "pretest:trainer-host": "npm run build:electron",
