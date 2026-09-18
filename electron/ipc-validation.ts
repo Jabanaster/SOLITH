@@ -699,6 +699,13 @@ export const LiveMemoryScanOperationIdSchema = z.object({
   operationId: z.string().uuid(),
 });
 
+/** P2-10 — cancellable adaptive/reference planned-scan start; shares `-cancel`/`-poll` with the other scan-start channels via the operationId they all return. */
+export const LiveMemoryAdaptiveScanStartSchema = z.object({
+  dataType: LIVE_VALUE_TYPE,
+  targetValue: z.number().finite(),
+  mode: z.enum(['adaptive', 'reference']).optional(),
+});
+
 /** Phase 9 — read-only research view (typed reinterpret at one address). */
 export const ResearchViewSchema = z.object({
   address: LIVE_ADDRESS_STRING,

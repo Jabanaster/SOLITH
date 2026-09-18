@@ -15,6 +15,7 @@ import TypedMemoryViewPanel from '../components/TypedMemoryViewPanel.js';
 import MemoryMapPanel from '../components/MemoryMapPanel.js';
 import WatchlistPanel from '../components/WatchlistPanel.js';
 import LiveCorrelationWatcherPanel from '../components/LiveCorrelationWatcherPanel.js';
+import AdaptiveScanPanel from '../components/AdaptiveScanPanel.js';
 import LiveToggleCardsPanel from '../components/LiveToggleCardsPanel.js';
 import SinglePlayerWaiverModal from '../components/SinglePlayerWaiverModal.js';
 import { ALL_GAMES } from '../../core/cheat-system/games.js';
@@ -1063,6 +1064,8 @@ const LiveMemoryTrainerPage: React.FC<{ initialCatalogGameId?: string | null }> 
           )}
         </section>
       )}
+
+      <AdaptiveScanPanel attached={attached} />
 
       {attached && (
         <LiveCorrelationWatcherPanel

@@ -4,6 +4,7 @@ interface FakeRegion {
   baseAddress: bigint;
   buffer: Buffer;
   writable: boolean;
+  regionType?: 'image' | 'mapped' | 'private' | 'unknown';
 }
 
 function sizeOf(dataType: LiveValueType): number {
@@ -136,9 +137,9 @@ export class FakeMemoryDriver implements MemoryDriver {
     return this.memory.get(key);
   }
 
-  /** Seed a simulated memory region for scanner tests. */
-  addRegion(baseAddress: bigint, buffer: Buffer, writable = true): void {
-    this.regions.push({ baseAddress, buffer, writable });
+  /** Seed a simulated memory region for scanner tests. `regionType` is optional — P2-10 adaptive-planner profile tests set it; existing scanner tests that never pass it are unaffected. */
+  addRegion(baseAddress: bigint, buffer: Buffer, writable = true, regionType?: 'image' | 'mapped' | 'private' | 'unknown'): void {
+    this.regions.push({ baseAddress, buffer, writable, regionType });
     this.regionOrder.push({ kind: 'readable', baseAddress });
   }
 
@@ -299,7 +300,7 @@ export class FakeMemoryDriver implements MemoryDriver {
     return this.regionOrder.map(({ kind, baseAddress }) => {
       if (kind === 'readable') {
         const r = this.regions.find((region) => region.baseAddress === baseAddress)!;
-        return { baseAddress: r.baseAddress, size: r.buffer.length, writable: r.writable };
+        return { baseAddress: r.baseAddress, size: r.buffer.length, writable: r.writable, regionType: r.regionType };
       }
       const r = this.unreadableRegions.find((region) => region.baseAddress === baseAddress)!;
       return { baseAddress: r.baseAddress, size: r.size, writable: r.writable };

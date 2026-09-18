@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { FakeMemoryDriver } from '../fixtures/fake-memory-driver.js';
 import { scanFirst, scanFirstAutoMatrix, scanFirstRange, scanNext } from '../../src/core/live-memory/memory-scanner.js';
 
+// P2-10 adaptive scan planner hook (`ScanBounds.regionOrder`) — covered directly here
+// since it lives on the canonical `scanFirst`, decoupled from the planner module itself.
+
 const HANDLE = { pid: 1234, opaque: { fake: true } };
 
 function filledBuffer(size: number, fill = 0xaa): Buffer {
@@ -520,4 +523,52 @@ test('scanFirstAutoMatrix marks incompatible buckets skipped instead of guessing
   assert.equal(result.totals.skippedBuckets, 4);
   assert.ok(result.buckets.every((bucket) => bucket.skipped));
   assert.equal(result.totals.unknownCaptured, false);
+});
+
+test('scanFirst regionOrder "largest_first" visits the largest eligible region before smaller ones', () => {
+  const driver = new FakeMemoryDriver();
+  const small = filledBuffer(32);
+  small.writeInt32LE(1, 0);
+  const large = filledBuffer(128);
+  large.writeInt32LE(1, 0);
+  driver.addRegion(0x1000n, small, true, 'private');
+  driver.addRegion(0x2000n, large, true, 'private');
+
+  const result = scanFirst(driver, HANDLE, 'int32', 1, { regionOrder: 'largest_first' });
+
+  assert.equal(result.matches.length, 2);
+  assert.equal(result.matches[0].address, 0x2000n, 'the 128-byte region should be visited first');
+  assert.equal(result.matches[1].address, 0x1000n);
+});
+
+test('scanFirst regionOrder "module_first" and "private_first" reorder without dropping any eligible region', () => {
+  const driver = new FakeMemoryDriver();
+  const moduleBuf = filledBuffer(16);
+  moduleBuf.writeInt32LE(1, 0);
+  const privateBuf = filledBuffer(16);
+  privateBuf.writeInt32LE(1, 0);
+  driver.addRegion(0x1000n, moduleBuf, true, 'image');
+  driver.addRegion(0x2000n, privateBuf, true, 'private');
+
+  const moduleFirst = scanFirst(driver, HANDLE, 'int32', 1, { regionOrder: 'module_first' });
+  assert.equal(moduleFirst.matches[0].address, 0x1000n);
+  assert.equal(moduleFirst.matches.length, 2);
+
+  const privateFirst = scanFirst(driver, HANDLE, 'int32', 1, { regionOrder: 'private_first' });
+  assert.equal(privateFirst.matches[0].address, 0x2000n);
+  assert.equal(privateFirst.matches.length, 2);
+});
+
+test('scanFirst with no regionOrder (default) is unaffected — same behavior as before P2-10', () => {
+  const driver = new FakeMemoryDriver();
+  const a = filledBuffer(16);
+  a.writeInt32LE(1, 0);
+  const b = filledBuffer(16);
+  b.writeInt32LE(1, 0);
+  driver.addRegion(0x1000n, a, true, 'image');
+  driver.addRegion(0x2000n, b, true, 'private');
+
+  const result = scanFirst(driver, HANDLE, 'int32', 1);
+  assert.equal(result.matches[0].address, 0x1000n); // enumeration order preserved
+  assert.equal(result.matches.length, 2);
 });

@@ -3,6 +3,7 @@ import type {
   LiveProcessHandle,
   LiveValueType,
   MemoryDriver,
+  MemoryRegion,
   ScanBounds,
   ScanComparison,
   ScanMatch,
@@ -132,11 +133,12 @@ export function isProcessGoneError(err: unknown): boolean {
  * A non-writable region is genuinely out of scope for a value scan (the whole
  * point is to find something writable), so excluding those is not a gap.
  */
-function selectScannableRegions(
+export function selectScannableRegions(
   driver: MemoryDriver,
   handle: LiveProcessHandle,
   maxRegionBytes: number,
   coverage: ScanCoverageTracker,
+  regionOrder?: ScanBounds['regionOrder'],
 ): ReturnType<MemoryDriver['getRegions']> {
   const all = driver.getRegions(handle);
   if (all.length === 0) {
@@ -167,10 +169,44 @@ function selectScannableRegions(
     }
     eligible.push(region);
   }
-  return eligible;
+  return orderEligibleRegions(eligible, regionOrder);
 }
 
-class ScanCoverageTracker {
+/**
+ * P2-10 adaptive scan planner hook. Reorders (never filters) the already-
+ * eligible region list. `Array#sort` is stable in the Node/V8 versions this
+ * project targets, so regions tied on the sort key keep their original OS
+ * enumeration order relative to each other — the reorder is deterministic for
+ * a given `getRegions()` snapshot, which `planAdaptiveScan`'s determinism
+ * contract depends on.
+ */
+function orderEligibleRegions(
+  eligible: ReturnType<MemoryDriver['getRegions']>,
+  regionOrder: ScanBounds['regionOrder'],
+): ReturnType<MemoryDriver['getRegions']> {
+  switch (regionOrder) {
+    case 'module_first':
+      return [...eligible].sort((a, b) => moduleRank(a) - moduleRank(b));
+    case 'private_first':
+      return [...eligible].sort((a, b) => privateRank(a) - privateRank(b));
+    case 'largest_first':
+      return [...eligible].sort((a, b) => b.size - a.size);
+    case 'as_enumerated':
+    case undefined:
+    default:
+      return eligible;
+  }
+}
+
+function moduleRank(region: MemoryRegion): number {
+  return region.regionType === 'image' ? 0 : 1;
+}
+
+function privateRank(region: MemoryRegion): number {
+  return region.regionType === 'private' ? 0 : 1;
+}
+
+export class ScanCoverageTracker {
   private readonly skippedRanges: CanonicalSkippedRange[] = [];
   private stop: CanonicalCompleteness | null = null;
 
@@ -275,7 +311,7 @@ export interface UnknownScanSnapshot extends ScanCoverage {
   truncated: boolean;
 }
 
-function valueSize(dataType: LiveValueType): number {
+export function valueSize(dataType: LiveValueType): number {
   switch (dataType) {
     case 'byte':
       return 1;
@@ -289,7 +325,7 @@ function valueSize(dataType: LiveValueType): number {
   }
 }
 
-function encodeValue(dataType: LiveValueType, value: number): Buffer {
+export function encodeValue(dataType: LiveValueType, value: number): Buffer {
   const buf = Buffer.alloc(valueSize(dataType));
   switch (dataType) {
     case 'byte':
@@ -361,7 +397,7 @@ export function scanFirst(
   const step = needle.length;
 
   const coverage = new ScanCoverageTracker();
-  const regions = selectScannableRegions(driver, handle, maxRegionBytes, coverage);
+  const regions = selectScannableRegions(driver, handle, maxRegionBytes, coverage, bounds?.regionOrder);
 
   const matches: ScanMatch[] = [];
   let bytesScanned = 0;
