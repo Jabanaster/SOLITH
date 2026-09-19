@@ -1148,8 +1148,11 @@ export const TrainerRollbackFeatureSchema = z.object({
  * confirmed, for a `scan_first`/`scan_unknown` feature only — the handler
  * (electron/trainer-execution-ipc.ts) and TrainerRuntime itself both refuse
  * any other feature type, so this can never override a real AOB/pointer
- * resolution. `address` is a hex string, never a bare Number, matching every
- * other address-carrying schema in this file.
+ * resolution. `address` accepts decimal or 0x-hex (never a bare Number),
+ * the same `LIVE_ADDRESS_STRING` format the legacy live-memory scan/narrow
+ * schemas already use — the confirmed address this handoff receives comes
+ * straight from those scan results (`bigint.toString()`, decimal), not from
+ * a hex-formatted source.
  */
 export const TrainerSeedDiscoveredFeatureSchema = z.object({
   featureId: z.string().min(1).max(128),
@@ -1162,7 +1165,7 @@ export const TrainerSeedDiscoveredFeatureSchema = z.object({
   // consent dialog in trainer-issue-write-consent/trainer-issue-freeze-
   // consent, exactly as it already is for the legacy liveMemoryProposeWrite
   // channel this seed handoff exists to replace.
-  address: z.string().regex(/^0x[0-9a-fA-F]+$/, 'address must be 0x-prefixed hex').refine((v) => BigInt(v) !== 0n, 'address must not be the null/unresolved sentinel (0x0)'),
+  address: LIVE_ADDRESS_STRING.refine((v) => BigInt(v) !== 0n, 'address must not be the null/unresolved sentinel (0x0)'),
   dataType: z.enum(['int32', 'uint32', 'float', 'double', 'int64', 'byte']),
 }).strict();
 
