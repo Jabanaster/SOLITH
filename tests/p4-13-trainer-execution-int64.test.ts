@@ -133,4 +133,18 @@ describe('P4-13 canonical discovery seed — address sanity floor', () => {
   test('rejects 0x0 written with extra leading zeros', () => {
     assert.throws(() => TrainerSeedDiscoveredFeatureSchema.parse({ featureId: 'gold', address: '0x0000', dataType: 'int32' }));
   });
+
+  // P4-12R fix — the legacy Phase 2 scan/narrow IPC this handoff receives
+  // its `confirmedAddress` from serializes addresses via bigint.toString(),
+  // i.e. decimal, not hex (electron/live-memory-ipc.ts serializeMatches and
+  // every other scan-result address field). A hex-only schema silently
+  // rejected every real discovered address reaching this handoff.
+  test('accepts a real non-zero decimal address (the format legacy scan results actually use)', () => {
+    const parsed = TrainerSeedDiscoveredFeatureSchema.parse({ featureId: 'gold', address: '36012', dataType: 'int32' });
+    assert.equal(parsed.address, '36012');
+  });
+
+  test('rejects the decimal 0 null sentinel', () => {
+    assert.throws(() => TrainerSeedDiscoveredFeatureSchema.parse({ featureId: 'gold', address: '0', dataType: 'int32' }));
+  });
 });
